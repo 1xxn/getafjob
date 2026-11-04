@@ -37,6 +37,8 @@ type Config struct {
 	DatabaseURL Secret
 	// DatabasePassword overrides the password in DatabaseURL.
 	DatabasePassword Secret
+	// DatabaseAppPassword is set on the application role by migrate (serve and worker log in with it).
+	DatabaseAppPassword Secret
 	// LogLevel and LogFormat configure slog.
 	LogLevel  slog.Level
 	LogFormat string
@@ -79,6 +81,7 @@ var specs = []spec{
 	{"PUBLIC_URL", "https://localhost:8443", setPublicURL},
 	{"DATABASE_URL", "", setDatabaseURL},
 	{"DATABASE_PASSWORD", "", func(c *Config, v string) error { c.DatabasePassword = Secret(v); return nil }},
+	{"DATABASE_APP_PASSWORD", "", func(c *Config, v string) error { c.DatabaseAppPassword = Secret(v); return nil }},
 	{"LOG_LEVEL", "info", func(c *Config, v string) error { return c.LogLevel.UnmarshalText([]byte(v)) }},
 	{"LOG_FORMAT", "json", setLogFormat},
 	{"BROWSER_BIN", "", func(c *Config, v string) error { c.BrowserBin = v; return nil }},

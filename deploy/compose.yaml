@@ -16,9 +16,10 @@ x-hardening: &hardening
     driver: json-file
     options: { max-size: 10m, max-file: "3" }
 
+# serve and worker use the application role (row-level security applies); only migrate uses the owner.
 x-app-env: &app-env
-  GETAFJOB_DATABASE_URL: postgres://getafjob@postgres:5432/getafjob?sslmode=disable
-  GETAFJOB_DATABASE_PASSWORD_FILE: /run/secrets/db_password
+  GETAFJOB_DATABASE_URL: postgres://getafjob_app@postgres:5432/getafjob?sslmode=disable
+  GETAFJOB_DATABASE_PASSWORD_FILE: /run/secrets/db_app_password
   GETAFJOB_PUBLIC_URL: ${GETAFJOB_PUBLIC_URL:-https://localhost:8443}
   GETAFJOB_LOG_FORMAT: json
   GETAFJOB_LOG_LEVEL: ${GETAFJOB_LOG_LEVEL:-info}
@@ -53,8 +54,12 @@ services:
     build: { context: .., target: app }
     command: [migrate]
     restart: "no"
-    environment: *app-env
-    secrets: [db_password]
+    environment:
+      <<: *app-env
+      GETAFJOB_DATABASE_URL: postgres://getafjob@postgres:5432/getafjob?sslmode=disable
+      GETAFJOB_DATABASE_PASSWORD_FILE: /run/secrets/db_password
+      GETAFJOB_DATABASE_APP_PASSWORD_FILE: /run/secrets/db_app_password
+    secrets: [db_password, db_app_password]
     depends_on:
       postgres: { condition: service_healthy }
     networks: [backend]
@@ -67,7 +72,7 @@ services:
     environment:
       <<: *app-env
       GETAFJOB_HTTP_ADDR: ":8080"
-    secrets: [db_password, master_key]
+    secrets: [db_app_password, master_key]
     depends_on:
       migrate: { condition: service_completed_successfully }
     healthcheck:
@@ -87,7 +92,7 @@ services:
       <<: *app-env
       GETAFJOB_HEALTH_ADDR: ":8081"
       GETAFJOB_EGRESS_PROXY: http://egress:4750
-    secrets: [db_password, master_key]
+    secrets: [db_app_password, master_key]
     depends_on:
       migrate: { condition: service_completed_successfully }
       egress: { condition: service_healthy }
@@ -171,6 +176,8 @@ networks:
 secrets:
   db_password:
     file: ${GETAFJOB_SECRETS_DIR:-./secrets}/db_password
+  db_app_password:
+    file: ${GETAFJOB_SECRETS_DIR:-./secrets}/db_app_password
   master_key:
     file: ${GETAFJOB_SECRETS_DIR:-./secrets}/master_key
 
