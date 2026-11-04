@@ -33,7 +33,7 @@ This document grows with every module.
 | T3 | Tampered images or binaries | 6 | Pinned actions/tools, cosign signatures, provenance, SBOM | CI |
 | R1 | User disputes an application | n/a | Evidence: values + sources, screenshot, confirmation, timeline; audit log | Phase 2 |
 | I1 | User reads another user's data | 4 | RLS + application filters ([0006](adr/0006-tenant-isolation-rls-and-envelope-encryption.md)) | Phase 1 tenant test |
-| I2 | SSRF to internal services or cloud metadata | 3 | Egress proxy denies private/loopback/link-local; runner on internal networks only | `deploy/smoke.sh` |
+| I2 | SSRF to internal services or cloud metadata | 3 | `netguard`: URLs read like Chromium (WHATWG, UTS 46), every connection checked after DNS, redirects checked; egress proxy denies private/loopback/link-local; runner on internal networks only | `TestNonPublicURLs`, `TestClientRefusesPrivateTargetsPerConnection`, `FuzzPublicURL`, `deploy/smoke.sh` |
 | I3 | Secrets or personal data in logs or errors | all | `config.Secret` redaction, sensitive log attributes redacted, generic errors | `TestSecretIsRedactedEverywhere`, `TestErrorsNeverContainSecrets`, `TestSensitiveKeysAreRedacted` |
 | I4 | Readiness details leak internals | 1 | `/readyz` returns ok/fail only; hidden by Caddy | `TestReadyzReportsEachCheckWithoutDetails`, smoke test |
 | I5 | One-time tokens in access logs | 1 | Caddy without access log | `deploy/Caddyfile` |

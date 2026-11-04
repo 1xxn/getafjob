@@ -113,6 +113,8 @@ jobs:
         run: go test -race -shuffle=on -coverprofile=coverage.out -covermode=atomic ./...
       - name: coverage summary
         run: go tool cover -func=coverage.out | tail -n 1
+      - name: fuzz (short)
+        run: .github/scripts/fuzz-all.sh 20s
 
   test-other:
     name: test (${{ matrix.os }})
