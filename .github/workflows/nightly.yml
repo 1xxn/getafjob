@@ -88,7 +88,7 @@ jobs:
 
   network:
     name: network (read-only, opt-in)
-    # Reads real job sources and forms – never fills or submits. Enable with the repository variable
+    # Reads real job sources and forms; never fills or submits. Enable with the repository variable
     # GETAFJOB_NETWORK_TESTS=1.
     if: vars.GETAFJOB_NETWORK_TESTS == '1'
     runs-on: ubuntu-24.04

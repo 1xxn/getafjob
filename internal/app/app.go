@@ -31,7 +31,7 @@ type Env struct {
 	Config config.Source
 }
 
-const usage = `getafjob – collects jobs, ranks them per user and applies in a real browser.
+const usage = `getafjob collects jobs, ranks them per user and applies in a real browser.
 
 Usage:
   getafjob <role|command> [arguments]

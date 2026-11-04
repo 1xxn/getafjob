@@ -1,4 +1,4 @@
-# getafjob – local stack (the same services as production; deploy/compose.prod.yaml adds the server specifics).
+# getafjob local stack (the same services as production; deploy/compose.prod.yaml adds the server specifics).
 #
 #   go tool task dev:up      # creates dev secrets, builds images, starts everything, waits until healthy
 #   open https://localhost:8443/healthz

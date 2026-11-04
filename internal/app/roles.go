@@ -52,7 +52,7 @@ func worker(ctx context.Context, cfg config.Config, logger *slog.Logger) error {
 }
 
 // runner: browser runner. Phase 0: self-test at start-up (Chromium starts with sandbox, a page opens),
-// then ready. No database access – the runner will only talk to the gateway.
+// then ready. No database access; the runner will only talk to the gateway.
 func runner(ctx context.Context, cfg config.Config, logger *slog.Logger) error {
 	health := httpx.NewHealth(logger)
 	selfTest := selfTestBrowser(ctx, cfg, logger)

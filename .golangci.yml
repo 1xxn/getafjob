@@ -48,7 +48,7 @@ linters:
           msg: the browser sandbox must stay enabled
     depguard:
       rules:
-        # The runner has no database access – only Connect RPC to the gateway.
+        # The runner has no database access, only Connect RPC to the gateway.
         runner-no-db:
           files:
             - "**/internal/runner/**"

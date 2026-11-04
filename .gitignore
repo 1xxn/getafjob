@@ -5,7 +5,7 @@
 *.out
 coverage.*
 
-# Local runtime data – never commit (real application data, screenshots, keys)
+# Local runtime data, never commit (real application data, screenshots, keys)
 .env
 .env.*
 !.env.example
