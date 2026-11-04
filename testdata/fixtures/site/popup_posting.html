@@ -1,0 +1,20 @@
+<!doctype html>
+<html lang="en">
+<head><meta charset="utf-8"><title>Infrastructure Engineer – Popup GmbH</title></head>
+<body>
+<!-- "Apply now" briefly opens a window (account check) that closes itself; the application continues in the
+     original tab. -->
+<h1>Infrastructure Engineer (m/f/d)</h1>
+<p>Berlin · Hybrid. Kubernetes, Terraform, Observability.</p>
+<button type="button" id="apply">Apply now</button>
+<script>
+  document.getElementById("apply").addEventListener("click", () => {
+    const popup = window.open("/apply.html", "_blank");
+    setTimeout(() => {
+      popup && popup.close();
+      location.href = "/apply.html";
+    }, 1800);
+  });
+</script>
+</body>
+</html>

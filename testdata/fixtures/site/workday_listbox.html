@@ -1,0 +1,48 @@
+<!doctype html>
+<html lang="en">
+<head><meta charset="utf-8"><title>My Information – Example Careers</title>
+<style>.field{margin:12px 0} [role=listbox]{border:1px solid #999;margin:0;padding:0;list-style:none;width:260px;position:absolute;background:#fff}
+[role=option]{padding:6px}</style></head>
+<body>
+<!-- Like Workday ("My Information"): selects are <button aria-haspopup="listbox"> without a role attribute;
+     the options appear only after the click, as a popup at the end of the page. -->
+<h2>My Information</h2>
+<div class="field"><label for="state">State<abbr title="required">*</abbr></label>
+  <button type="button" id="state" aria-haspopup="listbox" aria-label="State Select One Required">Select One</button></div>
+<div class="field"><label for="device">Phone Device Type<abbr title="required">*</abbr></label>
+  <button type="button" id="device" aria-haspopup="listbox" aria-label="Phone Device Type Select One Required">Select One</button></div>
+<div class="field"><label for="city">City *</label><input id="city"></div>
+<button type="button" id="next">Save and Continue</button>
+<script>
+  const OPTIONS = { state: ["Baden-Württemberg", "Bayern", "Berlin", "Brandenburg"], device: ["Landline", "Mobile"] };
+  let open = null;
+  const close = () => { if (open) open.remove(); open = null; };
+  for (const id of Object.keys(OPTIONS)) {
+    const btn = document.getElementById(id);
+    btn.addEventListener("click", () => {
+      const was = open && open.dataset.for === id;
+      close();
+      if (was) return;
+      const list = document.createElement("ul");
+      list.setAttribute("role", "listbox");
+      list.dataset.for = id;
+      for (const text of OPTIONS[id]) {
+        const li = document.createElement("li");
+        li.setAttribute("role", "option");
+        li.textContent = text;
+        li.addEventListener("click", () => {
+          btn.textContent = text;
+          btn.setAttribute("aria-label", btn.getAttribute("aria-label").split(" Select One")[0] + " " + text + " Required");
+          close();
+        });
+        list.appendChild(li);
+      }
+      const r = btn.getBoundingClientRect();
+      Object.assign(list.style, { left: `${r.left + scrollX}px`, top: `${r.bottom + scrollY}px` });
+      document.body.appendChild(list);
+      open = list;
+    });
+  }
+</script>
+</body>
+</html>
