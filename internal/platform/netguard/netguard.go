@@ -145,7 +145,7 @@ func browserIPv4(host string) (netip.Addr, ipKind) {
 	if len(parts) > 4 {
 		return netip.Addr{}, ipInvalid
 	}
-	nums := make([]uint64, len(parts))
+	nums := make([]uint32, len(parts))
 	for i, p := range parts {
 		n, ok := ipv4Number(p)
 		if !ok {
@@ -158,19 +158,19 @@ func browserIPv4(host string) (netip.Addr, ipKind) {
 			return netip.Addr{}, ipInvalid
 		}
 	}
-	if nums[len(nums)-1] >= 1<<(8*(5-len(nums))) {
+	if uint64(nums[len(nums)-1]) >= 1<<(8*(5-len(nums))) {
 		return netip.Addr{}, ipInvalid
 	}
 	addr := nums[len(nums)-1]
 	for i, n := range nums[:len(nums)-1] {
-		addr += n << (8 * (3 - i))
+		addr |= n << (8 * (3 - i))
 	}
 	var b [4]byte
-	binary.BigEndian.PutUint32(b[:], uint32(addr)) //nolint:gosec // addr < 2^32, checked above
+	binary.BigEndian.PutUint32(b[:], addr)
 	return netip.AddrFrom4(b), ipV4
 }
 
-func ipv4Number(p string) (uint64, bool) {
+func ipv4Number(p string) (uint32, bool) {
 	base := 10
 	switch {
 	case len(p) >= 2 && (p[:2] == "0x" || p[:2] == "0X"):
@@ -184,8 +184,11 @@ func ipv4Number(p string) (uint64, bool) {
 	if !isDigits(p, base) {
 		return 0, false
 	}
-	n, err := strconv.ParseUint(p, base, 64)
-	return n, err == nil && n < 1<<32
+	n, err := strconv.ParseUint(p, base, 32)
+	if err != nil {
+		return 0, false
+	}
+	return uint32(n), true
 }
 
 func isDigits(s string, base int) bool {
