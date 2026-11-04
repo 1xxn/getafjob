@@ -1,0 +1,46 @@
+package log
+
+import (
+	"bytes"
+	"log/slog"
+	"strings"
+	"testing"
+)
+
+func TestSensitiveKeysAreRedacted(t *testing.T) {
+	for _, format := range []string{"json", "text"} {
+		var buf bytes.Buffer
+		l := New(&buf, slog.LevelDebug, format)
+		l.Info("event",
+			"email", "max.mustermann@example.com",
+			"user_phone", "+49 30 1234567",
+			"X-Api-Key", "abc",
+			"session_id", "s1",
+			slog.Group("req", "authorization", "Bearer xyz", "path", "/healthz"),
+			"count", 3,
+		)
+		out := buf.String()
+		for _, leak := range []string{"max.mustermann", "1234567", "abc", "s1", "Bearer xyz"} {
+			if strings.Contains(out, leak) {
+				t.Errorf("%s: %q leaked: %s", format, leak, out)
+			}
+		}
+		for _, keep := range []string{"/healthz", "3"} {
+			if !strings.Contains(out, keep) {
+				t.Errorf("%s: %q missing: %s", format, keep, out)
+			}
+		}
+	}
+}
+
+func TestSensitive(t *testing.T) {
+	cases := map[string]bool{
+		"email": true, "Email": true, "db_password": true, "csrf-token": true, "phone_number": true,
+		"user_id": false, "path": false, "status": false, "duration": false, "ats": false,
+	}
+	for k, want := range cases {
+		if got := Sensitive(k); got != want {
+			t.Errorf("Sensitive(%q) = %v, want %v", k, got, want)
+		}
+	}
+}

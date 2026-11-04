@@ -1,0 +1,10 @@
+.git
+.github
+bin
+dist
+deploy/secrets
+docs
+testdata
+.task
+*.md
+!README.md

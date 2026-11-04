@@ -1,0 +1,29 @@
+# TLS termination in front of serve. GETAFJOB_TLS_MODE: internal (local CA, development) or acme (production).
+{
+	admin localhost:2019
+}
+
+(tls-internal) {
+	tls internal
+}
+
+(tls-acme) {
+	# Certificates via ACME (Let's Encrypt / ZeroSSL); the contact address is required.
+	tls {$GETAFJOB_ACME_EMAIL}
+}
+
+{$GETAFJOB_DOMAIN:localhost} {
+	import tls-{$GETAFJOB_TLS_MODE:internal}
+
+	encode zstd gzip
+	header -Server
+
+	# Readiness details stay inside the Compose network.
+	@internal path /readyz
+	respond @internal 404
+
+	# No access log on purpose: request URIs can carry one-time tokens (magic links, invitations).
+	reverse_proxy serve:8080 {
+		header_up -X-Forwarded-Host
+	}
+}

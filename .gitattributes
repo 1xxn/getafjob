@@ -1,0 +1,18 @@
+* text=auto eol=lf
+
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.ico binary
+*.pdf binary
+*.docx binary
+*.woff2 binary
+
+# Generated code: collapsed in diffs
+*.gen.go linguist-generated=true
+*.pb.go linguist-generated=true
+*_templ.go linguist-generated=true
+internal/gen/** linguist-generated=true
+# Test fixture pages do not count as project language
+testdata/** linguist-vendored=true

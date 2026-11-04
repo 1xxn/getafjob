@@ -1,0 +1,5 @@
+# zizmor configuration (CI runs the auditor persona).
+rules:
+  # Local reusable workflows are referenced as ./.github/workflows/…, the form documented by GitHub.
+  self-repository:
+    disable: true

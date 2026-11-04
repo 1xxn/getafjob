@@ -1,0 +1,172 @@
+# All commands for development and CI. Run: go tool task <name>   (list: go tool task --list)
+version: "3"
+
+vars:
+  # Same version as in .github/workflows/ci.yml (Renovate keeps both in sync).
+  GOLANGCI_LINT_VERSION: v2.15.0
+  BIN: bin/getafjob{{exeExt}}
+  COMPOSE: docker compose -f deploy/compose.yaml
+  RUNNER_IMAGE: getafjob-runner:dev
+
+tasks:
+  default:
+    cmds:
+      - go tool task --list
+    silent: true
+
+  check:
+    desc: Everything CI checks locally before a PR (fmt, vet, lint, tests with race, govulncheck, generate diff)
+    cmds:
+      - task: fmt:check
+      - task: tidy:check
+      - task: vet
+      - task: lint
+      - task: test
+      - task: vuln
+      - task: generate:check
+
+  fmt:
+    desc: Format all Go files
+    cmds:
+      - gofmt -w -s .
+
+  fmt:check:
+    desc: Fail if any Go file is not gofmt-ed
+    cmds:
+      - cmd: |
+          out="$(gofmt -l -s .)"
+          if [ -n "$out" ]; then echo "not gofmt-ed:"; echo "$out"; exit 1; fi
+
+  tidy:check:
+    desc: Fail if go.mod/go.sum are not tidy
+    cmds:
+      - go mod tidy -diff
+
+  vet:
+    cmds:
+      - go vet ./...
+
+  lint:
+    desc: golangci-lint (pinned, runs in Docker, no local install)
+    cmds:
+      - >-
+        docker run --rm -v "{{.ROOT_DIR}}:/src" -w /src
+        -v getafjob-golangci-cache:/root/.cache
+        golangci/golangci-lint:{{.GOLANGCI_LINT_VERSION}} golangci-lint run ./...
+
+  test:
+    desc: Unit + integration tests (integration needs Docker) with race detector and shuffled order
+    cmds:
+      - go test -race -shuffle=on ./...
+
+  test:short:
+    desc: Unit tests only (no Docker)
+    cmds:
+      - go test -short -shuffle=on ./...
+
+  test:browser:
+    desc: Browser fixture suite inside the runner image (real Chromium with sandbox and seccomp profile)
+    cmds:
+      - task: image:runner
+      - task: test:browser:run
+
+  test:browser:run:
+    desc: Run the browser tests in an already built runner image
+    env:
+      CGO_ENABLED: "0"
+      GOOS: linux
+      GOARCH: '{{ARCH}}'
+    cmds:
+      - go test -c -tags browser -o bin/browser-tests/ ./internal/runner/...
+      - >-
+        docker run --rm --read-only --tmpfs /tmp:rw,size=512m --shm-size=512m
+        --cap-drop ALL --security-opt no-new-privileges
+        --security-opt seccomp=deploy/seccomp/chromium.json
+        -v "{{.ROOT_DIR}}/bin/browser-tests:/tests:ro"
+        -v "{{.ROOT_DIR}}/testdata:/testdata:ro"
+        -e GETAFJOB_FIXTURES_DIR=/testdata/fixtures/site
+        --entrypoint /bin/sh {{.RUNNER_IMAGE}} -c
+        'set -e; for t in /tests/*.test; do echo "== $t"; "$t" -test.v -test.shuffle=on {{.CLI_ARGS}}; done'
+
+  vuln:
+    desc: Known vulnerabilities in reachable code
+    cmds:
+      - go tool govulncheck ./...
+
+  generate:
+    desc: Run all code generators (buf, oapi-codegen, templ, sqlc)
+    cmds:
+      - go tool buf generate
+      - go generate ./...
+
+  generate:check:
+    desc: Fail if generated code is out of date
+    cmds:
+      - task: generate
+      - git diff --exit-code -- . ':(exclude)go.sum'
+      - cmd: |
+          untracked="$(git ls-files --others --exclude-standard)"
+          if [ -n "$untracked" ]; then echo "untracked generated files:"; echo "$untracked"; exit 1; fi
+
+  proto:lint:
+    desc: buf lint and breaking-change check against main
+    cmds:
+      - go tool buf lint
+      - go tool buf breaking --against '.git#branch=main'
+
+  build:
+    desc: Build the binary into bin/
+    env:
+      CGO_ENABLED: "0"
+    cmds:
+      - go build -trimpath -o {{.BIN}} ./cmd/getafjob
+
+  image:app:
+    cmds:
+      - docker build --target app -t getafjob:dev .
+  image:runner:
+    cmds:
+      - docker build --target runner -t {{.RUNNER_IMAGE}} .
+  image:egress:
+    cmds:
+      - docker build --target egress -t getafjob-egress:dev .
+  images:
+    desc: Build app, runner and egress images
+    cmds:
+      - task: image:app
+      - task: image:runner
+      - task: image:egress
+
+  dev:secrets:
+    desc: Create random development secrets in deploy/secrets (never used in production)
+    status:
+      - test -f deploy/secrets/db_password
+      - test -f deploy/secrets/master_key
+    cmds:
+      - go run ./cmd/getafjob admin gen-secret > deploy/secrets/db_password
+      - go run ./cmd/getafjob admin gen-secret > deploy/secrets/master_key
+
+  dev:up:
+    desc: Start the full stack locally (https://localhost:8443) and wait until every service is healthy
+    deps: [dev:secrets]
+    cmds:
+      - '{{.COMPOSE}} up -d --build --wait --wait-timeout 300'
+      - '{{.COMPOSE}} ps'
+
+  dev:down:
+    cmds:
+      - '{{.COMPOSE}} down'
+
+  dev:logs:
+    cmds:
+      - '{{.COMPOSE}} logs -f {{.CLI_ARGS}}'
+
+  release:snapshot:
+    desc: goreleaser dry run (no publishing)
+    cmds:
+      - docker run --rm -v "{{.ROOT_DIR}}:/src" -w /src goreleaser/goreleaser:v2.20.0 release --snapshot --clean
+
+  hooks:
+    desc: Install git hooks (lefthook)
+    cmds:
+      - go tool lefthook install

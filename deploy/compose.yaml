@@ -1,0 +1,180 @@
+# getafjob local stack (the same services as production; deploy/compose.prod.yaml adds the server specifics).
+#
+#   go tool task dev:up      # creates dev secrets, builds images, starts everything, waits until healthy
+#   open https://localhost:8443/healthz
+#
+# Networks: only caddy and egress reach the internet. Everything else sits on internal networks; the runner and
+# the worker reach the web exclusively through the egress proxy, which blocks private networks and cloud metadata.
+name: getafjob
+
+x-hardening: &hardening
+  read_only: true
+  cap_drop: [ALL]
+  security_opt: [no-new-privileges:true]
+  restart: unless-stopped
+  logging:
+    driver: json-file
+    options: { max-size: 10m, max-file: "3" }
+
+x-app-env: &app-env
+  GETAFJOB_DATABASE_URL: postgres://getafjob@postgres:5432/getafjob?sslmode=disable
+  GETAFJOB_DATABASE_PASSWORD_FILE: /run/secrets/db_password
+  GETAFJOB_PUBLIC_URL: ${GETAFJOB_PUBLIC_URL:-https://localhost:8443}
+  GETAFJOB_LOG_FORMAT: json
+  GETAFJOB_LOG_LEVEL: ${GETAFJOB_LOG_LEVEL:-info}
+
+services:
+  postgres:
+    image: postgres:18.6-alpine@sha256:10a5c69a83035ab5239f5620d708520e8b28f5aa1f2b20143e6024532edadfb5
+    environment:
+      POSTGRES_USER: getafjob
+      POSTGRES_DB: getafjob
+      POSTGRES_PASSWORD_FILE: /run/secrets/db_password
+    secrets: [db_password]
+    volumes:
+      - pgdata:/var/lib/postgresql
+    tmpfs:
+      - /var/run/postgresql
+      - /tmp
+    read_only: true
+    security_opt: [no-new-privileges:true]
+    shm_size: 256mb
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U getafjob -d getafjob"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+    networks: [backend]
+
+  migrate:
+    <<: *hardening
+    image: getafjob:dev
+    build: { context: .., target: app }
+    command: [migrate]
+    restart: "no"
+    environment: *app-env
+    secrets: [db_password]
+    depends_on:
+      postgres: { condition: service_healthy }
+    networks: [backend]
+
+  serve:
+    <<: *hardening
+    image: getafjob:dev
+    pull_policy: never
+    command: [serve]
+    environment:
+      <<: *app-env
+      GETAFJOB_HTTP_ADDR: ":8080"
+    secrets: [db_password, master_key]
+    depends_on:
+      migrate: { condition: service_completed_successfully }
+    healthcheck:
+      test: ["CMD", "/usr/local/bin/getafjob", "healthcheck", "http://127.0.0.1:8080/readyz"]
+      interval: 10s
+      timeout: 5s
+      start_period: 10s
+      start_interval: 1s
+    networks: [edge, backend, gateway, proxy]
+
+  worker:
+    <<: *hardening
+    image: getafjob:dev
+    pull_policy: never
+    command: [worker]
+    environment:
+      <<: *app-env
+      GETAFJOB_HEALTH_ADDR: ":8081"
+      GETAFJOB_EGRESS_PROXY: http://egress:4750
+    secrets: [db_password, master_key]
+    depends_on:
+      migrate: { condition: service_completed_successfully }
+      egress: { condition: service_healthy }
+    healthcheck:
+      test: ["CMD", "/usr/local/bin/getafjob", "healthcheck", "http://127.0.0.1:8081/readyz"]
+      interval: 10s
+      timeout: 5s
+      start_period: 10s
+      start_interval: 1s
+    networks: [backend, proxy]
+
+  runner:
+    <<: *hardening
+    image: getafjob-runner:dev
+    build: { context: .., target: runner }
+    command: [runner]
+    environment:
+      GETAFJOB_LOG_FORMAT: json
+      GETAFJOB_LOG_LEVEL: ${GETAFJOB_LOG_LEVEL:-info}
+      GETAFJOB_HEALTH_ADDR: ":8081"
+      GETAFJOB_EGRESS_PROXY: http://egress:4750
+    # Chromium's own sandbox stays on: the seccomp profile allows user namespaces instead of --no-sandbox.
+    security_opt:
+      - no-new-privileges:true
+      - seccomp=./seccomp/chromium.json
+    tmpfs:
+      - /tmp:rw,size=512m,mode=1777
+    shm_size: 256mb
+    depends_on:
+      egress: { condition: service_healthy }
+    healthcheck:
+      test: ["CMD", "/usr/local/bin/getafjob", "healthcheck", "http://127.0.0.1:8081/readyz"]
+      interval: 10s
+      timeout: 5s
+      start_period: 20s
+      start_interval: 1s
+    networks: [gateway, proxy]
+
+  egress:
+    <<: *hardening
+    image: getafjob-egress:dev
+    build: { context: .., target: egress }
+    healthcheck:
+      test: ["CMD", "/usr/local/bin/getafjob", "healthcheck", "tcp://127.0.0.1:4750"]
+      interval: 10s
+      timeout: 3s
+      start_period: 5s
+      start_interval: 1s
+    networks: [proxy, internet]
+
+  caddy:
+    <<: *hardening
+    image: caddy:2.11.7-alpine@sha256:e70b164da81ef698b3ad19af799ea6086ce6d9e48ed4079eb9fe26f6fbf14ee5
+    cap_add: [NET_BIND_SERVICE]
+    environment:
+      GETAFJOB_DOMAIN: ${GETAFJOB_DOMAIN:-localhost}
+      GETAFJOB_TLS_MODE: ${GETAFJOB_TLS_MODE:-internal}
+    ports:
+      - "127.0.0.1:8443:443"
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    depends_on:
+      serve: { condition: service_healthy }
+    healthcheck:
+      test: ["CMD", "wget", "-q", "-O", "/dev/null", "http://127.0.0.1:2019/config/"]
+      interval: 10s
+      timeout: 3s
+      start_period: 5s
+      start_interval: 1s
+    networks: [edge, internet]
+
+networks:
+  internet: {}
+  edge: { internal: true }
+  backend: { internal: true }
+  gateway: { internal: true }
+  proxy: { internal: true }
+
+secrets:
+  db_password:
+    file: ${GETAFJOB_SECRETS_DIR:-./secrets}/db_password
+  master_key:
+    file: ${GETAFJOB_SECRETS_DIR:-./secrets}/master_key
+
+volumes:
+  pgdata: {}
+  caddy_data: {}
+  caddy_config: {}

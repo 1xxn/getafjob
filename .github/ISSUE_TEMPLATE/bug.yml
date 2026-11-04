@@ -1,0 +1,45 @@
+name: Bug
+description: Something does not work as intended
+labels: ["type: bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Use fictional data only. Never paste real names, e-mail addresses, CVs or screenshots of real data.
+        Security problems go to private vulnerability reporting, not here.
+  - type: textarea
+    id: what
+    attributes:
+      label: What happened
+      description: What you did, what you expected, what happened instead.
+    validations:
+      required: true
+  - type: textarea
+    id: reproduce
+    attributes:
+      label: Steps to reproduce
+      placeholder: |
+        1. go tool task dev:up
+        2. …
+    validations:
+      required: true
+  - type: input
+    id: version
+    attributes:
+      label: Version
+      description: Output of `getafjob version`
+    validations:
+      required: true
+  - type: dropdown
+    id: area
+    attributes:
+      label: Area
+      options: [identity, profile, discovery, matching, application, runner, tracking, notify, assist, ai, web, platform, deploy, ci]
+    validations:
+      required: true
+  - type: textarea
+    id: logs
+    attributes:
+      label: Logs
+      description: Relevant log lines (logs are redacted, but check them for personal data anyway).
+      render: text

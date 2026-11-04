@@ -1,0 +1,127 @@
+version: "2"
+
+run:
+  timeout: 5m
+  tests: true
+
+linters:
+  default: standard # errcheck, govet, ineffassign, staticcheck, unused
+  enable:
+    - bodyclose
+    - noctx
+    - gosec
+    - depguard
+    - errorlint
+    - contextcheck
+    - nilerr
+    - rowserrcheck
+    - sqlclosecheck
+    - unconvert
+    - usestdlibvars
+    - copyloopvar
+    - exhaustive
+    - forbidigo
+    - gocritic
+    - misspell
+    - durationcheck
+    - makezero
+    - nolintlint
+  settings:
+    misspell:
+      locale: US
+    gosec:
+      excludes:
+        - G104 # covered by errcheck
+    exhaustive:
+      default-signifies-exhaustive: true
+    nolintlint:
+      require-explanation: true
+      require-specific: true
+    forbidigo:
+      forbid:
+        # No output that bypasses the logging pipeline (privacy: logs are redacted).
+        - pattern: ^print(ln)?$
+        - pattern: ^fmt\.Print(f|ln)?$
+          msg: write to an io.Writer or use slog
+        # Sandbox and site isolation stay on (docs/adr/0011-browser-automation-go-rod.md).
+        - pattern: ^flags\.NoSandbox$
+          msg: the browser sandbox must stay enabled
+    depguard:
+      rules:
+        # The runner has no database access, only Connect RPC to the gateway.
+        runner-no-db:
+          files:
+            - "**/internal/runner/**"
+          deny:
+            - pkg: github.com/jackc/pgx
+              desc: the runner has no database access (ADR 0007)
+            - pkg: github.com/1xxn/getafjob/internal/platform/db
+              desc: the runner has no database access (ADR 0007)
+            - pkg: github.com/riverqueue/river
+              desc: the runner has no queue access (ADR 0007)
+        # Domain logic is free of I/O.
+        domain-pure:
+          files:
+            - "**/internal/*/domain.go"
+            - "**/internal/*/domain_*.go"
+          deny:
+            - pkg: net/http
+              desc: domain.go has no I/O; put it into service.go or adapters/
+            - pkg: database/sql
+              desc: domain.go has no I/O
+            - pkg: github.com/jackc/pgx
+              desc: domain.go has no I/O
+            - pkg: os
+              desc: domain.go has no I/O
+            - pkg: github.com/go-rod/rod
+              desc: domain.go has no I/O
+        # The platform knows no business modules.
+        platform-no-modules:
+          files:
+            - "**/internal/platform/**"
+          deny:
+            - pkg: github.com/1xxn/getafjob/internal/identity
+              desc: platform must not depend on business modules
+            - pkg: github.com/1xxn/getafjob/internal/profile
+              desc: platform must not depend on business modules
+            - pkg: github.com/1xxn/getafjob/internal/discovery
+              desc: platform must not depend on business modules
+            - pkg: github.com/1xxn/getafjob/internal/matching
+              desc: platform must not depend on business modules
+            - pkg: github.com/1xxn/getafjob/internal/application
+              desc: platform must not depend on business modules
+            - pkg: github.com/1xxn/getafjob/internal/runner
+              desc: platform must not depend on business modules
+            - pkg: github.com/1xxn/getafjob/internal/web
+              desc: platform must not depend on business modules
+        # No stealth/disguise libraries (guard rail: no disguise).
+        no-stealth:
+          files:
+            - $all
+          deny:
+            - pkg: github.com/go-rod/stealth
+              desc: no stealth plugins (guard rail)
+            - pkg: github.com/chromedp/chromedp
+              desc: browser automation is go-rod (ADR 0011)
+  exclusions:
+    generated: lax
+    presets:
+      - std-error-handling
+    rules:
+      - path: _test\.go
+        linters:
+          - gosec
+          - noctx
+          - bodyclose
+          - forbidigo
+
+formatters:
+  enable:
+    - gofmt
+    - goimports
+  settings:
+    goimports:
+      local-prefixes:
+        - github.com/1xxn/getafjob
+  exclusions:
+    generated: lax
