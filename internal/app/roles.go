@@ -103,6 +103,9 @@ func migrate(ctx context.Context, cfg config.Config, logger *slog.Logger) error 
 	if err != nil {
 		return err
 	}
+	if err := db.SetAppRolePassword(ctx, pool, cfg.DatabaseAppPassword); err != nil {
+		return err
+	}
 	logger.Info("database schema up to date", "applied", len(applied))
 	return nil
 }
