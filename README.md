@@ -8,7 +8,6 @@ Collects job postings, ranks them per user and fills out applications in a real 
 [![CodeQL](https://github.com/1xxn/getafjob/actions/workflows/codeql.yml/badge.svg?branch=main)](https://github.com/1xxn/getafjob/actions/workflows/codeql.yml)
 [![OpenSSF Scorecard](https://api.scorecard.dev/projects/github.com/1xxn/getafjob/badge)](https://scorecard.dev/viewer/?uri=github.com/1xxn/getafjob)
 [![OpenSSF Best Practices](https://www.bestpractices.dev/projects/16347/badge)](https://www.bestpractices.dev/projects/16347)
-[![Go Report Card](https://goreportcard.com/badge/github.com/1xxn/getafjob)](https://goreportcard.com/report/github.com/1xxn/getafjob)
 [![Go Reference](https://pkg.go.dev/badge/github.com/1xxn/getafjob.svg)](https://pkg.go.dev/github.com/1xxn/getafjob)
 [![Go version](https://img.shields.io/github/go-mod/go-version/1xxn/getafjob?logo=go&logoColor=white)](go.mod)
 [![License: MIT](https://img.shields.io/github/license/1xxn/getafjob)](LICENSE)
@@ -81,7 +80,7 @@ issue.
 | Phase | Scope | Status |
 |---|---|---|
 | [0: Foundation](https://github.com/1xxn/getafjob/milestone/1) | binary, Compose stack, CI/CD, docs, go-rod spike | done |
-| [1: Users, profile, jobs](https://github.com/1xxn/getafjob/milestone/2) | identity, profile, discovery, matching, UI | next |
+| [1: Users, profile, jobs](https://github.com/1xxn/getafjob/milestone/2) | identity, profile, discovery, matching, UI | in progress |
 | [2: Applying](https://github.com/1xxn/getafjob/milestone/3) | runner engine, ATS adapters, remote browser, evidence | planned |
 | [3: Autonomy](https://github.com/1xxn/getafjob/milestone/4) | rules, quotas, inbox tracking, notifications, extension | planned |
 | [4: Portals, AI, hardening](https://github.com/1xxn/getafjob/milestone/5) | portal search, optional AI, ASVS review, deploy | planned |
