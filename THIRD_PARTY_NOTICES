@@ -1,7 +1,7 @@
 getafjob includes or is derived from the following third-party works.
 
 ================================================================================
-JobSpy – https://github.com/speedyapply/JobSpy
+JobSpy: https://github.com/speedyapply/JobSpy
 Used for: portal search (LinkedIn guest search, Indeed GraphQL, Glassdoor) ported to Go
 ================================================================================
 

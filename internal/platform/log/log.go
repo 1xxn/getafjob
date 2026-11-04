@@ -1,5 +1,5 @@
 // Package log sets up slog. Logs contain no personal data: attributes with sensitive names
-// (email, phone, password, token, cookie …) are redacted whatever their value – a safety net below the net,
+// (email, phone, password, token, cookie …) are redacted whatever their value: a safety net below the net,
 // because code should not log such values in the first place.
 package log
 

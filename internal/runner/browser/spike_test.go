@@ -178,7 +178,7 @@ func (s *spike) click(st *State, id string) {
 	}
 }
 
-// clickAt clicks where the element is, like a person would – also when another element lies on top
+// clickAt clicks where the element is, like a person would, also when another element lies on top
 // (react-select's placeholder covers its input).
 func (s *spike) clickAt(el *rod.Element) {
 	s.t.Helper()
@@ -391,7 +391,7 @@ func TestSpikePressedToggleIsReported(t *testing.T) {
 	}
 	s.click(st, yes.ID)
 	if !s.button(s.extract(), "Yes", false).Pressed {
-		t.Fatal("pressed state not reported after click – the engine could click it off again")
+		t.Fatal("pressed state not reported after click; the engine could click it off again")
 	}
 	s.click(st, s.button(st, "Submit Application", false).ID)
 	if sub := s.site.submission(t); sub["regulated"] != "yes" {
@@ -467,7 +467,7 @@ func TestSpikeOutOfProcessIframe(t *testing.T) {
 		}
 	}
 	if !oopif {
-		t.Fatal("iframe is not out-of-process – site isolation off?")
+		t.Fatal("iframe is not out-of-process: site isolation off?")
 	}
 	// No rod.Element in an OOPIF: focus over the frame's own CDP session, type on the top page.
 	tel := s.field(st, "text", "Telefonnummer")

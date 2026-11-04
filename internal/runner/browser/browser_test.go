@@ -86,7 +86,7 @@ func TestRendererRunsInItsOwnNamespaces(t *testing.T) {
 		}
 		for _, line := range strings.Split(string(status), "\n") {
 			if strings.HasPrefix(line, "NSpid:") && len(strings.Fields(line)) < 3 {
-				t.Errorf("renderer %s shares the PID namespace (%q) – namespace sandbox off", cmdPath, line)
+				t.Errorf("renderer %s shares the PID namespace (%q): namespace sandbox off", cmdPath, line)
 			}
 		}
 	}

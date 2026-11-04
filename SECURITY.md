@@ -8,13 +8,13 @@ reviews are in [docs/security.md](docs/security.md).
 
 | Version | Supported |
 |---|---|
-| `main` and the latest release | ✅ security fixes |
-| older releases | ❌ – update to the latest release |
+| `main` and the latest release | yes, security fixes |
+| older releases | no, update to the latest release |
 
 ## Reporting a vulnerability
 
 Please report privately through GitHub's
-[private vulnerability reporting](https://github.com/1xxn/getafjob/security/advisories/new) – not in a public issue,
+[private vulnerability reporting](https://github.com/1xxn/getafjob/security/advisories/new), not in a public issue,
 discussion or pull request. Include:
 
 - what an attacker can do and what they need (a malicious job page, a crafted mail, another user of the same

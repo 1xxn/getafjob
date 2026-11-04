@@ -25,10 +25,10 @@ Chosen option: "Ports and adapters per module", because it keeps the domain pure
 
 Each module under `internal/<module>/` has:
 
-- `domain.go` – types and rules, no I/O (no `net/http`, `database/sql`, pgx, `os`, go-rod),
-- `service.go` – use cases,
-- `ports.go` – interfaces, declared by the consumer,
-- `adapters/` – PostgreSQL, HTTP, browser, mail …,
+- `domain.go`: types and rules, no I/O (no `net/http`, `database/sql`, pgx, `os`, go-rod),
+- `service.go`: use cases,
+- `ports.go`: interfaces, declared by the consumer,
+- `adapters/`: PostgreSQL, HTTP, browser, mail …,
 - nested `internal/` for internals no other module may import.
 
 Modules: `identity`, `profile`, `discovery`, `matching`, `application`, `runner`, `tracking`, `notify`, `assist`,

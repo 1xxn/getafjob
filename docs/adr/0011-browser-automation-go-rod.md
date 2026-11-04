@@ -21,17 +21,17 @@ runner image (headless-shell 157, seccomp profile, non-root, read-only rootfs).
 
 | Case | Result | How |
 |---|---|---|
-| Header button with the same name as the submit (`greenhouse_header_submit`) | ✅ | extraction marks the form of each button; submit only with the button inside the form |
-| react-select, async suggestions rendered twice (`greenhouse_select`) | ✅ | click at the element's position (placeholder covers the input), type, pick `[role=option]` with retry, verify by re-extraction |
-| Listbox buttons without role (`workday_listbox`) | ✅ | reported as combobox, not as button |
-| Drop zone that ignores directly set files (`dropzone`) | ✅ | `Page.HandleFileDialog` intercepts the zone's own file chooser |
-| Lazy iframe below the fold (`lazy_embed`) | ✅ | scroll, then the frame becomes readable |
-| Popup that closes itself (`popup_posting`) | ✅ | `WaitOpen`; the run continues in the original tab |
-| Pressed toggle (`ashby_yesno`) | ✅ | `aria-pressed` reported, so the engine never clicks it off |
-| Shadow DOM inside an iframe (`apply` → `step1`/`step2`) | ✅ | own resolver walks open shadow roots (CSS queries do not pierce them) |
-| Out-of-process iframe (other site) | ✅ with workaround | see findings |
+| Header button with the same name as the submit (`greenhouse_header_submit`) | passed | extraction marks the form of each button; submit only with the button inside the form |
+| react-select, async suggestions rendered twice (`greenhouse_select`) | passed | click at the element's position (placeholder covers the input), type, pick `[role=option]` with retry, verify by re-extraction |
+| Listbox buttons without role (`workday_listbox`) | passed | reported as combobox, not as button |
+| Drop zone that ignores directly set files (`dropzone`) | passed | `Page.HandleFileDialog` intercepts the zone's own file chooser |
+| Lazy iframe below the fold (`lazy_embed`) | passed | scroll, then the frame becomes readable |
+| Popup that closes itself (`popup_posting`) | passed | `WaitOpen`; the run continues in the original tab |
+| Pressed toggle (`ashby_yesno`) | passed | `aria-pressed` reported, so the engine never clicks it off |
+| Shadow DOM inside an iframe (`apply` → `step1`/`step2`) | passed | own resolver walks open shadow roots (CSS queries do not pierce them) |
+| Out-of-process iframe (other site) | passed, with a workaround | see findings |
 
-Each case runs in 1–3 s; the suite is stable over repeated shuffled runs.
+Each case runs in 1 to 3 s; the suite is stable over repeated shuffled runs.
 
 ## Findings
 
@@ -58,5 +58,5 @@ does well.
 ### Consequences
 
 - Good, because the hardest known quirks work today, inside the hardened runner image.
-- Bad, because out-of-process iframes need our own CDP path for actions (click, upload) – planned in #24.
+- Bad, because out-of-process iframes need our own CDP path for actions (click, upload), planned in #24.
 - Follow-up: report the `Element.Frame` panic upstream.

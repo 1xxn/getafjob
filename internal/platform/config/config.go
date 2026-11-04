@@ -47,7 +47,7 @@ type Config struct {
 	// ShutdownTimeout bounds the graceful shutdown.
 	ShutdownTimeout time.Duration
 
-	// Unknown lists GETAFJOB_* variables that are set but read by nobody (typos) – names only, never values.
+	// Unknown lists GETAFJOB_* variables that are set but read by nobody (typos); names only, never values.
 	Unknown []string
 }
 
@@ -187,7 +187,7 @@ func setDatabaseURL(c *Config, v string) error {
 	if v == "" {
 		return nil
 	}
-	// url.Parse errors contain the URL including the password – hence our own message.
+	// url.Parse errors contain the URL including the password, hence our own message.
 	u, err := url.Parse(v)
 	if err != nil || (u.Scheme != "postgres" && u.Scheme != "postgresql") || u.Host == "" {
 		return errors.New("must be a postgres:// URL")

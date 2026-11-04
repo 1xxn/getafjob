@@ -47,7 +47,7 @@ tasks:
       - go vet ./...
 
   lint:
-    desc: golangci-lint (pinned, runs in Docker – no local install)
+    desc: golangci-lint (pinned, runs in Docker, no local install)
     cmds:
       - >-
         docker run --rm -v "{{.ROOT_DIR}}:/src" -w /src

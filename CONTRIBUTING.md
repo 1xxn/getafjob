@@ -41,7 +41,7 @@ go tool task test:browser   # if you touched the runner or browser code
 | Kind | Command | Notes |
 |---|---|---|
 | unit | `go test -short ./...` | table tests, no Docker |
-| integration | `go test ./...` | testcontainers (PostgreSQL 18) – needs Docker |
+| integration | `go test ./...` | testcontainers (PostgreSQL 18), needs Docker |
 | browser | `go tool task test:browser` | real Chromium inside the runner image, sandbox on |
 | fuzz | `.github/scripts/fuzz-all.sh 1m` | every parser of foreign data has a fuzz target |
 | e2e | `go test -tags e2e ./...` | against the running Compose stack |

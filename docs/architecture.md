@@ -4,17 +4,17 @@ arc42 structure; decisions are in [adr/](adr/README.md). Diagrams use Mermaid (C
 
 ## 1. Introduction and goals
 
-getafjob collects job postings, ranks them per user and fills out application forms in a real browser – without
+getafjob collects job postings, ranks them per user and fills out application forms in a real browser, without
 disguise and, by default, without AI. Invite-only, several users, self-hosted.
 
 Quality goals, in order:
 
-1. **Correctness of applications** – never invented data ([0013](adr/0013-provenance-for-every-form-value.md)),
+1. **Correctness of applications**: never invented data ([0013](adr/0013-provenance-for-every-form-value.md)),
    never twice ([0014](adr/0014-submit-register-never-twice.md)), never a silent failure.
-2. **Security and privacy** – tenant isolation, encrypted personal data, isolated runners, no SSRF.
-3. **Honesty** – humans handle checks meant for humans ([0015](adr/0015-humans-handle-checks-no-disguise.md)).
-4. **Operability** – one server, Docker Compose, tested backups, observable.
-5. **Responsiveness** – dashboard p95 < 200 ms.
+2. **Security and privacy**: tenant isolation, encrypted personal data, isolated runners, no SSRF.
+3. **No disguise**: humans handle checks meant for humans ([0015](adr/0015-humans-handle-checks-no-disguise.md)).
+4. **Operability**: one server, Docker Compose, tested backups, observable.
+5. **Responsiveness**: dashboard p95 < 200 ms.
 
 ## 2. Constraints
 
@@ -96,7 +96,7 @@ C4Container
 
 ## 6. Runtime
 
-**Application run** – the application state machine (`discovered → matched → queued → running ⇄ needs_input →
+**Application run:** the application state machine (`discovered → matched → queued → running ⇄ needs_input →
 submitting → submitted → confirmed → interview | rejected | offer | withdrawn`, plus `skipped`, `parked`, `failed`,
 `submit_unknown`) drives runs. Each run: prepare → extract → plan → execute → verify, with a checkpoint (JSON +
 screenshot) per step.
@@ -121,13 +121,13 @@ sequenceDiagram
   S->>DB: state submitted/confirmed, evidence
 ```
 
-**Handoff** – a CAPTCHA, login checkpoint, security code or open question pauses the run; the user gets a Web Push
+**Handoff:** a CAPTCHA, login checkpoint, security code or open question pauses the run; the user gets a Web Push
 and continues in the remote browser (CDP screencast); after the hold time the run is parked.
 
 ## 7. Deployment
 
 See [0017](adr/0017-compose-deployment-and-hardening.md) and `deploy/`. Networks: `internet` (caddy, egress),
-internal `edge` (caddy–serve), `backend` (serve, worker, migrate, postgres), `gateway` (serve–runner), `proxy`
+internal `edge` (caddy and serve), `backend` (serve, worker, migrate, postgres), `gateway` (serve and runner), `proxy`
 (runner, worker, serve → egress).
 
 ## 8. Crosscutting concepts
@@ -156,7 +156,7 @@ internal `edge` (caddy–serve), `backend` (serve, worker, migrate, postgres), `
 ## 11. Risks and technical debt
 
 - ATS forms change without notice → fixtures + maturity metric per adapter; dry runs before autonomy.
-- Hosts that restrict unprivileged user namespaces (AppArmor) need a runner profile – see the deploy runbook.
+- Hosts that restrict unprivileged user namespaces (AppArmor) need a runner profile; see the deploy runbook.
 
 ## 12. Glossary
 

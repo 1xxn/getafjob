@@ -17,7 +17,7 @@ The UI needs live updates (runs, handoffs) and a strict CSP, without a Node tool
 
 Chosen option 2. Pages are rendered by templ components (`Section`, `StickyBar`, `Field`, `StatusLabel`), htmx 2
 with `allowEval=false`, live updates via SSE. TypeScript only for the remote-browser viewer and keyboard shortcuts,
-bundled with the esbuild Go API – no Node/npm. Modern CSS (tokens, cascade layers, nesting), no framework, one
+bundled with the esbuild Go API, no Node/npm. Modern CSS (tokens, cascade layers, nesting), no framework, one
 accent colour for "your turn". PWA with Web Push; WCAG 2.2 AA. The UI calls services directly; the JSON API is for
 other clients ([0010](0010-spec-first-json-api.md)).
 

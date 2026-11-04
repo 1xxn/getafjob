@@ -1,4 +1,4 @@
-// Package browser starts Chromium for the runner – without disguise and with the sandbox on.
+// Package browser starts Chromium for the runner, without disguise and with the sandbox on.
 //
 // go-rod's launcher defaults do not fit our threat model and are overridden explicitly here
 // (see docs/adr/0011-browser-automation-go-rod.md):
@@ -36,7 +36,7 @@ type Options struct {
 	ExtraFlags map[string]string
 }
 
-// forbiddenFlags must never be set – neither through ExtraFlags nor through go-rod defaults.
+// forbiddenFlags must never be set, neither through ExtraFlags nor through go-rod defaults.
 var forbiddenFlags = []flags.Flag{
 	"no-sandbox", "disable-web-security", "disable-site-isolation-trials", "allow-running-insecure-content",
 	"ignore-certificate-errors", "disable-setuid-sandbox", "single-process", "no-zygote",
