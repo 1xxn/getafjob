@@ -1,0 +1,12 @@
+{
+  "app.name": "getafjob",
+  "mail.footer": "You receive this mail because you have an account at {site}.",
+  "mail.invitation.subject": "Your invitation to getafjob",
+  "mail.invitation.body": "Hello,\n\nyou have been invited to getafjob. Open this link to create your account:\n\n{link}\n\nThe link works once and expires on {expires}.",
+  "mail.magic_link.subject": "Your sign-in link for getafjob",
+  "mail.magic_link.body": "Hello {name},\n\nopen this link to sign in:\n\n{link}\n\nThe link works once and expires in {minutes} minutes. If you did not ask for it, ignore this mail.",
+  "msg.identity.invitation_invalid": "This invitation is invalid or has expired.",
+  "msg.identity.magic_link_invalid": "This sign-in link is invalid or has expired.",
+  "msg.identity.session_expired": "Your session has expired. Please sign in again.",
+  "msg.identity.user_disabled": "This account is disabled."
+}

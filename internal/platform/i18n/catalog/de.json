@@ -1,0 +1,12 @@
+{
+  "app.name": "getafjob",
+  "mail.footer": "Du erhältst diese Mail, weil du ein Konto bei {site} hast.",
+  "mail.invitation.subject": "Deine Einladung zu getafjob",
+  "mail.invitation.body": "Hallo,\n\ndu wurdest zu getafjob eingeladen. Öffne diesen Link, um dein Konto anzulegen:\n\n{link}\n\nDer Link funktioniert einmal und läuft am {expires} ab.",
+  "mail.magic_link.subject": "Dein Anmeldelink für getafjob",
+  "mail.magic_link.body": "Hallo {name},\n\nöffne diesen Link, um dich anzumelden:\n\n{link}\n\nDer Link funktioniert einmal und läuft in {minutes} Minuten ab. Wenn du ihn nicht angefordert hast, ignoriere diese Mail.",
+  "msg.identity.invitation_invalid": "Diese Einladung ist ungültig oder abgelaufen.",
+  "msg.identity.magic_link_invalid": "Dieser Anmeldelink ist ungültig oder abgelaufen.",
+  "msg.identity.session_expired": "Deine Sitzung ist abgelaufen. Bitte melde dich erneut an.",
+  "msg.identity.user_disabled": "Dieses Konto ist deaktiviert."
+}
