@@ -29,6 +29,7 @@ go tool task test:browser   # if you touched the runner or browser code
 ```
 
 - One focused change per pull request, branched from `main`, linked to its issue (`Closes #n`).
+- New features and fixes come with tests in the automated suite.
 - Commits follow [Conventional Commits](https://www.conventionalcommits.org/) (`feat(runner): …`).
 - Hot paths get a benchmark; the pull request shows `benchstat` against `main` (> 10 % slower needs a reason).
 - A new form quirk first gets an anonymised fixture in `testdata/fixtures/site/` and a failing test, then the fix in
