@@ -20,6 +20,7 @@ tool (
 require (
 	connectrpc.com/connect v1.21.1
 	github.com/go-rod/rod v0.116.2
+	github.com/google/uuid v1.6.0
 	github.com/jackc/pgx/v5 v5.12.0
 	github.com/pressly/goose/v3 v3.29.0
 	github.com/testcontainers/testcontainers-go v0.44.0
@@ -171,7 +172,6 @@ require (
 	github.com/google/cel-go v0.29.0 // indirect
 	github.com/google/go-containerregistry v0.22.1 // indirect
 	github.com/google/s2a-go v0.1.10 // indirect
-	github.com/google/uuid v1.6.0 // indirect
 	github.com/googleapis/enterprise-certificate-proxy v0.3.22 // indirect
 	github.com/googleapis/gax-go/v2 v2.26.2 // indirect
 	github.com/hashicorp/aws-sdk-go-base/v2 v2.0.0-beta.74 // indirect

@@ -1,7 +1,7 @@
 # Architecture decision records
 
 Decisions are recorded in the [MADR](https://adr.github.io/madr/) format: one file per decision, numbered, never
-rewritten once accepted – a changed decision gets a new ADR that supersedes the old one. Copy
+rewritten once accepted: a changed decision gets a new ADR that supersedes the old one. Copy
 [`template.md`](template.md) to start a new one.
 
 | # | Decision | Status |

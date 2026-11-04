@@ -11,6 +11,7 @@ an error. Unknown `GETAFJOB_*` variables are reported as a warning (typos), with
 | `GETAFJOB_PUBLIC_URL` | `https://localhost:8443` | serve, worker | public address behind Caddy (links, cookies, WebAuthn) |
 | `GETAFJOB_DATABASE_URL` | none | serve, worker, migrate | `postgres://user@host:5432/db?sslmode=…` |
 | `GETAFJOB_DATABASE_PASSWORD` | none | serve, worker, migrate | overrides the password in the URL; use `_FILE` |
+| `GETAFJOB_DATABASE_APP_PASSWORD` | none | migrate | password migrate sets on the application role `getafjob_app` (serve and worker log in with it) |
 | `GETAFJOB_LOG_LEVEL` | `info` | all | `debug`, `info`, `warn`, `error` |
 | `GETAFJOB_LOG_FORMAT` | `json` | all | `json` or `text` |
 | `GETAFJOB_BROWSER_BIN` | lookup | runner | Chromium/headless-shell binary |

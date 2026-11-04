@@ -141,10 +141,12 @@ tasks:
     desc: Create random development secrets in deploy/secrets (never used in production)
     status:
       - test -f deploy/secrets/db_password
+      - test -f deploy/secrets/db_app_password
       - test -f deploy/secrets/master_key
     cmds:
-      - go run ./cmd/getafjob admin gen-secret > deploy/secrets/db_password
-      - go run ./cmd/getafjob admin gen-secret > deploy/secrets/master_key
+      - test -f deploy/secrets/db_password || go run ./cmd/getafjob admin gen-secret > deploy/secrets/db_password
+      - test -f deploy/secrets/db_app_password || go run ./cmd/getafjob admin gen-secret > deploy/secrets/db_app_password
+      - test -f deploy/secrets/master_key || go run ./cmd/getafjob admin gen-secret > deploy/secrets/master_key
 
   dev:up:
     desc: Start the full stack locally (https://localhost:8443) and wait until every service is healthy

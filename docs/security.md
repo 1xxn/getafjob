@@ -32,7 +32,7 @@ This document grows with every module.
 | T2 | Page tricks the engine into a wrong field or domain | 5 | Provenance, field/domain checks, page content is data | Phase 2 |
 | T3 | Tampered images or binaries | 6 | Pinned actions/tools, cosign signatures, provenance, SBOM | CI |
 | R1 | User disputes an application | n/a | Evidence: values + sources, screenshot, confirmation, timeline; audit log | Phase 2 |
-| I1 | User reads another user's data | 4 | RLS + application filters ([0006](adr/0006-tenant-isolation-rls-and-envelope-encryption.md)) | Phase 1 tenant test |
+| I1 | User reads another user's data | 4 | RLS for the application role `getafjob_app` (no bypass), tenant set per transaction ([0006](adr/0006-tenant-isolation-rls-and-envelope-encryption.md)) | `TestTenantSeparation`, `TestAppRoleCannotBypassRLS` |
 | I2 | SSRF to internal services or cloud metadata | 3 | Egress proxy denies private/loopback/link-local; runner on internal networks only | `deploy/smoke.sh` |
 | I3 | Secrets or personal data in logs or errors | all | `config.Secret` redaction, sensitive log attributes redacted, generic errors | `TestSecretIsRedactedEverywhere`, `TestErrorsNeverContainSecrets`, `TestSensitiveKeysAreRedacted` |
 | I4 | Readiness details leak internals | 1 | `/readyz` returns ok/fail only; hidden by Caddy | `TestReadyzReportsEachCheckWithoutDetails`, smoke test |
