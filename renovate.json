@@ -37,7 +37,7 @@
       "groupName": "container images"
     },
     {
-      "description": "Tool versions outside go.mod (golangci-lint, goreleaser, smokescreen)",
+      "description": "Tool versions outside go.mod (golangci-lint, goreleaser)",
       "matchManagers": ["custom.regex"],
       "matchDatasources": ["github-releases", "go"],
       "groupName": "ci tools"
@@ -59,14 +59,6 @@
       "matchStrings": ["goreleaser/goreleaser:(?<currentValue>v[0-9.]+)", "GORELEASER_VERSION: (?<currentValue>v[0-9.]+)"],
       "depNameTemplate": "goreleaser/goreleaser",
       "datasourceTemplate": "github-releases"
-    },
-    {
-      "description": "smokescreen egress proxy (built from source in the Dockerfile)",
-      "customType": "regex",
-      "managerFilePatterns": ["/^Dockerfile$/"],
-      "matchStrings": ["ARG SMOKESCREEN_VERSION=(?<currentValue>v[0-9.]+)"],
-      "depNameTemplate": "github.com/stripe/smokescreen",
-      "datasourceTemplate": "go"
     },
     {
       "description": "Postgres image used by integration tests",

@@ -35,6 +35,9 @@ jobs:
         run: go mod verify
       - name: go mod tidy
         run: go mod tidy -diff
+      - name: egress build module (verify, tidy)
+        working-directory: deploy/egress
+        run: go mod verify && go mod tidy -diff
       - name: gofmt
         run: |
           out="$(gofmt -l -s .)"
