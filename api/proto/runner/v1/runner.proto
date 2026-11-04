@@ -1,0 +1,49 @@
+syntax = "proto3";
+
+// Runner gateway: runners (server runners and home runners) connect outbound to `serve` and lease work.
+// Runners never get database access; every run carries only the data it needs plus a short-lived token.
+package runner.v1;
+
+import "google/protobuf/duration.proto";
+
+option go_package = "github.com/1xxn/getafjob/internal/gen/proto/runner/v1;runnerv1";
+
+// RunnerService is served by the gateway in `serve`.
+service RunnerService {
+  // Register announces a runner and its capabilities and returns its ID.
+  rpc Register(RegisterRequest) returns (RegisterResponse) {}
+  // Heartbeat keeps a registration alive and reports the current load.
+  rpc Heartbeat(HeartbeatRequest) returns (HeartbeatResponse) {}
+}
+
+// RunnerKind tells where a runner lives.
+enum RunnerKind {
+  RUNNER_KIND_UNSPECIFIED = 0;
+  // A runner container next to the server (Compose service `runner`).
+  RUNNER_KIND_SERVER = 1;
+  // A home runner on the user's own machine (outbound connections only).
+  RUNNER_KIND_HOME = 2;
+}
+
+message RegisterRequest {
+  // getafjob version of the runner binary.
+  string version = 1;
+  // Browser product, e.g. "Chrome/157.0.8103.27".
+  string browser = 2;
+  RunnerKind kind = 3;
+  // How many runs the runner accepts in parallel.
+  int32 max_parallel = 4;
+}
+
+message RegisterResponse {
+  string runner_id = 1;
+  // How often the runner must send a heartbeat.
+  google.protobuf.Duration heartbeat_interval = 2;
+}
+
+message HeartbeatRequest {
+  string runner_id = 1;
+  int32 active_runs = 2;
+}
+
+message HeartbeatResponse {}

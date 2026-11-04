@@ -1,0 +1,25 @@
+# Fast checks before a commit. Install: go tool task hooks
+pre-commit:
+  parallel: true
+  jobs:
+    - name: gofmt
+      glob: "*.go"
+      run: test -z "$(gofmt -l -s {staged_files})" || (gofmt -l -s {staged_files}; exit 1)
+    - name: go mod tidy
+      glob: "go.{mod,sum}"
+      run: go mod tidy -diff
+    - name: go vet
+      glob: "*.go"
+      run: go vet ./...
+    - name: no personal paths
+      # Personal paths never belong in the repo (fixtures use Max Mustermann).
+      run: '! grep -nE "[A-Za-z]:[\\/]+Users[\\/]+[^\\/]+|/home/[a-z]+/|/Users/[a-z]+/" {staged_files}'
+      exclude:
+        - lefthook.yml
+
+commit-msg:
+  jobs:
+    - name: conventional commit
+      run: head -n1 {1} | grep -qE '^(feat|fix|docs|style|refactor|perf|test|build|ci|chore|revert)(\([a-z0-9/_-]+\))?!?: .+' || (echo "commit subject must follow Conventional Commits"; exit 1)
+    - name: single author
+      run: '! grep -qiE "^(co-authored-by|generated with)" {1} || (echo "no co-author or generator trailers"; exit 1)'

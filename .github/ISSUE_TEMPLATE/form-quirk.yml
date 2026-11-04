@@ -1,0 +1,40 @@
+name: Form quirk (ATS)
+description: An application form getafjob cannot fill or submit correctly
+labels: ["type: form-quirk", "area: runner"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Every quirk becomes an anonymised fixture in `testdata/fixtures/site/` plus a failing test first, then a fix in
+        the shared engine logic. Never paste real personal data or screenshots of it.
+  - type: dropdown
+    id: ats
+    attributes:
+      label: ATS
+      options: [Greenhouse, Lever, Ashby, Workday, SmartRecruiters, Personio, Recruitee, Workable, iCIMS, Taleo, SuccessFactors, Teamtailor, other / company site]
+    validations:
+      required: true
+  - type: input
+    id: url
+    attributes:
+      label: Public posting URL
+      description: The job posting (public page only). Leave empty if it must stay private.
+  - type: textarea
+    id: quirk
+    attributes:
+      label: What the form does
+      description: The markup or behaviour that trips getafjob (e.g. listbox buttons without role, toggle buttons with aria-pressed, a submit button outside the form).
+    validations:
+      required: true
+  - type: textarea
+    id: run
+    attributes:
+      label: What getafjob did
+      description: Run steps from the evidence page (field, value source, error). Redact personal values.
+    validations:
+      required: true
+  - type: textarea
+    id: html
+    attributes:
+      label: Minimal HTML (anonymised)
+      render: html

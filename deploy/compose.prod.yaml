@@ -1,0 +1,46 @@
+# Production overlay: docker compose -f deploy/compose.yaml -f deploy/compose.prod.yaml up -d
+#
+# Images come from GHCR (signed, see docs/runbooks/deploy.md); nothing is built on the server. Required:
+#   GETAFJOB_VERSION       image tag or digest to run (e.g. v0.1.0)
+#   GETAFJOB_DOMAIN        public host name (DNS points to the server)
+#   GETAFJOB_ACME_EMAIL    contact for the certificate authority
+#   GETAFJOB_SECRETS_DIR   directory with db_password and master_key (root-owned, 0600)
+services:
+  migrate:
+    image: ghcr.io/1xxn/getafjob:${GETAFJOB_VERSION:?set GETAFJOB_VERSION}
+    build: !reset null
+  serve:
+    image: ghcr.io/1xxn/getafjob:${GETAFJOB_VERSION:?set GETAFJOB_VERSION}
+    pull_policy: missing
+    environment:
+      GETAFJOB_PUBLIC_URL: https://${GETAFJOB_DOMAIN:?set GETAFJOB_DOMAIN}
+    deploy:
+      resources: { limits: { memory: 1g } }
+  worker:
+    image: ghcr.io/1xxn/getafjob:${GETAFJOB_VERSION:?set GETAFJOB_VERSION}
+    pull_policy: missing
+    environment:
+      GETAFJOB_PUBLIC_URL: https://${GETAFJOB_DOMAIN:?set GETAFJOB_DOMAIN}
+    deploy:
+      resources: { limits: { memory: 1g } }
+  runner:
+    image: ghcr.io/1xxn/getafjob-runner:${GETAFJOB_VERSION:?set GETAFJOB_VERSION}
+    build: !reset null
+    deploy:
+      replicas: ${GETAFJOB_RUNNERS:-1}
+      resources: { limits: { memory: 2g, pids: 512 } }
+  egress:
+    image: ghcr.io/1xxn/getafjob-egress:${GETAFJOB_VERSION:?set GETAFJOB_VERSION}
+    build: !reset null
+  postgres:
+    deploy:
+      resources: { limits: { memory: 2g } }
+  caddy:
+    environment:
+      GETAFJOB_DOMAIN: ${GETAFJOB_DOMAIN:?set GETAFJOB_DOMAIN}
+      GETAFJOB_TLS_MODE: acme
+      GETAFJOB_ACME_EMAIL: ${GETAFJOB_ACME_EMAIL:?set GETAFJOB_ACME_EMAIL}
+    ports: !override
+      - "80:80"
+      - "443:443"
+      - "443:443/udp"

@@ -1,0 +1,24 @@
+name: Images
+
+# Every push to main publishes signed images tagged "main" and "sha-<commit>" (staging deploys pick them up).
+on:
+  push:
+    branches: [main]
+
+permissions: {}
+
+concurrency:
+  group: images-main
+  cancel-in-progress: false
+
+jobs:
+  publish:
+    permissions:
+      contents: read
+      packages: write # push images to GHCR
+      id-token: write # keyless signing (cosign) and attestations via GitHub OIDC
+      attestations: write # build provenance attestations
+    uses: ./.github/workflows/images-publish.yml
+    with:
+      version: main-${{ github.sha }}
+      tags: type=raw,value=main

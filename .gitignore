@@ -1,0 +1,22 @@
+# Build output
+/bin/
+/dist/
+*.test
+*.out
+coverage.*
+
+# Local runtime data – never commit (real application data, screenshots, keys)
+.env
+.env.*
+!.env.example
+/deploy/secrets/*
+!/deploy/secrets/README.md
+/.data/
+/tmp/
+
+# Tools
+/.task/
+.idea/
+.vscode/
+*.swp
+.DS_Store

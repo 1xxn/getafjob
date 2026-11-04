@@ -1,0 +1,79 @@
+{
+  "$schema": "https://docs.renovatebot.com/renovate-schema.json",
+  "extends": [
+    "config:best-practices",
+    ":semanticCommits",
+    ":semanticCommitTypeAll(build)",
+    ":disableDependencyDashboard"
+  ],
+  "timezone": "Europe/Berlin",
+  "schedule": ["before 6am on monday"],
+  "minimumReleaseAge": "7 days",
+  "prConcurrentLimit": 5,
+  "rebaseWhen": "behind-base-branch",
+  "postUpdateOptions": ["gomodTidy", "gomodUpdateImportPaths"],
+  "packageRules": [
+    {
+      "description": "Go modules (minor/patch) in one PR",
+      "matchManagers": ["gomod"],
+      "matchUpdateTypes": ["minor", "patch", "digest"],
+      "groupName": "go modules"
+    },
+    {
+      "description": "Go toolchain stays on the pinned line until updated on purpose",
+      "matchManagers": ["gomod"],
+      "matchDepTypes": ["golang", "toolchain"],
+      "groupName": "go toolchain"
+    },
+    {
+      "description": "GitHub Actions (SHA-pinned) in one PR",
+      "matchManagers": ["github-actions"],
+      "groupName": "github actions"
+    },
+    {
+      "description": "Container base images and their digests in one PR",
+      "matchManagers": ["dockerfile", "docker-compose", "custom.regex"],
+      "matchDatasources": ["docker"],
+      "groupName": "container images"
+    },
+    {
+      "description": "Tool versions outside go.mod (golangci-lint, goreleaser, smokescreen)",
+      "matchManagers": ["custom.regex"],
+      "matchDatasources": ["github-releases", "go"],
+      "groupName": "ci tools"
+    }
+  ],
+  "customManagers": [
+    {
+      "description": "golangci-lint version in Taskfile and CI",
+      "customType": "regex",
+      "managerFilePatterns": ["/^Taskfile\\.yml$/", "/^\\.github/workflows/.+\\.ya?ml$/"],
+      "matchStrings": ["GOLANGCI_LINT_VERSION: (?<currentValue>v[0-9.]+)"],
+      "depNameTemplate": "golangci/golangci-lint",
+      "datasourceTemplate": "github-releases"
+    },
+    {
+      "description": "goreleaser version in Taskfile and workflows",
+      "customType": "regex",
+      "managerFilePatterns": ["/^Taskfile\\.yml$/", "/^\\.github/workflows/.+\\.ya?ml$/"],
+      "matchStrings": ["goreleaser/goreleaser:(?<currentValue>v[0-9.]+)", "GORELEASER_VERSION: (?<currentValue>v[0-9.]+)"],
+      "depNameTemplate": "goreleaser/goreleaser",
+      "datasourceTemplate": "github-releases"
+    },
+    {
+      "description": "smokescreen egress proxy (built from source in the Dockerfile)",
+      "customType": "regex",
+      "managerFilePatterns": ["/^Dockerfile$/"],
+      "matchStrings": ["ARG SMOKESCREEN_VERSION=(?<currentValue>v[0-9.]+)"],
+      "depNameTemplate": "github.com/stripe/smokescreen",
+      "datasourceTemplate": "go"
+    },
+    {
+      "description": "Postgres image used by integration tests",
+      "customType": "regex",
+      "managerFilePatterns": ["/_test\\.go$/"],
+      "matchStrings": ["\"(?<depName>postgres):(?<currentValue>[0-9.]+-alpine)@(?<currentDigest>sha256:[a-f0-9]+)\""],
+      "datasourceTemplate": "docker"
+    }
+  ]
+}

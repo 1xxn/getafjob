@@ -1,0 +1,68 @@
+openapi: 3.1.0
+info:
+  title: getafjob API
+  version: 1.0.0
+  summary: JSON API for the browser extension and future clients.
+  description: |
+    The web UI calls the services directly; this API exists for the browser extension (assist) and other clients.
+    Texts meant for people are never sent as prose: errors carry a stable `code` plus `params`, and the client
+    translates them (English and German catalogs).
+  license:
+    name: MIT
+    identifier: MIT
+servers:
+  - url: /api/v1
+paths:
+  /meta:
+    get:
+      operationId: getMeta
+      summary: Server version and API level
+      security: []
+      responses:
+        "200":
+          description: Version information
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Meta"
+        default:
+          $ref: "#/components/responses/Problem"
+components:
+  responses:
+    Problem:
+      description: Error in RFC 9457 form with a stable code for translation
+      content:
+        application/problem+json:
+          schema:
+            $ref: "#/components/schemas/Problem"
+  schemas:
+    Meta:
+      type: object
+      additionalProperties: false
+      required: [version, api]
+      properties:
+        version:
+          type: string
+          description: getafjob version (e.g. v0.1.0 or dev)
+          maxLength: 64
+        api:
+          type: string
+          description: API level
+          enum: [v1]
+    Problem:
+      type: object
+      additionalProperties: false
+      required: [status, code]
+      properties:
+        status:
+          type: integer
+          minimum: 400
+          maximum: 599
+        code:
+          type: string
+          description: Stable error code, e.g. api.not_found; the client translates it.
+          pattern: "^[a-z][a-z0-9_.]{1,63}$"
+        params:
+          type: object
+          description: Parameters for the translated message (scalar values).
+          additionalProperties: true
