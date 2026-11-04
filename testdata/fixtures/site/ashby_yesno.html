@@ -1,0 +1,53 @@
+<!doctype html>
+<html lang="en">
+<head><meta charset="utf-8"><title>Senior Site Reliability Engineer @ Example Finance</title>
+<style>
+  .field{margin:12px 0}
+  .yesno-option{padding:6px 14px;border:1px solid #999;background:#fff;margin-right:6px}
+  .yesno-option._active{background:#246;color:#fff}
+  .yesno input{position:absolute;opacity:0;width:1px;height:1px;pointer-events:none}
+</style></head>
+<body>
+<!-- Like jobs.ashbyhq.com: yes/no questions are two buttons with aria-pressed (plus a hidden checkbox).
+     A second click on the chosen answer clears it again; no <form>, submit via a click handler. -->
+<h1>Senior Site Reliability Engineer</h1>
+<div id="app">
+  <div class="field"><label for="name">Name *</label><input id="name" placeholder="Type here..."></div>
+  <div class="field"><label for="email">Email *</label><input id="email" type="email" placeholder="hello@example.com..."></div>
+  <div class="field">
+    <label id="regulated-label">Do you have experience working in a regulated industry (e.g. banking)? *</label>
+    <div class="yesno" role="group" aria-labelledby="regulated-label">
+      <button type="button" class="yesno-option" aria-pressed="false" data-option="yes">Yes</button>
+      <button type="button" class="yesno-option" aria-pressed="false" data-option="no">No</button>
+      <input type="checkbox" tabindex="-1" aria-hidden="true">
+    </div>
+  </div>
+  <div id="errors"></div>
+  <button type="button" id="send">Submit Application</button>
+</div>
+<script>
+  let answer = "";
+  for (const b of document.querySelectorAll(".yesno-option")) {
+    b.addEventListener("click", () => {
+      const on = b.getAttribute("aria-pressed") !== "true";
+      for (const o of document.querySelectorAll(".yesno-option")) {
+        o.setAttribute("aria-pressed", "false");
+        o.classList.remove("_active");
+      }
+      if (on) { b.setAttribute("aria-pressed", "true"); b.classList.add("_active"); }
+      answer = on ? b.dataset.option : "";
+    });
+  }
+  document.getElementById("send").addEventListener("click", async () => {
+    const data = { name: document.getElementById("name").value, email: document.getElementById("email").value,
+      regulated: answer };
+    if (!data.name || !data.email || !data.regulated) {
+      document.getElementById("errors").innerHTML = '<div role="alert">Please answer all required questions</div>';
+      return;
+    }
+    await fetch("/submit", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(data) });
+    document.getElementById("app").innerHTML = "<h2>Thank you for applying!</h2><p>Your application was submitted.</p>";
+  });
+</script>
+</body>
+</html>

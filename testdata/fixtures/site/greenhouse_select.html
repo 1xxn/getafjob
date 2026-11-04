@@ -1,0 +1,106 @@
+<!doctype html>
+<html lang="de">
+<head><meta charset="utf-8"><title>Bewerbung als Platform Engineer bei Beispiel Cloud</title>
+<style>
+  .field{margin:12px 0}
+  .select{position:relative;width:320px}
+  .select__control{position:relative;display:flex;border:1px solid #999;min-height:34px;padding:0 8px;align-items:center;cursor:default}
+  .select__value-container{position:relative;display:grid;flex:1}
+  .select__placeholder,.select__single-value{grid-area:1/1;color:#555}
+  .select__input-container{grid-area:1/1}
+  .select__input{width:100%;min-width:2px;border:0;outline:0;padding:0;background:0}
+  .select__menu{border:1px solid #999;background:#fff}
+  .select__option{padding:6px}
+  .select__option--is-focused{background:#def}
+  .select__menu-notice{padding:6px;color:#777}
+</style></head>
+<body>
+<!-- Like job-boards.eu.greenhouse.io (react-select): German labels, English options; options exist in the
+     DOM only while open; the tiny input sits under the placeholder; the location search loads suggestions
+     asynchronously (1.2 s) and renders them twice; the country code shows only "+49" after selection. -->
+<h1>Platform Engineer</h1>
+<form id="application-form" novalidate>
+  <div class="field"><label for="first_name">Vorname*</label><input id="first_name" name="first_name" required></div>
+  <div class="field"><label for="last_name">Nachname*</label><input id="last_name" name="last_name" required></div>
+  <div class="field"><label for="email">E-Mail*</label><input id="email" name="email" type="email" required></div>
+  <div class="field"><label id="country-label" for="country">Land*</label>
+    <div class="select" data-name="country" data-options="Deutschland +49|Österreich +43" data-show="code"></div></div>
+  <div class="field"><label id="relocate-label" for="relocate">Falls du nicht in Berlin lebst, wärst du bereit dorthin umzuziehen?*</label>
+    <div class="select" data-name="relocate" data-options="Yes|No"></div></div>
+  <div class="field"><label id="language-label" for="language">Welche Kommunikationssprache bevorzugst du?*</label>
+    <div class="select" data-name="language" data-options="German|English"></div></div>
+  <div class="field"><label id="location-label" for="location">Standort (Stadt)*</label>
+    <div class="select" data-name="location" data-async="1"></div></div>
+  <div id="errors"></div>
+  <button type="submit">Bewerbung einreichen</button>
+</form>
+<script>
+  const CITIES = ["Berlin, Germany", "New Berlin, Wisconsin, United States", "Bernau bei Berlin, Brandenburg, Germany",
+    "Hamburg, Germany"];
+  const el = (tag, cls) => { const e = document.createElement(tag); if (cls) e.className = cls; return e; };
+  const values = {};
+  for (const root of document.querySelectorAll(".select")) {
+    const name = root.dataset.name, remote = root.dataset.async === "1";
+    const all = (root.dataset.options || "").split("|").filter(Boolean);
+    const control = el("div", "select__control"), box = el("div", "select__value-container");
+    const ph = el("div", "select__placeholder"), single = el("div", "select__single-value");
+    const wrap = el("div", "select__input-container"), input = el("input", "select__input");
+    ph.textContent = "Auswählen ..."; single.hidden = true;
+    Object.assign(input, { id: name, type: "text", autocomplete: "off" });
+    input.setAttribute("role", "combobox"); input.setAttribute("aria-autocomplete", "list");
+    input.setAttribute("aria-expanded", "false"); input.setAttribute("aria-labelledby", `${name}-label`);
+    wrap.appendChild(input); box.append(wrap, ph, single); control.appendChild(box); root.appendChild(control);
+    let menu = null, shown = [], focused = 0, timer = null;
+    const close = () => { if (menu) menu.remove(); menu = null; input.setAttribute("aria-expanded", "false"); input.removeAttribute("aria-controls"); };
+    const choose = (text) => { values[name] = text; single.textContent = root.dataset.show === "code" ? text.split(" ").pop() : text; single.hidden = false; ph.hidden = true; input.value = ""; close(); };
+    const render = (list, notice) => {
+      close(); shown = list; menu = el("div", "select__menu");
+      const lb = el("div", "select__menu-list"); lb.setAttribute("role", "listbox"); lb.id = `${name}-listbox`;
+      if (!list.length) { const n = el("div", "select__menu-notice select__menu-notice--no-options"); n.textContent = notice || "No options"; lb.appendChild(n); }
+      list.forEach((text, i) => {
+        const o = el("div", "select__option" + (i === focused ? " select__option--is-focused" : ""));
+        o.setAttribute("role", "option"); o.id = `${name}-option-${i}`; o.textContent = text;
+        o.addEventListener("mousedown", (e) => { e.preventDefault(); choose(text); });
+        lb.appendChild(o);
+      });
+      menu.appendChild(lb); root.appendChild(menu);
+      input.setAttribute("aria-expanded", "true"); input.setAttribute("aria-controls", lb.id);
+    };
+    const update = () => {
+      focused = 0;
+      const q = input.value.toLowerCase();
+      if (!remote) { render(all.filter((o) => o.toLowerCase().includes(q))); return; }
+      clearTimeout(timer);
+      render([], q ? "Loading..." : "Tippen, um zu suchen");
+      if (!q) return;
+      timer = setTimeout(() => {
+        const hits = CITIES.filter((c) => c.toLowerCase().includes(q));
+        render(hits);
+        setTimeout(() => { if (menu) render(hits); }, 400); // a second response re-renders the list
+      }, 1200);
+    };
+    control.addEventListener("mousedown", (e) => { e.preventDefault(); input.focus(); update(); });
+    input.addEventListener("input", update);
+    input.addEventListener("keydown", (e) => {
+      if (e.key === "ArrowDown") { e.preventDefault(); if (!menu) update(); else { focused = Math.min(focused + 1, shown.length - 1); render(shown); } }
+      else if (e.key === "Enter") { e.preventDefault(); if (menu && shown[focused]) choose(shown[focused]); }
+      else if (e.key === "Escape") close();
+    });
+    input.addEventListener("blur", () => setTimeout(close, 50));
+  }
+  document.getElementById("application-form").addEventListener("submit", async (e) => {
+    e.preventDefault();
+    const f = e.target;
+    const data = { first_name: f.first_name.value, last_name: f.last_name.value, email: f.email.value,
+      relocate: values.relocate || "", language: values.language || "", location: values.location || "" };
+    const missing = Object.keys(data).filter((k) => !data[k]);
+    if (missing.length) {
+      document.getElementById("errors").innerHTML = '<div role="alert">Bitte ausfüllen: ' + missing.join(", ") + "</div>";
+      return;
+    }
+    await fetch("/submit", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(data) });
+    document.body.innerHTML = "<h1>Vielen Dank für deine Bewerbung!</h1>";
+  });
+</script>
+</body>
+</html>

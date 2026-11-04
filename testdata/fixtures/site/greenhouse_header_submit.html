@@ -1,0 +1,42 @@
+<!doctype html>
+<html lang="en">
+<head><meta charset="utf-8"><title>Job Application for Site Reliability Engineer at Example Cloud</title>
+<style>
+  .job__header{position:sticky;top:0;background:#fff;padding:8px;border-bottom:1px solid #ccc}
+  .job__description{height:1600px}
+  .field{margin:12px 0}
+</style></head>
+<body>
+<!-- Like job-boards.greenhouse.io (English board): the posting header has a button with the same name as
+     the real submit button that only scrolls to the form (no <form>, type=button, aria-label "Apply"). -->
+<main class="job-post">
+  <div class="job__header">
+    <h1>Site Reliability Engineer</h1>
+    <button type="button" class="btn btn--rectangle" aria-label="Apply">Submit application</button>
+  </div>
+  <div class="job__description"><p>We run Kubernetes on bare metal. Berlin · Hybrid.</p></div>
+  <form id="application-form" class="application--form" novalidate>
+    <div class="field"><label for="first_name">First Name *</label><input id="first_name" name="first_name" required></div>
+    <div class="field"><label for="last_name">Last Name *</label><input id="last_name" name="last_name" required></div>
+    <div class="field"><label for="email">Email *</label><input id="email" name="email" type="email" required></div>
+    <div class="field"><label for="resume">Resume/CV *</label><input id="resume" name="resume" type="file" required></div>
+    <div class="field application--submit"><button type="submit" class="btn btn--rectangle">Submit application</button></div>
+  </form>
+</main>
+<script>
+  document.querySelector(".job__header button").addEventListener("click", () => {
+    const first = document.getElementById("first_name");
+    first.scrollIntoView();
+    first.focus();
+  });
+  document.getElementById("application-form").addEventListener("submit", async (e) => {
+    e.preventDefault();
+    const f = e.target;
+    const data = { first_name: f.first_name.value, last_name: f.last_name.value, email: f.email.value,
+      resume: f.resume.files.length ? f.resume.files[0].name : "", form: "greenhouse_header_submit" };
+    await fetch("/submit", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(data) });
+    document.body.innerHTML = "<h1>Thank you for applying.</h1><p>Your application has been received.</p>";
+  });
+</script>
+</body>
+</html>
