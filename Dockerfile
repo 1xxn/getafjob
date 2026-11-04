@@ -20,17 +20,17 @@ RUN --mount=type=cache,target=/go/pkg/mod \
       -ldflags="-s -w -X github.com/1xxn/getafjob/internal/platform/buildinfo.Version=${VERSION} -X github.com/1xxn/getafjob/internal/platform/buildinfo.Commit=${COMMIT} -X github.com/1xxn/getafjob/internal/platform/buildinfo.Date=${DATE}" \
       -o /out/getafjob ./cmd/getafjob
 
-# smokescreen is built from source at a pinned version (checked against sum.golang.org).
+# smokescreen comes from the build module in deploy/egress: a pinned release with dependencies raised to
+# versions without known vulnerabilities (go.sum verified, Renovate-managed).
 FROM --platform=$BUILDPLATFORM golang:1.27.3-trixie@sha256:c65ecfe613b539ac74c62a4c3b2c27e8f8a6076384c8f27e8a3c0f3be17cc385 AS smokescreen
 ARG TARGETOS
 ARG TARGETARCH
-ARG SMOKESCREEN_VERSION=v0.1.0
 ENV CGO_ENABLED=0 GOTOOLCHAIN=local GOFLAGS=-trimpath
+WORKDIR /egress
+COPY deploy/egress/go.mod deploy/egress/go.sum ./
 RUN --mount=type=cache,target=/go/pkg/mod \
     --mount=type=cache,target=/root/.cache/go-build \
-    GOOS=$TARGETOS GOARCH=$TARGETARCH go install -ldflags="-s -w" github.com/stripe/smokescreen@${SMOKESCREEN_VERSION} && \
-    mkdir -p /out && \
-    { cp /go/bin/${TARGETOS}_${TARGETARCH}/smokescreen /out/smokescreen 2>/dev/null || cp /go/bin/smokescreen /out/smokescreen; }
+    GOOS=$TARGETOS GOARCH=$TARGETARCH go build -ldflags="-s -w" -o /out/smokescreen github.com/stripe/smokescreen
 
 FROM gcr.io/distroless/static-debian13:nonroot@sha256:25ac8f0c3b2334a9eb05452266bd4697864a8c8ef0ef71e5e6480d7f92868329 AS app
 COPY --from=build /out/getafjob /usr/local/bin/getafjob
