@@ -5,6 +5,6 @@ generate:
   models: true
   std-http-server: true
   strict-server: true
-  embedded-spec: true
+  embedded-spec: false # the binary does not need the spec at runtime (keeps kin-openapi out of it)
 output-options:
   skip-prune: false

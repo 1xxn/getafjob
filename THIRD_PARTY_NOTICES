@@ -32,8 +32,8 @@ Container images
 ================================================================================
 
 The egress image contains smokescreen (https://github.com/stripe/smokescreen),
-MIT License, Copyright (c) 2016 Stripe, built from source at the version pinned
-in the Dockerfile.
+MIT License, Copyright (c) 2016 Stripe, built from source at the release pinned
+in deploy/egress/go.mod.
 
 The runner image is based on chromedp/headless-shell, which contains Chromium
 (BSD-3-Clause and the licenses listed in its about:credits). Go module
