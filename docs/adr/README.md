@@ -16,7 +16,7 @@ rewritten once accepted – a changed decision gets a new ADR that supersedes th
 | [0008](0008-egress-proxy.md) | Egress proxy for runners and source fetches | accepted |
 | [0009](0009-server-rendered-ui-templ-htmx.md) | Server-rendered UI with templ, htmx and SSE | accepted |
 | [0010](0010-spec-first-json-api.md) | Spec-first JSON API v1 | accepted |
-| 0011 | Browser automation library (decided by the Phase 0 spike, #9) | pending |
+| [0011](0011-browser-automation-go-rod.md) | Browser automation with go-rod | accepted |
 | [0012](0012-no-ai-by-default.md) | Works without AI; optional AI module | accepted |
 | [0013](0013-provenance-for-every-form-value.md) | Provenance for every form value | accepted |
 | [0014](0014-submit-register-never-twice.md) | One submit path and a submit register | accepted |
