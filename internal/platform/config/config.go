@@ -6,6 +6,7 @@
 package config
 
 import (
+	"encoding/base64"
 	"errors"
 	"fmt"
 	"io"
@@ -48,6 +49,9 @@ type Config struct {
 	EgressProxy *url.URL
 	// OTelEndpoint is the OTLP/HTTP endpoint for traces and metrics (http://otel-collector:4318). Empty: off.
 	OTelEndpoint *url.URL
+	// MasterKey wraps the users' data keys (32 bytes, base64url); MasterKeyOld is the previous one during a
+	// rotation (admin rotate-master-key).
+	MasterKey, MasterKeyOld Secret
 	// SMTPURL is the mail server (smtps://user:pass@host:465, smtp://…:587 with STARTTLS). Empty: no mail.
 	SMTPURL Secret
 	// MailFrom is the sender address of all mail.
@@ -98,6 +102,8 @@ var specs = []spec{
 	{"BROWSER_BIN", "", func(c *Config, v string) error { c.BrowserBin = v; return nil }},
 	{"EGRESS_PROXY", "", setEgressProxy},
 	{"OTEL_ENDPOINT", "", setOTelEndpoint},
+	{"MASTER_KEY", "", func(c *Config, v string) error { return setKey(&c.MasterKey, v) }},
+	{"MASTER_KEY_OLD", "", func(c *Config, v string) error { return setKey(&c.MasterKeyOld, v) }},
 	{"SHUTDOWN_TIMEOUT", "20s", setShutdownTimeout},
 	{"SMTP_URL", "", func(c *Config, v string) error { c.SMTPURL = Secret(v); return nil }},
 	{"MAIL_FROM", "getafjob@localhost", setMailFrom},
@@ -292,6 +298,8 @@ func (c Config) LogValue() slog.Value {
 		slog.Bool("egress_proxy_set", c.EgressProxy != nil),
 		slog.String("otel_endpoint", urlString(c.OTelEndpoint)),
 		slog.Bool("smtp_configured", c.SMTPURL != ""),
+		slog.Bool("master_key_set", c.MasterKey != ""),
+		slog.Bool("old_master_key_set", c.MasterKeyOld != ""),
 		slog.Duration("shutdown_timeout", c.ShutdownTimeout),
 	)
 }
@@ -312,5 +320,18 @@ func setOTelEndpoint(c *Config, v string) error {
 		return errors.New("must be an http(s) URL without credentials")
 	}
 	c.OTelEndpoint = u
+	return nil
+}
+
+// setKey accepts 32 bytes in base64url (admin gen-secret); the error never shows the value.
+func setKey(dst *Secret, v string) error {
+	v = strings.TrimRight(strings.TrimSpace(v), "=")
+	if v == "" {
+		return nil
+	}
+	if b, err := base64.RawURLEncoding.DecodeString(v); err != nil || len(b) != 32 {
+		return errors.New("must be 32 bytes, base64url encoded (admin gen-secret)")
+	}
+	*dst = Secret(v)
 	return nil
 }

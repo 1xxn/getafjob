@@ -189,3 +189,15 @@ func TestCrawlSettings(t *testing.T) {
 		}
 	}
 }
+
+func TestMasterKeys(t *testing.T) {
+	good := "AAECAwQFBgcICQoLDA0ODxAREhMUFRYXGBkaGxwdHh8"
+	c, err := Load(fakeSource(map[string]string{"GETAFJOB_MASTER_KEY": good + "\n", "GETAFJOB_MASTER_KEY_OLD": good + "="}, nil))
+	if err != nil || c.MasterKey.Reveal() != good || c.MasterKeyOld.Reveal() != good {
+		t.Fatalf("keys = %v, %v", c.MasterKey, err)
+	}
+	_, err = Load(fakeSource(map[string]string{"GETAFJOB_MASTER_KEY": "hunter2-too-short"}, nil))
+	if err == nil || !strings.Contains(err.Error(), "GETAFJOB_MASTER_KEY") || strings.Contains(err.Error(), "hunter2") {
+		t.Fatalf("err = %v", err)
+	}
+}

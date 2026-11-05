@@ -135,6 +135,14 @@ type User struct {
 	DisabledAt  *time.Time
 }
 
+type UserKey struct {
+	UserID      uuid.UUID
+	MasterKeyID string
+	Wrapped     []byte
+	CreatedAt   time.Time
+	RotatedAt   *time.Time
+}
+
 type WebauthnChallenge struct {
 	ID        uuid.UUID
 	UserID    *uuid.UUID

@@ -73,6 +73,7 @@ services:
       <<: *app-env
       GETAFJOB_HTTP_ADDR: ":8080"
       GETAFJOB_SMTP_URL_FILE: /run/secrets/smtp_url
+      GETAFJOB_MASTER_KEY_FILE: /run/secrets/master_key
       GETAFJOB_MAIL_FROM: ${GETAFJOB_MAIL_FROM:-getafjob@localhost}
     secrets: [db_app_password, master_key, smtp_url]
     depends_on:
@@ -94,6 +95,7 @@ services:
       <<: *app-env
       GETAFJOB_HEALTH_ADDR: ":8081"
       GETAFJOB_EGRESS_PROXY: http://egress:4750
+      GETAFJOB_MASTER_KEY_FILE: /run/secrets/master_key
     secrets: [db_app_password, master_key]
     depends_on:
       migrate: { condition: service_completed_successfully }

@@ -159,6 +159,10 @@ internal `edge` (caddy and serve), `backend` (serve, worker, migrate, postgres),
 
 - **Configuration:** environment variables or `*_FILE` secrets ([configuration.md](configuration.md)).
 - **Security:** [security.md](security.md).
+- **Encryption at rest:** `platform/crypto` seals user secrets and files with a per-user data key (AES-256-GCM,
+  associated data = user and purpose); data keys live wrapped in `user_keys` under the master key from a Docker
+  secret ([0006](adr/0006-tenant-isolation-rls-and-envelope-encryption.md),
+  [key-rotation.md](runbooks/key-rotation.md)).
 - **Texts:** English/German catalogs, backend texts as code + params ([0019](adr/0019-english-first-ui-en-de.md)).
 - **Observability:** slog + OpenTelemetry ([0021](adr/0021-observability-slog-opentelemetry.md)). With
   `GETAFJOB_OTEL_ENDPOINT` set, every role exports traces and metrics over OTLP/HTTP; log records carry `trace_id`
