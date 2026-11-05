@@ -16,6 +16,7 @@ an error. Unknown `GETAFJOB_*` variables are reported as a warning (typos), with
 | `GETAFJOB_LOG_FORMAT` | `json` | all | `json` or `text` |
 | `GETAFJOB_BROWSER_BIN` | lookup | runner | Chromium/headless-shell binary |
 | `GETAFJOB_EGRESS_PROXY` | none | runner, worker | egress proxy, e.g. `http://egress:4750` |
+| `GETAFJOB_OTEL_ENDPOINT` | none | serve, worker | OTLP/HTTP endpoint for traces and metrics, e.g. `http://otel-collector:4318`; empty: telemetry off |
 | `GETAFJOB_SHUTDOWN_TIMEOUT` | `20s` | all | graceful shutdown limit (1s to 5m) |
 | `GETAFJOB_SMTP_URL` | none | serve, worker, admin | mail server: `smtps://user:pass@host:465` or `smtp://user:pass@host:587` (STARTTLS); `smtp+insecure://host:1025` for local development only; use `_FILE` |
 | `GETAFJOB_MAIL_FROM` | `getafjob@localhost` | serve, worker, admin | sender address of all mail |

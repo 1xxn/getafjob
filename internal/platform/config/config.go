@@ -46,6 +46,8 @@ type Config struct {
 	BrowserBin string
 	// EgressProxy is the egress proxy for the browser and source fetches (http://egress:4750). Empty: direct.
 	EgressProxy *url.URL
+	// OTelEndpoint is the OTLP/HTTP endpoint for traces and metrics (http://otel-collector:4318). Empty: off.
+	OTelEndpoint *url.URL
 	// SMTPURL is the mail server (smtps://user:pass@host:465, smtp://…:587 with STARTTLS). Empty: no mail.
 	SMTPURL Secret
 	// MailFrom is the sender address of all mail.
@@ -95,6 +97,7 @@ var specs = []spec{
 	{"LOG_FORMAT", "json", setLogFormat},
 	{"BROWSER_BIN", "", func(c *Config, v string) error { c.BrowserBin = v; return nil }},
 	{"EGRESS_PROXY", "", setEgressProxy},
+	{"OTEL_ENDPOINT", "", setOTelEndpoint},
 	{"SHUTDOWN_TIMEOUT", "20s", setShutdownTimeout},
 	{"SMTP_URL", "", func(c *Config, v string) error { c.SMTPURL = Secret(v); return nil }},
 	{"MAIL_FROM", "getafjob@localhost", setMailFrom},
@@ -287,6 +290,7 @@ func (c Config) LogValue() slog.Value {
 		slog.String("log_level", c.LogLevel.String()),
 		slog.String("log_format", c.LogFormat),
 		slog.Bool("egress_proxy_set", c.EgressProxy != nil),
+		slog.String("otel_endpoint", urlString(c.OTelEndpoint)),
 		slog.Bool("smtp_configured", c.SMTPURL != ""),
 		slog.Duration("shutdown_timeout", c.ShutdownTimeout),
 	)
@@ -297,4 +301,16 @@ func urlString(u *url.URL) string {
 		return ""
 	}
 	return u.String()
+}
+
+func setOTelEndpoint(c *Config, v string) error {
+	if v == "" {
+		return nil
+	}
+	u, err := url.Parse(v)
+	if err != nil || (u.Scheme != "http" && u.Scheme != "https") || u.Host == "" || u.User != nil {
+		return errors.New("must be an http(s) URL without credentials")
+	}
+	c.OTelEndpoint = u
+	return nil
 }

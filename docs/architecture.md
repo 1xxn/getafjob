@@ -160,7 +160,12 @@ internal `edge` (caddy and serve), `backend` (serve, worker, migrate, postgres),
 - **Configuration:** environment variables or `*_FILE` secrets ([configuration.md](configuration.md)).
 - **Security:** [security.md](security.md).
 - **Texts:** English/German catalogs, backend texts as code + params ([0019](adr/0019-english-first-ui-en-de.md)).
-- **Observability:** slog + OpenTelemetry ([0021](adr/0021-observability-slog-opentelemetry.md)).
+- **Observability:** slog + OpenTelemetry ([0021](adr/0021-observability-slog-opentelemetry.md)). With
+  `GETAFJOB_OTEL_ENDPOINT` set, every role exports traces and metrics over OTLP/HTTP; log records carry `trace_id`
+  and `span_id`. Spans: HTTP requests (named after the route), River jobs, source fetches (no trace headers to
+  third-party sites). Metrics: `http.server.request.duration` per route, `getafjob.queue.job.duration`,
+  `getafjob.queue.jobs` (depth per queue and state), `getafjob.crawl.*` (duration, postings per step, changes,
+  sources by outcome, source errors by code) and `getafjob.boards.*` (discovery checks, added boards).
 - **Testing:** table tests, fuzzing for foreign input, golden tests per source, testcontainers, browser fixtures in
   the runner image, e2e with Compose, architecture tests.
 

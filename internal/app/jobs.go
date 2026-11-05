@@ -10,6 +10,8 @@ import (
 	"github.com/jackc/pgx/v5"
 	"github.com/riverqueue/river"
 	"github.com/riverqueue/river/rivertype"
+	"go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp"
+	"go.opentelemetry.io/otel/propagation"
 
 	"github.com/1xxn/getafjob/internal/discovery"
 	"github.com/1xxn/getafjob/internal/discovery/adapters/sources"
@@ -45,12 +47,14 @@ type crawlWorker struct {
 	cfg     config.Config
 	logger  *slog.Logger
 	timeout time.Duration
+	metrics *crawlMetrics
 }
 
 // Timeout bounds one crawl (a crawl with detail requests takes minutes, not hours).
 func (w *crawlWorker) Timeout(*river.Job[CrawlArgs]) time.Duration { return w.timeout }
 
 func (w *crawlWorker) Work(ctx context.Context, _ *river.Job[CrawlArgs]) error {
+	start := time.Now()
 	srcs, ids, err := crawlSources(ctx, w.client, w.boards, w.cfg, w.logger)
 	if err != nil {
 		return err
@@ -59,6 +63,7 @@ func (w *crawlWorker) Work(ctx context.Context, _ *river.Job[CrawlArgs]) error {
 	if err != nil {
 		return err // validators stay as they were, so the next crawl fetches everything again
 	}
+	w.metrics.crawl(ctx, rep, len(srcs), time.Since(start))
 	if err := w.states.SaveBoardStates(ctx, boardStates(ids, rep), time.Now()); err != nil {
 		return err
 	}
@@ -90,6 +95,7 @@ type boardDiscoveryWorker struct {
 	river.WorkerDefaults[BoardDiscoveryArgs]
 	discovery *discovery.BoardDiscovery
 	logger    *slog.Logger
+	metrics   *crawlMetrics
 }
 
 // Timeout bounds one run (about 30 companies with a few requests each).
@@ -102,6 +108,7 @@ func (w *boardDiscoveryWorker) Work(ctx context.Context, _ *river.Job[BoardDisco
 	if err != nil {
 		return err
 	}
+	w.metrics.boards(ctx, st)
 	w.logger.InfoContext(ctx, "board discovery finished", "checked", st.Checked, "found", st.Found, "added", st.Added,
 		"errors", st.Errors)
 	return nil
@@ -152,7 +159,10 @@ func boardStates(ids map[string]int64, rep discovery.Report) []discovery.BoardSt
 
 // sourceClient fetches through the egress proxy when one is configured.
 func sourceClient(cfg config.Config) *sources.Client {
-	return sources.NewClient(netguard.NewClient(netguard.ClientOptions{Proxy: cfg.EgressProxy, Timeout: 2 * time.Minute}))
+	hc := netguard.NewClient(netguard.ClientOptions{Proxy: cfg.EgressProxy, Timeout: 2 * time.Minute})
+	// Client spans only: no trace headers go to third-party sites; netguard still checks every connection.
+	hc.Transport = otelhttp.NewTransport(hc.Transport, otelhttp.WithPropagators(propagation.NewCompositeTextMapPropagator()))
+	return sources.NewClient(hc)
 }
 
 // CleanupArgs removes expired sign-in tokens, sessions and invitations.
