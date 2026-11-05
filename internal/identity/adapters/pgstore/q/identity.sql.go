@@ -28,6 +28,29 @@ func (q *Queries) CountMagicLinksSince(ctx context.Context, arg CountMagicLinksS
 	return count, err
 }
 
+const createChallenge = `-- name: CreateChallenge :one
+INSERT INTO webauthn_challenges (user_id, kind, data, expires_at) VALUES ($1, $2, $3, $4) RETURNING id
+`
+
+type CreateChallengeParams struct {
+	UserID    *uuid.UUID
+	Kind      string
+	Data      []byte
+	ExpiresAt time.Time
+}
+
+func (q *Queries) CreateChallenge(ctx context.Context, arg CreateChallengeParams) (uuid.UUID, error) {
+	row := q.db.QueryRow(ctx, createChallenge,
+		arg.UserID,
+		arg.Kind,
+		arg.Data,
+		arg.ExpiresAt,
+	)
+	var id uuid.UUID
+	err := row.Scan(&id)
+	return id, err
+}
+
 const createInvitation = `-- name: CreateInvitation :exec
 INSERT INTO invitations (email, role, token_hash, created_by, expires_at) VALUES ($1, $2, $3, $4, $5)
 `
@@ -188,6 +211,23 @@ type DeleteOtherSessionsParams struct {
 
 func (q *Queries) DeleteOtherSessions(ctx context.Context, arg DeleteOtherSessionsParams) (int64, error) {
 	result, err := q.db.Exec(ctx, deleteOtherSessions, arg.UserID, arg.Keep)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
+}
+
+const deletePasskey = `-- name: DeletePasskey :execrows
+DELETE FROM passkeys WHERE id = $1 AND user_id = $2
+`
+
+type DeletePasskeyParams struct {
+	ID     []byte
+	UserID uuid.UUID
+}
+
+func (q *Queries) DeletePasskey(ctx context.Context, arg DeletePasskeyParams) (int64, error) {
+	result, err := q.db.Exec(ctx, deletePasskey, arg.ID, arg.UserID)
 	if err != nil {
 		return 0, err
 	}
@@ -359,6 +399,29 @@ func (q *Queries) InsertAuditEvent(ctx context.Context, arg InsertAuditEventPara
 	return err
 }
 
+const insertPasskey = `-- name: InsertPasskey :exec
+INSERT INTO passkeys (id, user_id, name, credential, created_at) VALUES ($1, $2, $3, $4, $5)
+`
+
+type InsertPasskeyParams struct {
+	ID         []byte
+	UserID     uuid.UUID
+	Name       string
+	Credential []byte
+	CreatedAt  time.Time
+}
+
+func (q *Queries) InsertPasskey(ctx context.Context, arg InsertPasskeyParams) error {
+	_, err := q.db.Exec(ctx, insertPasskey,
+		arg.ID,
+		arg.UserID,
+		arg.Name,
+		arg.Credential,
+		arg.CreatedAt,
+	)
+	return err
+}
+
 const markInvitationAccepted = `-- name: MarkInvitationAccepted :execrows
 UPDATE invitations SET accepted_at = $2, accepted_user = $3 WHERE id = $1 AND accepted_at IS NULL
 `
@@ -409,6 +472,31 @@ func (q *Queries) ReplaceSession(ctx context.Context, arg ReplaceSessionParams) 
 	return i, err
 }
 
+const takeChallenge = `-- name: TakeChallenge :one
+DELETE FROM webauthn_challenges
+WHERE id = $1 AND kind = $2 AND expires_at > $3
+RETURNING user_id, data
+`
+
+type TakeChallengeParams struct {
+	ID   uuid.UUID
+	Kind string
+	Now  time.Time
+}
+
+type TakeChallengeRow struct {
+	UserID *uuid.UUID
+	Data   []byte
+}
+
+// A challenge is used once.
+func (q *Queries) TakeChallenge(ctx context.Context, arg TakeChallengeParams) (TakeChallengeRow, error) {
+	row := q.db.QueryRow(ctx, takeChallenge, arg.ID, arg.Kind, arg.Now)
+	var i TakeChallengeRow
+	err := row.Scan(&i.UserID, &i.Data)
+	return i, err
+}
+
 const touchSession = `-- name: TouchSession :exec
 UPDATE sessions SET last_seen_at = $2 WHERE token_hash = $1
 `
@@ -439,6 +527,67 @@ func (q *Queries) UseMagicLink(ctx context.Context, arg UseMagicLinkParams) (uui
 	var user_id uuid.UUID
 	err := row.Scan(&user_id)
 	return user_id, err
+}
+
+const usePasskey = `-- name: UsePasskey :one
+UPDATE passkeys SET credential = $3, last_used_at = $4 WHERE id = $1 AND user_id = $2 RETURNING user_id
+`
+
+type UsePasskeyParams struct {
+	ID         []byte
+	UserID     uuid.UUID
+	Credential []byte
+	LastUsedAt *time.Time
+}
+
+func (q *Queries) UsePasskey(ctx context.Context, arg UsePasskeyParams) (uuid.UUID, error) {
+	row := q.db.QueryRow(ctx, usePasskey,
+		arg.ID,
+		arg.UserID,
+		arg.Credential,
+		arg.LastUsedAt,
+	)
+	var user_id uuid.UUID
+	err := row.Scan(&user_id)
+	return user_id, err
+}
+
+const userPasskeys = `-- name: UserPasskeys :many
+SELECT id, name, credential, created_at, last_used_at FROM passkeys WHERE user_id = $1 ORDER BY created_at
+`
+
+type UserPasskeysRow struct {
+	ID         []byte
+	Name       string
+	Credential []byte
+	CreatedAt  time.Time
+	LastUsedAt *time.Time
+}
+
+func (q *Queries) UserPasskeys(ctx context.Context, userID uuid.UUID) ([]UserPasskeysRow, error) {
+	rows, err := q.db.Query(ctx, userPasskeys, userID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []UserPasskeysRow{}
+	for rows.Next() {
+		var i UserPasskeysRow
+		if err := rows.Scan(
+			&i.ID,
+			&i.Name,
+			&i.Credential,
+			&i.CreatedAt,
+			&i.LastUsedAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
 }
 
 const userSessions = `-- name: UserSessions :many

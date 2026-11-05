@@ -33,6 +33,23 @@ type NewSession struct {
 	ExpiresAt time.Time
 }
 
+// Challenge is the server state of a WebAuthn ceremony between options and response.
+type Challenge struct {
+	UserID    *uuid.UUID // nil for a sign-in (the user is not known yet)
+	Kind      string     // register, login
+	Data      []byte     // webauthn.SessionData as JSON
+	ExpiresAt time.Time
+}
+
+// Passkey is a registered WebAuthn credential.
+type Passkey struct {
+	ID         []byte
+	Name       string
+	Credential []byte // webauthn.Credential as JSON
+	CreatedAt  time.Time
+	LastUsed   time.Time
+}
+
 // StoredSession is a session row as Sessions returns it.
 type StoredSession struct {
 	Hash Hash
@@ -69,6 +86,18 @@ type Store interface {
 	DeleteOtherSessions(ctx context.Context, userID uuid.UUID, keep Hash, audit AuditEvent) (int, error)
 	// DeleteUserSessions ends every session of the user.
 	DeleteUserSessions(ctx context.Context, userID uuid.UUID, audit AuditEvent) (int, error)
+
+	// SaveChallenge stores the state of a WebAuthn ceremony; TakeChallenge returns and deletes it if it has the
+	// kind and has not expired at now (ErrNotFound otherwise).
+	SaveChallenge(ctx context.Context, c Challenge) (uuid.UUID, error)
+	TakeChallenge(ctx context.Context, id uuid.UUID, kind string, now time.Time) (Challenge, error)
+	// UserByID returns an account with its passkeys.
+	UserByID(ctx context.Context, id uuid.UUID) (User, []Passkey, error)
+	AddPasskey(ctx context.Context, userID uuid.UUID, p Passkey, audit AuditEvent) error
+	// SignInWithPasskey stores the updated credential and creates the session atomically (no session for a
+	// disabled user).
+	SignInWithPasskey(ctx context.Context, userID uuid.UUID, id, credential []byte, s NewSession, at time.Time) (User, error)
+	DeletePasskey(ctx context.Context, userID uuid.UUID, id []byte, audit AuditEvent) (bool, error)
 	DeleteSession(ctx context.Context, h Hash, audit AuditEvent) error
 	DeleteExpired(ctx context.Context, before time.Time) error
 }

@@ -7,6 +7,7 @@ import (
 	"net/url"
 	"time"
 
+	"github.com/go-webauthn/webauthn/webauthn"
 	"github.com/google/uuid"
 
 	"github.com/1xxn/getafjob/internal/platform/i18n"
@@ -18,6 +19,8 @@ type Service struct {
 	mailer Mailer // nil: mail disabled (links are only printed by the CLI)
 	base   *url.URL
 	now    func() time.Time
+	// webauthn is nil until EnablePasskeys.
+	webauthn *webauthn.WebAuthn
 }
 
 // NewService wires the service; base is the public URL used in links.

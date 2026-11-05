@@ -42,4 +42,6 @@ func T(ctx context.Context, key string, params ...any) string {
 type Page struct {
 	Title    string
 	UserName string // empty: signed out
+	// Passkeys loads the passkey script (pages with passkey buttons).
+	Passkeys bool
 }

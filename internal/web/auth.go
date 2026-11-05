@@ -1,6 +1,7 @@
 package web
 
 import (
+	"encoding/base64"
 	"errors"
 	"net/http"
 	"strconv"
@@ -61,7 +62,7 @@ func (s *Server) loginForm(w http.ResponseWriter, r *http.Request, u *identity.U
 	case r.URL.Query().Get("expired") == "1":
 		notice = identity.Msg(identity.ErrSessionExpired).Render(views.Locale(r.Context()))
 	}
-	s.render(w, r, http.StatusOK, views.Login("", notice))
+	s.render(w, r, http.StatusOK, views.Login("", notice, s.Identity.PasskeysEnabled()))
 }
 
 func (s *Server) loginSubmit(w http.ResponseWriter, r *http.Request, _ *identity.User) {
@@ -161,7 +162,11 @@ func sessionToken(r *http.Request) string {
 }
 
 func (s *Server) account(w http.ResponseWriter, r *http.Request, u *identity.User) {
-	s.renderAccount(w, r, u, "")
+	notice := ""
+	if r.URL.Query().Get("added") == "1" {
+		notice = views.T(r.Context(), "passkey.added")
+	}
+	s.renderAccount(w, r, u, notice)
 }
 
 func (s *Server) renderAccount(w http.ResponseWriter, r *http.Request, u *identity.User, notice string) {
@@ -179,7 +184,22 @@ func (s *Server) renderAccount(w http.ResponseWriter, r *http.Request, u *identi
 		rows[i] = views.SessionRow{Method: string(si.Method), Created: views.When(r.Context(), si.CreatedAt),
 			LastSeen: views.When(r.Context(), si.LastSeen), Current: si.Current}
 	}
-	s.render(w, r, http.StatusOK, views.Account(u.DisplayName, notice, rows))
+	d := views.AccountData{Name: u.DisplayName, Notice: notice, Sessions: rows, Enabled: s.Identity.PasskeysEnabled()}
+	if d.Enabled {
+		keys, err := s.Identity.Passkeys(r.Context(), u.ID)
+		if err != nil {
+			s.failed(w, r, u, err)
+			return
+		}
+		for _, k := range keys {
+			p := views.PasskeyRow{ID: base64.RawURLEncoding.EncodeToString(k.ID), Name: k.Name, Created: views.When(r.Context(), k.CreatedAt)}
+			if !k.LastUsed.IsZero() {
+				p.LastUsed = views.When(r.Context(), k.LastUsed)
+			}
+			d.Passkeys = append(d.Passkeys, p)
+		}
+	}
+	s.render(w, r, http.StatusOK, views.Account(d))
 }
 
 func (s *Server) signOutOthers(w http.ResponseWriter, r *http.Request, u *identity.User) {

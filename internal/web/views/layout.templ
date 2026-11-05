@@ -11,6 +11,9 @@ templ Layout(p Page) {
 			<link rel="stylesheet" href="/static/app.css"/>
 			<link rel="icon" href="/static/icon.svg" type="image/svg+xml"/>
 			<link rel="manifest" href="/static/manifest.webmanifest"/>
+			if p.Passkeys {
+				<script type="module" src="/static/js/passkey.js"></script>
+			}
 		</head>
 		<body>
 			<a class="skip" href="#main">{ T(ctx, "nav.skip") }</a>

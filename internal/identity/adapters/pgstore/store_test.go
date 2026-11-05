@@ -1,9 +1,12 @@
 package pgstore_test
 
 import (
+	"bytes"
 	"context"
+	"encoding/json"
 	"errors"
 	"net/url"
+	"slices"
 	"strings"
 	"sync"
 	"testing"
@@ -15,6 +18,7 @@ import (
 
 	"github.com/1xxn/getafjob/internal/identity"
 	"github.com/1xxn/getafjob/internal/identity/adapters/pgstore"
+	"github.com/1xxn/getafjob/internal/identity/softauthn"
 	"github.com/1xxn/getafjob/internal/platform/db"
 	"github.com/1xxn/getafjob/internal/platform/db/dbtest"
 	"github.com/1xxn/getafjob/internal/platform/i18n"
@@ -489,5 +493,155 @@ func TestSignOutUser(t *testing.T) {
 	}
 	if _, err := e.svc.SignOutUser(ctx, "erika@example.com"); !errors.Is(err, identity.ErrNotFound) {
 		t.Errorf("unknown account: %v", err)
+	}
+}
+
+func passkeyEnv(t *testing.T) *env {
+	t.Helper()
+	e := newEnv(t)
+	base, _ := url.Parse("https://jobs.example.org")
+	if err := e.svc.EnablePasskeys(base); err != nil {
+		t.Fatal(err)
+	}
+	return e
+}
+
+func mustJSON(t *testing.T, v any) []byte {
+	t.Helper()
+	b, err := json.Marshal(v)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return b
+}
+
+func register(t *testing.T, e *env, u identity.User, session identity.Token, key *softauthn.Key) error {
+	t.Helper()
+	opts, ch, err := e.svc.BeginPasskeyRegistration(t.Context(), u.ID, string(session))
+	if err != nil {
+		return err
+	}
+	resp, err := key.Create(mustJSON(t, opts))
+	if err != nil {
+		t.Fatal(err)
+	}
+	return e.svc.FinishPasskeyRegistration(t.Context(), u.ID, string(session), ch, " Laptop  of Max ", resp)
+}
+
+func login(t *testing.T, e *env, key *softauthn.Key) (identity.User, identity.Token, error) {
+	t.Helper()
+	opts, ch, err := e.svc.BeginPasskeyLogin(t.Context())
+	if err != nil {
+		t.Fatal(err)
+	}
+	resp, err := key.Get(mustJSON(t, opts))
+	if err != nil {
+		t.Fatal(err)
+	}
+	return e.svc.FinishPasskeyLogin(t.Context(), ch, resp)
+}
+
+func TestPasskeys(t *testing.T) {
+	e := passkeyEnv(t)
+	ctx := t.Context()
+	u, session := signIn(t, e)
+	key := softauthn.New("jobs.example.org", "https://jobs.example.org")
+	if err := register(t, e, u, session, key); err != nil {
+		t.Fatal(err)
+	}
+	keys, err := e.svc.Passkeys(ctx, u.ID)
+	if err != nil || len(keys) != 1 || keys[0].Name != "Laptop of Max" || !bytes.Equal(keys[0].ID, key.ID) {
+		t.Fatalf("passkeys = %+v, %v", keys, err)
+	}
+	// The same authenticator cannot register twice.
+	if err := register(t, e, u, session, key); !errors.Is(err, identity.ErrPasskeyFailed) {
+		t.Fatalf("second registration: %v", err)
+	}
+
+	got, s, err := login(t, e, key)
+	if err != nil || got.ID != u.ID || s == "" {
+		t.Fatalf("login = %+v, %q, %v", got, s, err)
+	}
+	list, _ := e.svc.Sessions(ctx, u.ID, string(s))
+	if len(list) != 2 || !slices.ContainsFunc(list, func(x identity.SessionInfo) bool { return x.Current && x.Method == identity.MethodPasskey }) {
+		t.Fatalf("sessions after passkey login = %+v", list)
+	}
+	if keys, _ := e.svc.Passkeys(ctx, u.ID); keys[0].LastUsed.IsZero() {
+		t.Error("last use not recorded")
+	}
+
+	// A replayed challenge, a counter that went backwards, no user verification and a foreign origin are refused.
+	opts, ch, _ := e.svc.BeginPasskeyLogin(ctx)
+	resp, _ := key.Get(mustJSON(t, opts))
+	if _, _, err := e.svc.FinishPasskeyLogin(ctx, ch, resp); err != nil {
+		t.Fatal(err)
+	}
+	if _, _, err := e.svc.FinishPasskeyLogin(ctx, ch, resp); !errors.Is(err, identity.ErrPasskeyFailed) {
+		t.Errorf("replayed challenge: %v", err)
+	}
+	key.Count = 0
+	if _, _, err := login(t, e, key); !errors.Is(err, identity.ErrPasskeyFailed) {
+		t.Errorf("cloned authenticator: %v", err)
+	}
+	key.Count = 100
+	key.NoUV = true
+	if _, _, err := login(t, e, key); !errors.Is(err, identity.ErrPasskeyFailed) {
+		t.Errorf("without user verification: %v", err)
+	}
+	key.NoUV = false
+	key.Origin = "https://evil.example.org"
+	if _, _, err := login(t, e, key); !errors.Is(err, identity.ErrPasskeyFailed) {
+		t.Errorf("foreign origin: %v", err)
+	}
+	key.Origin = "https://jobs.example.org"
+	stranger := softauthn.New("jobs.example.org", "https://jobs.example.org")
+	stranger.UserHandle = u.ID[:]
+	if _, _, err := login(t, e, stranger); !errors.Is(err, identity.ErrPasskeyFailed) {
+		t.Errorf("unknown credential: %v", err)
+	}
+	// An expired challenge is refused.
+	opts, ch, _ = e.svc.BeginPasskeyLogin(ctx)
+	resp, _ = key.Get(mustJSON(t, opts))
+	e.now = e.now.Add(6 * time.Minute)
+	if _, _, err := e.svc.FinishPasskeyLogin(ctx, ch, resp); !errors.Is(err, identity.ErrPasskeyFailed) {
+		t.Errorf("expired challenge: %v", err)
+	}
+}
+
+func TestPasskeyChangesNeedFreshSignIn(t *testing.T) {
+	e := passkeyEnv(t)
+	ctx := t.Context()
+	u, session := signIn(t, e)
+	key := softauthn.New("jobs.example.org", "https://jobs.example.org")
+	if err := register(t, e, u, session, key); err != nil {
+		t.Fatal(err)
+	}
+	e.now = e.now.Add(identity.SessionFresh)
+	_, next, err := e.svc.Authenticate(ctx, string(session))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if next != "" {
+		session = next
+	}
+	if err := register(t, e, u, session, softauthn.New("jobs.example.org", "https://jobs.example.org")); !errors.Is(err, identity.ErrReauthRequired) {
+		t.Errorf("stale registration: %v", err)
+	}
+	if err := e.svc.DeletePasskey(ctx, u.ID, string(session), key.ID); !errors.Is(err, identity.ErrReauthRequired) {
+		t.Errorf("stale removal: %v", err)
+	}
+	// Signing in with the passkey makes a fresh session that may remove it.
+	_, fresh, err := login(t, e, key)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := e.svc.DeletePasskey(ctx, u.ID, string(fresh), key.ID); err != nil {
+		t.Fatal(err)
+	}
+	if err := e.svc.DeletePasskey(ctx, u.ID, string(fresh), key.ID); !errors.Is(err, identity.ErrNotFound) {
+		t.Errorf("second removal: %v", err)
+	}
+	if _, _, err := login(t, e, key); !errors.Is(err, identity.ErrPasskeyFailed) {
+		t.Errorf("removed passkey still signs in: %v", err)
 	}
 }
