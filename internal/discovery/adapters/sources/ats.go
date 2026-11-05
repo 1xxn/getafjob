@@ -13,9 +13,23 @@ import (
 	"github.com/1xxn/getafjob/internal/platform/htmltext"
 )
 
+// conditional keeps the validators of a source's last answer (discovery.Conditional).
+type conditional struct{ since discovery.Validators }
+
+// SetValidators implements discovery.Conditional.
+func (c *conditional) SetValidators(v discovery.Validators) { c.since = v }
+
+var (
+	_ discovery.Conditional = (*Greenhouse)(nil)
+	_ discovery.Conditional = (*Ashby)(nil)
+	_ discovery.Conditional = (*Lever)(nil)
+	_ discovery.Conditional = (*Personio)(nil)
+)
+
 // Greenhouse reads boards-api.greenhouse.io.
 type Greenhouse struct {
-	c              *Client
+	c *Client
+	conditional
 	board, company string
 }
 
@@ -50,8 +64,9 @@ func (s *Greenhouse) Fetch(ctx context.Context) (discovery.Batch, error) {
 			Updated   string `json:"updated_at"`
 		} `json:"jobs"`
 	}
-	if err := s.c.GetJSON(ctx, s.Name(), base+"/jobs", url.Values{"content": {"true"}}, nil, &data); err != nil {
-		return discovery.Batch{}, err
+	v, unchanged, err := s.c.GetJSONConditional(ctx, s.Name(), base+"/jobs", url.Values{"content": {"true"}}, s.since, &data)
+	if err != nil || unchanged {
+		return discovery.Batch{NotModified: unchanged, Validators: v}, err
 	}
 	out := make([]discovery.Posting, 0, len(data.Jobs))
 	for _, j := range data.Jobs {
@@ -68,12 +83,13 @@ func (s *Greenhouse) Fetch(ctx context.Context) (discovery.Batch, error) {
 			Location: location, URL: j.URL, Description: htmltext.Text(j.Content), Posted: day(or(j.Published, j.Updated)),
 		})
 	}
-	return discovery.Batch{Postings: out, Complete: true}, nil
+	return discovery.Batch{Postings: out, Complete: true, Validators: v}, nil
 }
 
 // Ashby reads the public Ashby job board API.
 type Ashby struct {
-	c              *Client
+	c *Client
+	conditional
 	board, company string
 }
 
@@ -108,8 +124,9 @@ func (s *Ashby) Fetch(ctx context.Context) (discovery.Batch, error) {
 		} `json:"jobs"`
 	}
 	u := "https://api.ashbyhq.com/posting-api/job-board/" + url.PathEscape(s.board)
-	if err := s.c.GetJSON(ctx, s.Name(), u, nil, nil, &data); err != nil {
-		return discovery.Batch{}, err
+	v, unchanged, err := s.c.GetJSONConditional(ctx, s.Name(), u, nil, s.since, &data)
+	if err != nil || unchanged {
+		return discovery.Batch{NotModified: unchanged, Validators: v}, err
 	}
 	out := make([]discovery.Posting, 0, len(data.Jobs))
 	for _, j := range data.Jobs {
@@ -134,12 +151,13 @@ func (s *Ashby) Fetch(ctx context.Context) (discovery.Batch, error) {
 			Posted: day(j.PublishedAt), Workplace: wp,
 		})
 	}
-	return discovery.Batch{Postings: out, Complete: true}, nil
+	return discovery.Batch{Postings: out, Complete: true, Validators: v}, nil
 }
 
 // Lever reads the Lever postings API (global and EU hosts).
 type Lever struct {
-	c             *Client
+	c *Client
+	conditional
 	slug, company string
 }
 
@@ -167,14 +185,17 @@ func (s *Lever) Fetch(ctx context.Context) (discovery.Batch, error) {
 	}
 	var data []posting
 	var err error
+	var v discovery.Validators
+	var unchanged bool
 	for _, host := range []string{"api.lever.co", "api.eu.lever.co"} {
 		u := "https://" + host + "/v0/postings/" + url.PathEscape(s.slug)
-		if err = s.c.GetJSON(ctx, s.Name(), u, url.Values{"mode": {"json"}}, nil, &data); Status(err) != http.StatusNotFound {
+		v, unchanged, err = s.c.GetJSONConditional(ctx, s.Name(), u, url.Values{"mode": {"json"}}, s.since, &data)
+		if Status(err) != http.StatusNotFound {
 			break
 		}
 	}
-	if err != nil {
-		return discovery.Batch{}, err
+	if err != nil || unchanged {
+		return discovery.Batch{NotModified: unchanged, Validators: v}, err
 	}
 	out := make([]discovery.Posting, 0, len(data))
 	for _, j := range data {
@@ -192,7 +213,7 @@ func (s *Lever) Fetch(ctx context.Context) (discovery.Batch, error) {
 			Posted: epochDay(j.CreatedAt), Workplace: workplace(j.Workplace),
 		})
 	}
-	return discovery.Batch{Postings: out, Complete: true}, nil
+	return discovery.Batch{Postings: out, Complete: true, Validators: v}, nil
 }
 
 // SmartRecruiters reads the SmartRecruiters posting API; descriptions come per posting (Details).
@@ -291,7 +312,8 @@ func (s *SmartRecruiters) Details(ctx context.Context, p *discovery.Posting) err
 
 // Personio reads the XML feed of a Personio career page.
 type Personio struct {
-	c             *Client
+	c *Client
+	conditional
 	slug, company string
 }
 
@@ -318,9 +340,9 @@ type personioFeed struct {
 // Fetch implements discovery.Source.
 func (s *Personio) Fetch(ctx context.Context) (discovery.Batch, error) {
 	host := "https://" + s.slug + ".jobs.personio.de"
-	b, err := s.c.GetBytes(ctx, s.Name(), host+"/xml", url.Values{"language": {"de"}}, "application/xml")
-	if err != nil {
-		return discovery.Batch{}, err
+	b, v, unchanged, err := s.c.GetConditional(ctx, s.Name(), host+"/xml", url.Values{"language": {"de"}}, "application/xml", s.since)
+	if err != nil || unchanged {
+		return discovery.Batch{NotModified: unchanged, Validators: v}, err
 	}
 	var feed personioFeed
 	// encoding/xml expands no external entities and no DTD entities.
@@ -351,7 +373,7 @@ func (s *Personio) Fetch(ctx context.Context) (discovery.Batch, error) {
 			Extra: extra,
 		})
 	}
-	return discovery.Batch{Postings: out, Complete: true}, nil
+	return discovery.Batch{Postings: out, Complete: true, Validators: v}, nil
 }
 
 // Recruitee reads the offers API of a Recruitee career site.

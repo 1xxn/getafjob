@@ -27,6 +27,7 @@ var (
 	_ discovery.Store       = (*Store)(nil)
 	_ discovery.Boards      = (*Store)(nil)
 	_ discovery.BoardChecks = (*Store)(nil)
+	_ discovery.BoardStates = (*Store)(nil)
 )
 
 // New returns a store on pool.
@@ -309,7 +310,8 @@ func (s *Store) EnabledBoards(ctx context.Context) ([]discovery.Board, error) {
 	err := s.system(ctx, func(qs *q.Queries) error {
 		rows, err := qs.EnabledBoards(ctx)
 		for _, r := range rows {
-			out = append(out, discovery.Board{ID: r.ID, ATS: r.Ats, Slug: r.Slug, Company: r.Company, Config: r.Config})
+			out = append(out, discovery.Board{ID: r.ID, ATS: r.Ats, Slug: r.Slug, Company: r.Company, Config: r.Config,
+				Validators: discovery.Validators{ETag: r.Etag, LastModified: r.LastModified}})
 		}
 		return err
 	})
@@ -374,4 +376,18 @@ func discoveredBoard(ctx context.Context, qs *q.Queries, b discovery.Board) (id 
 	}
 	id, err = qs.InsertDiscoveredBoard(ctx, q.InsertDiscoveredBoardParams{Ats: b.ATS, Slug: b.Slug, Company: b.Company, Config: cfg})
 	return id, err == nil, err
+}
+
+// SaveBoardStates records when each board was crawled, its error code and, after a good fetch, its validators.
+func (s *Store) SaveBoardStates(ctx context.Context, states []discovery.BoardState, at time.Time) error {
+	return s.system(ctx, func(qs *q.Queries) error {
+		for _, st := range states {
+			if err := qs.SaveBoardState(ctx, q.SaveBoardStateParams{
+				ID: st.ID, At: &at, LastError: st.Error, Etag: st.Validators.ETag, LastModified: st.Validators.LastModified,
+			}); err != nil {
+				return err
+			}
+		}
+		return nil
+	})
 }

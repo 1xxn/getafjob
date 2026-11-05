@@ -63,7 +63,8 @@ ON CONFLICT (ats, slug) DO UPDATE SET company = EXCLUDED.company, config = EXCLU
 RETURNING (xmax = 0)::bool AS inserted;
 
 -- name: EnabledBoards :many
-SELECT id, ats, slug, company, config FROM boards WHERE enabled ORDER BY id;
+SELECT id, ats, slug, company, config, coalesce(etag, '')::text AS etag, coalesce(last_modified, '')::text AS last_modified
+FROM boards WHERE enabled ORDER BY id;
 
 -- name: TouchOpenJobs :many
 UPDATE jobs SET last_seen = sqlc.arg(at) WHERE fingerprint = ANY(sqlc.arg(fingerprints)::text[]) AND status = 'open'
@@ -94,3 +95,12 @@ INSERT INTO board_checks (company_key, checked_at, recheck_at, result, board_id)
 ON CONFLICT (company_key) DO UPDATE
 SET checked_at = EXCLUDED.checked_at, recheck_at = EXCLUDED.recheck_at, result = EXCLUDED.result,
     board_id = EXCLUDED.board_id;
+
+-- name: SaveBoardState :exec
+-- A failed fetch keeps the validators of the last good one.
+UPDATE boards
+SET last_crawled_at = sqlc.arg(at),
+    last_error      = nullif(sqlc.arg(last_error)::text, ''),
+    etag            = CASE WHEN sqlc.arg(last_error)::text = '' THEN nullif(sqlc.arg(etag)::text, '') ELSE etag END,
+    last_modified   = CASE WHEN sqlc.arg(last_error)::text = '' THEN nullif(sqlc.arg(last_modified)::text, '') ELSE last_modified END
+WHERE id = sqlc.arg(id);

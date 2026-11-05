@@ -64,7 +64,7 @@ func worker(ctx context.Context, cfg config.Config, logger *slog.Logger) error {
 	store := discoverystore.New(pool)
 	workers := river.NewWorkers()
 	client := sourceClient(cfg)
-	river.AddWorker(workers, &crawlWorker{svc: discovery.NewService(store), boards: store, client: client,
+	river.AddWorker(workers, &crawlWorker{svc: discovery.NewService(store), boards: store, states: store, client: client,
 		cfg: cfg, logger: logger, timeout: 90 * time.Minute})
 	river.AddWorker(workers, &boardDiscoveryWorker{
 		discovery: discovery.NewBoardDiscovery(store, store, sources.NewFinder(client)), logger: logger})
