@@ -13,8 +13,8 @@ import (
 // completes it in the assistant.
 
 var (
-	emailRx    = regexp.MustCompile(`[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}`)
-	phoneRx    = regexp.MustCompile(`(?:\+\d{1,3}[\s./-]?)?(?:\(\d{1,5}\)[\s./-]?)?\d[\d\s./-]{6,18}\d`)
+	emailRx = regexp.MustCompile(`[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}`)
+	phoneRx = regexp.MustCompile(`(?:\+\d{1,3}[\s./-]?)?(?:\(\d{1,5}\)[\s./-]?)?\d[\d\s./-]{6,18}\d`)
 	// The host must start the line or follow a separator, so evil-linkedin.com or xgithub.com never count.
 	linkedinRx = regexp.MustCompile(`(?i)(?:^|[\s(<|,;:])((?:https?://)?(?:www\.|[a-z]{2}\.)?linkedin\.com/in/[A-Za-z0-9_%-]+/?)`)
 	githubRx   = regexp.MustCompile(`(?i)(?:^|[\s(<|,;:])((?:https?://)?(?:www\.)?github\.com/[A-Za-z0-9-]{1,39}/?)`)
