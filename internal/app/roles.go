@@ -79,7 +79,7 @@ func serve(ctx context.Context, cfg config.Config, logger *slog.Logger) error {
 		Importer: cvimport.NewImporter(docs, profiles, extractor)}).Register(mux)
 
 	h := httpx.Instrument(httpx.Protect(httpx.Routes(mux), maxBody, cfg.PublicURL.Scheme == "https",
-		httpx.Upload{Path: "/documents", Max: web.MaxUpload}))
+		httpx.Upload{Path: "/documents", Max: web.MaxUpload}, httpx.Upload{Path: "/setup/cv", Max: web.MaxUpload}))
 	return httpx.Run(ctx, httpx.NewServer(cfg.HTTPAddr, h, logger), cfg.ShutdownTimeout, logger)
 }
 

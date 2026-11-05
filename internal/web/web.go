@@ -72,6 +72,11 @@ func (s *Server) Register(mux *http.ServeMux) {
 	mux.Handle("POST /texts", s.page(s.textSave))
 	mux.Handle("POST /texts/{id}", s.page(s.textSave))
 	mux.Handle("POST /texts/{id}/delete", s.page(s.itemDelete(profile.ItemText, "/texts")))
+	mux.Handle("GET /setup", s.page(s.setupStart))
+	mux.Handle("GET /setup/{step}", s.page(s.setupPage))
+	mux.Handle("POST /setup/{step}", s.page(s.setupSave))
+	mux.Handle("POST /setup/cv", s.limited(s.page(s.setupCVUpload)))
+	mux.Handle("POST /setup/cv/import/{id}", s.limited(s.page(s.setupCVImport)))
 	mux.Handle("GET /account", s.page(s.account))
 	mux.Handle("POST /account/sessions/others", s.page(s.signOutOthers))
 	mux.Handle("POST /account/passkeys/options", s.page(s.passkeyAddOptions))
@@ -146,7 +151,12 @@ func (s *Server) home(w http.ResponseWriter, r *http.Request, u *identity.User) 
 		}
 		nudge = len(keys) == 0
 	}
-	s.render(w, r, http.StatusOK, views.Home(u.DisplayName, nudge))
+	snap, err := s.Profile.Get(r.Context(), u.ID)
+	if err != nil {
+		s.failed(w, r, u, err)
+		return
+	}
+	s.render(w, r, http.StatusOK, views.Home(u.DisplayName, nudge, len(snap.Profile.Missing()) > 0))
 }
 
 // limiter is a token bucket per client address.

@@ -164,6 +164,10 @@ internal `edge` (caddy and serve), `backend` (serve, worker, migrate, postgres),
   required). Session tokens rotate hourly; adding or removing passkeys and ending other sessions need a sign-in in
   the last 15 minutes ([security.md](security.md#asvs-50-l2-authentication-v6-and-sessions-v7)). The passkey
   script is a TypeScript island in `internal/web/ts`, bundled with the esbuild Go API by `go generate`.
+- **Profile:** profile, answers, text blocks and document names are sealed per user; search preferences stay
+  readable for the crawler. Documents are typed by content and stored sealed in the blob store. The CV import reads
+  PDF or DOCX text in a limited child process (`getafjob extract-text`) and fills only empty fields; the setup
+  assistant (`/setup`) walks through CV, contact, work, experience, search and what is still missing.
 - **Encryption at rest:** `platform/crypto` seals user secrets and files with a per-user data key (AES-256-GCM,
   associated data = user and purpose); data keys live wrapped in `user_keys` under the master key from a Docker
   secret ([0006](adr/0006-tenant-isolation-rls-and-envelope-encryption.md),
