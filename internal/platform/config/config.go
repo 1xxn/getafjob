@@ -46,6 +46,10 @@ type Config struct {
 	BrowserBin string
 	// EgressProxy is the egress proxy for the browser and source fetches (http://egress:4750). Empty: direct.
 	EgressProxy *url.URL
+	// SMTPURL is the mail server (smtps://user:pass@host:465, smtp://…:587 with STARTTLS). Empty: no mail.
+	SMTPURL Secret
+	// MailFrom is the sender address of all mail.
+	MailFrom string
 	// ShutdownTimeout bounds the graceful shutdown.
 	ShutdownTimeout time.Duration
 
@@ -87,6 +91,8 @@ var specs = []spec{
 	{"BROWSER_BIN", "", func(c *Config, v string) error { c.BrowserBin = v; return nil }},
 	{"EGRESS_PROXY", "", setEgressProxy},
 	{"SHUTDOWN_TIMEOUT", "20s", setShutdownTimeout},
+	{"SMTP_URL", "", func(c *Config, v string) error { c.SMTPURL = Secret(v); return nil }},
+	{"MAIL_FROM", "getafjob@localhost", setMailFrom},
 }
 
 // Names returns all known variable names (with prefix), e.g. for the docs.
@@ -219,6 +225,14 @@ func setEgressProxy(c *Config, v string) error {
 	return nil
 }
 
+func setMailFrom(c *Config, v string) error {
+	if strings.ContainsAny(v, "\r\n <>") || !strings.Contains(v, "@") {
+		return errors.New("must be a plain e-mail address")
+	}
+	c.MailFrom = v
+	return nil
+}
+
 func setShutdownTimeout(c *Config, v string) error {
 	d, err := time.ParseDuration(v)
 	if err != nil || d < time.Second || d > 5*time.Minute {
@@ -238,6 +252,7 @@ func (c Config) LogValue() slog.Value {
 		slog.String("log_level", c.LogLevel.String()),
 		slog.String("log_format", c.LogFormat),
 		slog.Bool("egress_proxy_set", c.EgressProxy != nil),
+		slog.Bool("smtp_configured", c.SMTPURL != ""),
 		slog.Duration("shutdown_timeout", c.ShutdownTimeout),
 	)
 }

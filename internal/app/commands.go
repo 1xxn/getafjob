@@ -22,10 +22,11 @@ Commands:
   check-config   validate the configuration (prints variable names, never values)
   env            list all configuration variables
   gen-secret     print 32 random bytes (base64url) for passwords and keys
+  invite         create a one-time invitation link (admin invite -email … [-role admin] [-send])
 `
 
 // admin bundles administrative commands. Phase 1 adds "invite".
-func admin(_ context.Context, args []string, env Env) int {
+func admin(ctx context.Context, args []string, env Env) int {
 	if len(args) == 0 {
 		_, _ = fmt.Fprint(env.Stderr, adminUsage)
 		return ExitUsage
@@ -47,6 +48,8 @@ func admin(_ context.Context, args []string, env Env) int {
 			_, _ = fmt.Fprintln(env.Stdout, n)
 		}
 		return ExitOK
+	case "invite":
+		return adminInvite(ctx, args[1:], env)
 	case "gen-secret":
 		b := make([]byte, 32)
 		_, _ = rand.Read(b) // crypto/rand.Read never returns an error (it crashes instead)
