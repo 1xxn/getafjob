@@ -1,0 +1,31 @@
+{
+  "complete": true,
+  "postings": [
+    {
+      "Source": "arbeitnow",
+      "ExternalID": "backend-developer-musterfirma-berlin-1",
+      "Company": "Musterfirma GmbH",
+      "Title": "Backend Developer",
+      "Location": "Berlin, Germany",
+      "URL": "https://www.arbeitnow.com/jobs/companies/musterfirma/backend-developer-musterfirma-berlin-1",
+      "ApplyURL": "",
+      "Description": "Go and PostgreSQL (updated).",
+      "Posted": "2026-11-01",
+      "Workplace": "hybrid",
+      "Extra": null
+    },
+    {
+      "Source": "arbeitnow",
+      "ExternalID": "data-analyst-beispiel-wien-2",
+      "Company": "Beispiel AG",
+      "Title": "Data Analyst",
+      "Location": "Wien, Austria",
+      "URL": "https://www.arbeitnow.at/jobs/companies/beispiel/data-analyst-beispiel-wien-2",
+      "ApplyURL": "",
+      "Description": "Dashboards.",
+      "Posted": "2026-11-02",
+      "Workplace": "remote",
+      "Extra": null
+    }
+  ]
+}

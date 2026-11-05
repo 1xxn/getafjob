@@ -1,0 +1,28 @@
+{
+  "name": "Muster Labs",
+  "description": null,
+  "jobs": [
+    {
+      "title": "QA Engineer",
+      "shortcode": "A1B2C3D4E5",
+      "code": "",
+      "country": "Germany",
+      "city": "Frankfurt",
+      "url": "https://apply.workable.com/j/A1B2C3D4E5",
+      "application_url": "https://apply.workable.com/j/A1B2C3D4E5/apply",
+      "description": "<p>Test everything.</p>",
+      "published_on": "2026-10-29",
+      "telecommuting": false
+    },
+    {
+      "title": "Support Engineer",
+      "shortcode": "F6G7H8I9J0",
+      "country": "Germany",
+      "city": "",
+      "url": "https://apply.workable.com/j/F6G7H8I9J0",
+      "description": "Help users.",
+      "published_on": "2026-11-01",
+      "telecommuting": "true"
+    }
+  ]
+}

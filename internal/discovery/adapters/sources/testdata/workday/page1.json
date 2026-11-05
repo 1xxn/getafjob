@@ -1,0 +1,17 @@
+{
+  "total": 3,
+  "jobPostings": [
+    {
+      "title": "Backend Engineer",
+      "externalPath": "/job/Berlin/Backend-Engineer_R-1001",
+      "locationsText": "Berlin",
+      "postedOn": "Posted 3 Days Ago"
+    },
+    {
+      "title": "Data Engineer",
+      "externalPath": "/job/Remote/Data-Engineer_R-1002",
+      "locationsText": "2 Locations",
+      "postedOn": "Posted Today"
+    }
+  ]
+}

@@ -1,0 +1,35 @@
+{
+  "data": [
+    {
+      "slug": "backend-developer-musterfirma-berlin-1",
+      "company_name": "Musterfirma GmbH",
+      "title": "Backend Developer",
+      "description": "<p>Go and PostgreSQL.</p>",
+      "remote": false,
+      "url": "https://www.arbeitnow.com/jobs/companies/musterfirma/backend-developer-musterfirma-berlin-1",
+      "tags": [
+        "IT"
+      ],
+      "job_types": [
+        "Berufserfahren",
+        "Hybrid"
+      ],
+      "location": "Berlin",
+      "created_at": 1793491200
+    },
+    {
+      "slug": "data-analyst-beispiel-wien-2",
+      "company_name": "Beispiel AG",
+      "title": "Data Analyst",
+      "description": "Dashboards.",
+      "remote": true,
+      "url": "https://www.arbeitnow.at/jobs/companies/beispiel/data-analyst-beispiel-wien-2",
+      "job_types": [],
+      "location": "Wien",
+      "created_at": 1793577600
+    }
+  ],
+  "links": {
+    "next": "https://www.arbeitnow.com/api/job-board-api?page=2"
+  }
+}

@@ -1,0 +1,25 @@
+{
+  "jobs": [
+    {
+      "guid": "https://himalayas.app/companies/muster-cloud/jobs/go-engineer",
+      "title": "Go Engineer",
+      "companyName": "Muster Cloud",
+      "applicationLink": "https://himalayas.app/companies/muster-cloud/jobs/go-engineer",
+      "description": "<p>Remote Go work.</p>",
+      "pubDate": 1793664000,
+      "locationRestrictions": [
+        "Germany",
+        "Austria"
+      ]
+    },
+    {
+      "guid": "https://himalayas.app/companies/beispiel-io/jobs/sre",
+      "title": "SRE",
+      "companyName": "Beispiel IO",
+      "applicationLink": "https://himalayas.app/companies/beispiel-io/jobs/sre",
+      "description": "On call.",
+      "pubDate": 1793664000,
+      "locationRestrictions": []
+    }
+  ]
+}

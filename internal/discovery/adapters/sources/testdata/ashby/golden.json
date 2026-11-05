@@ -1,0 +1,31 @@
+{
+  "complete": true,
+  "postings": [
+    {
+      "Source": "ashby:beispiel",
+      "ExternalID": "1b6c4a0e-0000-4000-8000-000000000001",
+      "Company": "Beispiel Labs",
+      "Title": "Product Designer",
+      "Location": "Berlin; Remote (Germany)",
+      "URL": "https://jobs.ashbyhq.com/beispiel/1b6c4a0e-0000-4000-8000-000000000001",
+      "ApplyURL": "https://jobs.ashbyhq.com/beispiel/1b6c4a0e-0000-4000-8000-000000000001/application",
+      "Description": "Design tools for Max Mustermann and friends.",
+      "Posted": "2026-10-28",
+      "Workplace": "hybrid",
+      "Extra": null
+    },
+    {
+      "Source": "ashby:beispiel",
+      "ExternalID": "1b6c4a0e-0000-4000-8000-000000000003",
+      "Company": "Beispiel Labs",
+      "Title": "Go Developer",
+      "Location": "Remote",
+      "URL": "https://jobs.ashbyhq.com/beispiel/1b6c4a0e-0000-4000-8000-000000000003",
+      "ApplyURL": "",
+      "Description": "Write Go.",
+      "Posted": "2026-11-03",
+      "Workplace": "remote",
+      "Extra": null
+    }
+  ]
+}

@@ -1,0 +1,34 @@
+{
+  "offset": 0,
+  "limit": 100,
+  "totalFound": 3,
+  "content": [
+    {
+      "id": "744000000000001",
+      "name": "Elektroniker (m/w/d)",
+      "releasedDate": "2026-10-30T08:00:00.000Z",
+      "company": {
+        "name": "Musterwerk GmbH"
+      },
+      "location": {
+        "city": "Stuttgart",
+        "country": "de",
+        "fullLocation": "Stuttgart, Baden-Württemberg, Germany",
+        "remote": false
+      }
+    },
+    {
+      "id": "744000000000002",
+      "name": "IT Administrator",
+      "releasedDate": "2026-10-31T08:00:00.000Z",
+      "company": {
+        "name": "Musterwerk GmbH"
+      },
+      "location": {
+        "city": "Ulm",
+        "country": "de",
+        "hybrid": true
+      }
+    }
+  ]
+}

@@ -1,0 +1,16 @@
+{
+  "total": 0,
+  "jobPostings": [
+    {
+      "title": "Platform Engineer",
+      "externalPath": "/job/Hamburg/Platform-Engineer_R-1003",
+      "locationsText": "Hamburg",
+      "postedOn": "Posted 30+ Days Ago"
+    },
+    {
+      "title": "Broken",
+      "externalPath": "https://evil.example.org/x",
+      "locationsText": "Nowhere"
+    }
+  ]
+}

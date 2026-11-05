@@ -1,0 +1,19 @@
+{
+  "applyUrl": "https://jobs.smartrecruiters.com/Musterwerk/744000000000001-elektroniker?oga=true",
+  "jobAd": {
+    "sections": {
+      "companyDescription": {
+        "title": "Company",
+        "text": "<p>Musterwerk builds machines.</p>"
+      },
+      "jobDescription": {
+        "title": "Job",
+        "text": "<ul><li>Wire things</li></ul>"
+      },
+      "qualifications": {
+        "title": "Profile",
+        "text": "<p>Training as an electrician</p>"
+      }
+    }
+  }
+}

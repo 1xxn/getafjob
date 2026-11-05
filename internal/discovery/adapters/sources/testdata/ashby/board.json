@@ -1,0 +1,40 @@
+{
+  "apiVersion": "1",
+  "jobs": [
+    {
+      "id": "1b6c4a0e-0000-4000-8000-000000000001",
+      "title": "Product Designer",
+      "location": "Berlin",
+      "secondaryLocations": [
+        {
+          "location": "Remote (Germany)"
+        }
+      ],
+      "workplaceType": "Hybrid",
+      "isRemote": false,
+      "isListed": true,
+      "jobUrl": "https://jobs.ashbyhq.com/beispiel/1b6c4a0e-0000-4000-8000-000000000001",
+      "applyUrl": "https://jobs.ashbyhq.com/beispiel/1b6c4a0e-0000-4000-8000-000000000001/application",
+      "descriptionPlain": "Design tools for Max Mustermann and friends.",
+      "descriptionHtml": "<p>ignored</p>",
+      "publishedAt": "2026-10-28T12:00:00.000+00:00"
+    },
+    {
+      "id": "1b6c4a0e-0000-4000-8000-000000000002",
+      "title": "Hidden Role",
+      "location": "Berlin",
+      "isListed": false,
+      "jobUrl": "https://jobs.ashbyhq.com/beispiel/2",
+      "descriptionPlain": "not listed"
+    },
+    {
+      "id": "1b6c4a0e-0000-4000-8000-000000000003",
+      "title": "Go Developer",
+      "location": "Remote",
+      "isRemote": true,
+      "jobUrl": "https://jobs.ashbyhq.com/beispiel/1b6c4a0e-0000-4000-8000-000000000003",
+      "descriptionHtml": "<p>Write <b>Go</b>.</p>",
+      "publishedAt": "2026-11-03T07:30:00.000+00:00"
+    }
+  ]
+}

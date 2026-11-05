@@ -1,0 +1,50 @@
+{
+  "complete": true,
+  "postings": [
+    {
+      "Source": "workday:muster/External",
+      "ExternalID": "R-1001",
+      "Company": "Muster AG",
+      "Title": "Backend Engineer",
+      "Location": "Berlin",
+      "URL": "https://muster.wd3.myworkdayjobs.com/External/job/Berlin/Backend-Engineer_R-1001",
+      "ApplyURL": "",
+      "Description": "Build services.",
+      "Posted": "",
+      "Workplace": "hybrid",
+      "Extra": {
+        "path": "/job/Berlin/Backend-Engineer_R-1001"
+      }
+    },
+    {
+      "Source": "workday:muster/External",
+      "ExternalID": "R-1002",
+      "Company": "Muster AG",
+      "Title": "Data Engineer",
+      "Location": "2 Locations",
+      "URL": "https://muster.wd3.myworkdayjobs.com/External/job/Remote/Data-Engineer_R-1002",
+      "ApplyURL": "",
+      "Description": "Pipelines.",
+      "Posted": "",
+      "Workplace": "remote",
+      "Extra": {
+        "path": "/job/Remote/Data-Engineer_R-1002"
+      }
+    },
+    {
+      "Source": "workday:muster/External",
+      "ExternalID": "R-1003",
+      "Company": "Muster AG",
+      "Title": "Platform Engineer",
+      "Location": "Hamburg",
+      "URL": "https://muster.wd3.myworkdayjobs.com/External/job/Hamburg/Platform-Engineer_R-1003",
+      "ApplyURL": "",
+      "Description": "Pipelines.",
+      "Posted": "",
+      "Workplace": "remote",
+      "Extra": {
+        "path": "/job/Hamburg/Platform-Engineer_R-1003"
+      }
+    }
+  ]
+}

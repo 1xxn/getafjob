@@ -1,0 +1,35 @@
+[
+  {
+    "id": "aa000000-0000-4000-8000-000000000001",
+    "text": "Data Engineer",
+    "categories": {
+      "location": "Köln",
+      "allLocations": [
+        "Köln",
+        "Düsseldorf"
+      ]
+    },
+    "hostedUrl": "https://jobs.eu.lever.co/musterfirma/aa000000-0000-4000-8000-000000000001",
+    "applyUrl": "https://jobs.eu.lever.co/musterfirma/aa000000-0000-4000-8000-000000000001/apply",
+    "descriptionPlain": "Move data around.",
+    "workplaceType": "onsite",
+    "createdAt": 1793491200000,
+    "lists": [
+      {
+        "text": "What you bring",
+        "content": "<li>SQL</li><li>Python</li>"
+      }
+    ]
+  },
+  {
+    "id": "aa000000-0000-4000-8000-000000000002",
+    "text": "Engineering Manager",
+    "categories": {
+      "location": "Remote"
+    },
+    "hostedUrl": "https://jobs.eu.lever.co/musterfirma/aa000000-0000-4000-8000-000000000002",
+    "descriptionPlain": "",
+    "workplaceType": "remote",
+    "lists": []
+  }
+]

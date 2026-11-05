@@ -1,0 +1,31 @@
+{
+  "complete": false,
+  "postings": [
+    {
+      "Source": "amazon",
+      "ExternalID": "3100001",
+      "Company": "AWS",
+      "Title": "Solutions Architect, Startups",
+      "Location": "Berlin, BE, DEU",
+      "URL": "https://www.amazon.jobs/en/jobs/3100001/solutions-architect-startups",
+      "ApplyURL": "https://account.amazon.jobs/jobs/3100001/apply",
+      "Description": "Help startups build on the cloud.\n\nKey job responsibilities\n\n- 5+ years of experience\n\n- German and English",
+      "Posted": "2026-11-02",
+      "Workplace": "",
+      "Extra": null
+    },
+    {
+      "Source": "amazon",
+      "ExternalID": "3100002",
+      "Company": "Amazon",
+      "Title": "Software Development Engineer",
+      "Location": "DE, BE, Berlin",
+      "URL": "https://www.amazon.jobs/en/jobs/3100002/software-development-engineer",
+      "ApplyURL": "",
+      "Description": "Build services.",
+      "Posted": "2026-10-31",
+      "Workplace": "",
+      "Extra": null
+    }
+  ]
+}
