@@ -24,7 +24,9 @@ Collects job postings, ranks them per user and fills out applications in a real 
 ## Features
 
 - **Job collection** from ATS boards (Greenhouse, Lever, Ashby, Workday, SmartRecruiters, Personio, Recruitee,
-  Workable), job boards and careers pages, in one deduplicated index with history.
+  Workable, Eightfold), job boards (Arbeitnow, Himalayas, Bundesagentur für Arbeit), the career sites of Google,
+  Apple and Amazon, and careers pages, in one deduplicated index with history. A built-in catalog lists tech
+  employers with remote or Germany jobs, each checked against its live API.
 - **Ranking per user** with reasons: role, seniority, skills, location and remote, language, salary, recency.
 - **Applications in a real browser** with go-rod and Chromium, including iframes, shadow DOM, custom selects,
   drop zones and multi-step forms.

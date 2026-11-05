@@ -205,6 +205,29 @@ func TestSources(t *testing.T) {
 		}, func(_ *testing.T, c *sources.Client) discovery.Source {
 			return sources.NewAmazon(c, []string{"software"}, "DEU")
 		}},
+		{"google", map[string][]string{
+			"GET https://www.google.com/about/careers/applications/jobs/feed.xml": {"feed.xml"},
+		}, func(_ *testing.T, c *sources.Client) discovery.Source { return sources.NewGoogle(c) }},
+		{"apple", map[string][]string{
+			"GET https://jobs.apple.com/en-us/search?location=germany-DEU&page=1": {"page1.html"},
+			"GET https://jobs.apple.com/en-us/search?location=germany-DEU&page=2": {"page2.html"},
+		}, func(_ *testing.T, c *sources.Client) discovery.Source { return sources.NewApple(c, "germany-DEU") }},
+		{"eightfold-v2", map[string][]string{
+			"GET https://careers.example.org/api/apply/v2/jobs?domain=example.org&location=Germany&num=100&start=0": {"jobs.json"},
+			"GET https://careers.example.org/api/apply/v2/jobs/800000000001?domain=example.org":                     {"detail1.json"},
+			"GET https://careers.example.org/api/apply/v2/jobs/800000000002?domain=example.org":                     {"detail2.json"},
+		}, func(t *testing.T, c *sources.Client) discovery.Source {
+			return board(t, c, "eightfold", "example.org", "Example Streaming", `{"host":"careers.example.org","api":"v2","location":"Germany"}`)
+		}},
+		{"eightfold-pcsx", map[string][]string{
+			"GET https://apply.careers.example.com/api/pcsx/search?domain=example.com&location=Germany&start=0":                     {"page1.json"},
+			"GET https://apply.careers.example.com/api/pcsx/search?domain=example.com&location=Germany&start=2":                     {"page2.json"},
+			"GET https://apply.careers.example.com/api/pcsx/position_details?domain=example.com&hl=en&position_id=1970000000000001": {"detail.json"},
+			"GET https://apply.careers.example.com/api/pcsx/position_details?domain=example.com&hl=en&position_id=1970000000000002": {"detail.json"},
+			"GET https://apply.careers.example.com/api/pcsx/position_details?domain=example.com&hl=en&position_id=1970000000000003": {"detail.json"},
+		}, func(t *testing.T, c *sources.Client) discovery.Source {
+			return board(t, c, "eightfold", "example.com", "Example Software", `{"host":"apply.careers.example.com","api":"pcsx","location":"Germany"}`)
+		}},
 	}
 	for _, c := range cases {
 		t.Run(c.dir, func(t *testing.T) {
@@ -323,7 +346,8 @@ func (b anyBody) RoundTrip(req *http.Request) (*http.Response, error) {
 // FuzzSources feeds arbitrary responses to every parser: no panics, no endless paging, only valid postings.
 func FuzzSources(f *testing.F) {
 	for _, seed := range []string{"testdata/greenhouse/jobs.json", "testdata/workday/page1.json", "testdata/personio/feed.xml",
-		"testdata/arbeitsagentur/search.json", "testdata/amazon/search.json", "testdata/smartrecruiters/page1.json"} {
+		"testdata/arbeitsagentur/search.json", "testdata/amazon/search.json", "testdata/smartrecruiters/page1.json",
+		"testdata/google/feed.xml", "testdata/apple/page1.html", "testdata/eightfold-pcsx/page1.json"} {
 		b, err := os.ReadFile(seed)
 		if err != nil {
 			f.Fatal(err)
@@ -332,15 +356,20 @@ func FuzzSources(f *testing.F) {
 	}
 	f.Fuzz(func(t *testing.T, body []byte) {
 		c := sources.NewClient(&http.Client{Transport: anyBody(body)}).WithoutWaiting()
+		apple := sources.NewApple(c, "germany-DEU")
+		apple.MaxPages = 3
 		srcs := []discovery.Source{
 			sources.NewArbeitnow(c, 3), sources.NewHimalayas(c, []string{"go"}, "Germany"),
 			sources.NewArbeitsagentur(c, []string{"go"}, []string{"Berlin"}), sources.NewAmazon(c, []string{"go"}, "DEU"),
+			sources.NewGoogle(c), apple,
 		}
 		for _, b := range []sources.Board{
 			{ATS: "greenhouse", Slug: "x"}, {ATS: "ashby", Slug: "x"}, {ATS: "lever", Slug: "x"},
 			{ATS: "smartrecruiters", Slug: "x"}, {ATS: "personio", Slug: "x"}, {ATS: "recruitee", Slug: "x"},
 			{ATS: "workable", Slug: "x"},
 			{ATS: "workday", Slug: "x", Config: json.RawMessage(`{"host":"x.wd1.myworkdayjobs.com","site":"x"}`)},
+			{ATS: "eightfold", Slug: "x.com", Config: json.RawMessage(`{"host":"jobs.x.com","api":"v2"}`)},
+			{ATS: "eightfold", Slug: "x.com", Config: json.RawMessage(`{"host":"jobs.x.com","api":"pcsx"}`)},
 		} {
 			s, err := sources.FromBoard(c, b)
 			if err != nil {

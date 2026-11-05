@@ -1,0 +1,31 @@
+{
+  "complete": true,
+  "postings": [
+    {
+      "Source": "eightfold:example.org",
+      "ExternalID": "800000000001",
+      "Company": "Example Streaming",
+      "Title": "Studio Manager - DACH",
+      "Location": "Berlin,Germany",
+      "URL": "https://careers.example.org/careers/job/800000000001",
+      "ApplyURL": "",
+      "Description": "Run the studio.",
+      "Posted": "2026-11-01",
+      "Workplace": "onsite",
+      "Extra": null
+    },
+    {
+      "Source": "eightfold:example.org",
+      "ExternalID": "800000000002",
+      "Company": "Example Streaming",
+      "Title": "Content Engineer",
+      "Location": "Remote, Germany",
+      "URL": "https://careers.example.org/careers/job/800000000002",
+      "ApplyURL": "",
+      "Description": "Ship content tools.",
+      "Posted": "2026-11-02",
+      "Workplace": "remote",
+      "Extra": null
+    }
+  ]
+}

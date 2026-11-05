@@ -59,6 +59,44 @@ func (q *Queries) DescribedJobs(ctx context.Context, fingerprints []string) ([]s
 	return items, nil
 }
 
+const enabledBoards = `-- name: EnabledBoards :many
+SELECT id, ats, slug, company, config FROM boards WHERE enabled ORDER BY id
+`
+
+type EnabledBoardsRow struct {
+	ID      int64
+	Ats     string
+	Slug    string
+	Company string
+	Config  []byte
+}
+
+func (q *Queries) EnabledBoards(ctx context.Context) ([]EnabledBoardsRow, error) {
+	rows, err := q.db.Query(ctx, enabledBoards)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []EnabledBoardsRow{}
+	for rows.Next() {
+		var i EnabledBoardsRow
+		if err := rows.Scan(
+			&i.ID,
+			&i.Ats,
+			&i.Slug,
+			&i.Company,
+			&i.Config,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const finishRun = `-- name: FinishRun :exec
 UPDATE crawl_runs SET finished_at = $2, stats = $3, errors = $4 WHERE id = $1
 `
@@ -351,4 +389,30 @@ func (q *Queries) UpdateJob(ctx context.Context, arg UpdateJobParams) error {
 		arg.ID,
 	)
 	return err
+}
+
+const upsertBoard = `-- name: UpsertBoard :one
+INSERT INTO boards (ats, slug, company, config, origin) VALUES ($1, $2, $3, $4, 'admin')
+ON CONFLICT (ats, slug) DO UPDATE SET company = EXCLUDED.company, config = EXCLUDED.config
+RETURNING (xmax = 0)::bool AS inserted
+`
+
+type UpsertBoardParams struct {
+	Ats     string
+	Slug    string
+	Company string
+	Config  []byte
+}
+
+// Keeps enabled, origin and crawl state; refreshes name and config.
+func (q *Queries) UpsertBoard(ctx context.Context, arg UpsertBoardParams) (bool, error) {
+	row := q.db.QueryRow(ctx, upsertBoard,
+		arg.Ats,
+		arg.Slug,
+		arg.Company,
+		arg.Config,
+	)
+	var inserted bool
+	err := row.Scan(&inserted)
+	return inserted, err
 }

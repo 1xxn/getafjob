@@ -1,0 +1,30 @@
+{
+  "status": 200,
+  "data": {
+    "count": 3,
+    "positions": [
+      {
+        "id": 1970000000000001,
+        "displayJobId": "100001",
+        "name": "Cloud Solution Architect",
+        "locations": [
+          "Germany, Bavaria, Munich"
+        ],
+        "postedTs": 1793664000,
+        "workLocationOption": "hybrid",
+        "positionUrl": "/careers/job/1970000000000001"
+      },
+      {
+        "id": 1970000000000002,
+        "displayJobId": "100002",
+        "name": "Data Center Technician",
+        "locations": [
+          "Germany, Hesse, Frankfurt"
+        ],
+        "postedTs": 1793664000,
+        "workLocationOption": "onsite",
+        "positionUrl": "/careers/job/1970000000000002"
+      }
+    ]
+  }
+}

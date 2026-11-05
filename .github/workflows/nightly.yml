@@ -39,9 +39,9 @@ jobs:
           retention-days: 14
 
   sources:
-    name: job sources (real APIs, read-only)
+    name: job sources and catalog (real APIs, read-only)
     runs-on: ubuntu-24.04
-    timeout-minutes: 20
+    timeout-minutes: 45
     permissions:
       contents: read
     steps:
@@ -54,10 +54,10 @@ jobs:
       - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
         with:
           go-version-file: go.mod
-      - name: one board per source
+      - name: one board per source, then every catalog board
         env:
           GETAFJOB_NETWORK_TESTS: "1"
-        run: go test -count=1 -run TestNetwork -v ./internal/discovery/adapters/sources/
+        run: go test -count=1 -timeout 40m -run 'TestNetwork|TestCatalog' -v ./internal/discovery/adapters/sources/
 
   bench:
     name: benchmarks vs main
