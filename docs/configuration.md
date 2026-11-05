@@ -18,6 +18,8 @@ an error. Unknown `GETAFJOB_*` variables are reported as a warning (typos), with
 | `GETAFJOB_EGRESS_PROXY` | none | runner, worker | egress proxy, e.g. `http://egress:4750` |
 | `GETAFJOB_OTEL_ENDPOINT` | none | serve, worker | OTLP/HTTP endpoint for traces and metrics, e.g. `http://otel-collector:4318`; empty: telemetry off |
 | `GETAFJOB_SHUTDOWN_TIMEOUT` | `20s` | all | graceful shutdown limit (1s to 5m) |
+| `GETAFJOB_MASTER_KEY` | none | serve, worker, admin | master key for envelope encryption, 32 bytes base64url (`admin gen-secret`); use `_FILE` |
+| `GETAFJOB_MASTER_KEY_OLD` | none | serve, worker, admin | previous master key, only during a rotation ([key-rotation.md](runbooks/key-rotation.md)); use `_FILE` |
 | `GETAFJOB_SMTP_URL` | none | serve, worker, admin | mail server: `smtps://user:pass@host:465` or `smtp://user:pass@host:587` (STARTTLS); `smtp+insecure://host:1025` for local development only; use `_FILE` |
 | `GETAFJOB_MAIL_FROM` | `getafjob@localhost` | serve, worker, admin | sender address of all mail |
 | `GETAFJOB_CRAWL_INTERVAL` | `6h` | worker | time between two crawls (30m to 168h) |

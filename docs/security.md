@@ -43,7 +43,7 @@ This document grows with every module.
 | I3 | Secrets or personal data in logs, traces or errors | all | `config.Secret` redaction, sensitive log attributes redacted, generic errors; spans carry the route template instead of the raw path and query, job spans no error text, no trace headers to third-party sites | `TestSecretIsRedactedEverywhere`, `TestErrorsNeverContainSecrets`, `TestSensitiveKeysAreRedacted`, `TestInstrumentNamesSpansByRoute`, `TestTelemetryMiddleware` |
 | I4 | Readiness details leak internals | 1 | `/readyz` returns ok/fail only; hidden by Caddy | `TestReadyzReportsEachCheckWithoutDetails`, smoke test |
 | I5 | One-time tokens in access logs | 1 | Caddy without access log | `deploy/Caddyfile` |
-| I6 | Database dump exposes secrets | 4 | Envelope encryption, master key outside the database | Phase 1 |
+| I6 | Database dump exposes secrets | 4 | Envelope encryption: AES-256-GCM data key per user, wrapped with the master key (Docker secret, never in the database); associated data binds every ciphertext to user and purpose; `Forget` deletes the data key | `TestEnvelope`, `TestKeyring`, `FuzzOpen` |
 | D1 | Slowloris / huge bodies | 1 | Server timeouts, header and body limits | `httpx.NewServer`, `TestProtect…` |
 | D3 | Guessing or flooding on sign-in endpoints | 1 | Rate limit per client address (burst 10, then one request per 6 s); pages are `no-store` | `TestSignInIsRateLimited` |
 | D2 | Hostile page exhausts the runner | 2/3 | Per-run limits, memory/pids limits, browser restarted per run | Phase 2 |
