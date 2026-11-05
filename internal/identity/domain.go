@@ -41,10 +41,16 @@ const (
 // Policy durations.
 const (
 	InvitationTTL   = 7 * 24 * time.Hour
-	MagicLinkTTL    = 15 * time.Minute
+	MagicLinkTTL    = 10 * time.Minute // ASVS 6.5.5: out-of-band links at most 10 minutes
 	SessionMaxAge   = 30 * 24 * time.Hour
 	SessionIdle     = 7 * 24 * time.Hour
 	sessionTouchGap = 5 * time.Minute
+	// SessionRotate is how often a session gets a new token; the old one stays valid for sessionGrace, so requests
+	// already in flight do not fail.
+	SessionRotate = time.Hour
+	sessionGrace  = time.Minute
+	// SessionFresh is how long after signing in a session may end other sessions or change sign-in methods.
+	SessionFresh    = 15 * time.Minute
 	magicLinkWindow = 15 * time.Minute
 	magicLinkLimit  = 3
 )
@@ -58,6 +64,7 @@ var (
 	ErrEmailTaken     = errors.New("identity: e-mail address already has an account")
 	ErrInvalidRole    = errors.New("identity: invalid role")
 	ErrNotFound       = errors.New("identity: not found")
+	ErrReauthRequired = errors.New("identity: sign in again to confirm")
 )
 
 // Msg maps an error to the text code shown to people.
@@ -65,6 +72,8 @@ func Msg(err error) i18n.Msg {
 	switch {
 	case errors.Is(err, ErrSessionExpired):
 		return i18n.Msg{Code: "identity.session_expired"}
+	case errors.Is(err, ErrReauthRequired):
+		return i18n.Msg{Code: "identity.reauth_required"}
 	case errors.Is(err, ErrUserDisabled):
 		return i18n.Msg{Code: "identity.user_disabled"}
 	default:
@@ -89,11 +98,35 @@ type Session struct {
 	CreatedAt time.Time
 	LastSeen  time.Time
 	ExpiresAt time.Time
+	// RotatedAt is when this token replaced an older one (zero: the token from sign-in); ReplacedAt is when a
+	// newer token replaced this one (zero: current).
+	RotatedAt, ReplacedAt time.Time
 }
 
-// Valid reports whether the session may still be used at now (absolute and idle limit).
+// Valid reports whether the session may still be used at now: absolute and idle limit, and a replaced token only
+// within the grace period.
 func (s Session) Valid(now time.Time) bool {
+	if !s.ReplacedAt.IsZero() && !now.Before(s.ReplacedAt.Add(sessionGrace)) {
+		return false
+	}
 	return now.Before(s.ExpiresAt) && now.Before(s.LastSeen.Add(SessionIdle))
+}
+
+// NeedsRotation reports whether the token is due for a new one. The absolute limit stays that of the sign-in.
+func (s Session) NeedsRotation(now time.Time) bool {
+	since := s.CreatedAt
+	if !s.RotatedAt.IsZero() {
+		since = s.RotatedAt
+	}
+	return s.ReplacedAt.IsZero() && now.Sub(since) >= SessionRotate
+}
+
+// SessionInfo describes an active session of the user (account page); Current marks the one asking.
+type SessionInfo struct {
+	Method    Method
+	CreatedAt time.Time
+	LastSeen  time.Time
+	Current   bool
 }
 
 // NeedsTouch reports whether last-seen should be written again (bounded writes per request).
@@ -149,3 +182,6 @@ func CleanDisplayName(s string) string {
 	}
 	return s
 }
+
+// Fresh reports whether the sign-in of this session is recent enough for sensitive account changes.
+func (s Session) Fresh(now time.Time) bool { return now.Sub(s.CreatedAt) < SessionFresh }

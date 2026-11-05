@@ -34,7 +34,7 @@ INSERT INTO sessions (token_hash, user_id, method, created_at, last_seen_at, exp
 VALUES ($1, $2, $3, $4, $4, $5);
 
 -- name: GetSession :one
-SELECT s.user_id, s.method, s.created_at, s.last_seen_at, s.expires_at,
+SELECT s.user_id, s.method, s.created_at, s.last_seen_at, s.expires_at, s.rotated_at, s.replaced_at,
        u.email, u.display_name, u.role, u.locale, u.disabled_at
 FROM sessions s JOIN users u ON u.id = s.user_id
 WHERE s.token_hash = $1;
@@ -43,12 +43,34 @@ WHERE s.token_hash = $1;
 UPDATE sessions SET last_seen_at = $2 WHERE token_hash = $1;
 
 -- name: DeleteSession :exec
-DELETE FROM sessions WHERE token_hash = $1;
+-- Ends the session with all its rotated tokens.
+DELETE FROM sessions s USING sessions t
+WHERE t.token_hash = $1 AND s.family = t.family;
 
 -- name: DeleteExpired :exec
-WITH s AS (DELETE FROM sessions WHERE sessions.expires_at < $1),
+WITH s AS (DELETE FROM sessions WHERE sessions.expires_at < $1 OR sessions.replaced_at < $1 - interval '5 minutes'),
      m AS (DELETE FROM magic_links WHERE magic_links.expires_at < $1)
 DELETE FROM webauthn_challenges WHERE webauthn_challenges.expires_at < $1;
 
 -- name: InsertAuditEvent :exec
 INSERT INTO audit_events (user_id, actor, code, params) VALUES ($1, $2, $3, $4);
+
+-- name: ReplaceSession :one
+-- Only one request rotates a session; a concurrent one finds it replaced already.
+UPDATE sessions SET replaced_at = sqlc.arg(at) WHERE token_hash = sqlc.arg(token_hash) AND replaced_at IS NULL
+RETURNING user_id, method, created_at, expires_at, family;
+
+-- name: CreateRotatedSession :exec
+INSERT INTO sessions (token_hash, user_id, method, created_at, last_seen_at, expires_at, rotated_at, family)
+VALUES ($1, $2, $3, $4, $5, $6, $5, $7);
+
+-- name: UserSessions :many
+SELECT token_hash, method, created_at, last_seen_at, expires_at FROM sessions
+WHERE user_id = $1 AND replaced_at IS NULL ORDER BY last_seen_at DESC LIMIT 100;
+
+-- name: DeleteOtherSessions :execrows
+DELETE FROM sessions o WHERE o.user_id = $1
+  AND o.family <> (SELECT k.family FROM sessions k WHERE k.token_hash = sqlc.arg(keep));
+
+-- name: DeleteUserSessions :execrows
+DELETE FROM sessions WHERE user_id = $1;

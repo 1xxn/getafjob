@@ -118,3 +118,22 @@ func FuzzNormalizeEmail(f *testing.F) {
 		}
 	})
 }
+
+func TestSessionRotationRule(t *testing.T) {
+	now := time.Date(2026, 11, 5, 12, 0, 0, 0, time.UTC)
+	s := Session{CreatedAt: now, LastSeen: now, ExpiresAt: now.Add(SessionMaxAge)}
+	if s.NeedsRotation(now.Add(SessionRotate-time.Second)) || !s.NeedsRotation(now.Add(SessionRotate)) {
+		t.Error("rotation after SessionRotate since sign-in")
+	}
+	s.RotatedAt = now.Add(2 * time.Hour)
+	if s.NeedsRotation(now.Add(2*time.Hour+30*time.Minute)) || !s.NeedsRotation(now.Add(3*time.Hour)) {
+		t.Error("rotation after SessionRotate since the last rotation")
+	}
+	s.ReplacedAt = now.Add(3 * time.Hour)
+	if s.NeedsRotation(now.Add(4 * time.Hour)) {
+		t.Error("a replaced token rotates again")
+	}
+	if !s.Valid(s.ReplacedAt.Add(sessionGrace-time.Second)) || s.Valid(s.ReplacedAt.Add(sessionGrace)) {
+		t.Error("grace period of a replaced token")
+	}
+}

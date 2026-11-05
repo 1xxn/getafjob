@@ -123,6 +123,9 @@ type Session struct {
 	CreatedAt  time.Time
 	LastSeenAt time.Time
 	ExpiresAt  time.Time
+	Family     uuid.UUID
+	RotatedAt  *time.Time
+	ReplacedAt *time.Time
 }
 
 type User struct {

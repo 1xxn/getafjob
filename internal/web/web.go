@@ -46,6 +46,8 @@ func (s *Server) Register(mux *http.ServeMux) {
 	mux.Handle("GET /invite/{token}", s.page(s.inviteForm))
 	mux.Handle("POST /invite/{token}", s.limited(s.page(s.inviteSubmit)))
 	mux.Handle("POST /logout", s.page(s.logout))
+	mux.Handle("GET /account", s.page(s.account))
+	mux.Handle("POST /account/sessions/others", s.page(s.signOutOthers))
 	mux.Handle("/", s.page(s.notFound))
 }
 
@@ -53,12 +55,13 @@ func (s *Server) Register(mux *http.ServeMux) {
 func (s *Server) page(h func(http.ResponseWriter, *http.Request, *identity.User)) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Cache-Control", "no-store")
-		u := s.currentUser(r)
+		u, token := s.currentUser(w, r)
 		l := i18n.FromAcceptLanguage(r.Header.Get("Accept-Language"))
 		if u != nil {
 			l = u.Locale
 		}
-		h(w, r.WithContext(views.WithLocale(r.Context(), l)), u)
+		ctx := context.WithValue(views.WithLocale(r.Context(), l), tokenKey{}, token)
+		h(w, r.WithContext(ctx), u)
 	})
 }
 

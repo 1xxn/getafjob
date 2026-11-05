@@ -9,6 +9,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 
@@ -101,7 +102,7 @@ func TestInvitationFlow(t *testing.T) {
 	if u.Role != identity.RoleAdmin || u.DisplayName != "Max Mustermann" || u.Locale != i18n.DE {
 		t.Fatalf("user = %+v", u)
 	}
-	got, err := e.svc.Authenticate(ctx, string(session))
+	got, _, err := e.svc.Authenticate(ctx, string(session))
 	if err != nil || got.ID != u.ID {
 		t.Fatalf("authenticate = %+v, %v", got, err)
 	}
@@ -117,7 +118,7 @@ func TestInvitationFlow(t *testing.T) {
 	if err := e.svc.SignOut(ctx, string(session), u.ID); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := e.svc.Authenticate(ctx, string(session)); !errors.Is(err, identity.ErrSessionExpired) {
+	if _, _, err := e.svc.Authenticate(ctx, string(session)); !errors.Is(err, identity.ErrSessionExpired) {
 		t.Fatalf("after sign-out: %v", err)
 	}
 }
@@ -167,14 +168,14 @@ func TestMagicLinkFlow(t *testing.T) {
 	}
 	m := e.mail.last(t)
 	link := linkIn(t, m.Text)
-	if m.To != "max@example.com" || !strings.HasPrefix(link, "https://jobs.example.org/login/link/") || !strings.Contains(m.Text, "15") {
+	if m.To != "max@example.com" || !strings.HasPrefix(link, "https://jobs.example.org/login/link/") || !strings.Contains(m.Text, "10 minutes") {
 		t.Fatalf("mail = %+v", m)
 	}
 	got, session, err := e.svc.SignInWithMagicLink(ctx, tokenFrom(link))
 	if err != nil || got.ID != u.ID {
 		t.Fatalf("sign in = %+v, %v", got, err)
 	}
-	if _, err := e.svc.Authenticate(ctx, string(session)); err != nil {
+	if _, _, err := e.svc.Authenticate(ctx, string(session)); err != nil {
 		t.Fatal(err)
 	}
 	if _, _, err := e.svc.SignInWithMagicLink(ctx, tokenFrom(link)); !errors.Is(err, identity.ErrInvalidToken) {
@@ -228,7 +229,7 @@ func TestDisabledUser(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if _, err := e.svc.Authenticate(ctx, string(session)); !errors.Is(err, identity.ErrUserDisabled) {
+	if _, _, err := e.svc.Authenticate(ctx, string(session)); !errors.Is(err, identity.ErrUserDisabled) {
 		t.Fatalf("disabled session: %v", err)
 	}
 	before := e.mail.count()
@@ -245,18 +246,22 @@ func TestSessionIdleTimeoutAndTouch(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	// Activity every six days keeps the session alive until the absolute limit.
+	// Activity every six days keeps the session alive until the absolute limit (following its rotated token).
 	for i := 0; i < 4; i++ {
 		e.now = e.now.Add(6 * 24 * time.Hour)
-		if _, err := e.svc.Authenticate(ctx, string(session)); err != nil {
+		_, next, err := e.svc.Authenticate(ctx, string(session))
+		if next != "" {
+			session = next
+		}
+		if err != nil {
 			t.Fatalf("day %d: %v", (i+1)*6, err)
 		}
 	}
 	e.now = e.now.Add(7 * 24 * time.Hour)
-	if _, err := e.svc.Authenticate(ctx, string(session)); !errors.Is(err, identity.ErrSessionExpired) {
+	if _, _, err := e.svc.Authenticate(ctx, string(session)); !errors.Is(err, identity.ErrSessionExpired) {
 		t.Fatalf("after idle period: %v", err)
 	}
-	if _, err := e.svc.Authenticate(ctx, "garbage"); !errors.Is(err, identity.ErrSessionExpired) {
+	if _, _, err := e.svc.Authenticate(ctx, "garbage"); !errors.Is(err, identity.ErrSessionExpired) {
 		t.Fatalf("garbage cookie: %v", err)
 	}
 }
@@ -312,4 +317,177 @@ func TestCleanupRemovesExpired(t *testing.T) {
 		t.Fatalf("sessions left: %d, %v", n, err)
 	}
 	_ = session
+}
+
+// signIn creates Max Mustermann and returns a fresh session token.
+func signIn(t *testing.T, e *env) (identity.User, identity.Token) {
+	t.Helper()
+	link, _, err := e.svc.Invite(t.Context(), identity.InviteRequest{Email: "max.mustermann@example.com", Role: identity.RoleUser})
+	if err != nil {
+		t.Fatal(err)
+	}
+	u, session, err := e.svc.AcceptInvitation(t.Context(), tokenFrom(link), "Max Mustermann", i18n.EN)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return u, session
+}
+
+func TestSessionRotation(t *testing.T) {
+	e := newEnv(t)
+	ctx := t.Context()
+	u, first := signIn(t, e)
+	start := e.now
+
+	if _, next, err := e.svc.Authenticate(ctx, string(first)); err != nil || next != "" {
+		t.Fatalf("fresh session rotated: %q, %v", next, err)
+	}
+	e.now = start.Add(identity.SessionRotate)
+	_, second, err := e.svc.Authenticate(ctx, string(first))
+	if err != nil || second == "" || second == first {
+		t.Fatalf("rotation: %q, %v", second, err)
+	}
+	// A request in flight with the old token still works, and does not rotate again.
+	if _, next, err := e.svc.Authenticate(ctx, string(first)); err != nil || next != "" {
+		t.Fatalf("old token in grace: %q, %v", next, err)
+	}
+	e.now = e.now.Add(2 * time.Minute)
+	if _, _, err := e.svc.Authenticate(ctx, string(first)); !errors.Is(err, identity.ErrSessionExpired) {
+		t.Fatalf("old token after grace: %v", err)
+	}
+	if _, next, err := e.svc.Authenticate(ctx, string(second)); err != nil || next != "" {
+		t.Fatalf("new token: %q, %v", next, err)
+	}
+	list, err := e.svc.Sessions(ctx, u.ID, string(second))
+	if err != nil || len(list) != 1 || !list[0].Current || !list[0].CreatedAt.Equal(start) || list[0].Method != identity.MethodInvitation {
+		t.Fatalf("sessions = %+v, %v (one session, sign-in time kept)", list, err)
+	}
+
+	// The absolute limit stays that of the sign-in, however often the token rotates.
+	tok := second
+	for e.now = e.now.Add(identity.SessionRotate); e.now.Before(start.Add(identity.SessionMaxAge)); e.now = e.now.Add(6 * 24 * time.Hour) {
+		_, next, err := e.svc.Authenticate(ctx, string(tok))
+		if err != nil {
+			t.Fatalf("at %v: %v", e.now, err)
+		}
+		if next != "" {
+			tok = next
+		}
+	}
+	e.now = start.Add(identity.SessionMaxAge)
+	if _, _, err := e.svc.Authenticate(ctx, string(tok)); !errors.Is(err, identity.ErrSessionExpired) {
+		t.Fatalf("after the absolute limit: %v", err)
+	}
+}
+
+func TestSignOutEndsRotatedTokens(t *testing.T) {
+	e := newEnv(t)
+	ctx := t.Context()
+	u, first := signIn(t, e)
+	e.now = e.now.Add(identity.SessionRotate)
+	_, second, err := e.svc.Authenticate(ctx, string(first))
+	if err != nil || second == "" {
+		t.Fatal(err)
+	}
+	// Signing out with the old token (another tab) also ends the new one.
+	if err := e.svc.SignOut(ctx, string(first), u.ID); err != nil {
+		t.Fatal(err)
+	}
+	if _, _, err := e.svc.Authenticate(ctx, string(second)); !errors.Is(err, identity.ErrSessionExpired) {
+		t.Fatalf("rotated token after sign-out: %v", err)
+	}
+}
+
+func TestSignOutOthers(t *testing.T) {
+	e := newEnv(t)
+	ctx := t.Context()
+	u, here := signIn(t, e)
+	var others []identity.Token
+	for range 2 {
+		if err := e.svc.RequestMagicLink(ctx, "max.mustermann@example.com"); err != nil {
+			t.Fatal(err)
+		}
+		_, s, err := e.svc.SignInWithMagicLink(ctx, tokenFrom(linkIn(t, e.mail.last(t).Text)))
+		if err != nil {
+			t.Fatal(err)
+		}
+		others = append(others, s)
+		e.now = e.now.Add(time.Second)
+	}
+	if list, err := e.svc.Sessions(ctx, u.ID, string(here)); err != nil || len(list) != 3 {
+		t.Fatalf("sessions = %+v, %v", list, err)
+	}
+	n, err := e.svc.SignOutOthers(ctx, u.ID, string(here))
+	if err != nil || n != 2 {
+		t.Fatalf("signed out %d, %v", n, err)
+	}
+	for _, o := range others {
+		if _, _, err := e.svc.Authenticate(ctx, string(o)); !errors.Is(err, identity.ErrSessionExpired) {
+			t.Errorf("other session still valid: %v", err)
+		}
+	}
+	if _, _, err := e.svc.Authenticate(ctx, string(here)); err != nil {
+		t.Errorf("own session ended: %v", err)
+	}
+	var code string
+	if err := db.InSystemTx(ctx, e.pool, func(tx pgx.Tx) error {
+		return tx.QueryRow(ctx, "SELECT code FROM audit_events ORDER BY id DESC LIMIT 1").Scan(&code)
+	}); err != nil || code != "identity.signed_out_others" {
+		t.Errorf("audit = %q, %v", code, err)
+	}
+}
+
+func TestSignOutOthersNeedsFreshSignIn(t *testing.T) {
+	e := newEnv(t)
+	ctx := t.Context()
+	u, here := signIn(t, e)
+	e.now = e.now.Add(identity.SessionFresh)
+	_, next, err := e.svc.Authenticate(ctx, string(here))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if next != "" {
+		here = next
+	}
+	if _, err := e.svc.SignOutOthers(ctx, u.ID, string(here)); !errors.Is(err, identity.ErrReauthRequired) {
+		t.Fatalf("stale session: %v", err)
+	}
+	other, _ := signInAgain(t, e)
+	if _, err := e.svc.SignOutOthers(ctx, uuid.New(), string(other)); !errors.Is(err, identity.ErrSessionExpired) {
+		t.Fatalf("someone else's session: %v", err)
+	}
+	if n, err := e.svc.SignOutOthers(ctx, u.ID, string(other)); err != nil || n != 1 {
+		t.Fatalf("after signing in again: %d, %v", n, err)
+	}
+}
+
+// signInAgain signs Max in with a magic link and returns the session.
+func signInAgain(t *testing.T, e *env) (identity.Token, identity.User) {
+	t.Helper()
+	if err := e.svc.RequestMagicLink(t.Context(), "max.mustermann@example.com"); err != nil {
+		t.Fatal(err)
+	}
+	u, s, err := e.svc.SignInWithMagicLink(t.Context(), tokenFrom(linkIn(t, e.mail.last(t).Text)))
+	if err != nil {
+		t.Fatal(err)
+	}
+	return s, u
+}
+
+func TestSignOutUser(t *testing.T) {
+	e := newEnv(t)
+	ctx := t.Context()
+	_, a := signIn(t, e)
+	b, _ := signInAgain(t, e)
+	if n, err := e.svc.SignOutUser(ctx, "Max.Mustermann@example.com"); err != nil || n != 2 {
+		t.Fatalf("signed out %d, %v", n, err)
+	}
+	for _, tok := range []identity.Token{a, b} {
+		if _, _, err := e.svc.Authenticate(ctx, string(tok)); !errors.Is(err, identity.ErrSessionExpired) {
+			t.Errorf("session still valid: %v", err)
+		}
+	}
+	if _, err := e.svc.SignOutUser(ctx, "erika@example.com"); !errors.Is(err, identity.ErrNotFound) {
+		t.Errorf("unknown account: %v", err)
+	}
 }

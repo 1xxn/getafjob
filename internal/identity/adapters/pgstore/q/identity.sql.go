@@ -72,6 +72,34 @@ func (q *Queries) CreateMagicLink(ctx context.Context, arg CreateMagicLinkParams
 	return err
 }
 
+const createRotatedSession = `-- name: CreateRotatedSession :exec
+INSERT INTO sessions (token_hash, user_id, method, created_at, last_seen_at, expires_at, rotated_at, family)
+VALUES ($1, $2, $3, $4, $5, $6, $5, $7)
+`
+
+type CreateRotatedSessionParams struct {
+	TokenHash  []byte
+	UserID     uuid.UUID
+	Method     string
+	CreatedAt  time.Time
+	LastSeenAt time.Time
+	ExpiresAt  time.Time
+	Family     uuid.UUID
+}
+
+func (q *Queries) CreateRotatedSession(ctx context.Context, arg CreateRotatedSessionParams) error {
+	_, err := q.db.Exec(ctx, createRotatedSession,
+		arg.TokenHash,
+		arg.UserID,
+		arg.Method,
+		arg.CreatedAt,
+		arg.LastSeenAt,
+		arg.ExpiresAt,
+		arg.Family,
+	)
+	return err
+}
+
 const createSession = `-- name: CreateSession :exec
 INSERT INTO sessions (token_hash, user_id, method, created_at, last_seen_at, expires_at)
 VALUES ($1, $2, $3, $4, $4, $5)
@@ -138,7 +166,7 @@ func (q *Queries) CreateUser(ctx context.Context, arg CreateUserParams) (CreateU
 }
 
 const deleteExpired = `-- name: DeleteExpired :exec
-WITH s AS (DELETE FROM sessions WHERE sessions.expires_at < $1),
+WITH s AS (DELETE FROM sessions WHERE sessions.expires_at < $1 OR sessions.replaced_at < $1 - interval '5 minutes'),
      m AS (DELETE FROM magic_links WHERE magic_links.expires_at < $1)
 DELETE FROM webauthn_challenges WHERE webauthn_challenges.expires_at < $1
 `
@@ -148,13 +176,45 @@ func (q *Queries) DeleteExpired(ctx context.Context, expiresAt time.Time) error 
 	return err
 }
 
-const deleteSession = `-- name: DeleteSession :exec
-DELETE FROM sessions WHERE token_hash = $1
+const deleteOtherSessions = `-- name: DeleteOtherSessions :execrows
+DELETE FROM sessions o WHERE o.user_id = $1
+  AND o.family <> (SELECT k.family FROM sessions k WHERE k.token_hash = $2)
 `
 
+type DeleteOtherSessionsParams struct {
+	UserID uuid.UUID
+	Keep   []byte
+}
+
+func (q *Queries) DeleteOtherSessions(ctx context.Context, arg DeleteOtherSessionsParams) (int64, error) {
+	result, err := q.db.Exec(ctx, deleteOtherSessions, arg.UserID, arg.Keep)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
+}
+
+const deleteSession = `-- name: DeleteSession :exec
+DELETE FROM sessions s USING sessions t
+WHERE t.token_hash = $1 AND s.family = t.family
+`
+
+// Ends the session with all its rotated tokens.
 func (q *Queries) DeleteSession(ctx context.Context, tokenHash []byte) error {
 	_, err := q.db.Exec(ctx, deleteSession, tokenHash)
 	return err
+}
+
+const deleteUserSessions = `-- name: DeleteUserSessions :execrows
+DELETE FROM sessions WHERE user_id = $1
+`
+
+func (q *Queries) DeleteUserSessions(ctx context.Context, userID uuid.UUID) (int64, error) {
+	result, err := q.db.Exec(ctx, deleteUserSessions, userID)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
 }
 
 const getInvitationByHash = `-- name: GetInvitationByHash :one
@@ -183,7 +243,7 @@ func (q *Queries) GetInvitationByHash(ctx context.Context, tokenHash []byte) (Ge
 }
 
 const getSession = `-- name: GetSession :one
-SELECT s.user_id, s.method, s.created_at, s.last_seen_at, s.expires_at,
+SELECT s.user_id, s.method, s.created_at, s.last_seen_at, s.expires_at, s.rotated_at, s.replaced_at,
        u.email, u.display_name, u.role, u.locale, u.disabled_at
 FROM sessions s JOIN users u ON u.id = s.user_id
 WHERE s.token_hash = $1
@@ -195,6 +255,8 @@ type GetSessionRow struct {
 	CreatedAt   time.Time
 	LastSeenAt  time.Time
 	ExpiresAt   time.Time
+	RotatedAt   *time.Time
+	ReplacedAt  *time.Time
 	Email       string
 	DisplayName string
 	Role        string
@@ -211,6 +273,8 @@ func (q *Queries) GetSession(ctx context.Context, tokenHash []byte) (GetSessionR
 		&i.CreatedAt,
 		&i.LastSeenAt,
 		&i.ExpiresAt,
+		&i.RotatedAt,
+		&i.ReplacedAt,
 		&i.Email,
 		&i.DisplayName,
 		&i.Role,
@@ -313,6 +377,38 @@ func (q *Queries) MarkInvitationAccepted(ctx context.Context, arg MarkInvitation
 	return result.RowsAffected(), nil
 }
 
+const replaceSession = `-- name: ReplaceSession :one
+UPDATE sessions SET replaced_at = $1 WHERE token_hash = $2 AND replaced_at IS NULL
+RETURNING user_id, method, created_at, expires_at, family
+`
+
+type ReplaceSessionParams struct {
+	At        *time.Time
+	TokenHash []byte
+}
+
+type ReplaceSessionRow struct {
+	UserID    uuid.UUID
+	Method    string
+	CreatedAt time.Time
+	ExpiresAt time.Time
+	Family    uuid.UUID
+}
+
+// Only one request rotates a session; a concurrent one finds it replaced already.
+func (q *Queries) ReplaceSession(ctx context.Context, arg ReplaceSessionParams) (ReplaceSessionRow, error) {
+	row := q.db.QueryRow(ctx, replaceSession, arg.At, arg.TokenHash)
+	var i ReplaceSessionRow
+	err := row.Scan(
+		&i.UserID,
+		&i.Method,
+		&i.CreatedAt,
+		&i.ExpiresAt,
+		&i.Family,
+	)
+	return i, err
+}
+
 const touchSession = `-- name: TouchSession :exec
 UPDATE sessions SET last_seen_at = $2 WHERE token_hash = $1
 `
@@ -343,4 +439,43 @@ func (q *Queries) UseMagicLink(ctx context.Context, arg UseMagicLinkParams) (uui
 	var user_id uuid.UUID
 	err := row.Scan(&user_id)
 	return user_id, err
+}
+
+const userSessions = `-- name: UserSessions :many
+SELECT token_hash, method, created_at, last_seen_at, expires_at FROM sessions
+WHERE user_id = $1 AND replaced_at IS NULL ORDER BY last_seen_at DESC LIMIT 100
+`
+
+type UserSessionsRow struct {
+	TokenHash  []byte
+	Method     string
+	CreatedAt  time.Time
+	LastSeenAt time.Time
+	ExpiresAt  time.Time
+}
+
+func (q *Queries) UserSessions(ctx context.Context, userID uuid.UUID) ([]UserSessionsRow, error) {
+	rows, err := q.db.Query(ctx, userSessions, userID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []UserSessionsRow{}
+	for rows.Next() {
+		var i UserSessionsRow
+		if err := rows.Scan(
+			&i.TokenHash,
+			&i.Method,
+			&i.CreatedAt,
+			&i.LastSeenAt,
+			&i.ExpiresAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
 }

@@ -10,6 +10,7 @@ import (
 	"strings"
 	"sync"
 	"testing"
+	"time"
 
 	"github.com/1xxn/getafjob/internal/identity"
 	"github.com/1xxn/getafjob/internal/identity/adapters/pgstore"
@@ -236,5 +237,91 @@ func TestErrorLogHasNoToken(t *testing.T) {
 	}
 	if out := logs.String(); strings.Contains(out, token) || !strings.Contains(out, "/login/link/{token}") {
 		t.Fatalf("log = %q", out)
+	}
+}
+
+func signedIn(t *testing.T, a *app) string {
+	t.Helper()
+	link, _, err := a.ids.Invite(t.Context(), identity.InviteRequest{Email: "max.mustermann@example.com", Role: identity.RoleUser})
+	if err != nil {
+		t.Fatal(err)
+	}
+	rec := a.do(http.MethodPost, strings.TrimPrefix(link, "https://jobs.example.org"), url.Values{"name": {"Max Mustermann"}, "locale": {"en"}}, "", nil)
+	return sessionFrom(t, rec)
+}
+
+func TestSessionCookieRotates(t *testing.T) {
+	a := newApp(t)
+	now := time.Now()
+	a.ids.WithClock(func() time.Time { return now })
+	first := signedIn(t, a)
+	if c := a.do(http.MethodGet, "/", nil, first, nil).Result().Cookies(); len(c) != 0 {
+		t.Fatalf("fresh session set a cookie: %v", c)
+	}
+	now = now.Add(identity.SessionRotate)
+	rec := a.do(http.MethodGet, "/", nil, first, nil)
+	second := sessionFrom(t, rec)
+	if rec.Code != http.StatusOK || second == first {
+		t.Fatalf("rotation: %d, same token %v", rec.Code, second == first)
+	}
+	// Signing out with the new cookie ends the old token too.
+	if rec := a.do(http.MethodPost, "/logout", url.Values{}, second, nil); rec.Code != http.StatusSeeOther {
+		t.Fatalf("logout: %d", rec.Code)
+	}
+	for _, tok := range []string{first, second} {
+		if rec := a.do(http.MethodGet, "/", nil, tok, nil); rec.Code != http.StatusSeeOther {
+			t.Errorf("token still signed in after logout: %d", rec.Code)
+		}
+	}
+}
+
+func TestAccountSessions(t *testing.T) {
+	a := newApp(t)
+	here := signedIn(t, a)
+	if err := a.ids.RequestMagicLink(t.Context(), "max.mustermann@example.com"); err != nil {
+		t.Fatal(err)
+	}
+	var link string
+	for _, w := range strings.Fields(a.mail.last.Text) {
+		if strings.HasPrefix(w, "https://") {
+			link = w
+		}
+	}
+	other := sessionFrom(t, a.do(http.MethodPost, strings.TrimPrefix(link, "https://jobs.example.org"), url.Values{}, "", nil))
+
+	page := a.do(http.MethodGet, "/account", nil, here, nil)
+	body := page.Body.String()
+	if page.Code != http.StatusOK || strings.Count(body, "<tr>") != 3 || !strings.Contains(body, "This device") ||
+		!strings.Contains(body, "Sign-in link") || !strings.Contains(body, "Invitation") {
+		t.Fatalf("account %d: %s", page.Code, body)
+	}
+	rec := a.do(http.MethodPost, "/account/sessions/others", url.Values{}, here, nil)
+	if rec.Code != http.StatusOK || !strings.Contains(rec.Body.String(), "Other sessions signed out: 1.") {
+		t.Fatalf("sign out others %d: %s", rec.Code, rec.Body.String())
+	}
+	if rec := a.do(http.MethodGet, "/", nil, other, nil); rec.Code != http.StatusSeeOther {
+		t.Errorf("other session still signed in: %d", rec.Code)
+	}
+	if rec := a.do(http.MethodGet, "/account", nil, "", nil); rec.Code != http.StatusSeeOther {
+		t.Errorf("account without session: %d", rec.Code)
+	}
+}
+
+func TestSignOutOthersAsksForFreshSignIn(t *testing.T) {
+	a := newApp(t)
+	now := time.Now()
+	a.ids.WithClock(func() time.Time { return now })
+	here := signedIn(t, a)
+	now = now.Add(identity.SessionFresh + identity.SessionRotate)
+	rec := a.do(http.MethodPost, "/account/sessions/others", url.Values{}, here, nil)
+	if rec.Code != http.StatusSeeOther || rec.Header().Get("Location") != "/login?reauth=1" {
+		t.Fatalf("stale session: %d %s", rec.Code, rec.Header().Get("Location"))
+	}
+	if c := sessionFrom(t, rec); c == here {
+		t.Error("token not rotated on the way")
+	}
+	page := a.do(http.MethodGet, "/login?reauth=1", nil, here, nil)
+	if page.Code != http.StatusOK || !strings.Contains(page.Body.String(), "Sign in again to confirm") {
+		t.Fatalf("reauth page %d", page.Code)
 	}
 }
