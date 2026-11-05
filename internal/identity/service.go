@@ -157,33 +157,103 @@ func (s *Service) SignInWithMagicLink(ctx context.Context, token string) (User, 
 	return u, st, nil
 }
 
-// Authenticate resolves a session cookie to its user.
-func (s *Service) Authenticate(ctx context.Context, token string) (User, error) {
+// Authenticate resolves a session cookie to its user. When the token is due for rotation it returns the new
+// token, which the caller must set as the cookie; otherwise next is empty.
+func (s *Service) Authenticate(ctx context.Context, token string) (u User, next Token, err error) {
 	h, ok := ParseToken(token)
 	if !ok {
-		return User{}, ErrSessionExpired
+		return User{}, "", ErrSessionExpired
 	}
 	u, sess, err := s.store.SessionByHash(ctx, h)
 	if errors.Is(err, ErrNotFound) {
-		return User{}, ErrSessionExpired
+		return User{}, "", ErrSessionExpired
 	}
 	if err != nil {
-		return User{}, err
+		return User{}, "", err
 	}
 	now := s.now()
 	if !sess.Valid(now) {
-		_ = s.store.DeleteSession(ctx, h, AuditEvent{UserID: &u.ID, Actor: "system", Code: "identity.session_expired"})
-		return User{}, ErrSessionExpired
+		if sess.ReplacedAt.IsZero() { // a replaced token just ran out of grace; cleanup removes it
+			_ = s.store.DeleteSession(ctx, h, AuditEvent{UserID: &u.ID, Actor: "system", Code: "identity.session_expired"})
+		}
+		return User{}, "", ErrSessionExpired
 	}
 	if u.Disabled {
-		return User{}, ErrUserDisabled
+		return User{}, "", ErrUserDisabled
+	}
+	if sess.NeedsRotation(now) {
+		t, nh := NewToken()
+		rotated, err := s.store.RotateSession(ctx, h, nh, now)
+		if err != nil {
+			return User{}, "", err
+		}
+		if rotated {
+			return u, t, nil
+		}
 	}
 	if sess.NeedsTouch(now) {
 		if err := s.store.TouchSession(ctx, h, now); err != nil {
-			return User{}, err
+			return User{}, "", err
 		}
 	}
-	return u, nil
+	return u, "", nil
+}
+
+// Sessions lists the user's sessions; the one of token is marked current.
+func (s *Service) Sessions(ctx context.Context, userID uuid.UUID, token string) ([]SessionInfo, error) {
+	h, _ := ParseToken(token)
+	rows, err := s.store.Sessions(ctx, userID)
+	if err != nil {
+		return nil, err
+	}
+	out := make([]SessionInfo, len(rows))
+	for i, r := range rows {
+		out[i] = r.SessionInfo
+		out[i].Current = r.Hash == h
+	}
+	return out, nil
+}
+
+// SignOutOthers ends all sessions of the user except the one of token. The session must be fresh (signed in
+// within SessionFresh), otherwise ErrReauthRequired: whoever stole a session cannot lock the owner out.
+func (s *Service) SignOutOthers(ctx context.Context, userID uuid.UUID, token string) (int, error) {
+	h, err := s.freshSession(ctx, userID, token)
+	if err != nil {
+		return 0, err
+	}
+	return s.store.DeleteOtherSessions(ctx, userID, h, AuditEvent{UserID: &userID, Actor: "user", Code: "identity.signed_out_others"})
+}
+
+// freshSession checks that token is a fresh session of userID.
+func (s *Service) freshSession(ctx context.Context, userID uuid.UUID, token string) (Hash, error) {
+	h, ok := ParseToken(token)
+	if !ok {
+		return Hash{}, ErrSessionExpired
+	}
+	u, sess, err := s.store.SessionByHash(ctx, h)
+	if errors.Is(err, ErrNotFound) || (err == nil && (u.ID != userID || !sess.Valid(s.now()))) {
+		return Hash{}, ErrSessionExpired
+	}
+	if err != nil {
+		return Hash{}, err
+	}
+	if !sess.Fresh(s.now()) {
+		return Hash{}, ErrReauthRequired
+	}
+	return h, nil
+}
+
+// SignOutUser ends every session of the account with email (admin command).
+func (s *Service) SignOutUser(ctx context.Context, email string) (int, error) {
+	email, err := NormalizeEmail(email)
+	if err != nil {
+		return 0, err
+	}
+	u, err := s.store.UserByEmail(ctx, email)
+	if err != nil {
+		return 0, err
+	}
+	return s.store.DeleteUserSessions(ctx, u.ID, AuditEvent{UserID: &u.ID, Actor: "admin", Code: "identity.signed_out_by_admin"})
 }
 
 // SignOut ends a session.

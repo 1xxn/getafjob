@@ -1,0 +1,50 @@
+package views
+
+// SessionRow is one signed-in browser on the account page.
+type SessionRow struct {
+	Method   string // invitation, magic_link, passkey
+	Created  string
+	LastSeen string
+	Current  bool
+}
+
+templ Account(name, notice string, sessions []SessionRow) {
+	@Layout(Page{Title: T(ctx, "account.title"), UserName: name}) {
+		@Section(T(ctx, "account.title")) {
+			if notice != "" {
+				@Notice("info", notice)
+			}
+			<h2>{ T(ctx, "account.sessions.title") }</h2>
+			<p class="muted">{ T(ctx, "account.sessions.text") }</p>
+			<table class="table">
+				<thead>
+					<tr>
+						<th scope="col">{ T(ctx, "account.sessions.method") }</th>
+						<th scope="col">{ T(ctx, "account.sessions.created") }</th>
+						<th scope="col">{ T(ctx, "account.sessions.last_seen") }</th>
+						<th scope="col"><span class="visually-hidden">{ T(ctx, "account.sessions.state") }</span></th>
+					</tr>
+				</thead>
+				<tbody>
+					for _, s := range sessions {
+						<tr>
+							<td>{ T(ctx, "account.method." + s.Method) }</td>
+							<td>{ s.Created }</td>
+							<td>{ s.LastSeen }</td>
+							<td>
+								if s.Current {
+									{ T(ctx, "account.sessions.current") }
+								}
+							</td>
+						</tr>
+					}
+				</tbody>
+			</table>
+			if len(sessions) > 1 {
+				<form method="post" action="/account/sessions/others">
+					<button type="submit">{ T(ctx, "account.sessions.sign_out_others") }</button>
+				</form>
+			}
+		}
+	}
+}

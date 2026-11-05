@@ -173,7 +173,8 @@ func (s *Store) SessionByHash(ctx context.Context, h identity.Hash) (u identity.
 			return notFound(err)
 		}
 		u = toUser(r.UserID, r.Email, r.DisplayName, r.Role, r.Locale, r.DisabledAt)
-		sess = identity.Session{UserID: r.UserID, Method: identity.Method(r.Method), CreatedAt: r.CreatedAt, LastSeen: r.LastSeenAt, ExpiresAt: r.ExpiresAt}
+		sess = identity.Session{UserID: r.UserID, Method: identity.Method(r.Method), CreatedAt: r.CreatedAt, LastSeen: r.LastSeenAt,
+			ExpiresAt: r.ExpiresAt, RotatedAt: deref(r.RotatedAt), ReplacedAt: deref(r.ReplacedAt)}
 		return nil
 	})
 	return u, sess, err
@@ -199,4 +200,81 @@ func (s *Store) DeleteSession(ctx context.Context, h identity.Hash, e identity.A
 // DeleteExpired removes expired sessions, links and challenges.
 func (s *Store) DeleteExpired(ctx context.Context, before time.Time) error {
 	return s.system(ctx, func(qs *q.Queries) error { return qs.DeleteExpired(ctx, before) })
+}
+
+func deref(t *time.Time) time.Time {
+	if t == nil {
+		return time.Time{}
+	}
+	return *t
+}
+
+func (s *Store) user(ctx context.Context, userID uuid.UUID, fn func(*q.Queries) error) error {
+	return db.InUserTx(ctx, s.pool, userID, func(tx pgx.Tx) error { return fn(q.New(tx)) })
+}
+
+// RotateSession replaces the token old by next in one transaction; the absolute expiry stays.
+func (s *Store) RotateSession(ctx context.Context, old, next identity.Hash, at time.Time) (rotated bool, err error) {
+	err = s.system(ctx, func(qs *q.Queries) error {
+		r, err := qs.ReplaceSession(ctx, q.ReplaceSessionParams{TokenHash: old[:], At: &at})
+		if errors.Is(err, pgx.ErrNoRows) {
+			return nil
+		}
+		if err != nil {
+			return err
+		}
+		rotated = true
+		return qs.CreateRotatedSession(ctx, q.CreateRotatedSessionParams{TokenHash: next[:], UserID: r.UserID, Method: r.Method,
+			CreatedAt: r.CreatedAt, LastSeenAt: at, ExpiresAt: r.ExpiresAt, Family: r.Family})
+	})
+	return rotated, err
+}
+
+// Sessions lists the user's current sessions (user context, row-level security).
+func (s *Store) Sessions(ctx context.Context, userID uuid.UUID) (out []identity.StoredSession, err error) {
+	err = s.user(ctx, userID, func(qs *q.Queries) error {
+		rows, err := qs.UserSessions(ctx, userID)
+		for _, r := range rows {
+			var h identity.Hash
+			copy(h[:], r.TokenHash)
+			out = append(out, identity.StoredSession{Hash: h, SessionInfo: identity.SessionInfo{
+				Method: identity.Method(r.Method), CreatedAt: r.CreatedAt, LastSeen: r.LastSeenAt}})
+		}
+		return err
+	})
+	return out, err
+}
+
+// DeleteOtherSessions ends the user's other sessions and records it.
+func (s *Store) DeleteOtherSessions(ctx context.Context, userID uuid.UUID, keep identity.Hash, e identity.AuditEvent) (n int, err error) {
+	err = s.user(ctx, userID, func(qs *q.Queries) error {
+		rows, err := qs.DeleteOtherSessions(ctx, q.DeleteOtherSessionsParams{UserID: userID, Keep: keep[:]})
+		if err != nil {
+			return err
+		}
+		n = int(rows)
+		if e.Params == nil {
+			e.Params = map[string]any{}
+		}
+		e.Params["count"] = n
+		return audit(ctx, qs, e)
+	})
+	return n, err
+}
+
+// DeleteUserSessions ends every session of the user and records it.
+func (s *Store) DeleteUserSessions(ctx context.Context, userID uuid.UUID, e identity.AuditEvent) (n int, err error) {
+	err = s.system(ctx, func(qs *q.Queries) error {
+		rows, err := qs.DeleteUserSessions(ctx, userID)
+		if err != nil {
+			return err
+		}
+		n = int(rows)
+		if e.Params == nil {
+			e.Params = map[string]any{}
+		}
+		e.Params["count"] = n
+		return audit(ctx, qs, e)
+	})
+	return n, err
 }

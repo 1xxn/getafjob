@@ -19,6 +19,7 @@ templ Layout(p Page) {
 				if p.UserName != "" {
 					<nav aria-label={ T(ctx, "nav.main") }>
 						<span class="muted">{ T(ctx, "nav.signed_in_as", "name", p.UserName) }</span>
+						<a href="/account">{ T(ctx, "nav.account") }</a>
 						<form method="post" action="/logout">
 							<button type="submit" class="link">{ T(ctx, "nav.sign_out") }</button>
 						</form>

@@ -81,3 +81,36 @@ func adminInvite(ctx context.Context, args []string, env Env) int {
 	_, _ = fmt.Fprintf(env.Stdout, "%s\nvalid until %s (one use)\n", link, expires.UTC().Format("2006-01-02 15:04 UTC"))
 	return ExitOK
 }
+
+// adminSignOut ends every session of one account (ASVS 7.4.5).
+func adminSignOut(ctx context.Context, args []string, env Env) int {
+	fs := flag.NewFlagSet("admin sign-out", flag.ContinueOnError)
+	fs.SetOutput(env.Stderr)
+	email := fs.String("email", "", "e-mail address of the account (required)")
+	if err := fs.Parse(args); err != nil || *email == "" || fs.NArg() != 0 {
+		_, _ = fmt.Fprintln(env.Stderr, "usage: getafjob admin sign-out -email max.mustermann@example.com")
+		return ExitUsage
+	}
+	cfg, err := config.Load(env.Config)
+	if err != nil {
+		_, _ = fmt.Fprintf(env.Stderr, "configuration error:\n%v\n", err)
+		return ExitUsage
+	}
+	pool, err := db.Open(ctx, cfg.DatabaseURL, cfg.DatabasePassword, "getafjob-admin")
+	if err != nil {
+		_, _ = fmt.Fprintln(env.Stderr, err)
+		return ExitError
+	}
+	defer pool.Close()
+	n, err := identity.NewService(pgstore.New(pool), nil, cfg.PublicURL).SignOutUser(ctx, *email)
+	if errors.Is(err, identity.ErrNotFound) || errors.Is(err, identity.ErrInvalidEmail) {
+		_, _ = fmt.Fprintln(env.Stderr, "no account with this address")
+		return ExitError
+	}
+	if err != nil {
+		_, _ = fmt.Fprintln(env.Stderr, "sign-out failed:", err)
+		return ExitError
+	}
+	_, _ = fmt.Fprintf(env.Stdout, "%d sessions ended\n", n)
+	return ExitOK
+}

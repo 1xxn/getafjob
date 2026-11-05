@@ -63,6 +63,40 @@ This document grows with every module.
 - Repository: ruleset on `main` (PR, required checks, rebase only, no force push), protected `v*` tags, secret
   scanning with push protection, private vulnerability reporting.
 
+## ASVS 5.0 L2: authentication (V6) and sessions (V7)
+
+getafjob has no passwords (ADR 0020), so the password requirements 6.1.2, 6.2.x and 6.5.2 for weak secrets do
+not apply. Federation and IdPs (6.8.x, 7.1.3, 7.6.1) do not apply either. Open points are issues.
+
+Sign-in pathways (6.1.3, 6.3.4): invitation link (first sign-in only), magic link by mail, passkey. There are no
+others; API v1 has no sign-in yet.
+
+| Req. | Requirement (short) | How | Test |
+|---|---|---|---|
+| 6.1.1, 6.3.1 | Documented and enforced rate limits | Sign-in and invitation endpoints: token bucket per client address; at most 3 magic links per account in 15 minutes | `TestSignInIsRateLimited`, `TestMagicLinksAreRateLimited` |
+| 6.3.2 | No default accounts | Accounts only by invitation; no built-in users | `TestInvitationFlow` |
+| 6.3.3 | MFA or combined factors | Passkeys with user verification (next PR of #14); a magic link alone is one factor: open, #76 | #76 |
+| 6.4.1 | Initial secrets random, short-lived, one-time | Invitation links: 256 random bits, 7 days, used once, stored as SHA-256 | `TestInvitationFlow`, `TestExpiredInvitation` |
+| 6.4.2 | No hints or secret questions | None exist | n/a |
+| 6.4.3, 6.4.4 | Recovery does not bypass stronger factors | Magic link also works for users with a passkey: open, #76 | #76 |
+| 6.5.1, 6.6.2 | Out-of-band links used once, for their request only | A magic link is consumed in the transaction that creates the session and names one account | `TestMagicLinkFlow` |
+| 6.5.3, 6.5.4 | Random out-of-band codes with enough entropy | 256 bits from `crypto/rand` | `TestMagicLinkFlow` |
+| 6.5.5 | Out-of-band lifetime at most 10 minutes | Magic links expire after 10 minutes | `TestMagicLinkFlow` |
+| 6.6.3 | Brute force protection for codes | 256-bit tokens plus rate limits | `TestSignInIsRateLimited` |
+| 7.1.1, 7.3.1, 7.3.2 | Documented idle and absolute timeout | Idle 7 days, absolute 30 days from sign-in, kept across rotations. Deviation from NIST SP 800-63B AAL2 (30 minutes idle, 24 hours absolute): getafjob works in the background for days and holds no payment data; sensitive changes need a fresh sign-in (7.5.x) | `TestSessionValidity`, `TestSessionIdleTimeoutAndTouch`, `TestSessionRotation` |
+| 7.1.2 | Concurrent sessions documented | No limit; the account page lists them (up to 100) and ends the others | `TestAccountSessions` |
+| 7.2.1, 7.2.2 | Tokens checked by the backend, generated per session | Reference tokens, looked up on every request | `TestInvitationAndSignOut` |
+| 7.2.3 | Reference tokens from a CSPRNG, at least 128 bits | 256 bits from `crypto/rand`, stored as SHA-256 | `TestSessionRotation` |
+| 7.2.4 | New token on (re-)authentication | Every sign-in creates a new session; tokens also rotate hourly, the old one stays valid for one minute | `TestSessionRotationRule`, `TestSessionCookieRotates` |
+| 7.4.1 | Logout and expiry end the session in the backend | Sign-out deletes the session with all its rotated tokens; expired rows are removed | `TestSignOutEndsRotatedTokens`, `TestSessionCookieRotates` |
+| 7.4.2 | Sessions end when an account is disabled or deleted | Disabled accounts fail authentication; deleting a user cascades to its sessions | `TestDisabledUser` |
+| 7.4.3 | Option to end other sessions after a factor change | Account page offers it; passkey changes follow in the next PR of #14 | `TestAccountSessions` |
+| 7.4.4 | Visible logout on every page | Sign-out button in the top bar of every signed-in page | `TestInvitationAndSignOut` |
+| 7.4.5 | Admins end sessions of a user | `getafjob admin sign-out -email …` | `TestSignOutUser` |
+| 7.5.1 | Re-authentication before changing sign-in methods | Fresh sign-in (15 minutes) required; passkey changes follow in the next PR of #14 | `TestSignOutOthersNeedsFreshSignIn` |
+| 7.5.2 | View and end sessions after re-authentication | Account page lists sessions; ending the others needs a sign-in in the last 15 minutes | `TestAccountSessions`, `TestSignOutOthersAsksForFreshSignIn` |
+| 7.6.2 | Sessions only by explicit action | Magic and invitation links show a button; only the POST signs in | `TestMagicLinkSignIn` |
+
 ## Findings
 
 | # | Severity | Finding | Fix | Status |

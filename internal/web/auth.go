@@ -16,19 +16,25 @@ const SessionCookie = "__Host-gaj_session"
 
 func itoa(n int) string { return strconv.Itoa(n) }
 
-func (s *Server) currentUser(r *http.Request) *identity.User {
+// currentUser resolves the session cookie and sets the new cookie when the session was rotated. It also returns
+// the token in use, so handlers can tell the current session from the others.
+func (s *Server) currentUser(w http.ResponseWriter, r *http.Request) (*identity.User, string) {
 	c, err := r.Cookie(SessionCookie)
 	if err != nil {
-		return nil
+		return nil, ""
 	}
-	u, err := s.Identity.Authenticate(r.Context(), c.Value)
+	u, next, err := s.Identity.Authenticate(r.Context(), c.Value)
 	if err != nil {
 		if !errors.Is(err, identity.ErrSessionExpired) && !errors.Is(err, identity.ErrUserDisabled) && !isCanceled(err) {
 			s.Logger.WarnContext(r.Context(), "session lookup failed", "err", err)
 		}
-		return nil
+		return nil, ""
 	}
-	return &u
+	if next != "" {
+		setSession(w, next)
+		return &u, string(next)
+	}
+	return &u, c.Value
 }
 
 func setSession(w http.ResponseWriter, t identity.Token) {
@@ -43,12 +49,16 @@ func clearSession(w http.ResponseWriter) {
 }
 
 func (s *Server) loginForm(w http.ResponseWriter, r *http.Request, u *identity.User) {
-	if u != nil {
+	reauth := r.URL.Query().Get("reauth") == "1"
+	if u != nil && !reauth {
 		http.Redirect(w, r, "/", http.StatusSeeOther)
 		return
 	}
 	notice := ""
-	if r.URL.Query().Get("expired") == "1" {
+	switch {
+	case reauth:
+		notice = views.T(r.Context(), "login.reauth")
+	case r.URL.Query().Get("expired") == "1":
 		notice = identity.Msg(identity.ErrSessionExpired).Render(views.Locale(r.Context()))
 	}
 	s.render(w, r, http.StatusOK, views.Login("", notice))
@@ -133,11 +143,58 @@ func (s *Server) inviteSubmit(w http.ResponseWriter, r *http.Request, _ *identit
 }
 
 func (s *Server) logout(w http.ResponseWriter, r *http.Request, u *identity.User) {
-	if c, err := r.Cookie(SessionCookie); err == nil && u != nil {
-		if err := s.Identity.SignOut(r.Context(), c.Value, u.ID); err != nil {
+	if u != nil {
+		if err := s.Identity.SignOut(r.Context(), sessionToken(r), u.ID); err != nil {
 			s.Logger.WarnContext(r.Context(), "sign out failed", "err", err)
 		}
 	}
 	clearSession(w)
 	http.Redirect(w, r, "/login", http.StatusSeeOther)
+}
+
+type tokenKey struct{}
+
+// sessionToken is the session token of the request (after a rotation the new one).
+func sessionToken(r *http.Request) string {
+	t, _ := r.Context().Value(tokenKey{}).(string)
+	return t
+}
+
+func (s *Server) account(w http.ResponseWriter, r *http.Request, u *identity.User) {
+	s.renderAccount(w, r, u, "")
+}
+
+func (s *Server) renderAccount(w http.ResponseWriter, r *http.Request, u *identity.User, notice string) {
+	if u == nil {
+		http.Redirect(w, r, "/login", http.StatusSeeOther)
+		return
+	}
+	list, err := s.Identity.Sessions(r.Context(), u.ID, sessionToken(r))
+	if err != nil {
+		s.failed(w, r, u, err)
+		return
+	}
+	rows := make([]views.SessionRow, len(list))
+	for i, si := range list {
+		rows[i] = views.SessionRow{Method: string(si.Method), Created: views.When(r.Context(), si.CreatedAt),
+			LastSeen: views.When(r.Context(), si.LastSeen), Current: si.Current}
+	}
+	s.render(w, r, http.StatusOK, views.Account(u.DisplayName, notice, rows))
+}
+
+func (s *Server) signOutOthers(w http.ResponseWriter, r *http.Request, u *identity.User) {
+	if u == nil {
+		http.Redirect(w, r, "/login", http.StatusSeeOther)
+		return
+	}
+	n, err := s.Identity.SignOutOthers(r.Context(), u.ID, sessionToken(r))
+	if errors.Is(err, identity.ErrReauthRequired) {
+		http.Redirect(w, r, "/login?reauth=1", http.StatusSeeOther)
+		return
+	}
+	if err != nil {
+		s.failed(w, r, u, err)
+		return
+	}
+	s.renderAccount(w, r, u, views.T(r.Context(), "account.sessions.signed_out_others", "count", n))
 }

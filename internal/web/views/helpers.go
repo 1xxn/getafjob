@@ -1,8 +1,10 @@
 package views
 
 import (
+	"context"
 	"strconv"
 	"strings"
+	"time"
 )
 
 func itoa(n int) string { return strconv.Itoa(n) }
@@ -36,4 +38,12 @@ func statusGlyph(status string) string {
 	default:
 		return "○"
 	}
+}
+
+// When formats a time for the reader's locale (UTC; the UI has no time zone setting yet).
+func When(ctx context.Context, t time.Time) string {
+	if Locale(ctx) == "de" {
+		return t.UTC().Format("02.01.2006 15:04") + " UTC"
+	}
+	return t.UTC().Format("Jan 2, 2006 15:04") + " UTC"
 }

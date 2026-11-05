@@ -25,6 +25,7 @@ Commands:
   env            list all configuration variables
   gen-secret     print 32 random bytes (base64url) for passwords and keys
   invite         create a one-time invitation link (admin invite -email … [-role admin] [-send])
+  sign-out       end all sessions of one account (admin sign-out -email …)
   rotate-master-key  re-wrap all data keys with GETAFJOB_MASTER_KEY (the previous key in GETAFJOB_MASTER_KEY_OLD)
 `
 
@@ -55,6 +56,8 @@ func admin(ctx context.Context, args []string, env Env) int {
 		return adminInvite(ctx, args[1:], env)
 	case "boards":
 		return adminBoards(ctx, args[1:], env)
+	case "sign-out":
+		return adminSignOut(ctx, args[1:], env)
 	case "rotate-master-key":
 		return adminRotate(ctx, args[1:], env)
 	case "crawl":
