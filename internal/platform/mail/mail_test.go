@@ -107,7 +107,9 @@ func TestSendThroughProxy(t *testing.T) {
 		if err != nil {
 			return
 		}
-		_, _ = io.WriteString(c, "HTTP/1.1 200 Connection established\r\n\r\n")
+		// Proxy answer and server greeting in one write, as real proxies often deliver them.
+		greeting, _ := bufio.NewReader(up).ReadString('\n')
+		_, _ = io.WriteString(c, "HTTP/1.1 200 Connection established\r\n\r\n"+greeting)
 		go func() { _, _ = io.Copy(up, r) }()
 		_, _ = io.Copy(c, up)
 	}()
