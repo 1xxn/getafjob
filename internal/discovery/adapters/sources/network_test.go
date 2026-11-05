@@ -137,7 +137,20 @@ func TestCatalog(t *testing.T) {
 		}
 		ctx, cancel := context.WithTimeout(context.Background(), 2*time.Minute)
 		batch, err := src.Fetch(ctx)
-		cancel()
+		if d, ok := src.(discovery.Detailer); ok && err == nil && len(batch.Postings) > 0 && batch.Postings[0].Stub {
+			// Stubs carry no location: one job page must read as a full posting, then the board counts as checked.
+			p := batch.Postings[0]
+			derr := d.Details(ctx, &p)
+			cancel()
+			switch {
+			case curate != "":
+				fmt.Printf("CANDIDATE %-16s %-28s %-24q stubs=%d details_err=%v title=%q location=%q\n",
+					b.ATS, b.Slug, b.Company, len(batch.Postings), derr, p.Title, p.Location)
+			case derr != nil || p.Title == "":
+				t.Errorf("%s (%s): details of %s: %v", key, b.Company, p.URL, derr)
+			}
+			continue
+		}
 		relevant := 0
 		for _, p := range batch.Postings {
 			if discovery.ValidPosting(p) && sources.ForGermany(p) {
@@ -153,6 +166,7 @@ func TestCatalog(t *testing.T) {
 			// Openings change daily; a board without one today is reported, not failed.
 			t.Logf("%s (%s): no job in Germany or remote among %d today", key, b.Company, len(batch.Postings))
 		}
+		cancel()
 		time.Sleep(500 * time.Millisecond)
 	}
 }

@@ -130,6 +130,11 @@ large companies; every request names itself as `getafjob/<version>` and goes thr
 River job on the `crawl` queue (one at a time, at most one waiting), scheduled every `GETAFJOB_CRAWL_INTERVAL` and
 started by hand with `getafjob admin crawl`; migrate applies River's schema after the own migrations.
 
+Sources that list jobs without text get one detail request per new job, at most 300 per crawl and 100 per source;
+stored descriptions are never fetched again. Sitemaps (Meta) list only job URLs as stubs: a known open job is just
+seen again, a new one becomes a posting from the schema.org `JobPosting` on its page. Careers pages are read the same
+way; links into supported systems name a company's board (`sources.DetectBoards`).
+
 **Handoff:** a CAPTCHA, login checkpoint, security code or open question pauses the run; the user gets a Web Push
 and continues in the remote browser (CDP screencast); after the hold time the run is parked.
 

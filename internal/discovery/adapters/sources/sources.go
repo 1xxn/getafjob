@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/1xxn/getafjob/internal/discovery"
+	"github.com/1xxn/getafjob/internal/platform/netguard"
 )
 
 // Board is a company board of an applicant tracking system, as stored in the boards table.
@@ -56,6 +57,24 @@ func FromBoard(c *Client, b Board) (discovery.Source, error) {
 	}
 	company := strings.TrimSpace(b.Company)
 	switch b.ATS {
+	case "sitemap", "careers":
+		var cfg struct {
+			URL      string `json:"url"`
+			Pattern  string `json:"pattern"`
+			Complete bool   `json:"complete"`
+		}
+		if err := config(b.Config, &cfg); err != nil || company == "" || !strings.HasPrefix(cfg.URL, "https://") ||
+			!netguard.PublicURL(cfg.URL) || len(cfg.URL) > 2048 {
+			return nil, bad("config")
+		}
+		if b.ATS == "careers" {
+			return &CareersPage{c: c, name: slug, company: company, rawURL: cfg.URL}, nil
+		}
+		rx, err := regexp.Compile(cfg.Pattern)
+		if err != nil || cfg.Pattern == "" || len(cfg.Pattern) > 200 {
+			return nil, bad("config")
+		}
+		return &Sitemap{c: c, name: slug, company: company, rawURL: cfg.URL, pattern: rx, complete: cfg.Complete}, nil
 	case "greenhouse":
 		return &Greenhouse{c: c, board: slug, company: company}, nil
 	case "ashby":

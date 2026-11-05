@@ -1,0 +1,31 @@
+{
+  "complete": false,
+  "postings": [
+    {
+      "Source": "careers:beispielwerk",
+      "ExternalID": "w-1",
+      "Company": "Beispielwerk",
+      "Title": "Werkstudent Data",
+      "Location": "Hamburg, DE",
+      "URL": "https://www.beispielwerk.example/karriere/w-1",
+      "ApplyURL": "",
+      "Description": "Wir bauen Dinge mit Go.",
+      "Posted": "2026-10-30",
+      "Workplace": "",
+      "Extra": null
+    },
+    {
+      "Source": "careers:beispielwerk",
+      "ExternalID": "w-3",
+      "Company": "Beispielwerk",
+      "Title": "DevOps Engineer",
+      "Location": "Remote, DE; Remote (Germany)",
+      "URL": "https://www.beispielwerk.example/karriere/w-3",
+      "ApplyURL": "",
+      "Description": "Wir bauen Dinge mit Go.",
+      "Posted": "2026-10-30",
+      "Workplace": "remote",
+      "Extra": null
+    }
+  ]
+}
