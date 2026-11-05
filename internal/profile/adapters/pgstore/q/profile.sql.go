@@ -12,6 +12,58 @@ import (
 	"github.com/google/uuid"
 )
 
+const activePreferences = `-- name: ActivePreferences :many
+SELECT p.preferences FROM profiles p JOIN users u ON u.id = p.user_id
+WHERE u.disabled_at IS NULL AND p.preferences IS NOT NULL ORDER BY p.user_id
+`
+
+// System role: the search preferences of enabled users.
+func (q *Queries) ActivePreferences(ctx context.Context) ([][]byte, error) {
+	rows, err := q.db.Query(ctx, activePreferences)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := [][]byte{}
+	for rows.Next() {
+		var preferences []byte
+		if err := rows.Scan(&preferences); err != nil {
+			return nil, err
+		}
+		items = append(items, preferences)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const activeProfileUsers = `-- name: ActiveProfileUsers :many
+SELECT p.user_id FROM profiles p JOIN users u ON u.id = p.user_id
+WHERE u.disabled_at IS NULL AND (p.sealed IS NOT NULL OR p.preferences IS NOT NULL) ORDER BY p.user_id
+`
+
+// System role: users with a profile or preferences whose account is enabled.
+func (q *Queries) ActiveProfileUsers(ctx context.Context) ([]uuid.UUID, error) {
+	rows, err := q.db.Query(ctx, activeProfileUsers)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []uuid.UUID{}
+	for rows.Next() {
+		var user_id uuid.UUID
+		if err := rows.Scan(&user_id); err != nil {
+			return nil, err
+		}
+		items = append(items, user_id)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const countDocuments = `-- name: CountDocuments :one
 SELECT count(*) FROM documents WHERE user_id = $1
 `

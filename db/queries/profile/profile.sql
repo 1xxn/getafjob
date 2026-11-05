@@ -46,3 +46,13 @@ UPDATE profile_items SET sealed = $4, updated_at = $5 WHERE id = $1 AND user_id 
 
 -- name: DeleteItem :execrows
 DELETE FROM profile_items WHERE id = $1 AND user_id = $2 AND kind = $3;
+
+-- name: ActiveProfileUsers :many
+-- System role: users with a profile or preferences whose account is enabled.
+SELECT p.user_id FROM profiles p JOIN users u ON u.id = p.user_id
+WHERE u.disabled_at IS NULL AND (p.sealed IS NOT NULL OR p.preferences IS NOT NULL) ORDER BY p.user_id;
+
+-- name: ActivePreferences :many
+-- System role: the search preferences of enabled users.
+SELECT p.preferences FROM profiles p JOIN users u ON u.id = p.user_id
+WHERE u.disabled_at IS NULL AND p.preferences IS NOT NULL ORDER BY p.user_id;

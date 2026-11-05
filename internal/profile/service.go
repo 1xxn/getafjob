@@ -28,9 +28,10 @@ func (e *ValidationError) Unwrap() error { return ErrInvalid }
 
 // Service reads and writes profiles.
 type Service struct {
-	store  Store
-	sealer Sealer
-	now    func() time.Time
+	store    Store
+	sealer   Sealer
+	now      func() time.Time
+	onChange func(ctx context.Context, userID uuid.UUID)
 }
 
 // NewService returns a profile service.
@@ -87,6 +88,9 @@ func (s *Service) SaveProfile(ctx context.Context, userID uuid.UUID, p Profile, 
 	if err == nil && !ok {
 		return ErrConflict
 	}
+	if err == nil {
+		s.changed(ctx, userID)
+	}
 	return err
 }
 
@@ -99,7 +103,23 @@ func (s *Service) SavePreferences(ctx context.Context, userID uuid.UUID, p Prefe
 	if err != nil {
 		return err
 	}
-	return s.store.SavePreferences(ctx, userID, b, s.now())
+	if err := s.store.SavePreferences(ctx, userID, b, s.now()); err != nil {
+		return err
+	}
+	s.changed(ctx, userID)
+	return nil
+}
+
+// WithOnChange registers fn to run after every saved profile or preferences change (matching).
+func (s *Service) WithOnChange(fn func(ctx context.Context, userID uuid.UUID)) *Service {
+	s.onChange = fn
+	return s
+}
+
+func (s *Service) changed(ctx context.Context, userID uuid.UUID) {
+	if s.onChange != nil {
+		s.onChange(ctx, userID)
+	}
 }
 
 // WithClock replaces the clock (tests).
