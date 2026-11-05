@@ -248,3 +248,13 @@ func FuzzText(f *testing.F) {
 		_, _ = Text(profile.MimeDOCX, b)
 	})
 }
+
+func TestLinksNeedTheirHost(t *testing.T) {
+	p := Parse("Max Mustermann\nevil-linkedin.com/in/max and xgithub.com/max\nhttps://www.linkedin.com/in/max-m (github.com/maxm)")
+	if p.Personal.LinkedIn != "https://www.linkedin.com/in/max-m" || p.Personal.GitHub != "https://github.com/maxm" {
+		t.Errorf("links = %q, %q", p.Personal.LinkedIn, p.Personal.GitHub)
+	}
+	if p := Parse("evil-linkedin.com/in/max"); p.Personal.LinkedIn != "" {
+		t.Errorf("look-alike host taken: %q", p.Personal.LinkedIn)
+	}
+}
