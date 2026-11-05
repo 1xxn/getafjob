@@ -1,0 +1,92 @@
+package views
+
+// DocumentRow is one stored file.
+type DocumentRow struct {
+	ID       string
+	Name     string
+	Kind     string // cv, certificate, other
+	Size     string
+	Created  string
+	Label    string
+	Language string
+	Focus    string
+}
+
+templ DocumentsPage(name, notice string, failed bool, docs []DocumentRow) {
+	@Layout(Page{Title: T(ctx, "documents.title"), UserName: name}) {
+		@Section(T(ctx, "documents.title")) {
+			<p class="muted">{ T(ctx, "documents.text") }</p>
+			if notice != "" {
+				if failed {
+					@Notice("error", notice)
+				} else {
+					@Notice("info", notice)
+				}
+			}
+			<form method="post" action="/documents" enctype="multipart/form-data" class="stack">
+				<div class="field">
+					<label for="f-kind">{ T(ctx, "documents.kind") }</label>
+					<select id="f-kind" name="kind">
+						for _, k := range []string{"cv", "certificate", "other"} {
+							<option value={ k }>{ T(ctx, "documents.kind." + k) }</option>
+						}
+					</select>
+				</div>
+				<div class="field">
+					<label for="f-file">{ T(ctx, "documents.file") }</label>
+					<input id="f-file" name="file" type="file" required accept=".pdf,.docx,.png,.jpg,.jpeg,application/pdf,image/png,image/jpeg" aria-describedby="f-file-hint"/>
+					<p class="hint" id="f-file-hint">{ T(ctx, "documents.file_hint") }</p>
+				</div>
+				<button type="submit" class="primary">{ T(ctx, "documents.upload") }</button>
+			</form>
+			if len(docs) > 0 {
+				<table class="table">
+					<thead>
+						<tr>
+							<th scope="col">{ T(ctx, "documents.name") }</th>
+							<th scope="col">{ T(ctx, "documents.kind") }</th>
+							<th scope="col">{ T(ctx, "documents.size") }</th>
+							<th scope="col">{ T(ctx, "documents.added") }</th>
+							<th scope="col"><span class="visually-hidden">{ T(ctx, "passkey.actions") }</span></th>
+						</tr>
+					</thead>
+					<tbody>
+						for _, d := range docs {
+							<tr>
+								<td><a href={ templ.SafeURL("/documents/" + d.ID) }>{ d.Name }</a></td>
+								<td>{ T(ctx, "documents.kind." + d.Kind) }</td>
+								<td>{ d.Size }</td>
+								<td>{ d.Created }</td>
+								<td>
+									<form method="post" action={ templ.SafeURL("/documents/" + d.ID + "/delete") }>
+										<button type="submit" class="link">{ T(ctx, "passkey.remove") }</button>
+									</form>
+								</td>
+							</tr>
+						}
+					</tbody>
+				</table>
+				for _, d := range docs {
+					if d.Kind == "cv" {
+						<form method="post" action={ templ.SafeURL("/documents/" + d.ID + "/variant") } class="stack form-section">
+							<h2>{ T(ctx, "documents.variant", "name", d.Name) }</h2>
+							<p class="muted">{ T(ctx, "documents.variant_text") }</p>
+							@Field(FieldProps{Name: "label-" + d.ID, Label: T(ctx, "documents.label"), Type: "text", Value: d.Label, MaxLength: 100})
+							<div class="field">
+								<label for={ "f-language-" + d.ID }>{ T(ctx, "documents.language") }</label>
+								<select id={ "f-language-" + d.ID } name={ "language-" + d.ID }>
+									for _, l := range []string{"", "en", "de"} {
+										<option value={ l } selected?={ d.Language == l }>{ T(ctx, "documents.language." + or(l, "any")) }</option>
+									}
+								</select>
+							</div>
+							@Field(FieldProps{Name: "focus-" + d.ID, Label: T(ctx, "documents.focus"), Type: "text", Value: d.Focus,
+								Hint: T(ctx, "documents.focus_hint"), MaxLength: 2000})
+							<button type="submit">{ T(ctx, "profile.save") }</button>
+						</form>
+					}
+				}
+			}
+		}
+	}
+}

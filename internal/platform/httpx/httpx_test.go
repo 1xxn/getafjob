@@ -129,3 +129,25 @@ func TestRunShutsDownOnCancel(t *testing.T) {
 		t.Fatal("Run did not return after cancel")
 	}
 }
+
+func TestProtectUploadLimit(t *testing.T) {
+	read := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if _, err := io.ReadAll(r.Body); err != nil {
+			w.WriteHeader(http.StatusRequestEntityTooLarge)
+		}
+	})
+	h := Protect(read, 10, false, Upload{Path: "/documents", Max: 100})
+	for _, c := range []struct {
+		path string
+		size int
+		want int
+	}{{"/profile", 11, 413}, {"/documents", 100, 200}, {"/documents", 101, 413}, {"/documents/x", 11, 413}} {
+		req := httptest.NewRequest(http.MethodPost, c.path, strings.NewReader(strings.Repeat("x", c.size)))
+		req.Header.Set("Sec-Fetch-Site", "same-origin")
+		rec := httptest.NewRecorder()
+		h.ServeHTTP(rec, req)
+		if rec.Code != c.want {
+			t.Errorf("%s with %d bytes: %d", c.path, c.size, rec.Code)
+		}
+	}
+}

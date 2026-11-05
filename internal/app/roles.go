@@ -16,6 +16,7 @@ import (
 	"github.com/1xxn/getafjob/internal/discovery/adapters/sources"
 	"github.com/1xxn/getafjob/internal/identity"
 	"github.com/1xxn/getafjob/internal/identity/adapters/pgstore"
+	"github.com/1xxn/getafjob/internal/platform/blob"
 	"github.com/1xxn/getafjob/internal/platform/config"
 	"github.com/1xxn/getafjob/internal/platform/crypto"
 	"github.com/1xxn/getafjob/internal/platform/db"
@@ -58,10 +59,20 @@ func serve(ctx context.Context, cfg config.Config, logger *slog.Logger) error {
 	if err != nil {
 		return fmt.Errorf("GETAFJOB_MASTER_KEY: %w", err)
 	}
-	profiles := profile.NewService(profilestore.New(pool), crypto.NewEnvelope(ring, pool))
-	(&web.Server{Identity: ids, Profile: profiles, Logger: logger}).Register(mux)
+	env := crypto.NewEnvelope(ring, pool)
+	if cfg.BlobURL == "" {
+		return errors.New("GETAFJOB_BLOB_URL is not set")
+	}
+	files, err := blob.Open(cfg.BlobURL, blob.S3Credentials{AccessKey: cfg.BlobAccessKey, SecretKey: cfg.BlobSecretKey})
+	if err != nil {
+		return err
+	}
+	pstore := profilestore.New(pool)
+	(&web.Server{Identity: ids, Logger: logger, Profile: profile.NewService(pstore, env),
+		Documents: profile.NewDocuments(pstore, blob.NewSealed(files, env), env)}).Register(mux)
 
-	h := httpx.Instrument(httpx.Protect(httpx.Routes(mux), maxBody, cfg.PublicURL.Scheme == "https"))
+	h := httpx.Instrument(httpx.Protect(httpx.Routes(mux), maxBody, cfg.PublicURL.Scheme == "https",
+		httpx.Upload{Path: "/documents", Max: web.MaxUpload}))
 	return httpx.Run(ctx, httpx.NewServer(cfg.HTTPAddr, h, logger), cfg.ShutdownTimeout, logger)
 }
 

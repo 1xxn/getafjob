@@ -11,3 +11,23 @@ WHERE profiles.version = sqlc.arg(version)::bigint;
 -- name: SavePreferences :exec
 INSERT INTO profiles (user_id, preferences, updated_at) VALUES ($1, $2, $3)
 ON CONFLICT (user_id) DO UPDATE SET preferences = EXCLUDED.preferences, updated_at = EXCLUDED.updated_at;
+
+-- name: InsertDocument :exec
+INSERT INTO documents (id, user_id, kind, sealed_name, mime, size, label, language, focus, created_at)
+VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10);
+
+-- name: ListDocuments :many
+SELECT id, kind, sealed_name, mime, size, label, language, focus, created_at FROM documents
+WHERE user_id = $1 ORDER BY created_at, id;
+
+-- name: GetDocument :one
+SELECT id, kind, sealed_name, mime, size, label, language, focus, created_at FROM documents WHERE id = $1 AND user_id = $2;
+
+-- name: CountDocuments :one
+SELECT count(*) FROM documents WHERE user_id = $1;
+
+-- name: UpdateVariant :execrows
+UPDATE documents SET label = $3, language = $4, focus = $5 WHERE id = $1 AND user_id = $2 AND kind = 'cv';
+
+-- name: DeleteDocument :execrows
+DELETE FROM documents WHERE id = $1 AND user_id = $2;

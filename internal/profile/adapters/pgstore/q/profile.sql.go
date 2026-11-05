@@ -12,6 +12,153 @@ import (
 	"github.com/google/uuid"
 )
 
+const countDocuments = `-- name: CountDocuments :one
+SELECT count(*) FROM documents WHERE user_id = $1
+`
+
+func (q *Queries) CountDocuments(ctx context.Context, userID uuid.UUID) (int64, error) {
+	row := q.db.QueryRow(ctx, countDocuments, userID)
+	var count int64
+	err := row.Scan(&count)
+	return count, err
+}
+
+const deleteDocument = `-- name: DeleteDocument :execrows
+DELETE FROM documents WHERE id = $1 AND user_id = $2
+`
+
+type DeleteDocumentParams struct {
+	ID     uuid.UUID
+	UserID uuid.UUID
+}
+
+func (q *Queries) DeleteDocument(ctx context.Context, arg DeleteDocumentParams) (int64, error) {
+	result, err := q.db.Exec(ctx, deleteDocument, arg.ID, arg.UserID)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
+}
+
+const getDocument = `-- name: GetDocument :one
+SELECT id, kind, sealed_name, mime, size, label, language, focus, created_at FROM documents WHERE id = $1 AND user_id = $2
+`
+
+type GetDocumentParams struct {
+	ID     uuid.UUID
+	UserID uuid.UUID
+}
+
+type GetDocumentRow struct {
+	ID         uuid.UUID
+	Kind       string
+	SealedName []byte
+	Mime       string
+	Size       int32
+	Label      string
+	Language   string
+	Focus      []string
+	CreatedAt  time.Time
+}
+
+func (q *Queries) GetDocument(ctx context.Context, arg GetDocumentParams) (GetDocumentRow, error) {
+	row := q.db.QueryRow(ctx, getDocument, arg.ID, arg.UserID)
+	var i GetDocumentRow
+	err := row.Scan(
+		&i.ID,
+		&i.Kind,
+		&i.SealedName,
+		&i.Mime,
+		&i.Size,
+		&i.Label,
+		&i.Language,
+		&i.Focus,
+		&i.CreatedAt,
+	)
+	return i, err
+}
+
+const insertDocument = `-- name: InsertDocument :exec
+INSERT INTO documents (id, user_id, kind, sealed_name, mime, size, label, language, focus, created_at)
+VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+`
+
+type InsertDocumentParams struct {
+	ID         uuid.UUID
+	UserID     uuid.UUID
+	Kind       string
+	SealedName []byte
+	Mime       string
+	Size       int32
+	Label      string
+	Language   string
+	Focus      []string
+	CreatedAt  time.Time
+}
+
+func (q *Queries) InsertDocument(ctx context.Context, arg InsertDocumentParams) error {
+	_, err := q.db.Exec(ctx, insertDocument,
+		arg.ID,
+		arg.UserID,
+		arg.Kind,
+		arg.SealedName,
+		arg.Mime,
+		arg.Size,
+		arg.Label,
+		arg.Language,
+		arg.Focus,
+		arg.CreatedAt,
+	)
+	return err
+}
+
+const listDocuments = `-- name: ListDocuments :many
+SELECT id, kind, sealed_name, mime, size, label, language, focus, created_at FROM documents
+WHERE user_id = $1 ORDER BY created_at, id
+`
+
+type ListDocumentsRow struct {
+	ID         uuid.UUID
+	Kind       string
+	SealedName []byte
+	Mime       string
+	Size       int32
+	Label      string
+	Language   string
+	Focus      []string
+	CreatedAt  time.Time
+}
+
+func (q *Queries) ListDocuments(ctx context.Context, userID uuid.UUID) ([]ListDocumentsRow, error) {
+	rows, err := q.db.Query(ctx, listDocuments, userID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []ListDocumentsRow{}
+	for rows.Next() {
+		var i ListDocumentsRow
+		if err := rows.Scan(
+			&i.ID,
+			&i.Kind,
+			&i.SealedName,
+			&i.Mime,
+			&i.Size,
+			&i.Label,
+			&i.Language,
+			&i.Focus,
+			&i.CreatedAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const loadProfile = `-- name: LoadProfile :one
 SELECT sealed, preferences, version, updated_at FROM profiles WHERE user_id = $1
 `
@@ -72,6 +219,32 @@ func (q *Queries) SaveProfile(ctx context.Context, arg SaveProfileParams) (int64
 		arg.Sealed,
 		arg.UpdatedAt,
 		arg.Version,
+	)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
+}
+
+const updateVariant = `-- name: UpdateVariant :execrows
+UPDATE documents SET label = $3, language = $4, focus = $5 WHERE id = $1 AND user_id = $2 AND kind = 'cv'
+`
+
+type UpdateVariantParams struct {
+	ID       uuid.UUID
+	UserID   uuid.UUID
+	Label    string
+	Language string
+	Focus    []string
+}
+
+func (q *Queries) UpdateVariant(ctx context.Context, arg UpdateVariantParams) (int64, error) {
+	result, err := q.db.Exec(ctx, updateVariant,
+		arg.ID,
+		arg.UserID,
+		arg.Label,
+		arg.Language,
+		arg.Focus,
 	)
 	if err != nil {
 		return 0, err
