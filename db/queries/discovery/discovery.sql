@@ -68,3 +68,29 @@ SELECT id, ats, slug, company, config FROM boards WHERE enabled ORDER BY id;
 -- name: TouchOpenJobs :many
 UPDATE jobs SET last_seen = sqlc.arg(at) WHERE fingerprint = ANY(sqlc.arg(fingerprints)::text[]) AND status = 'open'
 RETURNING fingerprint;
+
+-- name: BoardCandidates :many
+-- Open job-board hits of companies whose own board was not looked for recently, newest first.
+SELECT company, title, url, apply_url, match_key
+FROM jobs j
+WHERE j.status = 'open'
+  AND split_part(j.source, ':', 1) = ANY(sqlc.arg(aggregators)::text[])
+  AND split_part(j.match_key, '|', 1) <> ''
+  AND NOT EXISTS (SELECT 1 FROM board_checks c
+                  WHERE c.company_key = split_part(j.match_key, '|', 1) AND c.recheck_at > sqlc.arg(now))
+ORDER BY j.first_seen DESC, j.id
+LIMIT sqlc.arg(max_rows);
+
+-- name: BoardBySlug :one
+SELECT id FROM boards WHERE ats = sqlc.arg(ats) AND lower(slug) = lower(sqlc.arg(slug)::text) ORDER BY id LIMIT 1;
+
+-- name: InsertDiscoveredBoard :one
+INSERT INTO boards (ats, slug, company, config, origin) VALUES ($1, $2, $3, $4, 'discovered')
+ON CONFLICT (ats, slug) DO NOTHING
+RETURNING id;
+
+-- name: RecordBoardCheck :exec
+INSERT INTO board_checks (company_key, checked_at, recheck_at, result, board_id) VALUES ($1, $2, $3, $4, $5)
+ON CONFLICT (company_key) DO UPDATE
+SET checked_at = EXCLUDED.checked_at, recheck_at = EXCLUDED.recheck_at, result = EXCLUDED.result,
+    board_id = EXCLUDED.board_id;

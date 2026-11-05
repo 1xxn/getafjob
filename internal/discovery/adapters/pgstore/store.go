@@ -24,8 +24,9 @@ import (
 type Store struct{ pool *pgxpool.Pool }
 
 var (
-	_ discovery.Store  = (*Store)(nil)
-	_ discovery.Boards = (*Store)(nil)
+	_ discovery.Store       = (*Store)(nil)
+	_ discovery.Boards      = (*Store)(nil)
+	_ discovery.BoardChecks = (*Store)(nil)
 )
 
 // New returns a store on pool.
@@ -313,4 +314,64 @@ func (s *Store) EnabledBoards(ctx context.Context) ([]discovery.Board, error) {
 		return err
 	})
 	return out, err
+}
+
+// BoardCandidates returns open job-board hits of companies without a check that still holds.
+func (s *Store) BoardCandidates(ctx context.Context, now time.Time, maxRows int) ([]discovery.Hit, error) {
+	var out []discovery.Hit
+	err := s.system(ctx, func(qs *q.Queries) error {
+		rows, err := qs.BoardCandidates(ctx, q.BoardCandidatesParams{
+			Aggregators: discovery.Aggregators(), Now: now, MaxRows: int32(min(maxRows, 1<<20)), //nolint:gosec // bounded
+		})
+		for _, r := range rows {
+			out = append(out, discovery.Hit{Company: r.Company, Title: r.Title, URL: r.Url, ApplyURL: r.ApplyUrl, MatchKey: r.MatchKey})
+		}
+		return err
+	})
+	return out, err
+}
+
+// RecordBoardChecks stores the outcomes and adds confirmed boards that are not known yet (slugs compared without
+// case).
+func (s *Store) RecordBoardChecks(ctx context.Context, checks []discovery.BoardCheck, at time.Time) (added int, err error) {
+	err = s.system(ctx, func(qs *q.Queries) error {
+		added = 0
+		for _, c := range checks {
+			var boardID *int64
+			if b := c.Board; b != nil {
+				id, isNew, err := discoveredBoard(ctx, qs, *b)
+				if err != nil {
+					return err
+				}
+				boardID = &id
+				if isNew {
+					added++
+				}
+			}
+			if err := qs.RecordBoardCheck(ctx, q.RecordBoardCheckParams{
+				CompanyKey: c.CompanyKey, CheckedAt: at, RecheckAt: at.Add(c.Result.RecheckAfter()),
+				Result: string(c.Result), BoardID: boardID,
+			}); err != nil {
+				return err
+			}
+		}
+		return nil
+	})
+	return added, err
+}
+
+func discoveredBoard(ctx context.Context, qs *q.Queries, b discovery.Board) (id int64, isNew bool, err error) {
+	id, err = qs.BoardBySlug(ctx, q.BoardBySlugParams{Ats: b.ATS, Slug: b.Slug})
+	if err == nil {
+		return id, false, nil
+	}
+	if !errors.Is(err, pgx.ErrNoRows) {
+		return 0, false, err
+	}
+	cfg := b.Config
+	if len(cfg) == 0 {
+		cfg = []byte("{}")
+	}
+	id, err = qs.InsertDiscoveredBoard(ctx, q.InsertDiscoveredBoardParams{Ats: b.ATS, Slug: b.Slug, Company: b.Company, Config: cfg})
+	return id, err == nil, err
 }

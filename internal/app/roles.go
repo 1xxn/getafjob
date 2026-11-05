@@ -12,6 +12,7 @@ import (
 
 	"github.com/1xxn/getafjob/internal/discovery"
 	discoverystore "github.com/1xxn/getafjob/internal/discovery/adapters/pgstore"
+	"github.com/1xxn/getafjob/internal/discovery/adapters/sources"
 	"github.com/1xxn/getafjob/internal/identity"
 	"github.com/1xxn/getafjob/internal/identity/adapters/pgstore"
 	"github.com/1xxn/getafjob/internal/platform/config"
@@ -62,8 +63,11 @@ func worker(ctx context.Context, cfg config.Config, logger *slog.Logger) error {
 
 	store := discoverystore.New(pool)
 	workers := river.NewWorkers()
-	river.AddWorker(workers, &crawlWorker{svc: discovery.NewService(store), boards: store, client: sourceClient(cfg),
+	client := sourceClient(cfg)
+	river.AddWorker(workers, &crawlWorker{svc: discovery.NewService(store), boards: store, client: client,
 		cfg: cfg, logger: logger, timeout: 90 * time.Minute})
+	river.AddWorker(workers, &boardDiscoveryWorker{
+		discovery: discovery.NewBoardDiscovery(store, store, sources.NewFinder(client)), logger: logger})
 	river.AddWorker(workers, &cleanupWorker{ids: identity.NewService(pgstore.New(pool), nil, cfg.PublicURL)})
 	jobs, err := queue.NewWorker(pool, queue.Options{Workers: workers, Periodic: periodicJobs(cfg), Logger: logger})
 	if err != nil {

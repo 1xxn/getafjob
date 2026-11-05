@@ -5,6 +5,7 @@ import (
 	"log/slog"
 	"time"
 
+	"github.com/jackc/pgx/v5"
 	"github.com/riverqueue/river"
 	"github.com/riverqueue/river/rivertype"
 
@@ -58,6 +59,45 @@ func (w *crawlWorker) Work(ctx context.Context, _ *river.Job[CrawlArgs]) error {
 	w.logger.InfoContext(ctx, "crawl finished", "run", rep.RunID, "sources", len(srcs), "fetched", rep.Stats.Fetched,
 		"new", rep.Stats.Changes[discovery.ChangeNew], "updated", rep.Stats.Changes[discovery.ChangeUpdated],
 		"closed", rep.Stats.Closed, "failed_sources", len(rep.Errors))
+	if c, err := river.ClientFromContextSafely[pgx.Tx](ctx); err == nil {
+		if _, err := c.Insert(ctx, BoardDiscoveryArgs{}, nil); err != nil {
+			w.logger.WarnContext(ctx, "board discovery not queued", "err", err)
+		}
+	}
+	return nil
+}
+
+// BoardDiscoveryArgs looks for the own boards of companies seen only on job boards; queued after each crawl.
+type BoardDiscoveryArgs struct{}
+
+// Kind implements river.JobArgs.
+func (BoardDiscoveryArgs) Kind() string { return "board_discovery" }
+
+// InsertOpts runs discovery on the crawl queue (never alongside a crawl); at most one waits or runs.
+func (BoardDiscoveryArgs) InsertOpts() river.InsertOpts {
+	return river.InsertOpts{Queue: queue.Crawl, MaxAttempts: 2, UniqueOpts: river.UniqueOpts{
+		ByState: []rivertype.JobState{rivertype.JobStateAvailable, rivertype.JobStatePending, rivertype.JobStateRunning,
+			rivertype.JobStateRetryable, rivertype.JobStateScheduled}}}
+}
+
+type boardDiscoveryWorker struct {
+	river.WorkerDefaults[BoardDiscoveryArgs]
+	discovery *discovery.BoardDiscovery
+	logger    *slog.Logger
+}
+
+// Timeout bounds one run (about 30 companies with a few requests each).
+func (w *boardDiscoveryWorker) Timeout(*river.Job[BoardDiscoveryArgs]) time.Duration {
+	return 20 * time.Minute
+}
+
+func (w *boardDiscoveryWorker) Work(ctx context.Context, _ *river.Job[BoardDiscoveryArgs]) error {
+	st, err := w.discovery.Run(ctx)
+	if err != nil {
+		return err
+	}
+	w.logger.InfoContext(ctx, "board discovery finished", "checked", st.Checked, "found", st.Found, "added", st.Added,
+		"errors", st.Errors)
 	return nil
 }
 
