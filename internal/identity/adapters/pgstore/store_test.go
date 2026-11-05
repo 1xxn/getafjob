@@ -645,3 +645,92 @@ func TestPasskeyChangesNeedFreshSignIn(t *testing.T) {
 		t.Errorf("removed passkey still signs in: %v", err)
 	}
 }
+
+func TestRecoveryInsteadOfMagicLink(t *testing.T) {
+	e := passkeyEnv(t)
+	ctx := t.Context()
+	u, session := signIn(t, e)
+	start := e.now
+
+	// A link requested before the passkey existed no longer signs in once there is one.
+	if err := e.svc.RequestMagicLink(ctx, "max.mustermann@example.com"); err != nil {
+		t.Fatal(err)
+	}
+	early := tokenFrom(linkIn(t, e.mail.last(t).Text))
+	key := softauthn.New("jobs.example.org", "https://jobs.example.org")
+	if err := register(t, e, u, session, key); err != nil {
+		t.Fatal(err)
+	}
+	if _, _, err := e.svc.SignInWithMagicLink(ctx, early); !errors.Is(err, identity.ErrRecoveryWait) {
+		t.Fatalf("old link: %v", err)
+	}
+	if _, _, err := e.svc.SignInWithMagicLink(ctx, early); !errors.Is(err, identity.ErrInvalidToken) {
+		t.Fatalf("old link is not spent: %v", err)
+	}
+
+	// A request starts the waiting period: a notice by mail, no link, and no second notice.
+	mails := e.mail.count()
+	if err := e.svc.RequestMagicLink(ctx, "max.mustermann@example.com"); err != nil {
+		t.Fatal(err)
+	}
+	if m := e.mail.last(t); e.mail.count() != mails+1 || m.Subject != "Sign-in without your passkey requested" || strings.Contains(m.Text, "/login/link/") {
+		t.Fatalf("recovery mail = %+v", m)
+	}
+	if err := e.svc.RequestMagicLink(ctx, "max.mustermann@example.com"); err != nil || e.mail.count() != mails+1 {
+		t.Fatalf("second request mailed again: %v", err)
+	}
+	rec, err := e.svc.Recovery(ctx, u.ID)
+	if err != nil || rec == nil || !rec.ReadyAt.Equal(start.Add(identity.RecoveryDelay)) {
+		t.Fatalf("recovery = %+v, %v", rec, err)
+	}
+
+	// Signing in with the passkey cancels it.
+	if _, _, err := login(t, e, key); err != nil {
+		t.Fatal(err)
+	}
+	if rec, _ := e.svc.Recovery(ctx, u.ID); rec != nil {
+		t.Fatalf("recovery after passkey sign-in: %+v", rec)
+	}
+
+	// After the waiting period a link works once, and the owner is told.
+	if err := e.svc.RequestMagicLink(ctx, "max.mustermann@example.com"); err != nil {
+		t.Fatal(err)
+	}
+	e.now = e.now.Add(identity.RecoveryDelay - time.Minute)
+	mails = e.mail.count()
+	if err := e.svc.RequestMagicLink(ctx, "max.mustermann@example.com"); err != nil || e.mail.count() != mails {
+		t.Fatalf("request before the delay: mails %d, %v", e.mail.count()-mails, err)
+	}
+	e.now = e.now.Add(2 * time.Minute)
+	if err := e.svc.RequestMagicLink(ctx, "max.mustermann@example.com"); err != nil {
+		t.Fatal(err)
+	}
+	link := tokenFrom(linkIn(t, e.mail.last(t).Text))
+	if _, s, err := e.svc.SignInWithMagicLink(ctx, link); err != nil || s == "" {
+		t.Fatalf("recovery sign-in: %v", err)
+	}
+	if m := e.mail.last(t); m.Subject != "Signed in without a passkey" {
+		t.Fatalf("notice = %+v", m)
+	}
+	if rec, _ := e.svc.Recovery(ctx, u.ID); rec != nil {
+		t.Fatalf("recovery not used up: %+v", rec)
+	}
+
+	// An expired recovery is replaced by a new one, with a new waiting period.
+	if err := e.svc.RequestMagicLink(ctx, "max.mustermann@example.com"); err != nil {
+		t.Fatal(err)
+	}
+	e.now = e.now.Add(identity.RecoveryDelay + identity.RecoveryWindow)
+	if rec, _ := e.svc.Recovery(ctx, u.ID); rec != nil {
+		t.Fatalf("expired recovery still shown: %+v", rec)
+	}
+	if err := e.svc.RequestMagicLink(ctx, "max.mustermann@example.com"); err != nil {
+		t.Fatal(err)
+	}
+	if rec, _ := e.svc.Recovery(ctx, u.ID); rec == nil || !rec.ReadyAt.Equal(e.now.Add(identity.RecoveryDelay)) {
+		t.Fatalf("new recovery = %+v", rec)
+	}
+	if ok, err := e.svc.CancelRecovery(ctx, u.ID); err != nil || !ok {
+		t.Fatalf("cancel = %v, %v", ok, err)
+	}
+}

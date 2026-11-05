@@ -53,6 +53,7 @@ func (s *Server) Register(mux *http.ServeMux) {
 	mux.Handle("POST /account/passkeys/options", s.page(s.passkeyAddOptions))
 	mux.Handle("POST /account/passkeys", s.page(s.passkeyAdd))
 	mux.Handle("POST /account/passkeys/{id}/delete", s.page(s.passkeyDelete))
+	mux.Handle("POST /account/recovery/cancel", s.page(s.cancelRecovery))
 	mux.Handle("POST /login/passkey/options", s.limited(s.page(s.passkeyLoginOptions)))
 	mux.Handle("POST /login/passkey", s.limited(s.page(s.passkeyLogin)))
 	mux.Handle("/", s.page(s.notFound))
@@ -112,7 +113,16 @@ func (s *Server) home(w http.ResponseWriter, r *http.Request, u *identity.User) 
 		http.Redirect(w, r, "/login", http.StatusSeeOther)
 		return
 	}
-	s.render(w, r, http.StatusOK, views.Home(u.DisplayName))
+	nudge := false
+	if s.Identity.PasskeysEnabled() {
+		keys, err := s.Identity.Passkeys(r.Context(), u.ID)
+		if err != nil {
+			s.failed(w, r, u, err)
+			return
+		}
+		nudge = len(keys) == 0
+	}
+	s.render(w, r, http.StatusOK, views.Home(u.DisplayName, nudge))
 }
 
 // limiter is a token bucket per client address.

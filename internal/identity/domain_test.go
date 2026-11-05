@@ -137,3 +137,19 @@ func TestSessionRotationRule(t *testing.T) {
 		t.Error("grace period of a replaced token")
 	}
 }
+
+func TestRecoveryWindow(t *testing.T) {
+	now := time.Date(2026, 11, 5, 12, 0, 0, 0, time.UTC)
+	r := NewRecovery(now)
+	for _, c := range []struct {
+		at    time.Duration
+		ready bool
+	}{
+		{0, false}, {RecoveryDelay - time.Second, false}, {RecoveryDelay, true},
+		{RecoveryDelay + RecoveryWindow - time.Second, true}, {RecoveryDelay + RecoveryWindow, false},
+	} {
+		if r.Ready(now.Add(c.at)) != c.ready {
+			t.Errorf("Ready(+%v) = %v", c.at, !c.ready)
+		}
+	}
+}

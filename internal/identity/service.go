@@ -127,6 +127,13 @@ func (s *Service) RequestMagicLink(ctx context.Context, email string) error {
 		return err
 	}
 	now := s.now()
+	hasKeys, rec, err := s.store.RecoveryState(ctx, u.ID)
+	if err != nil {
+		return err
+	}
+	if hasKeys && (rec == nil || !rec.Ready(now)) {
+		return s.startRecovery(ctx, u, now)
+	}
 	token, hash := NewToken()
 	created, err := s.store.CreateMagicLink(ctx, u.ID, hash, now, now.Add(MagicLinkTTL), now.Add(-magicLinkWindow), magicLinkLimit)
 	if err != nil || !created || s.mailer == nil {
@@ -147,7 +154,7 @@ func (s *Service) SignInWithMagicLink(ctx context.Context, token string) (User, 
 	}
 	now := s.now()
 	st, sh := NewToken()
-	u, err := s.store.ConsumeMagicLink(ctx, h, s.newSession(sh, MethodMagicLink, now), now)
+	u, recovered, err := s.store.ConsumeMagicLink(ctx, h, s.newSession(sh, MethodMagicLink, now), now)
 	if errors.Is(err, ErrNotFound) {
 		return User{}, "", ErrInvalidToken
 	}
@@ -157,7 +164,45 @@ func (s *Service) SignInWithMagicLink(ctx context.Context, token string) (User, 
 	if u.Disabled {
 		return User{}, "", ErrUserDisabled // the store created no session
 	}
+	if recovered && s.mailer != nil {
+		l := u.Locale
+		body := i18n.T(l, "mail.recovered.body", map[string]any{"name": u.DisplayName, "time": stamp(now), "account": s.link("/account", "")})
+		if err := s.mailer.Send(ctx, Mail{To: u.Email, Subject: i18n.T(l, "mail.recovered.subject", nil), Text: body}); err != nil {
+			return User{}, "", fmt.Errorf("send recovery notice: %w", err)
+		}
+	}
 	return u, st, nil
+}
+
+// startRecovery answers a mail link request of an account with a passkey: it starts the waiting period and tells
+// the owner by mail. A recovery that is already waiting is not restarted and not mailed again.
+func (s *Service) startRecovery(ctx context.Context, u User, now time.Time) error {
+	r, started, err := s.store.StartRecovery(ctx, u.ID, NewRecovery(now),
+		AuditEvent{UserID: &u.ID, Actor: "user", Code: "identity.recovery_requested"})
+	if err != nil || !started || s.mailer == nil {
+		return err
+	}
+	l := u.Locale
+	body := i18n.T(l, "mail.recovery.body", map[string]any{
+		"name": u.DisplayName, "ready": stamp(r.ReadyAt), "until": stamp(r.ExpiresAt), "login": s.link("/login", ""),
+	})
+	return s.mailer.Send(ctx, Mail{To: u.Email, Subject: i18n.T(l, "mail.recovery.subject", nil), Text: body})
+}
+
+func stamp(t time.Time) string { return t.UTC().Format("2006-01-02 15:04 UTC") }
+
+// Recovery returns the user's pending recovery, if any.
+func (s *Service) Recovery(ctx context.Context, userID uuid.UUID) (*Recovery, error) {
+	_, r, err := s.store.RecoveryState(ctx, userID)
+	if r != nil && !s.now().Before(r.ExpiresAt) {
+		r = nil
+	}
+	return r, err
+}
+
+// CancelRecovery ends a pending recovery (account page).
+func (s *Service) CancelRecovery(ctx context.Context, userID uuid.UUID) (bool, error) {
+	return s.store.CancelRecovery(ctx, userID, AuditEvent{UserID: &userID, Actor: "user", Code: "identity.recovery_canceled"})
 }
 
 // Authenticate resolves a session cookie to its user. When the token is due for rotation it returns the new

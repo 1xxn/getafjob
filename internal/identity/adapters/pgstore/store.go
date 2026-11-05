@@ -141,8 +141,10 @@ func (s *Store) CreateMagicLink(ctx context.Context, userID uuid.UUID, h identit
 	return ok, err
 }
 
-// ConsumeMagicLink marks the link used and starts a session, unless the account is disabled.
-func (s *Store) ConsumeMagicLink(ctx context.Context, h identity.Hash, sess identity.NewSession, at time.Time) (u identity.User, err error) {
+// ConsumeMagicLink marks the link used and starts a session, unless the account is disabled. An account with a
+// passkey needs a ready recovery, which is used up; without one the link is spent and no session starts.
+func (s *Store) ConsumeMagicLink(ctx context.Context, h identity.Hash, sess identity.NewSession, at time.Time) (u identity.User, recovered bool, err error) {
+	wait := false
 	err = s.system(ctx, func(qs *q.Queries) error {
 		userID, err := qs.UseMagicLink(ctx, q.UseMagicLinkParams{TokenHash: h[:], UsedAt: &at})
 		if err != nil {
@@ -156,14 +158,84 @@ func (s *Store) ConsumeMagicLink(ctx context.Context, h identity.Hash, sess iden
 		if u.Disabled {
 			return nil
 		}
+		hasKeys, err := qs.HasPasskeys(ctx, userID)
+		if err != nil {
+			return err
+		}
+		if hasKeys {
+			if _, err := qs.UseRecovery(ctx, q.UseRecoveryParams{UserID: userID, At: at}); errors.Is(err, pgx.ErrNoRows) {
+				wait = true
+				return audit(ctx, qs, identity.AuditEvent{UserID: &u.ID, Actor: "system", Code: "identity.magic_link_refused"})
+			} else if err != nil {
+				return err
+			}
+			recovered = true
+		}
 		if err := qs.CreateSession(ctx, q.CreateSessionParams{TokenHash: sess.Hash[:], UserID: u.ID, Method: string(sess.Method),
 			CreatedAt: sess.CreatedAt, ExpiresAt: sess.ExpiresAt}); err != nil {
 			return err
 		}
-		return audit(ctx, qs, identity.AuditEvent{UserID: &u.ID, Actor: "user", Code: "identity.signed_in",
+		code := "identity.signed_in"
+		if recovered {
+			code = "identity.recovered"
+		}
+		return audit(ctx, qs, identity.AuditEvent{UserID: &u.ID, Actor: "user", Code: code,
 			Params: map[string]any{"method": sess.Method}})
 	})
-	return u, err
+	if err == nil && wait {
+		err = identity.ErrRecoveryWait
+	}
+	return u, recovered, err
+}
+
+// RecoveryState tells whether the user has a passkey and returns a pending recovery.
+func (s *Store) RecoveryState(ctx context.Context, userID uuid.UUID) (has bool, r *identity.Recovery, err error) {
+	err = s.system(ctx, func(qs *q.Queries) error {
+		if has, err = qs.HasPasskeys(ctx, userID); err != nil {
+			return err
+		}
+		row, err := qs.GetRecovery(ctx, userID)
+		if errors.Is(err, pgx.ErrNoRows) {
+			return nil
+		}
+		if err != nil {
+			return err
+		}
+		r = &identity.Recovery{RequestedAt: row.RequestedAt, ReadyAt: row.ReadyAt, ExpiresAt: row.ExpiresAt}
+		return nil
+	})
+	return has, r, err
+}
+
+// StartRecovery stores a new recovery unless one is pending or ready.
+func (s *Store) StartRecovery(ctx context.Context, userID uuid.UUID, r identity.Recovery, e identity.AuditEvent) (cur identity.Recovery, started bool, err error) {
+	err = s.system(ctx, func(qs *q.Queries) error {
+		row, err := qs.StartRecovery(ctx, q.StartRecoveryParams{UserID: userID, RequestedAt: r.RequestedAt, ReadyAt: r.ReadyAt, ExpiresAt: r.ExpiresAt})
+		if errors.Is(err, pgx.ErrNoRows) {
+			old, err := qs.GetRecovery(ctx, userID)
+			cur = identity.Recovery{RequestedAt: old.RequestedAt, ReadyAt: old.ReadyAt, ExpiresAt: old.ExpiresAt}
+			return err
+		}
+		if err != nil {
+			return err
+		}
+		cur, started = identity.Recovery{RequestedAt: r.RequestedAt, ReadyAt: row.ReadyAt, ExpiresAt: row.ExpiresAt}, true
+		return audit(ctx, qs, e)
+	})
+	return cur, started, err
+}
+
+// CancelRecovery deletes a pending recovery.
+func (s *Store) CancelRecovery(ctx context.Context, userID uuid.UUID, e identity.AuditEvent) (ok bool, err error) {
+	err = s.system(ctx, func(qs *q.Queries) error {
+		n, err := qs.CancelRecovery(ctx, userID)
+		if err != nil || n == 0 {
+			return err
+		}
+		ok = true
+		return audit(ctx, qs, e)
+	})
+	return ok, err
 }
 
 // SessionByHash resolves a session cookie.
@@ -347,6 +419,14 @@ func (s *Store) SignInWithPasskey(ctx context.Context, userID uuid.UUID, id, cre
 		u = toUser(r.ID, r.Email, r.DisplayName, r.Role, r.Locale, r.DisabledAt)
 		if u.Disabled {
 			return nil
+		}
+		// The owner is back with a passkey: a recovery that someone may have started is void.
+		if n, err := qs.CancelRecovery(ctx, u.ID); err != nil {
+			return err
+		} else if n > 0 {
+			if err := audit(ctx, qs, identity.AuditEvent{UserID: &u.ID, Actor: "system", Code: "identity.recovery_canceled"}); err != nil {
+				return err
+			}
 		}
 		if err := qs.CreateSession(ctx, q.CreateSessionParams{TokenHash: sess.Hash[:], UserID: u.ID, Method: string(sess.Method),
 			CreatedAt: sess.CreatedAt, ExpiresAt: sess.ExpiresAt}); err != nil {

@@ -95,3 +95,23 @@ UPDATE passkeys SET credential = $3, last_used_at = $4 WHERE id = $1 AND user_id
 
 -- name: DeletePasskey :execrows
 DELETE FROM passkeys WHERE id = $1 AND user_id = $2;
+
+-- name: HasPasskeys :one
+SELECT EXISTS (SELECT 1 FROM passkeys WHERE user_id = $1);
+
+-- name: GetRecovery :one
+SELECT requested_at, ready_at, expires_at FROM recoveries WHERE user_id = $1;
+
+-- name: StartRecovery :one
+-- A pending or ready recovery stays; only an expired one is replaced.
+INSERT INTO recoveries (user_id, requested_at, ready_at, expires_at) VALUES ($1, $2, $3, $4)
+ON CONFLICT (user_id) DO UPDATE
+SET requested_at = EXCLUDED.requested_at, ready_at = EXCLUDED.ready_at, expires_at = EXCLUDED.expires_at
+WHERE recoveries.expires_at <= EXCLUDED.requested_at
+RETURNING ready_at, expires_at;
+
+-- name: UseRecovery :one
+DELETE FROM recoveries WHERE user_id = $1 AND ready_at <= sqlc.arg(at) AND expires_at > sqlc.arg(at) RETURNING user_id;
+
+-- name: CancelRecovery :execrows
+DELETE FROM recoveries WHERE user_id = $1;
