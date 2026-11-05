@@ -14,6 +14,7 @@ import (
 
 	"github.com/1xxn/getafjob/internal/platform/config"
 	"github.com/1xxn/getafjob/internal/platform/db"
+	"github.com/1xxn/getafjob/internal/platform/queue"
 )
 
 // Image must match the Compose stack (deploy/compose.yaml); Renovate keeps both current.
@@ -51,7 +52,7 @@ func Start(t *testing.T) config.Secret {
 	return config.Secret(dsn)
 }
 
-// AppURL migrates a fresh database as owner and returns the application role's URL and password.
+// AppURL migrates a fresh database (schema and queue) as owner and returns the application role's URL and password.
 func AppURL(t *testing.T) (config.Secret, config.Secret) {
 	t.Helper()
 	url := Start(t)
@@ -64,6 +65,9 @@ func AppURL(t *testing.T) (config.Secret, config.Secret) {
 	defer owner.Close()
 	if _, err := db.Migrate(ctx, owner); err != nil {
 		t.Fatalf("migrate: %v", err)
+	}
+	if _, err := queue.Migrate(ctx, owner); err != nil {
+		t.Fatalf("migrate queue: %v", err)
 	}
 	if err := db.SetAppRolePassword(ctx, owner, appPassword); err != nil {
 		t.Fatal(err)

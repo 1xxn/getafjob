@@ -166,3 +166,26 @@ func TestNames(t *testing.T) {
 		t.Fatalf("Names = %v", n)
 	}
 }
+
+func TestCrawlSettings(t *testing.T) {
+	c, err := Load(fakeSource(map[string]string{
+		"GETAFJOB_CRAWL_INTERVAL": "2h",
+		"GETAFJOB_CRAWL_QUERIES":  " Softwareentwickler , Go Developer,,",
+		"GETAFJOB_CRAWL_CITIES":   "Berlin",
+	}, nil))
+	if err != nil || c.CrawlInterval != 2*time.Hour || len(c.CrawlQueries) != 2 || c.CrawlQueries[1] != "Go Developer" ||
+		len(c.CrawlCities) != 1 {
+		t.Fatalf("config = %v %v %v, %v", c.CrawlInterval, c.CrawlQueries, c.CrawlCities, err)
+	}
+	if d, _ := Load(fakeSource(nil, nil)); d.CrawlInterval != 6*time.Hour || d.CrawlQueries != nil {
+		t.Fatalf("defaults = %v %v", d.CrawlInterval, d.CrawlQueries)
+	}
+	for name, v := range map[string]string{
+		"GETAFJOB_CRAWL_INTERVAL": "5m",
+		"GETAFJOB_CRAWL_QUERIES":  strings.Repeat("x", 101),
+	} {
+		if _, err := Load(fakeSource(map[string]string{name: v}, nil)); err == nil || !strings.Contains(err.Error(), name) {
+			t.Errorf("%s=%q: err = %v", name, v, err)
+		}
+	}
+}

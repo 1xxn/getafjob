@@ -10,6 +10,7 @@ import (
 	"github.com/1xxn/getafjob/internal/discovery/adapters/sources"
 	"github.com/1xxn/getafjob/internal/platform/config"
 	"github.com/1xxn/getafjob/internal/platform/db"
+	"github.com/1xxn/getafjob/internal/platform/queue"
 )
 
 const boardsUsage = `usage: getafjob admin boards <import | list>
@@ -68,5 +69,40 @@ func adminBoards(ctx context.Context, args []string, env Env) int {
 		return ExitError
 	}
 	_, _ = fmt.Fprintf(env.Stdout, "%d boards added, %d updated\n", added, updated)
+	return ExitOK
+}
+
+// adminCrawl queues a crawl now; the worker runs it after a crawl that may be running.
+func adminCrawl(ctx context.Context, args []string, env Env) int {
+	if len(args) != 0 {
+		_, _ = fmt.Fprintln(env.Stderr, "usage: getafjob admin crawl")
+		return ExitUsage
+	}
+	cfg, err := config.Load(env.Config)
+	if err != nil {
+		_, _ = fmt.Fprintf(env.Stderr, "configuration error:\n%v\n", err)
+		return ExitUsage
+	}
+	pool, err := db.Open(ctx, cfg.DatabaseURL, cfg.DatabasePassword, "getafjob-admin")
+	if err != nil {
+		_, _ = fmt.Fprintln(env.Stderr, err)
+		return ExitError
+	}
+	defer pool.Close()
+	ins, err := queue.NewInserter(pool, nil)
+	if err != nil {
+		_, _ = fmt.Fprintln(env.Stderr, err)
+		return ExitError
+	}
+	res, err := ins.Insert(ctx, CrawlArgs{Manual: true}, nil)
+	if err != nil {
+		_, _ = fmt.Fprintln(env.Stderr, "queue failed:", err)
+		return ExitError
+	}
+	if res.UniqueSkippedAsDuplicate {
+		_, _ = fmt.Fprintln(env.Stdout, "a manual crawl is already queued or running")
+		return ExitOK
+	}
+	_, _ = fmt.Fprintf(env.Stdout, "crawl queued (job %d)\n", res.Job.ID)
 	return ExitOK
 }
