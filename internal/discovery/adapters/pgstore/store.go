@@ -221,6 +221,22 @@ func (s *Store) OpenJobs(ctx context.Context, sources []string) ([]discovery.Ope
 	return out, err
 }
 
+// Seen marks open jobs as seen and returns the fingerprints it found.
+func (s *Store) Seen(ctx context.Context, fingerprints []string, at time.Time) (map[string]bool, error) {
+	out := map[string]bool{}
+	if len(fingerprints) == 0 {
+		return out, nil
+	}
+	err := s.system(ctx, func(qs *q.Queries) error {
+		fps, err := qs.TouchOpenJobs(ctx, q.TouchOpenJobsParams{At: at, Fingerprints: fingerprints})
+		for _, fp := range fps {
+			out[fp] = true
+		}
+		return err
+	})
+	return out, err
+}
+
 // Described returns the fingerprints of stored jobs that have a description.
 func (s *Store) Described(ctx context.Context, fingerprints []string) (map[string]bool, error) {
 	out := map[string]bool{}

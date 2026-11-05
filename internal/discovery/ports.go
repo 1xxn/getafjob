@@ -25,6 +25,7 @@ type Detailer interface {
 // Stats summarizes a crawl.
 type Stats struct {
 	Fetched       int            `json:"fetched"`
+	Seen          int            `json:"seen"` // stubs of known jobs
 	Invalid       int            `json:"invalid"`
 	Details       int            `json:"details"`
 	DetailsFailed int            `json:"details_failed"`
@@ -40,6 +41,8 @@ type Store interface {
 	// description keeps the stored one.
 	Upsert(ctx context.Context, runID int64, p Posting, at time.Time) (change Change, duplicate bool, err error)
 	OpenJobs(ctx context.Context, sources []string) ([]OpenJob, error)
+	// Seen marks open jobs as seen at, by fingerprint, and returns the fingerprints it found.
+	Seen(ctx context.Context, fingerprints []string, at time.Time) (map[string]bool, error)
 	// Described returns the fingerprints of stored jobs that already have a description.
 	Described(ctx context.Context, fingerprints []string) (map[string]bool, error)
 	Close(ctx context.Context, runID int64, ids []int64, at time.Time) error

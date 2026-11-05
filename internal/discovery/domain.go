@@ -39,6 +39,9 @@ type Posting struct {
 	Posted      string // YYYY-MM-DD or empty
 	Workplace   Workplace
 	Extra       map[string]string
+	// Stub marks a posting that only names a job (sitemaps): source, ID and URL. A known open job is just seen
+	// again; a new one gets its details before it counts.
+	Stub bool `json:",omitempty"`
 }
 
 // Change describes what a crawl did to a job.
@@ -148,8 +151,13 @@ func ShouldClose(j OpenJob, runs map[string]SourceRun, listed map[string]bool, n
 	return now.Sub(j.LastSeen) >= StaleAfter
 }
 
+// ValidStub reports whether a stub names a job.
+func ValidStub(p Posting) bool {
+	return p.Stub && p.Source != "" && p.ExternalID != "" && p.URL != "" && len(p.URL) <= 2048 && len(p.ExternalID) <= 500
+}
+
 // ValidPosting reports whether a posting has what the index needs.
 func ValidPosting(p Posting) bool {
-	return p.Source != "" && p.ExternalID != "" && strings.TrimSpace(p.Title) != "" && p.URL != "" &&
+	return !p.Stub && p.Source != "" && p.ExternalID != "" && strings.TrimSpace(p.Title) != "" && p.URL != "" &&
 		len(p.Title) <= 500 && len(p.Company) <= 300 && len(p.Location) <= 1000 && len(p.URL) <= 2048
 }

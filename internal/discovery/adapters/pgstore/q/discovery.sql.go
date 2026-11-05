@@ -324,6 +324,36 @@ func (q *Queries) StartRun(ctx context.Context, arg StartRunParams) (int64, erro
 	return id, err
 }
 
+const touchOpenJobs = `-- name: TouchOpenJobs :many
+UPDATE jobs SET last_seen = $1 WHERE fingerprint = ANY($2::text[]) AND status = 'open'
+RETURNING fingerprint
+`
+
+type TouchOpenJobsParams struct {
+	At           time.Time
+	Fingerprints []string
+}
+
+func (q *Queries) TouchOpenJobs(ctx context.Context, arg TouchOpenJobsParams) ([]string, error) {
+	rows, err := q.db.Query(ctx, touchOpenJobs, arg.At, arg.Fingerprints)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []string{}
+	for rows.Next() {
+		var fingerprint string
+		if err := rows.Scan(&fingerprint); err != nil {
+			return nil, err
+		}
+		items = append(items, fingerprint)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const updateJob = `-- name: UpdateJob :exec
 UPDATE jobs
 SET fingerprint  = $1,

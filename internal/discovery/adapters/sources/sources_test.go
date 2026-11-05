@@ -102,9 +102,13 @@ func run(t *testing.T, src discovery.Source) result {
 	}
 	if d, ok := src.(discovery.Detailer); ok {
 		for i := range batch.Postings {
+			if !discovery.ValidStub(batch.Postings[i]) && batch.Postings[i].Stub {
+				t.Errorf("invalid stub %+v", batch.Postings[i])
+			}
 			if err := d.Details(ctx, &batch.Postings[i]); err != nil {
 				t.Fatalf("details %s: %v", batch.Postings[i].ExternalID, err)
 			}
+			batch.Postings[i].Stub = false // as the crawl does after details
 		}
 	}
 	for _, p := range batch.Postings {
@@ -212,6 +216,19 @@ func TestSources(t *testing.T) {
 			"GET https://jobs.apple.com/en-us/search?location=germany-DEU&page=1": {"page1.html"},
 			"GET https://jobs.apple.com/en-us/search?location=germany-DEU&page=2": {"page2.html"},
 		}, func(_ *testing.T, c *sources.Client) discovery.Source { return sources.NewApple(c, "germany-DEU") }},
+		{"sitemap", map[string][]string{
+			"GET https://careers.example.com/sitemap.xml":      {"index.xml"},
+			"GET https://careers.example.com/sitemap-jobs.xml": {"jobs.xml"},
+			"GET https://careers.example.com/jobs/1001/":       {"job1001.html"},
+			"GET https://careers.example.com/jobs/1002/":       {"job1002.html"},
+		}, func(t *testing.T, c *sources.Client) discovery.Source {
+			return board(t, c, "sitemap", "example", "Example Social", `{"url":"https://careers.example.com/sitemap.xml","pattern":"/jobs/(\\d+)/$"}`)
+		}},
+		{"careers", map[string][]string{
+			"GET https://www.beispielwerk.example/karriere": {"page.html"},
+		}, func(t *testing.T, c *sources.Client) discovery.Source {
+			return board(t, c, "careers", "beispielwerk", "Beispielwerk", `{"url":"https://www.beispielwerk.example/karriere"}`)
+		}},
 		{"eightfold-v2", map[string][]string{
 			"GET https://careers.example.org/api/apply/v2/jobs?domain=example.org&location=Germany&num=100&start=0": {"jobs.json"},
 			"GET https://careers.example.org/api/apply/v2/jobs/800000000001?domain=example.org":                     {"detail1.json"},

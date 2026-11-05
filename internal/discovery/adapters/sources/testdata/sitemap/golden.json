@@ -1,0 +1,31 @@
+{
+  "complete": false,
+  "postings": [
+    {
+      "Source": "sitemap:example",
+      "ExternalID": "1001",
+      "Company": "Example Social",
+      "Title": "Production Engineer",
+      "Location": "Berlin, DE",
+      "URL": "https://careers.example.com/jobs/1001/",
+      "ApplyURL": "",
+      "Description": "Wir bauen Dinge mit Go.",
+      "Posted": "2026-10-30",
+      "Workplace": "",
+      "Extra": null
+    },
+    {
+      "Source": "sitemap:example",
+      "ExternalID": "1002",
+      "Company": "Example Social",
+      "Title": "Software Engineer, Infrastructure",
+      "Location": "Menlo Park, US; Remote (Germany)",
+      "URL": "https://careers.example.com/jobs/1002/",
+      "ApplyURL": "",
+      "Description": "Wir bauen Dinge mit Go.",
+      "Posted": "2026-10-30",
+      "Workplace": "remote",
+      "Extra": null
+    }
+  ]
+}

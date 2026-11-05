@@ -64,3 +64,7 @@ RETURNING (xmax = 0)::bool AS inserted;
 
 -- name: EnabledBoards :many
 SELECT id, ats, slug, company, config FROM boards WHERE enabled ORDER BY id;
+
+-- name: TouchOpenJobs :many
+UPDATE jobs SET last_seen = sqlc.arg(at) WHERE fingerprint = ANY(sqlc.arg(fingerprints)::text[]) AND status = 'open'
+RETURNING fingerprint;

@@ -296,3 +296,57 @@ func TestImportBoards(t *testing.T) {
 		t.Fatal("unknown system accepted")
 	}
 }
+
+// stubbed lists jobs as stubs (a sitemap) and fills them in Details.
+type stubbed struct {
+	source
+	calls atomic.Int32
+}
+
+func (s *stubbed) Details(_ context.Context, p *discovery.Posting) error {
+	s.calls.Add(1)
+	if p.ExternalID == "broken" {
+		return errors.New("no_jobposting")
+	}
+	p.Title, p.Company, p.Location, p.Description = "Job "+p.ExternalID, "Example Social", "Berlin", "Details"
+	return nil
+}
+
+func TestCrawlStubs(t *testing.T) {
+	pool := dbtest.AppPool(t)
+	ctx := context.Background()
+	now := time.Date(2026, 11, 5, 12, 0, 0, 0, time.UTC)
+	svc := discovery.NewService(pgstore.New(pool)).WithClock(func() time.Time { return now })
+	stub := func(id string) discovery.Posting {
+		return discovery.Posting{Source: "sitemap:example", ExternalID: id, URL: "https://careers.example.com/jobs/" + id, Stub: true}
+	}
+	src := &stubbed{source: source{name: "sitemap:example", batch: discovery.Batch{Complete: true,
+		Postings: []discovery.Posting{stub("1"), stub("2"), stub("broken")}}}}
+
+	rep, err := svc.Crawl(ctx, []discovery.Source{src})
+	if err != nil || rep.Stats.Changes[discovery.ChangeNew] != 2 || rep.Stats.DetailsFailed != 1 || src.calls.Load() != 3 {
+		t.Fatalf("crawl 1: stats %+v, calls %d, %v", rep.Stats, src.calls.Load(), err)
+	}
+	if _, ok := load(t, pool, "sitemap:example", "broken"); ok {
+		t.Fatal("stub without details stored")
+	}
+
+	src.calls.Store(0)
+	now = now.Add(6 * time.Hour)
+	rep, err = svc.Crawl(ctx, []discovery.Source{src})
+	// Known jobs are only seen again; the broken one is asked again, nothing closes.
+	if err != nil || rep.Stats.Seen != 2 || src.calls.Load() != 1 || rep.Stats.Closed != 0 || len(rep.Stats.Changes) != 0 {
+		t.Fatalf("crawl 2: stats %+v, calls %d, %v", rep.Stats, src.calls.Load(), err)
+	}
+	var last time.Time
+	if err := pool.QueryRow(ctx, "SELECT last_seen FROM jobs WHERE fingerprint = $1",
+		discovery.Fingerprint("sitemap:example", "1")).Scan(&last); err != nil || !last.Equal(now) {
+		t.Fatalf("last_seen = %v (%v), want %v", last, err, now)
+	}
+
+	src.batch.Postings = []discovery.Posting{stub("1")}
+	rep, err = svc.Crawl(ctx, []discovery.Source{src})
+	if err != nil || rep.Stats.Closed != 1 {
+		t.Fatalf("crawl 3: job 2 left the complete sitemap and must close: %+v, %v", rep.Stats, err)
+	}
+}

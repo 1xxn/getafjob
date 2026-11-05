@@ -8,8 +8,12 @@ import (
 	"time"
 )
 
-// MaxDetails bounds the detail requests per crawl; the rest follow in the next crawl.
-const MaxDetails = 300
+// Detail requests per crawl, in total and per source (one large sitemap must not starve the others); the rest
+// follow in the next crawls.
+const (
+	MaxDetails          = 300
+	MaxDetailsPerSource = 100
+)
 
 // Service runs crawls.
 type Service struct {
@@ -69,7 +73,7 @@ func (s *Service) Crawl(ctx context.Context, sources []Source) (Report, error) {
 	rep := Report{RunID: runID, Stats: Stats{Changes: map[Change]int{}}, Errors: map[string]string{}}
 	runs := map[string]SourceRun{}
 	listed := map[string]bool{}
-	var items []item
+	var items, stubs []item
 	for _, r := range results {
 		name := r.src.Name()
 		if r.err != nil {
@@ -78,16 +82,28 @@ func (s *Service) Crawl(ctx context.Context, sources []Source) (Report, error) {
 			continue
 		}
 		runs[name] = SourceRun{Name: name, OK: true, Complete: r.batch.Complete}
+		_, detailer := r.src.(Detailer)
 		for _, p := range r.batch.Postings {
 			rep.Stats.Fetched++
-			if !ValidPosting(p) {
+			valid := ValidPosting(p) || (detailer && ValidStub(p))
+			if !valid {
 				rep.Stats.Invalid++
 				continue
 			}
 			listed[Fingerprint(p.Source, p.ExternalID)] = true
-			items = append(items, item{src: r.src, p: p})
+			if p.Stub {
+				stubs = append(stubs, item{src: r.src, p: p})
+			} else {
+				items = append(items, item{src: r.src, p: p})
+			}
 		}
 	}
+	now := s.now()
+	newStubs, err := s.seen(ctx, stubs, now, &rep.Stats)
+	if err != nil {
+		return rep, err
+	}
+	items = append(items, newStubs...)
 	// Company boards first: an aggregator copy arriving later is recognized as a duplicate.
 	sort.SliceStable(items, func(i, j int) bool {
 		return !IsAggregator(items[i].p.Source) && IsAggregator(items[j].p.Source)
@@ -96,8 +112,10 @@ func (s *Service) Crawl(ctx context.Context, sources []Source) (Report, error) {
 		return rep, err
 	}
 
-	now := s.now()
 	for _, it := range items {
+		if it.p.Stub {
+			continue // no details this time (cap or failure); the next crawl tries again
+		}
 		if err := ctx.Err(); err != nil {
 			return rep, err
 		}
@@ -129,6 +147,29 @@ func (s *Service) Crawl(ctx context.Context, sources []Source) (Report, error) {
 	return rep, s.store.FinishRun(ctx, runID, rep.Stats, rep.Errors, s.now())
 }
 
+// seen marks the known open jobs among stubs as seen and returns the stubs of jobs the index does not have yet.
+func (s *Service) seen(ctx context.Context, stubs []item, now time.Time, st *Stats) ([]item, error) {
+	if len(stubs) == 0 {
+		return nil, nil
+	}
+	fps := make([]string, len(stubs))
+	for i, it := range stubs {
+		fps[i] = Fingerprint(it.p.Source, it.p.ExternalID)
+	}
+	known, err := s.store.Seen(ctx, fps, now)
+	if err != nil {
+		return nil, err
+	}
+	st.Seen = len(known)
+	var out []item
+	for i, it := range stubs {
+		if !known[fps[i]] {
+			out = append(out, it)
+		}
+	}
+	return out, nil
+}
+
 func (s *Service) fetchAll(ctx context.Context, sources []Source) []fetched {
 	out := make([]fetched, len(sources))
 	s.parallel(len(sources), func(i int) {
@@ -138,13 +179,13 @@ func (s *Service) fetchAll(ctx context.Context, sources []Source) []fetched {
 	return out
 }
 
-// details loads missing descriptions for postings the index does not describe yet, at most MaxDetails per crawl.
-// A failed request leaves the description empty; the next crawl tries again.
+// details loads missing descriptions, and whole postings for new stubs, at most MaxDetails per crawl. A failed
+// request leaves the posting as it was (a stub is then skipped); the next crawl tries again.
 func (s *Service) details(ctx context.Context, items []item, st *Stats) error {
 	var need []int
 	var fps []string
 	for i, it := range items {
-		if _, ok := it.src.(Detailer); ok && it.p.Description == "" {
+		if _, ok := it.src.(Detailer); ok && (it.p.Description == "" || it.p.Stub) {
 			need = append(need, i)
 			fps = append(fps, Fingerprint(it.p.Source, it.p.ExternalID))
 		}
@@ -157,8 +198,11 @@ func (s *Service) details(ctx context.Context, items []item, st *Stats) error {
 		return err
 	}
 	var todo []int
+	perSource := map[string]int{}
 	for k, i := range need {
-		if !described[fps[k]] && len(todo) < MaxDetails {
+		name := items[i].src.Name()
+		if !described[fps[k]] && len(todo) < MaxDetails && perSource[name] < MaxDetailsPerSource {
+			perSource[name]++
 			todo = append(todo, i)
 		}
 	}
@@ -167,6 +211,7 @@ func (s *Service) details(ctx context.Context, items []item, st *Stats) error {
 		it := &items[todo[k]]
 		p := it.p
 		err := it.src.(Detailer).Details(ctx, &p)
+		p.Stub = false // filled now, or dropped below
 		if err != nil || !ValidPosting(p) || p.Source != it.p.Source || p.ExternalID != it.p.ExternalID {
 			failed[k] = true
 			return

@@ -109,6 +109,7 @@
     {"ats": "smartrecruiters", "slug": "LinkedIn3", "company": "LinkedIn"},
     {"ats": "smartrecruiters", "slug": "ServiceNow", "company": "ServiceNow"},
     {"ats": "smartrecruiters", "slug": "Ubisoft2", "company": "Ubisoft", "config": {"country": "de"}},
-    {"ats": "personio", "slug": "everphone", "company": "everphone"}
+    {"ats": "personio", "slug": "everphone", "company": "everphone"},
+    {"ats": "sitemap", "slug": "meta", "company": "Meta", "config": {"url": "https://www.metacareers.com/jobs/sitemap.xml", "pattern": "/profile/job_details/([0-9]+)/"}}
   ]
 }
