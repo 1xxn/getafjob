@@ -147,12 +147,16 @@ func (s *Sender) dial(ctx context.Context) (net.Conn, error) {
 		_ = conn.Close()
 		return nil, fmt.Errorf("proxy refused: %s", resp.Status)
 	}
-	if br.Buffered() > 0 {
-		_ = conn.Close()
-		return nil, errors.New("proxy sent data before the tunnel was open")
-	}
-	return conn, nil
+	// The server greeting may already sit in the buffer; read it from there first.
+	return bufferedConn{Conn: conn, r: br}, nil
 }
+
+type bufferedConn struct {
+	net.Conn
+	r *bufio.Reader
+}
+
+func (c bufferedConn) Read(p []byte) (int, error) { return c.r.Read(p) }
 
 // Compose renders an RFC 5322 message (UTF-8, quoted-printable).
 func Compose(from string, m Message, now time.Time) []byte {
