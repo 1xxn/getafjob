@@ -52,6 +52,19 @@ type CrawlRun struct {
 	Errors     []byte
 }
 
+type Document struct {
+	ID         uuid.UUID
+	UserID     uuid.UUID
+	Kind       string
+	SealedName []byte
+	Mime       string
+	Size       int32
+	Label      string
+	Language   string
+	Focus      []string
+	CreatedAt  time.Time
+}
+
 type Invitation struct {
 	ID           uuid.UUID
 	Email        string

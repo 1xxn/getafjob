@@ -15,30 +15,36 @@ import (
 func Instrument(next http.Handler) http.Handler {
 	return otelhttp.NewHandler(next, "http",
 		otelhttp.WithFilter(func(r *http.Request) bool { return r.URL.Path != "/healthz" && r.URL.Path != "/readyz" }),
-		otelhttp.WithSpanNameFormatter(func(_ string, r *http.Request) string { return r.Method }))
+		otelhttp.WithSpanNameFormatter(func(_ string, r *http.Request) string {
+			if r.Pattern != "" { // set by the mux once it matched
+				return r.Pattern
+			}
+			return r.Method
+		}))
 }
 
 // Routes names span and metrics after the pattern the mux matched ("GET /jobs/{id}") and replaces the raw path and
 // query in the span (sign-in links carry tokens) with the path template, or nothing for unmatched requests.
 func Routes(mux *http.ServeMux) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		defer name(r) // also after a panic, before the span ends
+		_, pattern := mux.Handler(r) // the pattern ServeHTTP will match; it does not depend on how the request is passed
+		defer name(r, pattern)       // also after a panic, before the span ends
 		mux.ServeHTTP(w, r)
 	})
 }
 
-func name(r *http.Request) {
+func name(r *http.Request, pattern string) {
 	span := trace.SpanFromContext(r.Context())
-	_, tmpl, _ := strings.Cut(r.Pattern, " ")
+	_, tmpl, _ := strings.Cut(pattern, " ")
 	if tmpl == "" {
-		tmpl = r.Pattern
+		tmpl = pattern
 	}
 	span.SetAttributes(attribute.String("url.path", tmpl), attribute.String("url.query", ""))
-	if r.Pattern == "" {
+	if pattern == "" {
 		return
 	}
-	route := attribute.String("http.route", r.Pattern)
-	span.SetName(r.Pattern)
+	route := attribute.String("http.route", pattern)
+	span.SetName(pattern)
 	span.SetAttributes(route)
 	if l, ok := otelhttp.LabelerFromContext(r.Context()); ok {
 		l.Add(route)

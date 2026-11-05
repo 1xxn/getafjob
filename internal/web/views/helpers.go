@@ -47,3 +47,22 @@ func When(ctx context.Context, t time.Time) string {
 	}
 	return t.UTC().Format("Jan 2, 2006 15:04") + " UTC"
 }
+
+func or(s, fallback string) string {
+	if s == "" {
+		return fallback
+	}
+	return s
+}
+
+// Size formats a byte count (KB, MB with one decimal).
+func Size(n int) string {
+	switch {
+	case n >= 1<<20:
+		return strconv.FormatFloat(float64(n)/(1<<20), 'f', 1, 64) + " MB"
+	case n >= 1<<10:
+		return strconv.Itoa(n>>10) + " KB"
+	default:
+		return strconv.Itoa(n) + " B"
+	}
+}

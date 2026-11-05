@@ -27,9 +27,25 @@ func SecurityHeaders(next http.Handler, hsts bool) http.Handler {
 	})
 }
 
+// Upload allows a larger body for POST requests to one exact path.
+type Upload struct {
+	Path string
+	Max  int64
+}
+
 // Protect combines the standard protection layers of the public web role: security headers,
-// cross-origin protection for state-changing requests (CSRF) and a body limit.
-func Protect(next http.Handler, maxBody int64, hsts bool) http.Handler {
+// cross-origin protection for state-changing requests (CSRF) and a body limit (larger for the given uploads).
+func Protect(next http.Handler, maxBody int64, hsts bool, uploads ...Upload) http.Handler {
 	cop := http.NewCrossOriginProtection()
-	return SecurityHeaders(cop.Handler(http.MaxBytesHandler(next, maxBody)), hsts)
+	limited := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		limit := maxBody
+		for _, u := range uploads {
+			if r.Method == http.MethodPost && r.URL.Path == u.Path {
+				limit = u.Max
+			}
+		}
+		r.Body = http.MaxBytesReader(w, r.Body, limit)
+		next.ServeHTTP(w, r)
+	})
+	return SecurityHeaders(cop.Handler(limited), hsts)
 }

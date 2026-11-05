@@ -23,6 +23,29 @@ type Store interface {
 	SavePreferences(ctx context.Context, userID uuid.UUID, prefs []byte, at time.Time) error
 }
 
+// StoredDocument is a document row; SealedName still needs opening.
+type StoredDocument struct {
+	Document
+	SealedName []byte
+}
+
+// DocumentStore persists document metadata per user (row-level security).
+type DocumentStore interface {
+	InsertDocument(ctx context.Context, userID uuid.UUID, d StoredDocument) error
+	Documents(ctx context.Context, userID uuid.UUID) ([]StoredDocument, error)
+	Document(ctx context.Context, userID, id uuid.UUID) (StoredDocument, error) // ErrNotFound
+	CountDocuments(ctx context.Context, userID uuid.UUID) (int, error)
+	UpdateVariant(ctx context.Context, userID, id uuid.UUID, label, language string, focus []string) (bool, error)
+	DeleteDocument(ctx context.Context, userID, id uuid.UUID) (bool, error)
+}
+
+// Files keeps file contents sealed per user (blob.Sealed).
+type Files interface {
+	Put(ctx context.Context, userID uuid.UUID, key string, data []byte) error
+	Get(ctx context.Context, userID uuid.UUID, key string) ([]byte, error)
+	Delete(ctx context.Context, userID uuid.UUID, key string) error
+}
+
 // Sealer encrypts per user (crypto.Envelope).
 type Sealer interface {
 	Seal(ctx context.Context, userID uuid.UUID, purpose string, plaintext []byte) ([]byte, error)

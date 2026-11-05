@@ -29,10 +29,11 @@ var staticFiles embed.FS
 
 // Server holds the dependencies of the UI.
 type Server struct {
-	Identity *identity.Service
-	Profile  *profile.Service
-	Logger   *slog.Logger
-	limiter  *limiter
+	Identity  *identity.Service
+	Profile   *profile.Service
+	Documents *profile.Documents
+	Logger    *slog.Logger
+	limiter   *limiter
 }
 
 // Register adds all UI routes to mux.
@@ -54,6 +55,11 @@ func (s *Server) Register(mux *http.ServeMux) {
 	mux.Handle("POST /profile", s.page(s.profileSave))
 	mux.Handle("GET /preferences", s.page(s.preferencesPage))
 	mux.Handle("POST /preferences", s.page(s.preferencesSave))
+	mux.Handle("GET /documents", s.page(s.documentsPage))
+	mux.Handle("POST /documents", s.page(s.documentUpload))
+	mux.Handle("GET /documents/{id}", s.page(s.documentDownload))
+	mux.Handle("POST /documents/{id}/variant", s.page(s.documentVariant))
+	mux.Handle("POST /documents/{id}/delete", s.page(s.documentDelete))
 	mux.Handle("GET /account", s.page(s.account))
 	mux.Handle("POST /account/sessions/others", s.page(s.signOutOthers))
 	mux.Handle("POST /account/passkeys/options", s.page(s.passkeyAddOptions))

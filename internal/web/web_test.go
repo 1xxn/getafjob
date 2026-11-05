@@ -7,6 +7,7 @@ import (
 	"encoding/json"
 	"io"
 	"log/slog"
+	"mime/multipart"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
@@ -18,6 +19,7 @@ import (
 	"github.com/1xxn/getafjob/internal/identity"
 	"github.com/1xxn/getafjob/internal/identity/adapters/pgstore"
 	"github.com/1xxn/getafjob/internal/identity/softauthn"
+	"github.com/1xxn/getafjob/internal/platform/blob"
 	"github.com/1xxn/getafjob/internal/platform/config"
 	"github.com/1xxn/getafjob/internal/platform/crypto"
 	"github.com/1xxn/getafjob/internal/platform/db/dbtest"
@@ -61,9 +63,17 @@ func newApp(t *testing.T) *app {
 	if err != nil {
 		t.Fatal(err)
 	}
-	profiles := profile.NewService(profilestore.New(pool), crypto.NewEnvelope(ring, pool))
-	(&web.Server{Identity: ids, Profile: profiles, Logger: slog.New(slog.NewTextHandler(io.Discard, nil))}).Register(mux)
-	return &app{t: t, h: httpx.Protect(mux, 1<<20, true), ids: ids, mail: mb}
+	env := crypto.NewEnvelope(ring, pool)
+	dir, err := blob.NewDir(t.TempDir())
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = dir.Close() })
+	pstore := profilestore.New(pool)
+	profiles := profile.NewService(pstore, env)
+	docs := profile.NewDocuments(pstore, blob.NewSealed(dir, env), env)
+	(&web.Server{Identity: ids, Profile: profiles, Documents: docs, Logger: slog.New(slog.NewTextHandler(io.Discard, nil))}).Register(mux)
+	return &app{t: t, h: httpx.Protect(mux, 1<<20, true, httpx.Upload{Path: "/documents", Max: web.MaxUpload}), ids: ids, mail: mb}
 }
 
 func (a *app) do(method, path string, form url.Values, cookie string, hdr map[string]string) *httptest.ResponseRecorder {
@@ -528,5 +538,72 @@ func TestProfilePages(t *testing.T) {
 	}
 	if body := a.do(http.MethodGet, "/preferences", nil, session, nil).Body.String(); !strings.Contains(body, `value="70000"`) {
 		t.Error("invalid preferences were saved")
+	}
+}
+
+func (a *app) upload(kind, name string, data []byte, cookie string) *httptest.ResponseRecorder {
+	a.t.Helper()
+	var buf bytes.Buffer
+	mw := multipart.NewWriter(&buf)
+	_ = mw.WriteField("kind", kind)
+	fw, err := mw.CreateFormFile("file", name)
+	if err != nil {
+		a.t.Fatal(err)
+	}
+	_, _ = fw.Write(data)
+	_ = mw.Close()
+	req := httptest.NewRequest(http.MethodPost, "https://jobs.example.org/documents", &buf)
+	req.Header.Set("Content-Type", mw.FormDataContentType())
+	req.Header.Set("Sec-Fetch-Site", "same-origin")
+	req.AddCookie(&http.Cookie{Name: web.SessionCookie, Value: cookie})
+	rec := httptest.NewRecorder()
+	a.h.ServeHTTP(rec, req)
+	return rec
+}
+
+func TestDocumentPages(t *testing.T) {
+	a := newApp(t)
+	session := signedIn(t, a)
+	pdf := []byte("%PDF-1.7\nCV of Max Mustermann")
+	if rec := a.upload("cv", "CV Max.pdf", pdf, session); rec.Code != http.StatusSeeOther {
+		t.Fatalf("upload %d: %s", rec.Code, rec.Body.String())
+	}
+	page := a.do(http.MethodGet, "/documents?uploaded=1", nil, session, nil).Body.String()
+	i := strings.Index(page, `href="/documents/`)
+	if i < 0 || !strings.Contains(page, "CV Max.pdf") || !strings.Contains(page, "CV variant") {
+		t.Fatalf("documents page: %s", page)
+	}
+	id := page[i+len(`href="/documents/`) : i+len(`href="/documents/`)+36]
+
+	dl := a.do(http.MethodGet, "/documents/"+id, nil, session, nil)
+	if dl.Code != http.StatusOK || !bytes.Equal(dl.Body.Bytes(), pdf) || dl.Header().Get("Content-Type") != "application/pdf" ||
+		!strings.HasPrefix(dl.Header().Get("Content-Disposition"), "attachment") || !strings.HasPrefix(dl.Header().Get("Content-Security-Policy"), "sandbox") {
+		t.Fatalf("download %d %v", dl.Code, dl.Header())
+	}
+	if rec := a.do(http.MethodPost, "/documents/"+id+"/variant", url.Values{"label-" + id: {"Platform"}, "language-" + id: {"en"}, "focus-" + id: {"platform, kubernetes"}}, session, nil); rec.Code != http.StatusOK ||
+		!strings.Contains(rec.Body.String(), `value="platform, kubernetes"`) {
+		t.Fatalf("variant %d", rec.Code)
+	}
+
+	// A disguised file, an oversized one and a stranger.
+	if rec := a.upload("cv", "cv.pdf", []byte("<html><script>alert(1)</script>"), session); rec.Code != http.StatusUnprocessableEntity {
+		t.Errorf("html as pdf: %d", rec.Code)
+	}
+	if rec := a.upload("cv", "big.pdf", append([]byte("%PDF-"), make([]byte, 10<<20)...), session); rec.Code != http.StatusRequestEntityTooLarge {
+		t.Errorf("oversized: %d", rec.Code)
+	}
+	link, _, err := a.ids.Invite(t.Context(), identity.InviteRequest{Email: "erika.mustermann@example.com", Role: identity.RoleUser})
+	if err != nil {
+		t.Fatal(err)
+	}
+	erika := sessionFrom(t, a.do(http.MethodPost, strings.TrimPrefix(link, "https://jobs.example.org"), url.Values{"name": {"Erika"}, "locale": {"en"}}, "", nil))
+	if rec := a.do(http.MethodGet, "/documents/"+id, nil, erika, nil); rec.Code != http.StatusNotFound {
+		t.Errorf("erika downloads max's CV: %d", rec.Code)
+	}
+	if rec := a.do(http.MethodPost, "/documents/"+id+"/delete", url.Values{}, erika, nil); rec.Code != http.StatusNotFound {
+		t.Errorf("erika deletes max's CV: %d", rec.Code)
+	}
+	if rec := a.do(http.MethodPost, "/documents/"+id+"/delete", url.Values{}, session, nil); rec.Code != http.StatusOK || !strings.Contains(rec.Body.String(), "Document removed") {
+		t.Errorf("delete: %d", rec.Code)
 	}
 }
