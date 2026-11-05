@@ -73,3 +73,13 @@ func fieldID(f FieldProps) string {
 	}
 	return "f-" + f.Name
 }
+
+func i64(n int64) string { return strconv.FormatInt(n, 10) }
+
+// points shows score points with their sign.
+func points(n int) string {
+	if n > 0 {
+		return "+" + strconv.Itoa(n)
+	}
+	return strconv.Itoa(n)
+}

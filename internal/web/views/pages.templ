@@ -76,7 +76,7 @@ templ Home(name string, nudge, setup bool) {
 			if nudge {
 				@PasskeyNudge()
 			}
-			<p class="muted">{ T(ctx, "home.empty") }</p>
+			<p><a href="/jobs">{ T(ctx, "home.jobs_link") }</a></p>
 		}
 	}
 }

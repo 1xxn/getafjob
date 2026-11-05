@@ -87,7 +87,7 @@ func serve(ctx context.Context, cfg config.Config, logger *slog.Logger) error {
 		return err
 	}
 	(&web.Server{Identity: ids, Logger: logger, Profile: profiles, Documents: docs, Items: profile.NewItems(pstore, env),
-		Importer: cvimport.NewImporter(docs, profiles, extractor)}).Register(mux)
+		Importer: cvimport.NewImporter(docs, profiles, extractor), Jobs: matching.NewListings(matchingstore.New(pool))}).Register(mux)
 
 	h := httpx.Instrument(httpx.Protect(httpx.Routes(mux), maxBody, cfg.PublicURL.Scheme == "https",
 		httpx.Upload{Path: "/documents", Max: web.MaxUpload}, httpx.Upload{Path: "/setup/cv", Max: web.MaxUpload}))

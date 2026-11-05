@@ -13,6 +13,162 @@ import (
 	"github.com/jackc/pgx/v5/pgtype"
 )
 
+const getMatch = `-- name: GetMatch :one
+SELECT j.id, j.title, j.company, j.location, j.workplace, j.posted, j.first_seen, j.description, j.url,
+  j.apply_url, j.status, m.score, m.decision, m.reasons, m.computed_at
+FROM matches m JOIN jobs j ON j.id = m.job_id WHERE m.user_id = $1 AND j.id = $2
+`
+
+type GetMatchParams struct {
+	UserID uuid.UUID
+	ID     int64
+}
+
+type GetMatchRow struct {
+	ID          int64
+	Title       string
+	Company     string
+	Location    string
+	Workplace   string
+	Posted      pgtype.Date
+	FirstSeen   time.Time
+	Description string
+	Url         string
+	ApplyUrl    string
+	Status      string
+	Score       int16
+	Decision    string
+	Reasons     []byte
+	ComputedAt  time.Time
+}
+
+func (q *Queries) GetMatch(ctx context.Context, arg GetMatchParams) (GetMatchRow, error) {
+	row := q.db.QueryRow(ctx, getMatch, arg.UserID, arg.ID)
+	var i GetMatchRow
+	err := row.Scan(
+		&i.ID,
+		&i.Title,
+		&i.Company,
+		&i.Location,
+		&i.Workplace,
+		&i.Posted,
+		&i.FirstSeen,
+		&i.Description,
+		&i.Url,
+		&i.ApplyUrl,
+		&i.Status,
+		&i.Score,
+		&i.Decision,
+		&i.Reasons,
+		&i.ComputedAt,
+	)
+	return i, err
+}
+
+const listMatches = `-- name: ListMatches :many
+SELECT j.id, j.title, j.company, j.location, j.workplace, j.posted, j.first_seen, m.score, m.decision,
+  count(*) OVER () AS total
+FROM matches m JOIN jobs j ON j.id = m.job_id
+WHERE m.user_id = $1 AND j.status = 'open'
+  AND (cardinality($2::text[]) = 0 OR m.decision = ANY ($2::text[]))
+  AND ($3::text = '' OR j.workplace = $3::text)
+  AND ($4::text = '' OR j.search @@ (websearch_to_tsquery('simple', $4::text)
+    || websearch_to_tsquery('english', $4::text) || websearch_to_tsquery('german', $4::text)))
+ORDER BY m.score DESC, j.id DESC
+LIMIT $6::integer OFFSET $5::integer
+`
+
+type ListMatchesParams struct {
+	UserID     uuid.UUID
+	Decisions  []string
+	Workplace  string
+	Query      string
+	PageOffset int32
+	PageSize   int32
+}
+
+type ListMatchesRow struct {
+	ID        int64
+	Title     string
+	Company   string
+	Location  string
+	Workplace string
+	Posted    pgtype.Date
+	FirstSeen time.Time
+	Score     int16
+	Decision  string
+	Total     int64
+}
+
+// One page of the user's open jobs, best first; total counts all hits of the filter.
+func (q *Queries) ListMatches(ctx context.Context, arg ListMatchesParams) ([]ListMatchesRow, error) {
+	rows, err := q.db.Query(ctx, listMatches,
+		arg.UserID,
+		arg.Decisions,
+		arg.Workplace,
+		arg.Query,
+		arg.PageOffset,
+		arg.PageSize,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []ListMatchesRow{}
+	for rows.Next() {
+		var i ListMatchesRow
+		if err := rows.Scan(
+			&i.ID,
+			&i.Title,
+			&i.Company,
+			&i.Location,
+			&i.Workplace,
+			&i.Posted,
+			&i.FirstSeen,
+			&i.Score,
+			&i.Decision,
+			&i.Total,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const matchCounts = `-- name: MatchCounts :many
+SELECT m.decision, count(*)::bigint AS n FROM matches m JOIN jobs j ON j.id = m.job_id
+WHERE m.user_id = $1 AND j.status = 'open' GROUP BY m.decision
+`
+
+type MatchCountsRow struct {
+	Decision string
+	N        int64
+}
+
+func (q *Queries) MatchCounts(ctx context.Context, userID uuid.UUID) ([]MatchCountsRow, error) {
+	rows, err := q.db.Query(ctx, matchCounts, userID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []MatchCountsRow{}
+	for rows.Next() {
+		var i MatchCountsRow
+		if err := rows.Scan(&i.Decision, &i.N); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const openJobsPage = `-- name: OpenJobsPage :many
 SELECT id, company, title, location, workplace, description, posted, first_seen FROM jobs
 WHERE status = 'open' AND id > $1 ORDER BY id LIMIT $2

@@ -18,9 +18,13 @@ import (
 	"testing"
 	"time"
 
+	"github.com/jackc/pgx/v5/pgxpool"
+
 	"github.com/1xxn/getafjob/internal/identity"
 	"github.com/1xxn/getafjob/internal/identity/adapters/pgstore"
 	"github.com/1xxn/getafjob/internal/identity/softauthn"
+	"github.com/1xxn/getafjob/internal/matching"
+	matchingstore "github.com/1xxn/getafjob/internal/matching/adapters/pgstore"
 	"github.com/1xxn/getafjob/internal/platform/blob"
 	"github.com/1xxn/getafjob/internal/platform/config"
 	"github.com/1xxn/getafjob/internal/platform/crypto"
@@ -50,6 +54,7 @@ type app struct {
 	h    http.Handler
 	ids  *identity.Service
 	mail *mailbox
+	pool *pgxpool.Pool
 }
 
 func newApp(t *testing.T) *app {
@@ -81,9 +86,9 @@ func newApp(t *testing.T) *app {
 	}
 	importer := cvimport.NewImporter(docs, profiles, cvimport.NewExtractorFor(exe, 20*time.Second))
 	(&web.Server{Identity: ids, Profile: profiles, Documents: docs, Items: profile.NewItems(pstore, env), Importer: importer,
-		Logger: slog.New(slog.NewTextHandler(io.Discard, nil))}).Register(mux)
+		Jobs: matching.NewListings(matchingstore.New(pool)), Logger: slog.New(slog.NewTextHandler(io.Discard, nil))}).Register(mux)
 	return &app{t: t, h: httpx.Protect(mux, 1<<20, true, httpx.Upload{Path: "/documents", Max: web.MaxUpload},
-		httpx.Upload{Path: "/setup/cv", Max: web.MaxUpload}), ids: ids, mail: mb}
+		httpx.Upload{Path: "/setup/cv", Max: web.MaxUpload}), ids: ids, mail: mb, pool: pool}
 }
 
 func (a *app) do(method, path string, form url.Values, cookie string, hdr map[string]string) *httptest.ResponseRecorder {

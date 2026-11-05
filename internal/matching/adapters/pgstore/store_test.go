@@ -2,6 +2,7 @@ package pgstore_test
 
 import (
 	"context"
+	"errors"
 	"testing"
 	"time"
 
@@ -114,5 +115,27 @@ func TestRunStoresResultsPerUser(t *testing.T) {
 	}
 	if again := matches(t, pool, max); !again["Senior Go Developer"].at.Equal(now) {
 		t.Fatalf("rewritten: %+v", again)
+	}
+
+	// Read side: search, filters, detail; another user sees nothing.
+	ls := matching.NewListings(st)
+	l, err := ls.List(ctx, max, matching.Filter{Query: "kubernetes"})
+	if err != nil || l.Total != 1 || l.Items[0].Title != "Senior Go Developer" || l.Counts[matching.Skip] != 1 {
+		t.Fatalf("search = %+v, %v", l, err)
+	}
+	l, err = ls.List(ctx, max, matching.Filter{Decisions: []matching.Decision{matching.Skip}, Workplace: "bogus"})
+	if err != nil || len(l.Items) != 1 || l.Items[0].Title != "Sales Manager" {
+		t.Fatalf("skip filter = %+v, %v", l, err)
+	}
+	if l, _ = ls.List(ctx, erika, matching.Filter{}); len(l.Items) != 0 {
+		t.Fatalf("erika's list = %+v", l)
+	}
+	full, _ := ls.List(ctx, max, matching.Filter{Query: "go"})
+	d, err := ls.Detail(ctx, max, full.Items[0].JobID)
+	if err != nil || !d.Open || d.URL != "https://example.org/1" || len(d.Reasons) == 0 || d.Reasons[0].Code != "title.exact" {
+		t.Fatalf("detail = %+v, %v", d, err)
+	}
+	if _, err := ls.Detail(ctx, erika, d.JobID); !errors.Is(err, matching.ErrNotFound) {
+		t.Fatalf("erika's detail: %v", err)
 	}
 }

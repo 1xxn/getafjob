@@ -7,10 +7,12 @@ package pgstore
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"time"
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgtype"
 	"github.com/jackc/pgx/v5/pgxpool"
 
 	"github.com/1xxn/getafjob/internal/matching"
@@ -38,10 +40,7 @@ func (s *Store) OpenJobs(ctx context.Context, afterID int64, limit int) ([]match
 	out := make([]matching.Job, len(rows))
 	for i, r := range rows {
 		out[i] = matching.Job{ID: r.ID, Company: r.Company, Title: r.Title, Location: r.Location,
-			Workplace: r.Workplace, Description: r.Description, FirstSeen: r.FirstSeen}
-		if r.Posted.Valid {
-			out[i].Posted = r.Posted.Time
-		}
+			Workplace: r.Workplace, Description: r.Description, Posted: date(r.Posted), FirstSeen: r.FirstSeen}
 	}
 	return out, nil
 }
@@ -73,4 +72,72 @@ func (s *Store) SaveMatches(ctx context.Context, userID uuid.UUID, rs []matching
 		return q.New(tx).SaveMatches(ctx, q.SaveMatchesParams{UserID: userID, Rules: matching.RulesVersion,
 			ComputedAt: at, Results: data})
 	})
+}
+
+var _ matching.Reader = (*Store)(nil)
+
+func date(d pgtype.Date) time.Time {
+	if d.Valid {
+		return d.Time
+	}
+	return time.Time{}
+}
+
+// ListMatches returns one page of the user's open jobs and the number of hits.
+func (s *Store) ListMatches(ctx context.Context, userID uuid.UUID, f matching.Filter, offset, limit int) (
+	items []matching.Item, total int, err error,
+) {
+	ds := make([]string, len(f.Decisions))
+	for i, d := range f.Decisions {
+		ds[i] = string(d)
+	}
+	err = db.InUserTx(ctx, s.pool, userID, func(tx pgx.Tx) error {
+		rows, err := q.New(tx).ListMatches(ctx, q.ListMatchesParams{UserID: userID, Decisions: ds,
+			Workplace: f.Workplace, Query: f.Query, PageOffset: int32(min(offset, 1_000_000)), //nolint:gosec // bounded
+			PageSize: int32(min(limit, 1000))}) //nolint:gosec // bounded
+		if err != nil {
+			return err
+		}
+		items = make([]matching.Item, len(rows))
+		for i, r := range rows {
+			items[i] = matching.Item{JobID: r.ID, Title: r.Title, Company: r.Company, Location: r.Location,
+				Workplace: r.Workplace, Posted: date(r.Posted), FirstSeen: r.FirstSeen, Score: int(r.Score),
+				Decision: matching.Decision(r.Decision)}
+			total = int(r.Total)
+		}
+		return nil
+	})
+	return items, total, err
+}
+
+// MatchCounts counts the user's open jobs per decision.
+func (s *Store) MatchCounts(ctx context.Context, userID uuid.UUID) (map[matching.Decision]int, error) {
+	out := map[matching.Decision]int{}
+	err := db.InUserTx(ctx, s.pool, userID, func(tx pgx.Tx) error {
+		rows, err := q.New(tx).MatchCounts(ctx, userID)
+		for _, r := range rows {
+			out[matching.Decision(r.Decision)] = int(r.N)
+		}
+		return err
+	})
+	return out, err
+}
+
+// Match returns one job with the user's result.
+func (s *Store) Match(ctx context.Context, userID uuid.UUID, jobID int64) (d matching.Detail, err error) {
+	err = db.InUserTx(ctx, s.pool, userID, func(tx pgx.Tx) error {
+		r, err := q.New(tx).GetMatch(ctx, q.GetMatchParams{UserID: userID, ID: jobID})
+		if errors.Is(err, pgx.ErrNoRows) {
+			return matching.ErrNotFound
+		}
+		if err != nil {
+			return err
+		}
+		d = matching.Detail{Item: matching.Item{JobID: r.ID, Title: r.Title, Company: r.Company, Location: r.Location,
+			Workplace: r.Workplace, Posted: date(r.Posted), FirstSeen: r.FirstSeen, Score: int(r.Score),
+			Decision: matching.Decision(r.Decision)}, Description: r.Description, URL: r.Url, ApplyURL: r.ApplyUrl,
+			Open: r.Status == "open", ComputedAt: r.ComputedAt}
+		return json.Unmarshal(r.Reasons, &d.Reasons)
+	})
+	return d, err
 }

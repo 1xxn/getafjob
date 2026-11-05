@@ -276,6 +276,32 @@
   }
 }
 
+@layer components {
+  .filters {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--space-4);
+    align-items: end;
+    margin-block-end: var(--space-6);
+    & .field { margin: 0; flex: 1 1 14rem; }
+  }
+  .jobs {
+    list-style: none;
+    padding: 0;
+    & li { border-block-end: 1px solid var(--line); padding-block: var(--space-4); }
+    & h2 { font-size: 1.1rem; margin: 0 0 var(--space-1); }
+  }
+  .job-meta { margin: 0 0 var(--space-1); }
+  .decision { font-weight: 600; color: var(--ink-2); }
+  .decision-match { color: var(--ink-1); }
+  .reasons {
+    padding-inline-start: var(--space-4);
+    & .points { display: inline-block; min-inline-size: 3ch; font-variant-numeric: tabular-nums; }
+  }
+  .description { white-space: pre-line; max-inline-size: var(--measure); }
+  .pager { display: flex; gap: var(--space-4); margin-block-start: var(--space-6); }
+}
+
 @layer utilities {
   .visually-hidden {
     position: absolute;

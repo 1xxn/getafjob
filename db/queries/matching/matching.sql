@@ -12,3 +12,25 @@ ON CONFLICT (user_id, job_id) DO UPDATE SET score = EXCLUDED.score, decision = E
 WHERE (matches.score, matches.decision, matches.reasons, matches.rules)
   IS DISTINCT FROM (EXCLUDED.score, EXCLUDED.decision, EXCLUDED.reasons, EXCLUDED.rules);
 
+
+-- name: ListMatches :many
+-- One page of the user's open jobs, best first; total counts all hits of the filter.
+SELECT j.id, j.title, j.company, j.location, j.workplace, j.posted, j.first_seen, m.score, m.decision,
+  count(*) OVER () AS total
+FROM matches m JOIN jobs j ON j.id = m.job_id
+WHERE m.user_id = sqlc.arg(user_id) AND j.status = 'open'
+  AND (cardinality(sqlc.arg(decisions)::text[]) = 0 OR m.decision = ANY (sqlc.arg(decisions)::text[]))
+  AND (sqlc.arg(workplace)::text = '' OR j.workplace = sqlc.arg(workplace)::text)
+  AND (sqlc.arg(query)::text = '' OR j.search @@ (websearch_to_tsquery('simple', sqlc.arg(query)::text)
+    || websearch_to_tsquery('english', sqlc.arg(query)::text) || websearch_to_tsquery('german', sqlc.arg(query)::text)))
+ORDER BY m.score DESC, j.id DESC
+LIMIT sqlc.arg(page_size)::integer OFFSET sqlc.arg(page_offset)::integer;
+
+-- name: MatchCounts :many
+SELECT m.decision, count(*)::bigint AS n FROM matches m JOIN jobs j ON j.id = m.job_id
+WHERE m.user_id = $1 AND j.status = 'open' GROUP BY m.decision;
+
+-- name: GetMatch :one
+SELECT j.id, j.title, j.company, j.location, j.workplace, j.posted, j.first_seen, j.description, j.url,
+  j.apply_url, j.status, m.score, m.decision, m.reasons, m.computed_at
+FROM matches m JOIN jobs j ON j.id = m.job_id WHERE m.user_id = $1 AND j.id = $2;
