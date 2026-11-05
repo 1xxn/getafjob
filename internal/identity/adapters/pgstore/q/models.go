@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/jackc/pgx/v5/pgtype"
 )
 
 type AuditEvent struct {
@@ -17,6 +18,30 @@ type AuditEvent struct {
 	Code      string
 	Params    []byte
 	CreatedAt time.Time
+}
+
+type Board struct {
+	ID            int64
+	Ats           string
+	Slug          string
+	Company       string
+	Config        []byte
+	Origin        string
+	Enabled       bool
+	Etag          *string
+	LastModified  *string
+	LastCrawledAt *time.Time
+	LastError     *string
+	CreatedAt     time.Time
+}
+
+type CrawlRun struct {
+	ID         int64
+	StartedAt  time.Time
+	FinishedAt *time.Time
+	Sources    []string
+	Stats      []byte
+	Errors     []byte
 }
 
 type Invitation struct {
@@ -29,6 +54,41 @@ type Invitation struct {
 	ExpiresAt    time.Time
 	AcceptedAt   *time.Time
 	AcceptedUser *uuid.UUID
+}
+
+type Job struct {
+	ID          int64
+	Fingerprint string
+	MatchKey    string
+	Source      string
+	ExternalID  string
+	Company     string
+	Title       string
+	Location    string
+	Workplace   string
+	Url         string
+	ApplyUrl    string
+	AltUrls     []string
+	Description string
+	Posted      pgtype.Date
+	ContentHash string
+	Status      string
+	FirstSeen   time.Time
+	LastSeen    time.Time
+	ClosedAt    *time.Time
+	Search      interface{}
+}
+
+type JobSnapshot struct {
+	ID          int64
+	JobID       int64
+	CrawlRun    *int64
+	Change      string
+	Title       string
+	Location    string
+	ContentHash string
+	Diff        []byte
+	CreatedAt   time.Time
 }
 
 type MagicLink struct {

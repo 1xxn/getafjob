@@ -32,6 +32,7 @@ This document grows with every module.
 | T1 | CSRF changes data | 1 | `http.CrossOriginProtection`, `__Host-` cookies | `TestProtectSetsHeadersAndBlocksCrossOriginPosts` |
 | T2 | Page tricks the engine into a wrong field or domain | 5 | Provenance, field/domain checks, page content is data | Phase 2 |
 | T3 | Tampered images or binaries | 6 | Pinned actions/tools, cosign signatures, provenance, SBOM | CI |
+| T6 | Hostile source data poisons the job index or merges unrelated jobs | 1 | Descriptions reduced to plain text (`htmltext`), length checks, a job board never replaces a company board, no cross-source match without a company, a failing source closes nothing | `FuzzText`, `TestCrawl`, `TestShouldClose` |
 | R1 | User disputes an application | n/a | Evidence: values + sources, screenshot, confirmation, timeline; audit log | Phase 2 |
 | R2 | Security events cannot be traced or are altered | 4 | Append-only audit log (codes and params, no personal data) | `TestAuditEventsAreAppendOnly`, `TestAuditLogHasNoPersonalData` |
 | I1 | User reads another user's data | 4 | RLS for the application role `getafjob_app` (no bypass), tenant set per transaction ([0006](adr/0006-tenant-isolation-rls-and-envelope-encryption.md)) | `TestTenantSeparation`, `TestAppRoleCannotBypassRLS` |
@@ -42,6 +43,7 @@ This document grows with every module.
 | I6 | Database dump exposes secrets | 4 | Envelope encryption, master key outside the database | Phase 1 |
 | D1 | Slowloris / huge bodies | 1 | Server timeouts, header and body limits | `httpx.NewServer`, `TestProtect…` |
 | D2 | Hostile page exhausts the runner | 2/3 | Per-run limits, memory/pids limits, browser restarted per run | Phase 2 |
+| D4 | Huge or endless source responses | 1 | Input caps (`htmltext.MaxInput`), bounded fetch parallelism; per-source timeouts and body limits in the source adapters | `TestTextCapsInput`, #18 |
 | E1 | Browser exploit escapes to the host | 2 | Chromium sandbox on (seccomp profile), site isolation, non-root, read-only rootfs, `cap_drop: ALL`, no DB access | `TestRendererRunsInItsOwnNamespaces`, `TestLaunchKeepsSandboxAndSiteIsolation` |
 | E2 | Compromised runner reaches data | 2 | Runner has no database access, depguard rule | `.golangci.yml` |
 | E3 | Malicious workflow change escalates | 6 | `permissions: {}`, read-only default token, SHA pinning enforced, zizmor, ruleset | CI, repository settings |
