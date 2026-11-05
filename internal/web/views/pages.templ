@@ -63,10 +63,16 @@ templ Invite(action, email, name, nameError string) {
 	}
 }
 
-templ Home(name string, nudge bool) {
+templ Home(name string, nudge, setup bool) {
 	@Layout(Page{Title: T(ctx, "home.title"), UserName: name}) {
 		@Section(T(ctx, "home.title")) {
 			<p class="lead">{ T(ctx, "home.greeting", "name", name) }</p>
+			if setup {
+				<p class="notice notice-info">
+					{ T(ctx, "setup.home") }
+					<a href="/setup">{ T(ctx, "setup.home_link") }</a>
+				</p>
+			}
 			if nudge {
 				@PasskeyNudge()
 			}

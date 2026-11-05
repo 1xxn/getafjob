@@ -1,0 +1,204 @@
+package views
+
+import (
+	"context"
+	"strconv"
+)
+
+// SetupSteps are the steps of the setup assistant in order.
+var SetupSteps = []string{"cv", "contact", "work", "history", "search", "done"}
+
+// ExperienceRow and EducationRow are editable entries of the history step (an empty one is appended).
+type ExperienceRow struct {
+	Title, Company, Start, End, Location, Highlights string
+}
+
+// EducationRow is one degree in the history step.
+type EducationRow struct {
+	Degree, Institution, Start, End, Grade string
+}
+
+// SetupData is what a step shows.
+type SetupData struct {
+	Name       string
+	Step       string
+	Form       Form
+	CVs        []DocumentRow // cv step
+	Experience []ExperienceRow
+	Education  []EducationRow
+	Missing    []string // done step: field names without a value
+	Passkeys   bool     // done step: the user has a passkey
+}
+
+func stepIndex(step string) int {
+	for i, s := range SetupSteps {
+		if s == step {
+			return i
+		}
+	}
+	return 0
+}
+
+func nextStep(step string) string {
+	if i := stepIndex(step); i+1 < len(SetupSteps) {
+		return SetupSteps[i+1]
+	}
+	return step
+}
+
+func prevStep(step string) string {
+	if i := stepIndex(step); i > 0 {
+		return SetupSteps[i-1]
+	}
+	return step
+}
+
+templ setupNav(step string) {
+	<nav aria-label={ T(ctx, "setup.progress") }>
+		<ol class="steps">
+			for i, s := range SetupSteps {
+				<li>
+					if s == step {
+						<span aria-current="step"><strong>{ strconv.Itoa(i+1) }. { T(ctx, "setup.step." + s) }</strong></span>
+					} else {
+						<a href={ templ.SafeURL("/setup/" + s) }>{ strconv.Itoa(i+1) }. { T(ctx, "setup.step." + s) }</a>
+					}
+				</li>
+			}
+		</ol>
+	</nav>
+}
+
+templ setupButtons(step string) {
+	@StickyBar() {
+		if step != "cv" {
+			<a href={ templ.SafeURL("/setup/" + prevStep(step)) }>{ T(ctx, "setup.back") }</a>
+		}
+		<a href={ templ.SafeURL("/setup/" + nextStep(step)) }>{ T(ctx, "setup.skip") }</a>
+		<button type="submit" class="primary">{ T(ctx, "setup.next") }</button>
+	}
+}
+
+templ SetupPage(d SetupData) {
+	@Layout(Page{Title: T(ctx, "setup.title"), UserName: d.Name}) {
+		@Section(T(ctx, "setup.title") + ": " + T(ctx, "setup.step." + d.Step)) {
+			@setupNav(d.Step)
+			<p class="muted">{ T(ctx, "setup.text." + d.Step) }</p>
+			@formNotice(d.Form)
+			switch d.Step {
+				case "cv":
+					for _, c := range d.CVs {
+						<form method="post" action={ templ.SafeURL("/setup/cv/import/" + c.ID) }>
+							<button type="submit">{ T(ctx, "setup.cv.use", "name", c.Name) }</button>
+						</form>
+					}
+					<form method="post" action="/setup/cv" enctype="multipart/form-data" class="stack">
+						<input type="hidden" name="kind" value="cv"/>
+						<div class="field">
+							<label for="f-file">{ T(ctx, "setup.cv.file") }</label>
+							<input id="f-file" name="file" type="file" required accept=".pdf,.docx,application/pdf" aria-describedby="f-file-hint"/>
+							<p class="hint" id="f-file-hint">{ T(ctx, "setup.cv.hint") }</p>
+						</div>
+						@setupButtons(d.Step)
+					</form>
+				case "contact":
+					<form method="post" action="/setup/contact" class="stack" novalidate>
+						<input type="hidden" name="version" value={ d.Form.Version }/>
+						@Field(input(ctx, d.Form, "first_name", "text", "given-name", 200))
+						@Field(input(ctx, d.Form, "last_name", "text", "family-name", 200))
+						@Field(input(ctx, d.Form, "email", "email", "email", 254))
+						@Field(input(ctx, d.Form, "phone", "tel", "tel", 30))
+						@Field(input(ctx, d.Form, "postal_code", "text", "postal-code", 12))
+						@Field(input(ctx, d.Form, "city", "text", "address-level2", 200))
+						@Field(input(ctx, d.Form, "linkedin", "url", "url", 200))
+						@Field(input(ctx, d.Form, "github", "url", "url", 200))
+						@setupButtons(d.Step)
+					</form>
+				case "work":
+					<form method="post" action="/setup/work" class="stack" novalidate>
+						<input type="hidden" name="version" value={ d.Form.Version }/>
+						@Field(input(ctx, d.Form, "current_title", "text", "organization-title", 200))
+						@Field(input(ctx, d.Form, "years_total", "text", "", 200))
+						@Field(input(ctx, d.Form, "notice_period", "text", "", 200))
+						@Field(input(ctx, d.Form, "earliest_start", "text", "", 200))
+						@Field(input(ctx, d.Form, "salary_expectation", "text", "", 200))
+						@Check("work_authorized_eu", T(ctx, "profile.field.work_authorized_eu"), d.Form.Checks["work_authorized_eu"])
+						@Check("needs_sponsorship", T(ctx, "profile.field.needs_sponsorship"), d.Form.Checks["needs_sponsorship"])
+						@TextArea(area(ctx, d.Form, "skills", 12000))
+						@TextArea(area(ctx, d.Form, "languages", 3000))
+						@setupButtons(d.Step)
+					</form>
+				case "history":
+					<form method="post" action="/setup/history" class="stack" novalidate>
+						<input type="hidden" name="version" value={ d.Form.Version }/>
+						<input type="hidden" name="exp-count" value={ strconv.Itoa(len(d.Experience)) }/>
+						<input type="hidden" name="edu-count" value={ strconv.Itoa(len(d.Education)) }/>
+						<h2>{ T(ctx, "setup.history.experience") }</h2>
+						for i, e := range d.Experience {
+							<fieldset class="stack form-section">
+								<legend>{ T(ctx, "setup.history.position_n", "n", i+1) }</legend>
+								@Field(hist(ctx, "exp", i, "title", e.Title))
+								@Field(hist(ctx, "exp", i, "company", e.Company))
+								@Field(hist(ctx, "exp", i, "start", e.Start))
+								@Field(hist(ctx, "exp", i, "end", e.End))
+								@Field(hist(ctx, "exp", i, "location", e.Location))
+								@TextArea(FieldProps{Name: histName("exp", i, "highlights"), Label: T(ctx, "setup.history.highlights"),
+									Hint: T(ctx, "profile.hint.certifications"), Value: e.Highlights, MaxLength: 5000})
+								if e.Title != "" || e.Company != "" {
+									@Check(histName("exp", i, "remove"), T(ctx, "setup.history.remove"), false)
+								}
+							</fieldset>
+						}
+						<h2 class="form-section">{ T(ctx, "setup.history.education") }</h2>
+						for i, e := range d.Education {
+							<fieldset class="stack form-section">
+								<legend>{ T(ctx, "setup.history.degree_n", "n", i+1) }</legend>
+								@Field(hist(ctx, "edu", i, "degree", e.Degree))
+								@Field(hist(ctx, "edu", i, "institution", e.Institution))
+								@Field(hist(ctx, "edu", i, "start", e.Start))
+								@Field(hist(ctx, "edu", i, "end", e.End))
+								@Field(hist(ctx, "edu", i, "grade", e.Grade))
+								if e.Degree != "" || e.Institution != "" {
+									@Check(histName("edu", i, "remove"), T(ctx, "setup.history.remove"), false)
+								}
+							</fieldset>
+						}
+						@setupButtons(d.Step)
+					</form>
+				case "search":
+					<form method="post" action="/setup/search" class="stack" novalidate>
+						@TextArea(area(ctx, d.Form, "titles", 12000))
+						@TextArea(area(ctx, d.Form, "locations", 12000))
+						@Check("remote", T(ctx, "profile.field.remote"), d.Form.Checks["remote"])
+						@Field(input(ctx, d.Form, "min_salary", "number", "", 9))
+						@setupButtons(d.Step)
+					</form>
+				case "done":
+					if len(d.Missing) > 0 {
+						<p>{ T(ctx, "setup.done.missing") }</p>
+						<ul>
+							for _, m := range d.Missing {
+								<li>{ T(ctx, "profile.field." + m) }</li>
+							}
+						</ul>
+						<p><a href="/profile">{ T(ctx, "setup.done.to_profile") }</a></p>
+					} else {
+						@Notice("info", T(ctx, "setup.done.complete"))
+					}
+					if !d.Passkeys {
+						@PasskeyNudge()
+					}
+					<p><a href="/" class="primary">{ T(ctx, "setup.done.home") }</a></p>
+			}
+		}
+	}
+}
+
+func histName(group string, i int, field string) string {
+	return group + "-" + strconv.Itoa(i) + "-" + field
+}
+
+// hist builds a field of the history step, labelled with setup.history.<field>.
+func hist(ctx context.Context, group string, i int, field, value string) FieldProps {
+	return FieldProps{Name: histName(group, i, field), Label: T(ctx, "setup.history."+field), Type: "text", Value: value, MaxLength: 200}
+}
