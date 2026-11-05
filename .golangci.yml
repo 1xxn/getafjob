@@ -114,6 +114,10 @@ linters:
           - noctx
           - bodyclose
           - forbidigo
+      # templ components receive the context in Render, not in the constructor.
+      - linters:
+          - contextcheck
+        source: 'views\.[A-Z]\w*\('
 
 formatters:
   enable:

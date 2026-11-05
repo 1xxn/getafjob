@@ -63,6 +63,12 @@ curl -k https://localhost:8443/api/v1/meta
 go tool task dev:down
 ```
 
+The first account needs an invitation. Locally all mail lands in Mailpit (http://127.0.0.1:8025):
+
+```bash
+docker compose -f deploy/compose.yaml exec serve getafjob admin invite -email max.mustermann@example.com -role admin -send
+```
+
 ## Development
 
 ```bash

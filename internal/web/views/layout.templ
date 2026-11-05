@@ -1,0 +1,33 @@
+package views
+
+templ Layout(p Page) {
+	<!DOCTYPE html>
+	<html lang={ string(Locale(ctx)) }>
+		<head>
+			<meta charset="utf-8"/>
+			<meta name="viewport" content="width=device-width, initial-scale=1"/>
+			<meta name="color-scheme" content="light dark"/>
+			<title>{ p.Title } · getafjob</title>
+			<link rel="stylesheet" href="/static/app.css"/>
+			<link rel="icon" href="/static/icon.svg" type="image/svg+xml"/>
+			<link rel="manifest" href="/static/manifest.webmanifest"/>
+		</head>
+		<body>
+			<a class="skip" href="#main">{ T(ctx, "nav.skip") }</a>
+			<header class="topbar">
+				<a class="brand" href="/">getafjob</a>
+				if p.UserName != "" {
+					<nav aria-label={ T(ctx, "nav.main") }>
+						<span class="muted">{ T(ctx, "nav.signed_in_as", "name", p.UserName) }</span>
+						<form method="post" action="/logout">
+							<button type="submit" class="link">{ T(ctx, "nav.sign_out") }</button>
+						</form>
+					</nav>
+				}
+			</header>
+			<main id="main" tabindex="-1">
+				{ children... }
+			</main>
+		</body>
+	</html>
+}

@@ -1,0 +1,72 @@
+package views
+
+// Section groups content under a heading; layout uses headings and rules, not cards.
+templ Section(title string) {
+	<section class="section">
+		<h1>{ title }</h1>
+		{ children... }
+	</section>
+}
+
+// FieldProps describe a labelled input; hint and error are linked with aria-describedby.
+type FieldProps struct {
+	Name         string
+	Label        string
+	Type         string
+	Value        string
+	Hint         string
+	Error        string
+	Autocomplete string
+	Required     bool
+	MaxLength    int
+}
+
+templ Field(f FieldProps) {
+	<div class={ "field", templ.KV("field-invalid", f.Error != "") }>
+		<label for={ "f-" + f.Name }>{ f.Label }</label>
+		<input
+			id={ "f-" + f.Name }
+			name={ f.Name }
+			type={ f.Type }
+			value={ f.Value }
+			if f.Autocomplete != "" {
+				autocomplete={ f.Autocomplete }
+			}
+			if f.Required {
+				required
+			}
+			if f.MaxLength > 0 {
+				maxlength={ itoa(f.MaxLength) }
+			}
+			if f.Hint != "" || f.Error != "" {
+				aria-describedby={ describedBy(f) }
+			}
+			if f.Error != "" {
+				aria-invalid="true"
+			}
+		/>
+		if f.Hint != "" {
+			<p class="hint" id={ "f-" + f.Name + "-hint" }>{ f.Hint }</p>
+		}
+		if f.Error != "" {
+			<p class="error" id={ "f-" + f.Name + "-error" }>{ f.Error }</p>
+		}
+	</div>
+}
+
+// Notice is a short message; kind is info or error.
+templ Notice(kind, text string) {
+	<p class={ "notice", "notice-" + kind } role={ noticeRole(kind) }>{ text }</p>
+}
+
+// StatusLabel shows a status as glyph plus word, never as a coloured pill.
+templ StatusLabel(status string) {
+	<span class={ "status", "status-" + status }><span aria-hidden="true">{ statusGlyph(status) }</span> { T(ctx, "status." + status) }</span>
+}
+
+// StickyBar holds the primary actions at the bottom of long forms.
+templ StickyBar() {
+	<div class="stickybar">
+		{ children... }
+	</div>
+}

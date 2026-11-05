@@ -29,7 +29,10 @@ This document grows with every module.
 | S1 | Account takeover by password attacks | 1 | No passwords: invitations, passkeys, magic links ([0020](adr/0020-authentication-invitations-passkeys.md)); one-time tokens stored as SHA-256 only | `TestInvitationFlow`, `TestMagicLinkFlow` |
 | S3 | Account enumeration and mail flooding via sign-in links | 1 | Same answer for unknown addresses; at most 3 links per account and 15 minutes | `TestMagicLinkFlow`, `TestMagicLinksAreRateLimited` |
 | S2 | Stolen runner token reused | 2 | Short-lived per-run tokens, lease bound to runner | Phase 2 |
-| T1 | CSRF changes data | 1 | `http.CrossOriginProtection`, `__Host-` cookies | `TestProtectSetsHeadersAndBlocksCrossOriginPosts` |
+| S4 | Session cookie stolen or replayed | 1 | `__Host-` cookie, Secure, HttpOnly, SameSite=Lax; idle and absolute expiry; stored as hash | `TestInvitationAndSignOut`, `TestSessionIdleTimeoutAndTouch` |
+| T1 | CSRF changes data | 1 | `http.CrossOriginProtection`, `__Host-` cookies | `TestProtectSetsHeadersAndBlocksCrossOriginPosts`, `TestCrossSitePostIsRejected` |
+| T4 | Mail scanners use up sign-in links | 1 | Opening a link shows a button; only the POST signs in | `TestMagicLinkSignIn` |
+| T5 | Script injection through user-controlled text | 1 | templ escapes all output; CSP without inline scripts | `TestInvitationAndSignOut` |
 | T2 | Page tricks the engine into a wrong field or domain | 5 | Provenance, field/domain checks, page content is data | Phase 2 |
 | T3 | Tampered images or binaries | 6 | Pinned actions/tools, cosign signatures, provenance, SBOM | CI |
 | T6 | Hostile source data poisons the job index or merges unrelated jobs | 1 | Descriptions reduced to plain text (`htmltext`), length checks, a job board never replaces a company board, no cross-source match without a company, a failing source closes nothing | `FuzzText`, `TestCrawl`, `TestShouldClose` |
@@ -42,6 +45,7 @@ This document grows with every module.
 | I5 | One-time tokens in access logs | 1 | Caddy without access log | `deploy/Caddyfile` |
 | I6 | Database dump exposes secrets | 4 | Envelope encryption, master key outside the database | Phase 1 |
 | D1 | Slowloris / huge bodies | 1 | Server timeouts, header and body limits | `httpx.NewServer`, `TestProtect…` |
+| D3 | Guessing or flooding on sign-in endpoints | 1 | Rate limit per client address (burst 10, then one request per 6 s); pages are `no-store` | `TestSignInIsRateLimited` |
 | D2 | Hostile page exhausts the runner | 2/3 | Per-run limits, memory/pids limits, browser restarted per run | Phase 2 |
 | D4 | Huge or endless source responses | 1 | Input caps (`htmltext.MaxInput`), bounded fetch parallelism; per-source timeouts and body limits in the source adapters | `TestTextCapsInput`, #18 |
 | E1 | Browser exploit escapes to the host | 2 | Chromium sandbox on (seccomp profile), site isolation, non-root, read-only rootfs, `cap_drop: ALL`, no DB access | `TestRendererRunsInItsOwnNamespaces`, `TestLaunchKeepsSandboxAndSiteIsolation` |

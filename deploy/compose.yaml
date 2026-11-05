@@ -72,7 +72,9 @@ services:
     environment:
       <<: *app-env
       GETAFJOB_HTTP_ADDR: ":8080"
-    secrets: [db_app_password, master_key]
+      GETAFJOB_SMTP_URL_FILE: /run/secrets/smtp_url
+      GETAFJOB_MAIL_FROM: ${GETAFJOB_MAIL_FROM:-getafjob@localhost}
+    secrets: [db_app_password, master_key, smtp_url]
     depends_on:
       migrate: { condition: service_completed_successfully }
     healthcheck:
@@ -143,6 +145,21 @@ services:
       start_interval: 1s
     networks: [proxy, internet]
 
+  # Development only (profile dev): catches all mail; web UI on http://127.0.0.1:8025.
+  mailpit:
+    image: axllent/mailpit:v1.33.0@sha256:9b3a463be15354c0f0eba91697d80e3e0d8a5623ef0e627cacc836bc17fd5231
+    profiles: [dev]
+    read_only: true
+    tmpfs: [/tmp]
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    environment:
+      MP_SMTP_AUTH_ACCEPT_ANY: "true"
+      MP_SMTP_AUTH_ALLOW_INSECURE: "true"
+    ports:
+      - "127.0.0.1:8025:8025"
+    networks: [backend, devtools]
+
   caddy:
     <<: *hardening
     image: caddy:2.11.7-alpine@sha256:e70b164da81ef698b3ad19af799ea6086ce6d9e48ed4079eb9fe26f6fbf14ee5
@@ -172,6 +189,7 @@ networks:
   backend: { internal: true }
   gateway: { internal: true }
   proxy: { internal: true }
+  devtools: {}
 
 secrets:
   db_password:
@@ -180,6 +198,8 @@ secrets:
     file: ${GETAFJOB_SECRETS_DIR:-./secrets}/db_app_password
   master_key:
     file: ${GETAFJOB_SECRETS_DIR:-./secrets}/master_key
+  smtp_url:
+    file: ${GETAFJOB_SECRETS_DIR:-./secrets}/smtp_url
 
 volumes:
   pgdata: {}
