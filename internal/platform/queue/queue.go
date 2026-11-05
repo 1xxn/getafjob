@@ -11,6 +11,7 @@ import (
 	"github.com/riverqueue/river"
 	"github.com/riverqueue/river/riverdriver/riverpgxv5"
 	"github.com/riverqueue/river/rivermigrate"
+	"github.com/riverqueue/river/rivertype"
 )
 
 // Queues.
@@ -49,7 +50,15 @@ type Options struct {
 
 // NewWorker returns a client that works the queues; start it with Start and stop it with Stop.
 func NewWorker(pool *pgxpool.Pool, o Options) (*Client, error) {
+	t, err := newTelemetry()
+	if err != nil {
+		return nil, err
+	}
+	if err := RegisterDepth(pool); err != nil {
+		return nil, err
+	}
 	return river.NewClient(riverpgxv5.New(pool), &river.Config{
+		Middleware: []rivertype.Middleware{t},
 		Queues: map[string]river.QueueConfig{
 			river.QueueDefault: {MaxWorkers: 4},
 			Crawl:              {MaxWorkers: 1},

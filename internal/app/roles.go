@@ -49,7 +49,7 @@ func serve(ctx context.Context, cfg config.Config, logger *slog.Logger) error {
 	apiv1.Mount(mux)
 	(&web.Server{Identity: ids, Logger: logger}).Register(mux)
 
-	h := httpx.Protect(mux, maxBody, cfg.PublicURL.Scheme == "https")
+	h := httpx.Instrument(httpx.Protect(httpx.Routes(mux), maxBody, cfg.PublicURL.Scheme == "https"))
 	return httpx.Run(ctx, httpx.NewServer(cfg.HTTPAddr, h, logger), cfg.ShutdownTimeout, logger)
 }
 
@@ -64,10 +64,14 @@ func worker(ctx context.Context, cfg config.Config, logger *slog.Logger) error {
 	store := discoverystore.New(pool)
 	workers := river.NewWorkers()
 	client := sourceClient(cfg)
+	metrics, err := newCrawlMetrics()
+	if err != nil {
+		return err
+	}
 	river.AddWorker(workers, &crawlWorker{svc: discovery.NewService(store), boards: store, states: store, client: client,
-		cfg: cfg, logger: logger, timeout: 90 * time.Minute})
+		cfg: cfg, logger: logger, timeout: 90 * time.Minute, metrics: metrics})
 	river.AddWorker(workers, &boardDiscoveryWorker{
-		discovery: discovery.NewBoardDiscovery(store, store, sources.NewFinder(client)), logger: logger})
+		discovery: discovery.NewBoardDiscovery(store, store, sources.NewFinder(client)), logger: logger, metrics: metrics})
 	river.AddWorker(workers, &cleanupWorker{ids: identity.NewService(pgstore.New(pool), nil, cfg.PublicURL)})
 	jobs, err := queue.NewWorker(pool, queue.Options{Workers: workers, Periodic: periodicJobs(cfg), Logger: logger})
 	if err != nil {

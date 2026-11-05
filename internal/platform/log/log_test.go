@@ -2,9 +2,12 @@ package log
 
 import (
 	"bytes"
+	"context"
 	"log/slog"
 	"strings"
 	"testing"
+
+	"go.opentelemetry.io/otel/trace"
 )
 
 func TestSensitiveKeysAreRedacted(t *testing.T) {
@@ -42,5 +45,20 @@ func TestSensitive(t *testing.T) {
 		if got := Sensitive(k); got != want {
 			t.Errorf("Sensitive(%q) = %v, want %v", k, got, want)
 		}
+	}
+}
+
+func TestTraceCorrelation(t *testing.T) {
+	var buf bytes.Buffer
+	l := New(&buf, slog.LevelInfo, "json").With("role", "worker")
+	sc := trace.NewSpanContext(trace.SpanContextConfig{
+		TraceID: trace.TraceID{1, 2, 3}, SpanID: trace.SpanID{4, 5}, TraceFlags: trace.FlagsSampled,
+	})
+	l.InfoContext(trace.ContextWithSpanContext(context.Background(), sc), "traced")
+	l.InfoContext(context.Background(), "plain")
+	lines := strings.Split(strings.TrimSpace(buf.String()), "\n")
+	if len(lines) != 2 || !strings.Contains(lines[0], `"trace_id":"01020300000000000000000000000000"`) ||
+		!strings.Contains(lines[0], `"span_id":"0405000000000000"`) || strings.Contains(lines[1], "trace_id") {
+		t.Errorf("logs = %s", buf.String())
 	}
 }

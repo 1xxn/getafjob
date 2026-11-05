@@ -11,10 +11,12 @@ import (
 	"fmt"
 	"io"
 	"log/slog"
+	"time"
 
 	"github.com/1xxn/getafjob/internal/platform/buildinfo"
 	"github.com/1xxn/getafjob/internal/platform/config"
 	"github.com/1xxn/getafjob/internal/platform/log"
+	"github.com/1xxn/getafjob/internal/platform/otel"
 )
 
 // Exit codes.
@@ -98,6 +100,18 @@ func run(ctx context.Context, env Env, name string, r role) int {
 	}
 	bi := buildinfo.Get()
 	logger.Info("starting", "version", bi.Version, "commit", bi.Commit, "config", cfg)
+	shutdown, err := otel.Setup(ctx, cfg.OTelEndpoint, "getafjob-"+name)
+	if err != nil {
+		logger.Error("telemetry setup failed", "err", err)
+		return ExitError
+	}
+	defer func() {
+		stop, cancel := context.WithTimeout(context.WithoutCancel(ctx), 10*time.Second)
+		defer cancel()
+		if err := shutdown(stop); err != nil {
+			logger.Warn("telemetry flush failed", "err", err)
+		}
+	}()
 	if err := r(ctx, cfg, logger); err != nil && !errors.Is(err, context.Canceled) {
 		logger.Error("stopped with error", "err", err)
 		return ExitError
