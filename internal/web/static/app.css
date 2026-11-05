@@ -150,7 +150,8 @@
     }
 
     input,
-    select {
+    select,
+    textarea {
       width: 100%;
       padding: var(--space-2) var(--space-3);
       border: 1px solid var(--line);
@@ -171,7 +172,8 @@
       font-size: 0.9rem;
     }
 
-    &.field-invalid input {
+    &.field-invalid input,
+    &.field-invalid textarea {
       border-color: var(--danger);
     }
   }
@@ -252,6 +254,25 @@
       color: var(--ink-2);
       font-weight: 600;
     }
+  }
+}
+
+@layer components {
+  .field-check {
+    grid-template-columns: auto 1fr;
+    align-items: center;
+
+    & input {
+      width: auto;
+    }
+
+    & label {
+      font-weight: 400;
+    }
+  }
+
+  .form-section {
+    margin-block-start: var(--space-8);
   }
 }
 

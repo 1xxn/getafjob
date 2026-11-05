@@ -18,8 +18,12 @@ import (
 	"github.com/1xxn/getafjob/internal/identity"
 	"github.com/1xxn/getafjob/internal/identity/adapters/pgstore"
 	"github.com/1xxn/getafjob/internal/identity/softauthn"
+	"github.com/1xxn/getafjob/internal/platform/config"
+	"github.com/1xxn/getafjob/internal/platform/crypto"
 	"github.com/1xxn/getafjob/internal/platform/db/dbtest"
 	"github.com/1xxn/getafjob/internal/platform/httpx"
+	"github.com/1xxn/getafjob/internal/profile"
+	profilestore "github.com/1xxn/getafjob/internal/profile/adapters/pgstore"
 	"github.com/1xxn/getafjob/internal/web"
 )
 
@@ -53,7 +57,12 @@ func newApp(t *testing.T) *app {
 		t.Fatal(err)
 	}
 	mux := http.NewServeMux()
-	(&web.Server{Identity: ids, Logger: slog.New(slog.NewTextHandler(io.Discard, nil))}).Register(mux)
+	ring, err := crypto.NewKeyring(config.Secret(base64.RawURLEncoding.EncodeToString(bytes.Repeat([]byte{9}, 32))), "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	profiles := profile.NewService(profilestore.New(pool), crypto.NewEnvelope(ring, pool))
+	(&web.Server{Identity: ids, Profile: profiles, Logger: slog.New(slog.NewTextHandler(io.Discard, nil))}).Register(mux)
 	return &app{t: t, h: httpx.Protect(mux, 1<<20, true), ids: ids, mail: mb}
 }
 
@@ -462,5 +471,62 @@ func TestPasskeyNudgeAndRecovery(t *testing.T) {
 	rec := a.do(http.MethodPost, "/account/recovery/cancel", url.Values{}, session, nil)
 	if rec.Code != http.StatusOK || !strings.Contains(rec.Body.String(), "The request was canceled") {
 		t.Fatalf("cancel %d", rec.Code)
+	}
+}
+
+func TestProfilePages(t *testing.T) {
+	a := newApp(t)
+	session := signedIn(t, a)
+	if rec := a.do(http.MethodGet, "/profile", nil, "", nil); rec.Code != http.StatusSeeOther {
+		t.Fatalf("profile without session: %d", rec.Code)
+	}
+	page := a.do(http.MethodGet, "/profile", nil, session, nil)
+	if page.Code != http.StatusOK || !strings.Contains(page.Body.String(), `name="version" value="0"`) {
+		t.Fatalf("empty profile page %d", page.Code)
+	}
+	form := url.Values{"version": {"0"}, "first_name": {"Max"}, "last_name": {"Mustermann"}, "email": {"max.mustermann@example.org"},
+		"phone": {"+49 30 1234567"}, "github": {"github.com/maxmustermann"}, "skills": {"Go, PostgreSQL\nKubernetes"},
+		"languages": {"German: native\nEnglish: C1"}, "work_authorized_eu": {"on"}}
+	if rec := a.do(http.MethodPost, "/profile", form, session, nil); rec.Code != http.StatusSeeOther || rec.Header().Get("Location") != "/profile?saved=1" {
+		t.Fatalf("save %d", rec.Code)
+	}
+	body := a.do(http.MethodGet, "/profile?saved=1", nil, session, nil).Body.String()
+	for _, want := range []string{`value="Mustermann"`, `value="https://github.com/maxmustermann"`, "Go\nPostgreSQL\nKubernetes",
+		"German: native\nEnglish: C1", `name="work_authorized_eu" type="checkbox" value="on" checked`, `name="version" value="1"`, "Saved."} {
+		if !strings.Contains(body, want) {
+			t.Errorf("profile page lacks %q", want)
+		}
+	}
+
+	// Errors: the form comes back with the typed values and a message per field.
+	form.Set("version", "1")
+	form.Set("email", "Max <max@example.org>")
+	rec := a.do(http.MethodPost, "/profile", form, session, nil)
+	if rec.Code != http.StatusUnprocessableEntity || !strings.Contains(rec.Body.String(), "Enter a plain e-mail address") ||
+		!strings.Contains(rec.Body.String(), `aria-invalid="true"`) {
+		t.Fatalf("invalid save %d: %s", rec.Code, rec.Body.String())
+	}
+	// A stale version: conflict with the current data.
+	form.Set("email", "max@example.org")
+	form.Set("version", "0")
+	if rec := a.do(http.MethodPost, "/profile", form, session, nil); rec.Code != http.StatusConflict || !strings.Contains(rec.Body.String(), "another tab") {
+		t.Fatalf("stale save %d", rec.Code)
+	}
+
+	prefs := url.Values{"titles": {"Platform Engineer\nSRE"}, "locations": {"Berlin"}, "remote": {"on"}, "min_salary": {"70000"},
+		"cover_letter_lang": {"de"}, "diversity": {"decline"}}
+	if rec := a.do(http.MethodPost, "/preferences", prefs, session, nil); rec.Code != http.StatusSeeOther {
+		t.Fatalf("preferences %d", rec.Code)
+	}
+	body = a.do(http.MethodGet, "/preferences", nil, session, nil).Body.String()
+	if !strings.Contains(body, "Platform Engineer\nSRE") || !strings.Contains(body, `value="70000"`) || !strings.Contains(body, `value="de" selected`) {
+		t.Fatalf("preferences page: %s", body)
+	}
+	prefs.Set("min_salary", "a lot")
+	if rec := a.do(http.MethodPost, "/preferences", prefs, session, nil); rec.Code != http.StatusUnprocessableEntity || !strings.Contains(rec.Body.String(), `value="a lot"`) {
+		t.Fatalf("invalid preferences %d", rec.Code)
+	}
+	if body := a.do(http.MethodGet, "/preferences", nil, session, nil).Body.String(); !strings.Contains(body, `value="70000"`) {
+		t.Error("invalid preferences were saved")
 	}
 }
