@@ -5,6 +5,8 @@ import (
 	"strconv"
 	"strings"
 	"time"
+
+	"github.com/a-h/templ"
 )
 
 func itoa(n int) string { return strconv.Itoa(n) }
@@ -82,4 +84,22 @@ func points(n int) string {
 		return "+" + strconv.Itoa(n)
 	}
 	return strconv.Itoa(n)
+}
+
+// htmxConfig: only the reviewed extensions, no indicator styles (app.css has them), view transitions on swaps.
+const htmxConfig = `extensions:"hx-csp,hx-sse",includeIndicatorCSS:false,transitions:true`
+
+// HX returns htmx attributes as name/value pairs plus the response's hx-nonce; elements without it are inert
+// under hx-csp. Use it for every element with hx-* attributes.
+func HX(ctx context.Context, kv ...string) templ.Attributes {
+	a := templ.Attributes{"hx-nonce": templ.GetNonce(ctx)}
+	for i := 0; i+1 < len(kv); i += 2 {
+		a[kv[i]] = kv[i+1]
+	}
+	return a
+}
+
+// pageLink loads another page of the job list into #results.
+func pageLink(ctx context.Context, url string) templ.Attributes {
+	return HX(ctx, "hx-get", url, "hx-target", "#results", "hx-swap", "outerHTML", "hx-push-url", "true")
 }

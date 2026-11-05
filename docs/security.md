@@ -32,7 +32,7 @@ This document grows with every module.
 | S4 | Session cookie stolen or replayed | 1 | `__Host-` cookie, Secure, HttpOnly, SameSite=Lax; idle and absolute expiry; stored as hash | `TestInvitationAndSignOut`, `TestSessionIdleTimeoutAndTouch` |
 | T1 | CSRF changes data | 1 | `http.CrossOriginProtection`, `__Host-` cookies | `TestProtectSetsHeadersAndBlocksCrossOriginPosts`, `TestCrossSitePostIsRejected` |
 | T4 | Mail scanners use up sign-in links | 1 | Opening a link shows a button; only the POST signs in | `TestMagicLinkSignIn` |
-| T5 | Script injection through user-controlled text | 1 | templ escapes all output; CSP without inline scripts | `TestInvitationAndSignOut` |
+| T5 | Script injection through user-controlled text | 1 | templ escapes all output; CSP with a nonce per response, no inline scripts, Trusted Types with only the `htmx` policy; htmx elements without the nonce are inert (`hx-csp`); vendored htmx checked against its sums | `TestInvitationAndSignOut`, `TestJobPages`, `TestProtectSetsHeadersAndBlocksCrossOriginPosts`, `TestVendoredFilesMatchChecksums` |
 | T2 | Page tricks the engine into a wrong field or domain | 5 | Provenance, field/domain checks, page content is data | Phase 2 |
 | T3 | Tampered images or binaries | 6 | Pinned actions/tools, cosign signatures, provenance, SBOM | CI |
 | T6 | Hostile source data poisons the job index or merges unrelated jobs | 1 | Descriptions reduced to plain text (`htmltext`), length checks, board slugs checked before they become host names or paths (`TestFromBoardRejectsUnsafeSlugs`), a job board never replaces a company board, no cross-source match without a company, a failing source closes nothing; JSON-LD with block, size and depth limits; sitemap job pages must stay on the sitemap's host; a discovered board is added only if it lists one of the company's jobs (same `MatchKey`), never replaces a known board,, and guessed slugs pass the same checks; stored ETag and Last-Modified values are capped at 256 bytes and a 304 closes nothing | `FuzzText`, `FuzzSources`, `FuzzJobPostings`, `TestBoardFromURL`, `TestFindBoard`, `TestBoardChecks`, `TestConditionalFetch`, `TestCrawlNotModified`, `TestCrawl`, `TestShouldClose` |
@@ -58,7 +58,8 @@ This document grows with every module.
 
 - Configuration secrets redact themselves in `fmt`, `slog` and JSON; errors name variables, never values.
 - Logs redact attributes with sensitive names (e-mail, phone, password, token, cookie …).
-- Security headers: strict CSP (`script-src 'self'`, Trusted Types, `frame-ancestors 'none'`), HSTS, `nosniff`,
+- Security headers: strict CSP (`script-src 'nonce-…'` fresh per response, Trusted Types limited to the `htmx`
+  policy, `frame-ancestors 'none'`), HSTS, `nosniff`,
   `Referrer-Policy: no-referrer`, COOP/CORP, Permissions-Policy.
 - Containers: distroless/non-root, read-only, `cap_drop: ALL`, `no-new-privileges`, internal networks.
 - Browser: sandbox and site isolation on, downloads denied, proxy without loopback bypass, no non-proxied UDP.

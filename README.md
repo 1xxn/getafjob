@@ -52,6 +52,8 @@ flowchart LR
 
 One Go binary runs as `serve` (web UI, API, runner gateway), `worker` (queue jobs), `runner` (Chromium, no
 database access), `migrate` and `admin`. PostgreSQL 18, Caddy and an egress proxy complete the Docker Compose stack.
+The web UI is rendered on the server with templ and works without JavaScript; htmx 4 adds partial updates and live
+status under a strict CSP with Trusted Types.
 Design decisions are recorded as [ADRs](docs/adr/README.md).
 
 ## Quickstart
