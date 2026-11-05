@@ -1,0 +1,10 @@
+{
+  "name": "getafjob",
+  "short_name": "getafjob",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "background_color": "#fbfaf8",
+  "theme_color": "#0b6e72",
+  "icons": [{ "src": "/static/icon.svg", "sizes": "any", "type": "image/svg+xml" }]
+}

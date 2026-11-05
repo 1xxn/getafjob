@@ -1,0 +1,76 @@
+package views
+
+templ Login(email, notice string) {
+	@Layout(Page{Title: T(ctx, "login.title")}) {
+		@Section(T(ctx, "login.title")) {
+			<p>{ T(ctx, "login.text") }</p>
+			if notice != "" {
+				@Notice("error", notice)
+			}
+			<form method="post" action="/login" class="stack">
+				@Field(FieldProps{Name: "email", Label: T(ctx, "login.email_label"), Type: "email", Value: email,
+					Hint: T(ctx, "login.email_hint"), Autocomplete: "email", Required: true, MaxLength: 254})
+				<button type="submit" class="primary">{ T(ctx, "login.submit") }</button>
+			</form>
+		}
+	}
+}
+
+templ LoginSent() {
+	@Layout(Page{Title: T(ctx, "login.sent.title")}) {
+		@Section(T(ctx, "login.sent.title")) {
+			@Notice("info", T(ctx, "login.sent.text"))
+		}
+	}
+}
+
+// ConfirmLink asks for a click before a sign-in link is used, so mail scanners cannot use it up.
+templ ConfirmLink(action string) {
+	@Layout(Page{Title: T(ctx, "link.title")}) {
+		@Section(T(ctx, "link.title")) {
+			<p>{ T(ctx, "link.text") }</p>
+			<form method="post" action={ templ.SafeURL(action) }>
+				<button type="submit" class="primary">{ T(ctx, "link.submit") }</button>
+			</form>
+		}
+	}
+}
+
+templ Invite(action, email, name, nameError string) {
+	@Layout(Page{Title: T(ctx, "invite.title")}) {
+		@Section(T(ctx, "invite.title")) {
+			<p>{ T(ctx, "invite.text", "email", email) }</p>
+			<form method="post" action={ templ.SafeURL(action) } class="stack">
+				@Field(FieldProps{Name: "name", Label: T(ctx, "invite.name_label"), Type: "text", Value: name,
+					Hint: T(ctx, "invite.name_hint"), Error: nameError, Autocomplete: "name", Required: true, MaxLength: 200})
+				<div class="field">
+					<label for="f-locale">{ T(ctx, "invite.locale_label") }</label>
+					<select id="f-locale" name="locale">
+						<option value="en" selected?={ Locale(ctx) == "en" }>{ T(ctx, "locale.en") }</option>
+						<option value="de" selected?={ Locale(ctx) == "de" }>{ T(ctx, "locale.de") }</option>
+					</select>
+				</div>
+				<button type="submit" class="primary">{ T(ctx, "invite.submit") }</button>
+			</form>
+		}
+	}
+}
+
+templ Home(name string) {
+	@Layout(Page{Title: T(ctx, "home.title"), UserName: name}) {
+		@Section(T(ctx, "home.title")) {
+			<p class="lead">{ T(ctx, "home.greeting", "name", name) }</p>
+			<p class="muted">{ T(ctx, "home.empty") }</p>
+		}
+	}
+}
+
+// Problem is the page for errors and invalid links; text is already translated.
+templ Problem(title, text, userName string) {
+	@Layout(Page{Title: title, UserName: userName}) {
+		@Section(title) {
+			@Notice("error", text)
+			<p><a href="/">getafjob</a></p>
+		}
+	}
+}

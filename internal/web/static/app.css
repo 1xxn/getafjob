@@ -1,0 +1,246 @@
+@layer tokens, base, layout, components, utilities;
+
+@layer tokens {
+  :root {
+    color-scheme: light dark;
+    --paper: #fbfaf8;
+    --raised: #ffffff;
+    --sunken: #f1efeb;
+    --line: #dcd8d1;
+    --ink-1: #1d1b18;
+    --ink-2: #4a4640;
+    --ink-3: #6b665e;
+    --accent: #0b6e72;
+    --accent-ink: #ffffff;
+    --danger: #a3261d;
+    --focus: #0b6e72;
+    --radius: 6px;
+    --space-1: 0.25rem;
+    --space-2: 0.5rem;
+    --space-3: 0.75rem;
+    --space-4: 1rem;
+    --space-6: 1.5rem;
+    --space-8: 2rem;
+    --measure: 40rem;
+    --font: system-ui, -apple-system, "Segoe UI", Roboto, "Noto Sans", sans-serif;
+  }
+
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --paper: #161513;
+      --raised: #1e1c1a;
+      --sunken: #0f0e0d;
+      --line: #3a3733;
+      --ink-1: #f2efea;
+      --ink-2: #cfcac2;
+      --ink-3: #a7a198;
+      --accent: #5cc2c6;
+      --accent-ink: #0b1414;
+      --danger: #ff8a7f;
+      --focus: #5cc2c6;
+    }
+  }
+}
+
+@layer base {
+  *,
+  *::before,
+  *::after {
+    box-sizing: border-box;
+  }
+
+  body {
+    margin: 0;
+    background: var(--paper);
+    color: var(--ink-1);
+    font: 400 1rem/1.55 var(--font);
+    font-variant-numeric: tabular-nums;
+  }
+
+  h1 {
+    font-size: 1.5rem;
+    font-weight: 600;
+    line-height: 1.25;
+    margin: 0 0 var(--space-4);
+  }
+
+  a {
+    color: var(--accent);
+  }
+
+  :focus-visible {
+    outline: 3px solid var(--focus);
+    outline-offset: 2px;
+  }
+
+  input,
+  select,
+  button {
+    font: inherit;
+  }
+}
+
+@layer layout {
+  .topbar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--space-4);
+    padding: var(--space-3) var(--space-6);
+    border-bottom: 1px solid var(--line);
+
+    nav {
+      display: flex;
+      align-items: center;
+      gap: var(--space-4);
+    }
+
+    form {
+      margin: 0;
+    }
+  }
+
+  .brand {
+    color: var(--ink-1);
+    font-weight: 600;
+    text-decoration: none;
+  }
+
+  main {
+    max-width: var(--measure);
+    margin: 0 auto;
+    padding: var(--space-8) var(--space-6);
+
+    &:focus {
+      outline: none;
+    }
+  }
+
+  .section + .section {
+    margin-top: var(--space-8);
+    padding-top: var(--space-8);
+    border-top: 1px solid var(--line);
+  }
+
+  .stack > * + * {
+    margin-top: var(--space-4);
+  }
+}
+
+@layer components {
+  .skip {
+    position: absolute;
+    left: var(--space-4);
+    top: -3rem;
+    padding: var(--space-2) var(--space-3);
+    background: var(--raised);
+    border: 1px solid var(--line);
+
+    &:focus {
+      top: var(--space-2);
+    }
+  }
+
+  .field {
+    display: grid;
+    gap: var(--space-1);
+
+    label {
+      font-weight: 600;
+    }
+
+    input,
+    select {
+      width: 100%;
+      padding: var(--space-2) var(--space-3);
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      background: var(--raised);
+      color: var(--ink-1);
+    }
+
+    .hint {
+      margin: 0;
+      color: var(--ink-3);
+      font-size: 0.9rem;
+    }
+
+    .error {
+      margin: 0;
+      color: var(--danger);
+      font-size: 0.9rem;
+    }
+
+    &.field-invalid input {
+      border-color: var(--danger);
+    }
+  }
+
+  button {
+    cursor: pointer;
+    border-radius: var(--radius);
+    padding: var(--space-2) var(--space-4);
+    border: 1px solid var(--line);
+    background: var(--raised);
+    color: var(--ink-1);
+
+    &.primary {
+      background: var(--accent);
+      border-color: var(--accent);
+      color: var(--accent-ink);
+      font-weight: 600;
+    }
+
+    &.link {
+      border: 0;
+      background: none;
+      padding: 0;
+      color: var(--accent);
+      text-decoration: underline;
+    }
+  }
+
+  .notice {
+    margin: var(--space-4) 0;
+    padding-left: var(--space-3);
+    border-left: 3px solid var(--line);
+
+    &.notice-error {
+      border-left-color: var(--danger);
+    }
+  }
+
+  .status {
+    white-space: nowrap;
+
+    &.status-your_turn {
+      color: var(--accent);
+      font-weight: 600;
+    }
+
+    &.status-failed {
+      color: var(--danger);
+    }
+  }
+
+  .stickybar {
+    position: sticky;
+    bottom: 0;
+    display: flex;
+    gap: var(--space-3);
+    justify-content: flex-end;
+    padding: var(--space-3) 0;
+    background: var(--paper);
+    border-top: 1px solid var(--line);
+  }
+}
+
+@layer utilities {
+  .muted {
+    color: var(--ink-3);
+  }
+
+  .lead {
+    font-size: 1.125rem;
+  }
+}

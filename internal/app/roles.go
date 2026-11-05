@@ -5,20 +5,24 @@ import (
 	"errors"
 	"log/slog"
 	"net/http"
+	"time"
 
 	"github.com/go-rod/rod/lib/proto"
 
+	"github.com/1xxn/getafjob/internal/identity"
+	"github.com/1xxn/getafjob/internal/identity/adapters/pgstore"
 	"github.com/1xxn/getafjob/internal/platform/config"
 	"github.com/1xxn/getafjob/internal/platform/db"
 	"github.com/1xxn/getafjob/internal/platform/httpx"
 	"github.com/1xxn/getafjob/internal/runner/browser"
+	"github.com/1xxn/getafjob/internal/web"
 	"github.com/1xxn/getafjob/internal/web/apiv1"
 )
 
 // maxBody caps request bodies of the web role (uploads get their own, larger limits later).
 const maxBody = 1 << 20
 
-// serve: web UI, API v1, SSE and runner gateway. Phase 0: health endpoints only.
+// serve: web UI, API v1, SSE and runner gateway.
 func serve(ctx context.Context, cfg config.Config, logger *slog.Logger) error {
 	pool, err := db.Open(ctx, cfg.DatabaseURL, cfg.DatabasePassword, "getafjob-serve")
 	if err != nil {
@@ -29,15 +33,22 @@ func serve(ctx context.Context, cfg config.Config, logger *slog.Logger) error {
 	health := httpx.NewHealth(logger)
 	health.Add("database", db.Ping(pool))
 	health.Add("schema", db.SchemaCurrent(pool))
+	mailer, err := newMailer(cfg)
+	if err != nil {
+		return err
+	}
+	ids := identity.NewService(pgstore.New(pool), mailer, cfg.PublicURL)
+
 	mux := http.NewServeMux()
 	health.Register(mux)
 	apiv1.Mount(mux)
+	(&web.Server{Identity: ids, Logger: logger}).Register(mux)
 
 	h := httpx.Protect(mux, maxBody, cfg.PublicURL.Scheme == "https")
 	return httpx.Run(ctx, httpx.NewServer(cfg.HTTPAddr, h, logger), cfg.ShutdownTimeout, logger)
 }
 
-// worker: background jobs (River). Phase 0: database reachable, health on the internal address.
+// worker: background jobs (River follows); for now the periodic identity cleanup.
 func worker(ctx context.Context, cfg config.Config, logger *slog.Logger) error {
 	pool, err := db.Open(ctx, cfg.DatabaseURL, cfg.DatabasePassword, "getafjob-worker")
 	if err != nil {
@@ -48,7 +59,27 @@ func worker(ctx context.Context, cfg config.Config, logger *slog.Logger) error {
 	health := httpx.NewHealth(logger)
 	health.Add("database", db.Ping(pool))
 	health.Add("schema", db.SchemaCurrent(pool))
+	ids := identity.NewService(pgstore.New(pool), nil, cfg.PublicURL)
+	go every(ctx, 15*time.Minute, func() {
+		if err := ids.Cleanup(ctx); err != nil && ctx.Err() == nil {
+			logger.Warn("identity cleanup failed", "err", err)
+		}
+	})
 	return serveHealth(ctx, cfg, health, logger)
+}
+
+// every runs fn now and then every d until ctx ends.
+func every(ctx context.Context, d time.Duration, fn func()) {
+	t := time.NewTicker(d)
+	defer t.Stop()
+	for {
+		fn()
+		select {
+		case <-ctx.Done():
+			return
+		case <-t.C:
+		}
+	}
 }
 
 // runner: browser runner. Phase 0: self-test at start-up (Chromium starts with sandbox, a page opens),
