@@ -129,15 +129,18 @@ func (q *Queries) DescribedJobs(ctx context.Context, fingerprints []string) ([]s
 }
 
 const enabledBoards = `-- name: EnabledBoards :many
-SELECT id, ats, slug, company, config FROM boards WHERE enabled ORDER BY id
+SELECT id, ats, slug, company, config, coalesce(etag, '')::text AS etag, coalesce(last_modified, '')::text AS last_modified
+FROM boards WHERE enabled ORDER BY id
 `
 
 type EnabledBoardsRow struct {
-	ID      int64
-	Ats     string
-	Slug    string
-	Company string
-	Config  []byte
+	ID           int64
+	Ats          string
+	Slug         string
+	Company      string
+	Config       []byte
+	Etag         string
+	LastModified string
 }
 
 func (q *Queries) EnabledBoards(ctx context.Context) ([]EnabledBoardsRow, error) {
@@ -155,6 +158,8 @@ func (q *Queries) EnabledBoards(ctx context.Context) ([]EnabledBoardsRow, error)
 			&i.Slug,
 			&i.Company,
 			&i.Config,
+			&i.Etag,
+			&i.LastModified,
 		); err != nil {
 			return nil, err
 		}
@@ -424,6 +429,35 @@ func (q *Queries) RecordBoardCheck(ctx context.Context, arg RecordBoardCheckPara
 		arg.RecheckAt,
 		arg.Result,
 		arg.BoardID,
+	)
+	return err
+}
+
+const saveBoardState = `-- name: SaveBoardState :exec
+UPDATE boards
+SET last_crawled_at = $1,
+    last_error      = nullif($2::text, ''),
+    etag            = CASE WHEN $2::text = '' THEN nullif($3::text, '') ELSE etag END,
+    last_modified   = CASE WHEN $2::text = '' THEN nullif($4::text, '') ELSE last_modified END
+WHERE id = $5
+`
+
+type SaveBoardStateParams struct {
+	At           *time.Time
+	LastError    string
+	Etag         string
+	LastModified string
+	ID           int64
+}
+
+// A failed fetch keeps the validators of the last good one.
+func (q *Queries) SaveBoardState(ctx context.Context, arg SaveBoardStateParams) error {
+	_, err := q.db.Exec(ctx, saveBoardState,
+		arg.At,
+		arg.LastError,
+		arg.Etag,
+		arg.LastModified,
+		arg.ID,
 	)
 	return err
 }

@@ -43,6 +43,9 @@ type Report struct {
 	RunID  int64
 	Stats  Stats
 	Errors map[string]string
+	// Validators per source that answered; save them only after the crawl succeeded, or the next crawl may skip
+	// changes it never stored.
+	Validators map[string]Validators
 }
 
 type fetched struct {
@@ -70,10 +73,12 @@ func (s *Service) Crawl(ctx context.Context, sources []Source) (Report, error) {
 	}
 	results := s.fetchAll(ctx, sources)
 
-	rep := Report{RunID: runID, Stats: Stats{Changes: map[Change]int{}}, Errors: map[string]string{}}
+	rep := Report{RunID: runID, Stats: Stats{Changes: map[Change]int{}}, Errors: map[string]string{},
+		Validators: map[string]Validators{}}
 	runs := map[string]SourceRun{}
 	listed := map[string]bool{}
 	var items, stubs []item
+	var unchanged []string
 	for _, r := range results {
 		name := r.src.Name()
 		if r.err != nil {
@@ -81,8 +86,17 @@ func (s *Service) Crawl(ctx context.Context, sources []Source) (Report, error) {
 			runs[name] = SourceRun{Name: name}
 			continue
 		}
-		runs[name] = SourceRun{Name: name, OK: true, Complete: r.batch.Complete}
 		_, detailer := r.src.(Detailer)
+		if !detailer { // a detailer may leave jobs without details for later; a 304 would hide them
+			rep.Validators[name] = r.batch.Validators
+		}
+		if r.batch.NotModified && !detailer {
+			runs[name] = SourceRun{Name: name, OK: true} // not complete: closes nothing
+			unchanged = append(unchanged, name)
+			rep.Stats.NotModified++
+			continue
+		}
+		runs[name] = SourceRun{Name: name, OK: true, Complete: r.batch.Complete}
 		for _, p := range r.batch.Postings {
 			rep.Stats.Fetched++
 			valid := ValidPosting(p) || (detailer && ValidStub(p))
@@ -99,6 +113,9 @@ func (s *Service) Crawl(ctx context.Context, sources []Source) (Report, error) {
 		}
 	}
 	now := s.now()
+	if err := s.unchanged(ctx, unchanged, listed, now, &rep.Stats); err != nil {
+		return rep, err
+	}
 	newStubs, err := s.seen(ctx, stubs, now, &rep.Stats)
 	if err != nil {
 		return rep, err
@@ -147,6 +164,25 @@ func (s *Service) Crawl(ctx context.Context, sources []Source) (Report, error) {
 	return rep, s.store.FinishRun(ctx, runID, rep.Stats, rep.Errors, s.now())
 }
 
+// unchanged marks the open jobs of sources that answered 304 as seen and listed.
+func (s *Service) unchanged(ctx context.Context, sources []string, listed map[string]bool, now time.Time, st *Stats) error {
+	if len(sources) == 0 {
+		return nil
+	}
+	open, err := s.store.OpenJobs(ctx, sources)
+	if err != nil {
+		return err
+	}
+	fps := make([]string, len(open))
+	for i, j := range open {
+		fps[i] = j.Fingerprint
+		listed[j.Fingerprint] = true
+	}
+	known, err := s.store.Seen(ctx, fps, now)
+	st.Seen += len(known)
+	return err
+}
+
 // seen marks the known open jobs among stubs as seen and returns the stubs of jobs the index does not have yet.
 func (s *Service) seen(ctx context.Context, stubs []item, now time.Time, st *Stats) ([]item, error) {
 	if len(stubs) == 0 {
@@ -160,7 +196,7 @@ func (s *Service) seen(ctx context.Context, stubs []item, now time.Time, st *Sta
 	if err != nil {
 		return nil, err
 	}
-	st.Seen = len(known)
+	st.Seen += len(known)
 	var out []item
 	for i, it := range stubs {
 		if !known[fps[i]] {

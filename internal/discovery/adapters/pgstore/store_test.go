@@ -420,3 +420,81 @@ func TestBoardChecks(t *testing.T) {
 		t.Fatalf("re-recording a check: %v", err)
 	}
 }
+
+func TestCrawlNotModified(t *testing.T) {
+	pool := dbtest.AppPool(t)
+	ctx := context.Background()
+	now := time.Date(2026, 11, 5, 12, 0, 0, 0, time.UTC)
+	svc := discovery.NewService(pgstore.New(pool)).WithClock(func() time.Time { return now })
+	v := discovery.Validators{ETag: `W/"1"`}
+	acme := &source{name: "greenhouse:acme", batch: discovery.Batch{Complete: true, Validators: v, Postings: []discovery.Posting{
+		posting("greenhouse:acme", "1", "ACME", "Backend Engineer", "Berlin"),
+		posting("greenhouse:acme", "2", "ACME", "SRE", "Hamburg"),
+	}}}
+	if rep, err := svc.Crawl(ctx, []discovery.Source{acme}); err != nil || rep.Validators["greenhouse:acme"] != v {
+		t.Fatalf("crawl 1: %+v, %v", rep, err)
+	}
+
+	// 304: nothing listed, yet nothing closes, and the open jobs count as seen.
+	acme.batch = discovery.Batch{NotModified: true, Validators: v}
+	now = now.Add(time.Hour)
+	rep, err := svc.Crawl(ctx, []discovery.Source{acme})
+	if err != nil || rep.Stats.NotModified != 1 || rep.Stats.Seen != 2 || rep.Stats.Closed != 0 || rep.Validators["greenhouse:acme"] != v {
+		t.Fatalf("crawl 2: %+v, %v", rep, err)
+	}
+	var seen time.Time
+	if err := pool.QueryRow(ctx, "SELECT min(last_seen) FROM jobs WHERE status = 'open'").Scan(&seen); err != nil || !seen.Equal(now) {
+		t.Fatalf("last_seen = %v, %v", seen, err)
+	}
+	if j := mustLoad(t, pool, "greenhouse:acme", "1"); j.Status != "open" {
+		t.Fatalf("job closed after 304: %+v", j)
+	}
+}
+
+func TestSaveBoardStates(t *testing.T) {
+	pool := dbtest.AppPool(t)
+	ctx := context.Background()
+	st := pgstore.New(pool)
+	if _, _, err := st.ImportBoards(ctx, []discovery.Board{{ATS: "greenhouse", Slug: "acme", Company: "ACME"}}); err != nil {
+		t.Fatal(err)
+	}
+	boards, err := st.EnabledBoards(ctx)
+	if err != nil || len(boards) != 1 || boards[0].Validators != (discovery.Validators{}) {
+		t.Fatalf("boards = %+v, %v", boards, err)
+	}
+	id, at := boards[0].ID, time.Date(2026, 11, 5, 12, 0, 0, 0, time.UTC)
+	v := discovery.Validators{ETag: `W/"1"`, LastModified: "Wed, 04 Nov 2026 10:00:00 GMT"}
+	validators := func() (discovery.Validators, string) {
+		t.Helper()
+		b, err := st.EnabledBoards(ctx)
+		if err != nil {
+			t.Fatal(err)
+		}
+		var lastErr *string
+		if err := pool.QueryRow(ctx, "SELECT last_error FROM boards WHERE id = $1", id).Scan(&lastErr); err != nil {
+			t.Fatal(err)
+		}
+		if lastErr == nil {
+			return b[0].Validators, ""
+		}
+		return b[0].Validators, *lastErr
+	}
+	if err := st.SaveBoardStates(ctx, []discovery.BoardState{{ID: id, Validators: v}}, at); err != nil {
+		t.Fatal(err)
+	}
+	if got, e := validators(); got != v || e != "" {
+		t.Fatalf("after success: %+v, %q", got, e)
+	}
+	if err := st.SaveBoardStates(ctx, []discovery.BoardState{{ID: id, Error: "http_503"}}, at); err != nil {
+		t.Fatal(err)
+	}
+	if got, e := validators(); got != v || e != "http_503" {
+		t.Fatalf("after failure: %+v, %q (validators stay)", got, e)
+	}
+	if err := st.SaveBoardStates(ctx, []discovery.BoardState{{ID: id}}, at); err != nil {
+		t.Fatal(err)
+	}
+	if got, e := validators(); got != (discovery.Validators{}) || e != "" {
+		t.Fatalf("after answer without validators: %+v, %q", got, e)
+	}
+}

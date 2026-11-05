@@ -1,8 +1,10 @@
 package app
 
 import (
+	"cmp"
 	"context"
 	"log/slog"
+	"slices"
 	"time"
 
 	"github.com/jackc/pgx/v5"
@@ -38,6 +40,7 @@ type crawlWorker struct {
 	river.WorkerDefaults[CrawlArgs]
 	svc     *discovery.Service
 	boards  discovery.Boards
+	states  discovery.BoardStates
 	client  *sources.Client
 	cfg     config.Config
 	logger  *slog.Logger
@@ -48,17 +51,20 @@ type crawlWorker struct {
 func (w *crawlWorker) Timeout(*river.Job[CrawlArgs]) time.Duration { return w.timeout }
 
 func (w *crawlWorker) Work(ctx context.Context, _ *river.Job[CrawlArgs]) error {
-	srcs, err := crawlSources(ctx, w.client, w.boards, w.cfg, w.logger)
+	srcs, ids, err := crawlSources(ctx, w.client, w.boards, w.cfg, w.logger)
 	if err != nil {
 		return err
 	}
 	rep, err := w.svc.Crawl(ctx, srcs)
 	if err != nil {
+		return err // validators stay as they were, so the next crawl fetches everything again
+	}
+	if err := w.states.SaveBoardStates(ctx, boardStates(ids, rep), time.Now()); err != nil {
 		return err
 	}
 	w.logger.InfoContext(ctx, "crawl finished", "run", rep.RunID, "sources", len(srcs), "fetched", rep.Stats.Fetched,
 		"new", rep.Stats.Changes[discovery.ChangeNew], "updated", rep.Stats.Changes[discovery.ChangeUpdated],
-		"closed", rep.Stats.Closed, "failed_sources", len(rep.Errors))
+		"closed", rep.Stats.Closed, "not_modified", rep.Stats.NotModified, "failed_sources", len(rep.Errors))
 	if c, err := river.ClientFromContextSafely[pgx.Tx](ctx); err == nil {
 		if _, err := c.Insert(ctx, BoardDiscoveryArgs{}, nil); err != nil {
 			w.logger.WarnContext(ctx, "board discovery not queued", "err", err)
@@ -102,9 +108,12 @@ func (w *boardDiscoveryWorker) Work(ctx context.Context, _ *river.Job[BoardDisco
 }
 
 // crawlSources lists what a crawl reads: career sites and job boards, search-based sources when search terms are
-// configured, and every enabled company board. A board that cannot be built is skipped and logged.
-func crawlSources(ctx context.Context, c *sources.Client, boards discovery.Boards, cfg config.Config, logger *slog.Logger) ([]discovery.Source, error) {
-	out := []discovery.Source{sources.NewGoogle(c), sources.NewApple(c, "germany-DEU"), sources.NewArbeitnow(c, 10)}
+// configured, and every enabled company board. A board that cannot be built is skipped and logged. ids maps the
+// source name of each board to its ID.
+func crawlSources(ctx context.Context, c *sources.Client, boards discovery.Boards, cfg config.Config, logger *slog.Logger) (
+	out []discovery.Source, ids map[string]int64, err error,
+) {
+	out = []discovery.Source{sources.NewGoogle(c), sources.NewApple(c, "germany-DEU"), sources.NewArbeitnow(c, 10)}
 	if len(cfg.CrawlQueries) > 0 {
 		out = append(out, sources.NewHimalayas(c, cfg.CrawlQueries, "Germany"), sources.NewAmazon(c, cfg.CrawlQueries, "DEU"))
 		if len(cfg.CrawlCities) > 0 {
@@ -113,17 +122,32 @@ func crawlSources(ctx context.Context, c *sources.Client, boards discovery.Board
 	}
 	list, err := boards.EnabledBoards(ctx)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
+	ids = map[string]int64{}
 	for _, b := range list {
 		src, err := sources.FromBoard(c, sources.Board{ATS: b.ATS, Slug: b.Slug, Company: b.Company, Config: b.Config})
 		if err != nil {
 			logger.WarnContext(ctx, "board skipped", "board", b.ID, "err", err)
 			continue
 		}
+		if cs, ok := src.(discovery.Conditional); ok {
+			cs.SetValidators(b.Validators)
+		}
+		ids[src.Name()] = b.ID
 		out = append(out, src)
 	}
-	return out, nil
+	return out, ids, nil
+}
+
+// boardStates turns a crawl report into the state of each board: its error code, or the validators of its answer.
+func boardStates(ids map[string]int64, rep discovery.Report) []discovery.BoardState {
+	out := make([]discovery.BoardState, 0, len(ids))
+	for name, id := range ids {
+		out = append(out, discovery.BoardState{ID: id, Error: rep.Errors[name], Validators: rep.Validators[name]})
+	}
+	slices.SortFunc(out, func(a, b discovery.BoardState) int { return cmp.Compare(a.ID, b.ID) })
+	return out
 }
 
 // sourceClient fetches through the egress proxy when one is configured.

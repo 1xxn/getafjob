@@ -5,6 +5,7 @@ import (
 	"io"
 	"log/slog"
 	"net/http"
+	"slices"
 	"strings"
 	"testing"
 
@@ -48,7 +49,7 @@ func TestCrawlSources(t *testing.T) {
 			"google apple:germany-DEU arbeitnow himalayas amazon arbeitsagentur greenhouse:acme workday:muster/External"},
 	}
 	for _, tc := range cases {
-		got, err := crawlSources(context.Background(), c, boards, tc.cfg, logger)
+		got, _, err := crawlSources(context.Background(), c, boards, tc.cfg, logger)
 		if err != nil || names(got) != tc.want {
 			t.Errorf("sources = %q, %v; want %q", names(got), err, tc.want)
 		}
@@ -66,5 +67,18 @@ func TestAdminCrawl(t *testing.T) {
 		if code := Main(t.Context(), []string{"admin", "crawl"}, env); code != ExitOK || !strings.HasPrefix(out.String(), want) {
 			t.Fatalf("run %d: code %d, out %q, err %q", i+1, code, out.String(), errb.String())
 		}
+	}
+}
+
+func TestBoardStates(t *testing.T) {
+	ids := map[string]int64{"greenhouse:acme": 1, "lever:umbrella": 2, "ashby:globex": 3}
+	rep := discovery.Report{
+		Errors:     map[string]string{"lever:umbrella": "http_503"},
+		Validators: map[string]discovery.Validators{"greenhouse:acme": {ETag: `"a"`}},
+	}
+	got := boardStates(ids, rep)
+	want := []discovery.BoardState{{ID: 1, Validators: discovery.Validators{ETag: `"a"`}}, {ID: 2, Error: "http_503"}, {ID: 3}}
+	if !slices.Equal(got, want) {
+		t.Errorf("states = %+v", got)
 	}
 }

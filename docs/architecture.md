@@ -135,6 +135,11 @@ stored descriptions are never fetched again. Sitemaps (Meta) list only job URLs 
 seen again, a new one becomes a posting from the schema.org `JobPosting` on its page. Careers pages are read the same
 way; links into supported systems name a company's board (`sources.DetectBoards`).
 
+Greenhouse, Ashby, Lever and Personio boards are fetched conditionally (`If-None-Match`, `If-Modified-Since`). On
+304 the open jobs of the board are only marked as seen and nothing closes. The worker stores ETag, Last-Modified,
+last crawl and error code per board only after the whole crawl succeeded, so a failed crawl never hides changes;
+a failed fetch keeps the last validators.
+
 **Board discovery:** after each crawl a River job looks for the own boards of up to 30 companies that appear only on
 job boards: first the boards their links point to, then slugs guessed from the company name (Greenhouse, Ashby,
 Lever, Recruitee, Workable, Personio), each fetched once without retries. A board is added (`origin = 'discovered'`)
