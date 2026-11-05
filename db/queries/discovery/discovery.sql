@@ -5,7 +5,7 @@ INSERT INTO crawl_runs (started_at, sources) VALUES ($1, $2) RETURNING id;
 UPDATE crawl_runs SET finished_at = $2, stats = $3, errors = $4 WHERE id = $1;
 
 -- name: JobByFingerprint :one
-SELECT id, title, location, content_hash, status, url, alt_urls FROM jobs WHERE fingerprint = $1 FOR UPDATE;
+SELECT id, title, location, description, content_hash, status, url, alt_urls FROM jobs WHERE fingerprint = $1 FOR UPDATE;
 
 -- name: OpenJobsByMatchKey :many
 SELECT id, source, location, url, alt_urls FROM jobs WHERE match_key = $1 AND status = 'open' ORDER BY id;
@@ -52,3 +52,6 @@ SELECT id, fingerprint, source, last_seen FROM jobs WHERE status = 'open' AND so
 -- name: CloseJob :one
 UPDATE jobs SET status = 'closed', closed_at = $2 WHERE id = $1 AND status = 'open'
 RETURNING title, location, content_hash;
+
+-- name: DescribedJobs :many
+SELECT fingerprint FROM jobs WHERE fingerprint = ANY(sqlc.arg(fingerprints)::text[]) AND description <> '';

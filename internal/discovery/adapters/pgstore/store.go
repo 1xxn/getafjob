@@ -81,6 +81,9 @@ func upsert(ctx context.Context, qs *q.Queries, runID int64, p discovery.Posting
 	if err != nil && !errors.Is(err, pgx.ErrNoRows) {
 		return "", false, err
 	}
+	if found && p.Description == "" {
+		hash = discovery.ContentHash(p.Title, p.Location, job.Description) // details not loaded this time
+	}
 
 	if !found {
 		other, err := sameJob(ctx, qs, p, mk)
@@ -211,6 +214,22 @@ func (s *Store) OpenJobs(ctx context.Context, sources []string) ([]discovery.Ope
 			out[i] = discovery.OpenJob{ID: r.ID, Fingerprint: r.Fingerprint, Source: r.Source, LastSeen: r.LastSeen}
 		}
 		return nil
+	})
+	return out, err
+}
+
+// Described returns the fingerprints of stored jobs that have a description.
+func (s *Store) Described(ctx context.Context, fingerprints []string) (map[string]bool, error) {
+	out := map[string]bool{}
+	if len(fingerprints) == 0 {
+		return out, nil
+	}
+	err := s.system(ctx, func(qs *q.Queries) error {
+		fps, err := qs.DescribedJobs(ctx, fingerprints)
+		for _, fp := range fps {
+			out[fp] = true
+		}
+		return err
 	})
 	return out, err
 }

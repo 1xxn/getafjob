@@ -35,6 +35,30 @@ func (q *Queries) CloseJob(ctx context.Context, arg CloseJobParams) (CloseJobRow
 	return i, err
 }
 
+const describedJobs = `-- name: DescribedJobs :many
+SELECT fingerprint FROM jobs WHERE fingerprint = ANY($1::text[]) AND description <> ''
+`
+
+func (q *Queries) DescribedJobs(ctx context.Context, fingerprints []string) ([]string, error) {
+	rows, err := q.db.Query(ctx, describedJobs, fingerprints)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []string{}
+	for rows.Next() {
+		var fingerprint string
+		if err := rows.Scan(&fingerprint); err != nil {
+			return nil, err
+		}
+		items = append(items, fingerprint)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const finishRun = `-- name: FinishRun :exec
 UPDATE crawl_runs SET finished_at = $2, stats = $3, errors = $4 WHERE id = $1
 `
@@ -133,13 +157,14 @@ func (q *Queries) InsertSnapshot(ctx context.Context, arg InsertSnapshotParams) 
 }
 
 const jobByFingerprint = `-- name: JobByFingerprint :one
-SELECT id, title, location, content_hash, status, url, alt_urls FROM jobs WHERE fingerprint = $1 FOR UPDATE
+SELECT id, title, location, description, content_hash, status, url, alt_urls FROM jobs WHERE fingerprint = $1 FOR UPDATE
 `
 
 type JobByFingerprintRow struct {
 	ID          int64
 	Title       string
 	Location    string
+	Description string
 	ContentHash string
 	Status      string
 	Url         string
@@ -153,6 +178,7 @@ func (q *Queries) JobByFingerprint(ctx context.Context, fingerprint string) (Job
 		&i.ID,
 		&i.Title,
 		&i.Location,
+		&i.Description,
 		&i.ContentHash,
 		&i.Status,
 		&i.Url,

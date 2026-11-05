@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -198,6 +199,61 @@ func TestCrawl(t *testing.T) {
 	var st discovery.Stats
 	if err := json.Unmarshal(stats, &st); err != nil || st.Changes[discovery.ChangeReopened] != 1 || string(errs) != "{}" {
 		t.Fatalf("run = %s %s (%v)", stats, errs, err)
+	}
+}
+
+type detailed struct {
+	source
+	calls atomic.Int32
+}
+
+func (d *detailed) Details(_ context.Context, p *discovery.Posting) error {
+	d.calls.Add(1)
+	if p.ExternalID == "broken" {
+		return errors.New("http_500")
+	}
+	p.Description = "Details for " + p.Title
+	return nil
+}
+
+func TestCrawlLoadsDetailsOnce(t *testing.T) {
+	pool := dbtest.AppPool(t)
+	ctx := context.Background()
+	svc := discovery.NewService(pgstore.New(pool))
+	list := func() []discovery.Posting {
+		out := []discovery.Posting{
+			posting("arbeitsagentur", "10001", "Musterfirma GmbH", "Go Developer", "Berlin, Deutschland"),
+			posting("arbeitsagentur", "broken", "Beispiel AG", "Data Analyst", "Bonn, Deutschland"),
+		}
+		for i := range out {
+			out[i].Description = ""
+		}
+		return out
+	}
+	src := &detailed{source: source{name: "arbeitsagentur", batch: discovery.Batch{Postings: list()}}}
+
+	rep, err := svc.Crawl(ctx, []discovery.Source{src})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if rep.Stats.Details != 1 || rep.Stats.DetailsFailed != 1 || src.calls.Load() != 2 {
+		t.Fatalf("crawl 1 stats = %+v, calls = %d", rep.Stats, src.calls.Load())
+	}
+
+	src.batch.Postings = list()
+	src.calls.Store(0)
+	rep, err = svc.Crawl(ctx, []discovery.Source{src})
+	if err != nil {
+		t.Fatal(err)
+	}
+	// Only the job without a stored description is asked again; the described one stays unchanged.
+	if src.calls.Load() != 1 || rep.Stats.Changes[discovery.ChangeUnchanged] != 2 {
+		t.Fatalf("crawl 2 stats = %+v, calls = %d", rep.Stats, src.calls.Load())
+	}
+	var desc string
+	if err := pool.QueryRow(ctx, "SELECT description FROM jobs WHERE fingerprint = $1",
+		discovery.Fingerprint("arbeitsagentur", "10001")).Scan(&desc); err != nil || desc != "Details for Go Developer" {
+		t.Fatalf("description = %q (%v)", desc, err)
 	}
 }
 
