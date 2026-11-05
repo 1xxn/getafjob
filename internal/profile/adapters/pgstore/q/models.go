@@ -137,6 +137,14 @@ type Profile struct {
 	UpdatedAt   time.Time
 }
 
+type ProfileItem struct {
+	ID        uuid.UUID
+	UserID    uuid.UUID
+	Kind      string
+	Sealed    []byte
+	UpdatedAt time.Time
+}
+
 type Recovery struct {
 	UserID      uuid.UUID
 	RequestedAt time.Time

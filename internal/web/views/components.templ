@@ -11,6 +11,7 @@ templ Section(title string) {
 // FieldProps describe a labelled input; hint and error are linked with aria-describedby.
 type FieldProps struct {
 	Name         string
+	ID           string // element id; empty: f-<Name>
 	Label        string
 	Type         string
 	Value        string
@@ -23,9 +24,9 @@ type FieldProps struct {
 
 templ Field(f FieldProps) {
 	<div class={ "field", templ.KV("field-invalid", f.Error != "") }>
-		<label for={ "f-" + f.Name }>{ f.Label }</label>
+		<label for={ fieldID(f) }>{ f.Label }</label>
 		<input
-			id={ "f-" + f.Name }
+			id={ fieldID(f) }
 			name={ f.Name }
 			type={ f.Type }
 			value={ f.Value }
@@ -46,10 +47,10 @@ templ Field(f FieldProps) {
 			}
 		/>
 		if f.Hint != "" {
-			<p class="hint" id={ "f-" + f.Name + "-hint" }>{ f.Hint }</p>
+			<p class="hint" id={ fieldID(f) + "-hint" }>{ f.Hint }</p>
 		}
 		if f.Error != "" {
-			<p class="error" id={ "f-" + f.Name + "-error" }>{ f.Error }</p>
+			<p class="error" id={ fieldID(f) + "-error" }>{ f.Error }</p>
 		}
 	</div>
 }
@@ -82,9 +83,9 @@ templ PasskeyNudge() {
 // TextArea is a labelled multi-line field (one item per line where the hint says so).
 templ TextArea(f FieldProps) {
 	<div class={ "field", templ.KV("field-invalid", f.Error != "") }>
-		<label for={ "f-" + f.Name }>{ f.Label }</label>
+		<label for={ fieldID(f) }>{ f.Label }</label>
 		<textarea
-			id={ "f-" + f.Name }
+			id={ fieldID(f) }
 			name={ f.Name }
 			rows="4"
 			if f.MaxLength > 0 {
@@ -98,10 +99,10 @@ templ TextArea(f FieldProps) {
 			}
 		>{ f.Value }</textarea>
 		if f.Hint != "" {
-			<p class="hint" id={ "f-" + f.Name + "-hint" }>{ f.Hint }</p>
+			<p class="hint" id={ fieldID(f) + "-hint" }>{ f.Hint }</p>
 		}
 		if f.Error != "" {
-			<p class="error" id={ "f-" + f.Name + "-error" }>{ f.Error }</p>
+			<p class="error" id={ fieldID(f) + "-error" }>{ f.Error }</p>
 		}
 	</div>
 }

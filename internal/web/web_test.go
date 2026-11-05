@@ -72,7 +72,8 @@ func newApp(t *testing.T) *app {
 	pstore := profilestore.New(pool)
 	profiles := profile.NewService(pstore, env)
 	docs := profile.NewDocuments(pstore, blob.NewSealed(dir, env), env)
-	(&web.Server{Identity: ids, Profile: profiles, Documents: docs, Logger: slog.New(slog.NewTextHandler(io.Discard, nil))}).Register(mux)
+	(&web.Server{Identity: ids, Profile: profiles, Documents: docs, Items: profile.NewItems(pstore, env),
+		Logger: slog.New(slog.NewTextHandler(io.Discard, nil))}).Register(mux)
 	return &app{t: t, h: httpx.Protect(mux, 1<<20, true, httpx.Upload{Path: "/documents", Max: web.MaxUpload}), ids: ids, mail: mb}
 }
 
@@ -605,5 +606,52 @@ func TestDocumentPages(t *testing.T) {
 	}
 	if rec := a.do(http.MethodPost, "/documents/"+id+"/delete", url.Values{}, session, nil); rec.Code != http.StatusOK || !strings.Contains(rec.Body.String(), "Document removed") {
 		t.Errorf("delete: %d", rec.Code)
+	}
+}
+
+func TestAnswersAndTexts(t *testing.T) {
+	a := newApp(t)
+	session := signedIn(t, a)
+	if rec := a.do(http.MethodPost, "/answers", url.Values{"question": {"Why us? *"}, "answer": {"Because of the product."}}, session, nil); rec.Code != http.StatusSeeOther {
+		t.Fatalf("add answer %d", rec.Code)
+	}
+	page := a.do(http.MethodGet, "/answers?saved=1", nil, session, nil).Body.String()
+	i := strings.Index(page, `action="/answers/`)
+	if i < 0 || !strings.Contains(page, "Because of the product.") {
+		t.Fatalf("answers page: %s", page)
+	}
+	id := page[i+len(`action="/answers/`) : i+len(`action="/answers/`)+36]
+	if rec := a.do(http.MethodPost, "/answers", url.Values{"question": {"Why us?"}, "answer": {""}}, session, nil); rec.Code != http.StatusUnprocessableEntity ||
+		!strings.Contains(rec.Body.String(), `value="Why us?"`) {
+		t.Fatalf("empty answer %d", rec.Code)
+	}
+	if rec := a.do(http.MethodPost, "/answers/"+id, url.Values{"question": {"Why us?"}, "answer": {"Changed."}}, session, nil); rec.Code != http.StatusSeeOther {
+		t.Fatalf("edit %d", rec.Code)
+	}
+	if body := a.do(http.MethodGet, "/answers", nil, session, nil).Body.String(); !strings.Contains(body, "Changed.") || strings.Count(body, `action="/answers/`) != 2 {
+		t.Fatalf("after edit: %s", body)
+	}
+
+	if rec := a.do(http.MethodPost, "/texts", url.Values{"name": {"Intro"}, "language": {"en"}, "body": {"Dear {company} team"}}, session, nil); rec.Code != http.StatusSeeOther {
+		t.Fatalf("add text %d", rec.Code)
+	}
+	rec := a.do(http.MethodPost, "/texts", url.Values{"name": {"Typo"}, "body": {"Hi {employer}"}}, session, nil)
+	if rec.Code != http.StatusUnprocessableEntity || !strings.Contains(rec.Body.String(), "Unknown placeholder") {
+		t.Fatalf("typo %d", rec.Code)
+	}
+	if body := a.do(http.MethodGet, "/texts", nil, session, nil).Body.String(); !strings.Contains(body, "Dear {company} team") || !strings.Contains(body, "{job_title}") {
+		t.Fatalf("texts page: %s", body)
+	}
+
+	link, _, _ := a.ids.Invite(t.Context(), identity.InviteRequest{Email: "erika.mustermann@example.com", Role: identity.RoleUser})
+	erika := sessionFrom(t, a.do(http.MethodPost, strings.TrimPrefix(link, "https://jobs.example.org"), url.Values{"name": {"Erika"}, "locale": {"en"}}, "", nil))
+	if rec := a.do(http.MethodPost, "/answers/"+id+"/delete", url.Values{}, erika, nil); rec.Code != http.StatusNotFound {
+		t.Errorf("erika deletes max's answer: %d", rec.Code)
+	}
+	if body := a.do(http.MethodGet, "/answers", nil, erika, nil).Body.String(); strings.Contains(body, "Changed.") {
+		t.Error("erika sees max's answers")
+	}
+	if rec := a.do(http.MethodPost, "/answers/"+id+"/delete", url.Values{}, session, nil); rec.Code != http.StatusSeeOther {
+		t.Errorf("delete %d", rec.Code)
 	}
 }

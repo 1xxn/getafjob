@@ -69,7 +69,7 @@ func serve(ctx context.Context, cfg config.Config, logger *slog.Logger) error {
 	}
 	pstore := profilestore.New(pool)
 	(&web.Server{Identity: ids, Logger: logger, Profile: profile.NewService(pstore, env),
-		Documents: profile.NewDocuments(pstore, blob.NewSealed(files, env), env)}).Register(mux)
+		Documents: profile.NewDocuments(pstore, blob.NewSealed(files, env), env), Items: profile.NewItems(pstore, env)}).Register(mux)
 
 	h := httpx.Instrument(httpx.Protect(httpx.Routes(mux), maxBody, cfg.PublicURL.Scheme == "https",
 		httpx.Upload{Path: "/documents", Max: web.MaxUpload}))

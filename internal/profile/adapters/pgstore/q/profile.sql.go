@@ -23,6 +23,22 @@ func (q *Queries) CountDocuments(ctx context.Context, userID uuid.UUID) (int64, 
 	return count, err
 }
 
+const countItems = `-- name: CountItems :one
+SELECT count(*) FROM profile_items WHERE user_id = $1 AND kind = $2
+`
+
+type CountItemsParams struct {
+	UserID uuid.UUID
+	Kind   string
+}
+
+func (q *Queries) CountItems(ctx context.Context, arg CountItemsParams) (int64, error) {
+	row := q.db.QueryRow(ctx, countItems, arg.UserID, arg.Kind)
+	var count int64
+	err := row.Scan(&count)
+	return count, err
+}
+
 const deleteDocument = `-- name: DeleteDocument :execrows
 DELETE FROM documents WHERE id = $1 AND user_id = $2
 `
@@ -34,6 +50,24 @@ type DeleteDocumentParams struct {
 
 func (q *Queries) DeleteDocument(ctx context.Context, arg DeleteDocumentParams) (int64, error) {
 	result, err := q.db.Exec(ctx, deleteDocument, arg.ID, arg.UserID)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
+}
+
+const deleteItem = `-- name: DeleteItem :execrows
+DELETE FROM profile_items WHERE id = $1 AND user_id = $2 AND kind = $3
+`
+
+type DeleteItemParams struct {
+	ID     uuid.UUID
+	UserID uuid.UUID
+	Kind   string
+}
+
+func (q *Queries) DeleteItem(ctx context.Context, arg DeleteItemParams) (int64, error) {
+	result, err := q.db.Exec(ctx, deleteItem, arg.ID, arg.UserID, arg.Kind)
 	if err != nil {
 		return 0, err
 	}
@@ -112,6 +146,29 @@ func (q *Queries) InsertDocument(ctx context.Context, arg InsertDocumentParams) 
 	return err
 }
 
+const insertItem = `-- name: InsertItem :exec
+INSERT INTO profile_items (id, user_id, kind, sealed, updated_at) VALUES ($1, $2, $3, $4, $5)
+`
+
+type InsertItemParams struct {
+	ID        uuid.UUID
+	UserID    uuid.UUID
+	Kind      string
+	Sealed    []byte
+	UpdatedAt time.Time
+}
+
+func (q *Queries) InsertItem(ctx context.Context, arg InsertItemParams) error {
+	_, err := q.db.Exec(ctx, insertItem,
+		arg.ID,
+		arg.UserID,
+		arg.Kind,
+		arg.Sealed,
+		arg.UpdatedAt,
+	)
+	return err
+}
+
 const listDocuments = `-- name: ListDocuments :many
 SELECT id, kind, sealed_name, mime, size, label, language, focus, created_at FROM documents
 WHERE user_id = $1 ORDER BY created_at, id
@@ -149,6 +206,41 @@ func (q *Queries) ListDocuments(ctx context.Context, userID uuid.UUID) ([]ListDo
 			&i.Focus,
 			&i.CreatedAt,
 		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const listItems = `-- name: ListItems :many
+SELECT id, sealed, updated_at FROM profile_items WHERE user_id = $1 AND kind = $2 ORDER BY id
+`
+
+type ListItemsParams struct {
+	UserID uuid.UUID
+	Kind   string
+}
+
+type ListItemsRow struct {
+	ID        uuid.UUID
+	Sealed    []byte
+	UpdatedAt time.Time
+}
+
+func (q *Queries) ListItems(ctx context.Context, arg ListItemsParams) ([]ListItemsRow, error) {
+	rows, err := q.db.Query(ctx, listItems, arg.UserID, arg.Kind)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []ListItemsRow{}
+	for rows.Next() {
+		var i ListItemsRow
+		if err := rows.Scan(&i.ID, &i.Sealed, &i.UpdatedAt); err != nil {
 			return nil, err
 		}
 		items = append(items, i)
@@ -219,6 +311,32 @@ func (q *Queries) SaveProfile(ctx context.Context, arg SaveProfileParams) (int64
 		arg.Sealed,
 		arg.UpdatedAt,
 		arg.Version,
+	)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
+}
+
+const updateItem = `-- name: UpdateItem :execrows
+UPDATE profile_items SET sealed = $4, updated_at = $5 WHERE id = $1 AND user_id = $2 AND kind = $3
+`
+
+type UpdateItemParams struct {
+	ID        uuid.UUID
+	UserID    uuid.UUID
+	Kind      string
+	Sealed    []byte
+	UpdatedAt time.Time
+}
+
+func (q *Queries) UpdateItem(ctx context.Context, arg UpdateItemParams) (int64, error) {
+	result, err := q.db.Exec(ctx, updateItem,
+		arg.ID,
+		arg.UserID,
+		arg.Kind,
+		arg.Sealed,
+		arg.UpdatedAt,
 	)
 	if err != nil {
 		return 0, err

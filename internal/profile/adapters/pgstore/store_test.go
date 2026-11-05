@@ -29,13 +29,18 @@ func user(t *testing.T, pool *pgxpool.Pool, email string) uuid.UUID {
 	return id
 }
 
-func service(t *testing.T, pool *pgxpool.Pool) *profile.Service {
+func sealer(t *testing.T, pool *pgxpool.Pool) *crypto.Envelope {
 	t.Helper()
 	ring, err := crypto.NewKeyring(config.Secret(base64.RawURLEncoding.EncodeToString(bytes.Repeat([]byte{3}, 32))), "")
 	if err != nil {
 		t.Fatal(err)
 	}
-	return profile.NewService(pgstore.New(pool), crypto.NewEnvelope(ring, pool))
+	return crypto.NewEnvelope(ring, pool)
+}
+
+func service(t *testing.T, pool *pgxpool.Pool) *profile.Service {
+	t.Helper()
+	return profile.NewService(pgstore.New(pool), sealer(t, pool))
 }
 
 func TestProfileRoundTrip(t *testing.T) {

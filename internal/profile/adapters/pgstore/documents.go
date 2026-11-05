@@ -94,3 +94,54 @@ func (s *Store) DeleteDocument(ctx context.Context, userID, id uuid.UUID) (ok bo
 	})
 	return ok, err
 }
+
+var _ profile.ItemStore = (*Store)(nil)
+
+// Items lists the user's answers or text blocks.
+func (s *Store) Items(ctx context.Context, userID uuid.UUID, kind string) (out []profile.StoredItem, err error) {
+	err = s.user(ctx, userID, func(qs *q.Queries) error {
+		rows, err := qs.ListItems(ctx, q.ListItemsParams{UserID: userID, Kind: kind})
+		for _, r := range rows {
+			out = append(out, profile.StoredItem{ID: r.ID, Sealed: r.Sealed, UpdatedAt: r.UpdatedAt})
+		}
+		return err
+	})
+	return out, err
+}
+
+// CountItems counts the user's answers or text blocks.
+func (s *Store) CountItems(ctx context.Context, userID uuid.UUID, kind string) (n int, err error) {
+	err = s.user(ctx, userID, func(qs *q.Queries) error {
+		c, err := qs.CountItems(ctx, q.CountItemsParams{UserID: userID, Kind: kind})
+		n = int(c)
+		return err
+	})
+	return n, err
+}
+
+// InsertItem stores a new item.
+func (s *Store) InsertItem(ctx context.Context, userID uuid.UUID, kind string, it profile.StoredItem) error {
+	return s.user(ctx, userID, func(qs *q.Queries) error {
+		return qs.InsertItem(ctx, q.InsertItemParams{ID: it.ID, UserID: userID, Kind: kind, Sealed: it.Sealed, UpdatedAt: it.UpdatedAt})
+	})
+}
+
+// UpdateItem replaces an item of the user.
+func (s *Store) UpdateItem(ctx context.Context, userID uuid.UUID, kind string, it profile.StoredItem) (ok bool, err error) {
+	err = s.user(ctx, userID, func(qs *q.Queries) error {
+		n, err := qs.UpdateItem(ctx, q.UpdateItemParams{ID: it.ID, UserID: userID, Kind: kind, Sealed: it.Sealed, UpdatedAt: it.UpdatedAt})
+		ok = n == 1
+		return err
+	})
+	return ok, err
+}
+
+// DeleteItem removes an item of the user.
+func (s *Store) DeleteItem(ctx context.Context, userID uuid.UUID, kind string, id uuid.UUID) (ok bool, err error) {
+	err = s.user(ctx, userID, func(qs *q.Queries) error {
+		n, err := qs.DeleteItem(ctx, q.DeleteItemParams{ID: id, UserID: userID, Kind: kind})
+		ok = n == 1
+		return err
+	})
+	return ok, err
+}

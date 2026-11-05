@@ -1,0 +1,74 @@
+package views
+
+import "strings"
+
+// AnswerRow is one saved answer.
+type AnswerRow struct {
+	ID, Question, Answer string
+}
+
+// TextRow is one text block.
+type TextRow struct {
+	ID, Name, Language, Body string
+}
+
+templ AnswersPage(name string, f Form, answers []AnswerRow) {
+	@Layout(Page{Title: T(ctx, "answers.title"), UserName: name}) {
+		@Section(T(ctx, "answers.title")) {
+			<p class="muted">{ T(ctx, "answers.text") }</p>
+			@formNotice(f)
+			<form method="post" action="/answers" class="stack">
+				<h2>{ T(ctx, "answers.add") }</h2>
+				@Field(FieldProps{Name: "question", Label: T(ctx, "answers.question"), Type: "text", Value: f.Values["question"],
+					Error: f.Errors["question"], Hint: T(ctx, "answers.question_hint"), MaxLength: 300})
+				@TextArea(FieldProps{Name: "answer", Label: T(ctx, "answers.answer"), Value: f.Values["answer"], Error: f.Errors["answer"], MaxLength: 5000})
+				<button type="submit" class="primary">{ T(ctx, "answers.save") }</button>
+			</form>
+			for _, a := range answers {
+				<form method="post" action={ templ.SafeURL("/answers/" + a.ID) } class="stack form-section">
+					@Field(FieldProps{Name: "question", ID: "f-question-" + a.ID, Label: T(ctx, "answers.question"), Type: "text", Value: a.Question, MaxLength: 300})
+					@TextArea(FieldProps{Name: "answer", ID: "f-answer-" + a.ID, Label: T(ctx, "answers.answer"), Value: a.Answer, MaxLength: 5000})
+					<button type="submit">{ T(ctx, "profile.save") }</button>
+					<button type="submit" class="link" formaction={ templ.SafeURL("/answers/" + a.ID + "/delete") }>{ T(ctx, "passkey.remove") }</button>
+				</form>
+			}
+		}
+	}
+}
+
+templ languageSelect(id, value string) {
+	<div class="field">
+		<label for={ "f-language-" + id }>{ T(ctx, "documents.language") }</label>
+		<select id={ "f-language-" + id } name="language">
+			for _, l := range []string{"", "en", "de"} {
+				<option value={ l } selected?={ value == l }>{ T(ctx, "documents.language." + or(l, "any")) }</option>
+			}
+		</select>
+	</div>
+}
+
+templ TextsPage(name string, f Form, texts []TextRow, placeholders []string) {
+	@Layout(Page{Title: T(ctx, "texts.title"), UserName: name}) {
+		@Section(T(ctx, "texts.title")) {
+			<p class="muted">{ T(ctx, "texts.text") }</p>
+			<p class="muted">{ T(ctx, "texts.placeholders", "list", "{" + strings.Join(placeholders, "}, {") + "}") }</p>
+			@formNotice(f)
+			<form method="post" action="/texts" class="stack">
+				<h2>{ T(ctx, "texts.add") }</h2>
+				@Field(FieldProps{Name: "name", Label: T(ctx, "texts.name"), Type: "text", Value: f.Values["name"], Error: f.Errors["name"], MaxLength: 100})
+				@languageSelect("new", f.Values["language"])
+				@TextArea(FieldProps{Name: "body", Label: T(ctx, "texts.body"), Value: f.Values["body"], Error: f.Errors["body"], MaxLength: 20000})
+				<button type="submit" class="primary">{ T(ctx, "answers.save") }</button>
+			</form>
+			for _, t := range texts {
+				<form method="post" action={ templ.SafeURL("/texts/" + t.ID) } class="stack form-section">
+					@Field(FieldProps{Name: "name", ID: "f-name-" + t.ID, Label: T(ctx, "texts.name"), Type: "text", Value: t.Name, MaxLength: 100})
+					@languageSelect(t.ID, t.Language)
+					@TextArea(FieldProps{Name: "body", ID: "f-body-" + t.ID, Label: T(ctx, "texts.body"), Value: t.Body, MaxLength: 20000})
+					<button type="submit">{ T(ctx, "profile.save") }</button>
+					<button type="submit" class="link" formaction={ templ.SafeURL("/texts/" + t.ID + "/delete") }>{ T(ctx, "passkey.remove") }</button>
+				</form>
+			}
+		}
+	}
+}

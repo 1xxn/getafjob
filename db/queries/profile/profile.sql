@@ -31,3 +31,18 @@ UPDATE documents SET label = $3, language = $4, focus = $5 WHERE id = $1 AND use
 
 -- name: DeleteDocument :execrows
 DELETE FROM documents WHERE id = $1 AND user_id = $2;
+
+-- name: ListItems :many
+SELECT id, sealed, updated_at FROM profile_items WHERE user_id = $1 AND kind = $2 ORDER BY id;
+
+-- name: CountItems :one
+SELECT count(*) FROM profile_items WHERE user_id = $1 AND kind = $2;
+
+-- name: InsertItem :exec
+INSERT INTO profile_items (id, user_id, kind, sealed, updated_at) VALUES ($1, $2, $3, $4, $5);
+
+-- name: UpdateItem :execrows
+UPDATE profile_items SET sealed = $4, updated_at = $5 WHERE id = $1 AND user_id = $2 AND kind = $3;
+
+-- name: DeleteItem :execrows
+DELETE FROM profile_items WHERE id = $1 AND user_id = $2 AND kind = $3;
