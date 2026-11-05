@@ -52,6 +52,10 @@ type Config struct {
 	// MasterKey wraps the users' data keys (32 bytes, base64url); MasterKeyOld is the previous one during a
 	// rotation (admin rotate-master-key).
 	MasterKey, MasterKeyOld Secret
+	// BlobURL names the file store: file:///var/lib/getafjob/blobs or s3://bucket/prefix?endpoint=…&region=….
+	// BlobAccessKey and BlobSecretKey are the S3 credentials.
+	BlobURL                      string
+	BlobAccessKey, BlobSecretKey Secret
 	// SMTPURL is the mail server (smtps://user:pass@host:465, smtp://…:587 with STARTTLS). Empty: no mail.
 	SMTPURL Secret
 	// MailFrom is the sender address of all mail.
@@ -104,6 +108,9 @@ var specs = []spec{
 	{"OTEL_ENDPOINT", "", setOTelEndpoint},
 	{"MASTER_KEY", "", func(c *Config, v string) error { return setKey(&c.MasterKey, v) }},
 	{"MASTER_KEY_OLD", "", func(c *Config, v string) error { return setKey(&c.MasterKeyOld, v) }},
+	{"BLOB_URL", "", setBlobURL},
+	{"BLOB_ACCESS_KEY", "", func(c *Config, v string) error { c.BlobAccessKey = Secret(v); return nil }},
+	{"BLOB_SECRET_KEY", "", func(c *Config, v string) error { c.BlobSecretKey = Secret(v); return nil }},
 	{"SHUTDOWN_TIMEOUT", "20s", setShutdownTimeout},
 	{"SMTP_URL", "", func(c *Config, v string) error { c.SMTPURL = Secret(v); return nil }},
 	{"MAIL_FROM", "getafjob@localhost", setMailFrom},
@@ -300,6 +307,7 @@ func (c Config) LogValue() slog.Value {
 		slog.Bool("smtp_configured", c.SMTPURL != ""),
 		slog.Bool("master_key_set", c.MasterKey != ""),
 		slog.Bool("old_master_key_set", c.MasterKeyOld != ""),
+		slog.String("blob_store", blobScheme(c.BlobURL)),
 		slog.Duration("shutdown_timeout", c.ShutdownTimeout),
 	)
 }
@@ -334,4 +342,22 @@ func setKey(dst *Secret, v string) error {
 	}
 	*dst = Secret(v)
 	return nil
+}
+
+func setBlobURL(c *Config, v string) error {
+	if v == "" {
+		return nil
+	}
+	u, err := url.Parse(v)
+	if err != nil || (u.Scheme != "file" && u.Scheme != "s3") || u.User != nil {
+		return errors.New("must be file:///path or s3://bucket/prefix?endpoint=…, without credentials")
+	}
+	c.BlobURL = v
+	return nil
+}
+
+// blobScheme logs only the kind of store.
+func blobScheme(v string) string {
+	scheme, _, _ := strings.Cut(v, ":")
+	return scheme
 }
