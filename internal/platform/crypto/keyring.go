@@ -134,8 +134,17 @@ func newAEAD(key []byte) (cipher.AEAD, error) {
 	return cipher.NewGCM(block)
 }
 
+// MaxPlaintext bounds what one call seals (the largest blob plus room); more is a caller bug.
+const MaxPlaintext = 128 << 20
+
+// ErrTooLarge reports a plaintext above MaxPlaintext.
+var ErrTooLarge = errors.New("plaintext too large")
+
 // seal returns version || nonce || ciphertext.
 func seal(a cipher.AEAD, plaintext, aad []byte) ([]byte, error) {
+	if len(plaintext) > MaxPlaintext {
+		return nil, ErrTooLarge
+	}
 	nonce := make([]byte, a.NonceSize())
 	if _, err := rand.Read(nonce); err != nil {
 		return nil, err

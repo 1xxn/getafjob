@@ -153,3 +153,12 @@ func FuzzOpen(f *testing.F) {
 		}
 	})
 }
+
+func TestSealRefusesHugePlaintext(t *testing.T) {
+	if _, err := crypto.SealForTest(make([]byte, crypto.MaxPlaintext+1)); !errors.Is(err, crypto.ErrTooLarge) {
+		t.Fatalf("err = %v", err)
+	}
+	if _, err := crypto.SealForTest(make([]byte, 1024)); err != nil {
+		t.Fatal(err)
+	}
+}
