@@ -1,0 +1,34 @@
+{
+  "complete": true,
+  "postings": [
+    {
+      "Source": "personio:musterhaus",
+      "ExternalID": "1200001",
+      "Company": "Musterhaus GmbH",
+      "Title": "Fullstack Entwickler (w/m/d)",
+      "Location": "Leipzig; Dresden",
+      "URL": "https://musterhaus.jobs.personio.de/job/1200001",
+      "ApplyURL": "",
+      "Description": "Deine Aufgaben\n• Features bauen\n\n• Code reviewen\n\nDein Profil\nErfahrung mit TypeScript \u0026 Go",
+      "Posted": "2026-10-15",
+      "Workplace": "",
+      "Extra": {
+        "seniority": "experienced",
+        "years": "2-5"
+      }
+    },
+    {
+      "Source": "personio:musterhaus",
+      "ExternalID": "1200002",
+      "Company": "Musterhaus",
+      "Title": "Werkstudent Marketing",
+      "Location": "Leipzig",
+      "URL": "https://musterhaus.jobs.personio.de/job/1200002",
+      "ApplyURL": "",
+      "Description": "",
+      "Posted": "2026-10-01",
+      "Workplace": "",
+      "Extra": null
+    }
+  ]
+}

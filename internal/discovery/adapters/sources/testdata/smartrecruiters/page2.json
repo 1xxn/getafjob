@@ -1,0 +1,20 @@
+{
+  "offset": 2,
+  "limit": 100,
+  "totalFound": 3,
+  "content": [
+    {
+      "id": "744000000000003",
+      "name": "Cloud Engineer",
+      "releasedDate": "2026-11-01T08:00:00.000Z",
+      "company": {
+        "name": "Musterwerk GmbH"
+      },
+      "location": {
+        "city": "Remote",
+        "country": "de",
+        "remote": true
+      }
+    }
+  ]
+}

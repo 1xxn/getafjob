@@ -1,0 +1,31 @@
+{
+  "complete": true,
+  "postings": [
+    {
+      "Source": "recruitee:beispielbau",
+      "ExternalID": "2300001",
+      "Company": "Beispielbau GmbH",
+      "Title": "Bauleiter Hochbau",
+      "Location": "Hannover, Germany",
+      "URL": "https://beispielbau.recruitee.com/o/bauleiter-hochbau",
+      "ApplyURL": "https://beispielbau.recruitee.com/o/bauleiter-hochbau/c/new",
+      "Description": "Baustellen leiten.\n\n• Bauingenieur",
+      "Posted": "2026-10-25",
+      "Workplace": "hybrid",
+      "Extra": null
+    },
+    {
+      "Source": "recruitee:beispielbau",
+      "ExternalID": "2300003",
+      "Company": "Beispielbau",
+      "Title": "Kalkulator",
+      "Location": "Remote",
+      "URL": "https://beispielbau.recruitee.com/o/kalkulator",
+      "ApplyURL": "",
+      "Description": "Zahlen.",
+      "Posted": "2026-11-02",
+      "Workplace": "remote",
+      "Extra": null
+    }
+  ]
+}

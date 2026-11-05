@@ -35,7 +35,7 @@ This document grows with every module.
 | T5 | Script injection through user-controlled text | 1 | templ escapes all output; CSP without inline scripts | `TestInvitationAndSignOut` |
 | T2 | Page tricks the engine into a wrong field or domain | 5 | Provenance, field/domain checks, page content is data | Phase 2 |
 | T3 | Tampered images or binaries | 6 | Pinned actions/tools, cosign signatures, provenance, SBOM | CI |
-| T6 | Hostile source data poisons the job index or merges unrelated jobs | 1 | Descriptions reduced to plain text (`htmltext`), length checks, a job board never replaces a company board, no cross-source match without a company, a failing source closes nothing | `FuzzText`, `TestCrawl`, `TestShouldClose` |
+| T6 | Hostile source data poisons the job index or merges unrelated jobs | 1 | Descriptions reduced to plain text (`htmltext`), length checks, board slugs checked before they become host names or paths (`TestFromBoardRejectsUnsafeSlugs`), a job board never replaces a company board, no cross-source match without a company, a failing source closes nothing | `FuzzText`, `FuzzSources`, `TestCrawl`, `TestShouldClose` |
 | R1 | User disputes an application | n/a | Evidence: values + sources, screenshot, confirmation, timeline; audit log | Phase 2 |
 | R2 | Security events cannot be traced or are altered | 4 | Append-only audit log (codes and params, no personal data) | `TestAuditEventsAreAppendOnly`, `TestAuditLogHasNoPersonalData` |
 | I1 | User reads another user's data | 4 | RLS for the application role `getafjob_app` (no bypass), tenant set per transaction ([0006](adr/0006-tenant-isolation-rls-and-envelope-encryption.md)) | `TestTenantSeparation`, `TestAppRoleCannotBypassRLS` |
@@ -47,7 +47,7 @@ This document grows with every module.
 | D1 | Slowloris / huge bodies | 1 | Server timeouts, header and body limits | `httpx.NewServer`, `TestProtect…` |
 | D3 | Guessing or flooding on sign-in endpoints | 1 | Rate limit per client address (burst 10, then one request per 6 s); pages are `no-store` | `TestSignInIsRateLimited` |
 | D2 | Hostile page exhausts the runner | 2/3 | Per-run limits, memory/pids limits, browser restarted per run | Phase 2 |
-| D4 | Huge or endless source responses | 1 | Input caps (`htmltext.MaxInput`), bounded fetch parallelism; per-source timeouts and body limits in the source adapters | `TestTextCapsInput`, #18 |
+| D4 | Huge or endless source responses | 1 | Body cap (`sources.MaxBody`), request timeouts, page caps per source, bounded fetch and detail parallelism, at most 3 attempts with backoff and `Retry-After` up to 30 s | `TestPagingIsBounded`, `TestClientErrors`, `FuzzSources` |
 | E1 | Browser exploit escapes to the host | 2 | Chromium sandbox on (seccomp profile), site isolation, non-root, read-only rootfs, `cap_drop: ALL`, no DB access | `TestRendererRunsInItsOwnNamespaces`, `TestLaunchKeepsSandboxAndSiteIsolation` |
 | E2 | Compromised runner reaches data | 2 | Runner has no database access, depguard rule | `.golangci.yml` |
 | E3 | Malicious workflow change escalates | 6 | `permissions: {}`, read-only default token, SHA pinning enforced, zizmor, ruleset | CI, repository settings |

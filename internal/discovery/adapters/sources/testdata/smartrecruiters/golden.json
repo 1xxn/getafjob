@@ -1,0 +1,44 @@
+{
+  "complete": true,
+  "postings": [
+    {
+      "Source": "smartrecruiters:Musterwerk",
+      "ExternalID": "744000000000001",
+      "Company": "Musterwerk GmbH",
+      "Title": "Elektroniker (m/w/d)",
+      "Location": "Stuttgart, Baden-Württemberg, Germany",
+      "URL": "https://jobs.smartrecruiters.com/Musterwerk/744000000000001",
+      "ApplyURL": "https://jobs.smartrecruiters.com/Musterwerk/744000000000001-elektroniker?oga=true",
+      "Description": "Company\nMusterwerk builds machines.\n\nJob\n• Wire things\n\nProfile\nTraining as an electrician",
+      "Posted": "2026-10-30",
+      "Workplace": "",
+      "Extra": null
+    },
+    {
+      "Source": "smartrecruiters:Musterwerk",
+      "ExternalID": "744000000000002",
+      "Company": "Musterwerk GmbH",
+      "Title": "IT Administrator",
+      "Location": "Ulm, de",
+      "URL": "https://jobs.smartrecruiters.com/Musterwerk/744000000000002",
+      "ApplyURL": "",
+      "Description": "Job\nRun the IT.",
+      "Posted": "2026-10-31",
+      "Workplace": "hybrid",
+      "Extra": null
+    },
+    {
+      "Source": "smartrecruiters:Musterwerk",
+      "ExternalID": "744000000000003",
+      "Company": "Musterwerk GmbH",
+      "Title": "Cloud Engineer",
+      "Location": "Remote, de",
+      "URL": "https://jobs.smartrecruiters.com/Musterwerk/744000000000003",
+      "ApplyURL": "https://jobs.smartrecruiters.com/Musterwerk/744000000000001-elektroniker?oga=true",
+      "Description": "Company\nMusterwerk builds machines.\n\nJob\n• Wire things\n\nProfile\nTraining as an electrician",
+      "Posted": "2026-11-01",
+      "Workplace": "remote",
+      "Extra": null
+    }
+  ]
+}

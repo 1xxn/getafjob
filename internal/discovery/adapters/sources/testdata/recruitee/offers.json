@@ -1,0 +1,36 @@
+{
+  "offers": [
+    {
+      "id": 2300001,
+      "status": "published",
+      "title": "Bauleiter Hochbau",
+      "company_name": "Beispielbau GmbH",
+      "city": "Hannover",
+      "country": "Germany",
+      "location": "Hannover, Germany",
+      "careers_url": "https://beispielbau.recruitee.com/o/bauleiter-hochbau",
+      "careers_apply_url": "https://beispielbau.recruitee.com/o/bauleiter-hochbau/c/new",
+      "description": "<p>Baustellen leiten.</p>",
+      "requirements": "<ul><li>Bauingenieur</li></ul>",
+      "published_at": "2026-10-25 08:00:00 UTC",
+      "remote": false,
+      "hybrid": true
+    },
+    {
+      "id": 2300002,
+      "status": "draft",
+      "title": "Draft",
+      "careers_url": "https://beispielbau.recruitee.com/o/draft"
+    },
+    {
+      "id": 2300003,
+      "status": "published",
+      "title": "Kalkulator",
+      "location": "Remote",
+      "careers_url": "https://beispielbau.recruitee.com/o/kalkulator",
+      "description": "Zahlen.",
+      "published_at": "2026-11-02 08:00:00 UTC",
+      "remote": true
+    }
+  ]
+}

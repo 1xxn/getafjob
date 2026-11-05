@@ -1,0 +1,38 @@
+{
+  "ergebnisliste": [
+    {
+      "referenznummer": "12345-1000000001-S",
+      "firma": "Musterfirma GmbH",
+      "stellenangebotsTitel": "Softwareentwickler Java (m/w/d)",
+      "stellenlokationen": [
+        {
+          "adresse": {
+            "ort": "Berlin",
+            "plz": "10115"
+          }
+        },
+        {
+          "adresse": {
+            "ort": "Potsdam"
+          }
+        }
+      ],
+      "datumErsteVeroeffentlichung": "2026-10-27"
+    },
+    {
+      "refnr": "12345-1000000002-S",
+      "arbeitgeber": "Beispiel Software AG",
+      "titel": "Softwareentwickler Go",
+      "arbeitsort": {
+        "ort": "Berlin"
+      },
+      "aktuelleVeroeffentlichungsdatum": "2026-10-30"
+    },
+    {
+      "referenznummer": "",
+      "firma": "Ohne Nummer",
+      "stellenangebotsTitel": "Skip me"
+    }
+  ],
+  "maxErgebnisse": 3
+}

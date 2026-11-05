@@ -1,0 +1,35 @@
+{
+  "hits": 3,
+  "jobs": [
+    {
+      "id_icims": "3100001",
+      "id": "3100001",
+      "company_name": "Amazon Web Services EMEA SARL, Niederlassung Deutschland",
+      "title": "Solutions Architect, Startups",
+      "normalized_location": "Berlin, BE, DEU",
+      "location": "DE, BE, Berlin",
+      "city": "Berlin",
+      "job_path": "/en/jobs/3100001/solutions-architect-startups",
+      "description": "Help startups build on the cloud.<br/><br/>Key job responsibilities",
+      "basic_qualifications": "- 5+ years of experience",
+      "preferred_qualifications": "- German and English",
+      "posted_date": "November 2, 2026",
+      "url_next_step": "https://account.amazon.jobs/jobs/3100001/apply"
+    },
+    {
+      "id_icims": "3100002",
+      "company_name": "Amazon Development Center Germany GmbH",
+      "title": "Software Development Engineer",
+      "normalized_location": "",
+      "location": "DE, BE, Berlin",
+      "job_path": "/en/jobs/3100002/software-development-engineer",
+      "description": "Build services.",
+      "posted_date": "October 31, 2026"
+    },
+    {
+      "id_icims": "3100001",
+      "title": "Solutions Architect, Startups",
+      "job_path": "/en/jobs/3100001/solutions-architect-startups"
+    }
+  ]
+}

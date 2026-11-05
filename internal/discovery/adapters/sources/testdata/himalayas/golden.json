@@ -1,0 +1,31 @@
+{
+  "complete": false,
+  "postings": [
+    {
+      "Source": "himalayas",
+      "ExternalID": "https://himalayas.app/companies/muster-cloud/jobs/go-engineer",
+      "Company": "Muster Cloud",
+      "Title": "Go Engineer",
+      "Location": "Remote (Germany, Austria)",
+      "URL": "https://himalayas.app/companies/muster-cloud/jobs/go-engineer",
+      "ApplyURL": "",
+      "Description": "Remote Go work.",
+      "Posted": "2026-11-03",
+      "Workplace": "remote",
+      "Extra": null
+    },
+    {
+      "Source": "himalayas",
+      "ExternalID": "https://himalayas.app/companies/beispiel-io/jobs/sre",
+      "Company": "Beispiel IO",
+      "Title": "SRE",
+      "Location": "Remote (Germany, Worldwide)",
+      "URL": "https://himalayas.app/companies/beispiel-io/jobs/sre",
+      "ApplyURL": "",
+      "Description": "On call.",
+      "Posted": "2026-11-03",
+      "Workplace": "remote",
+      "Extra": null
+    }
+  ]
+}

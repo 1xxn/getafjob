@@ -1,0 +1,31 @@
+{
+  "complete": true,
+  "postings": [
+    {
+      "Source": "lever:musterfirma",
+      "ExternalID": "aa000000-0000-4000-8000-000000000001",
+      "Company": "Musterfirma",
+      "Title": "Data Engineer",
+      "Location": "Köln; Düsseldorf",
+      "URL": "https://jobs.eu.lever.co/musterfirma/aa000000-0000-4000-8000-000000000001",
+      "ApplyURL": "https://jobs.eu.lever.co/musterfirma/aa000000-0000-4000-8000-000000000001/apply",
+      "Description": "Move data around.\n\nWhat you bring\n• SQL\n\n• Python",
+      "Posted": "2026-11-01",
+      "Workplace": "onsite",
+      "Extra": null
+    },
+    {
+      "Source": "lever:musterfirma",
+      "ExternalID": "aa000000-0000-4000-8000-000000000002",
+      "Company": "Musterfirma",
+      "Title": "Engineering Manager",
+      "Location": "Remote",
+      "URL": "https://jobs.eu.lever.co/musterfirma/aa000000-0000-4000-8000-000000000002",
+      "ApplyURL": "",
+      "Description": "",
+      "Posted": "",
+      "Workplace": "remote",
+      "Extra": null
+    }
+  ]
+}

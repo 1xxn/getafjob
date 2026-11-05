@@ -1,0 +1,31 @@
+{
+  "complete": true,
+  "postings": [
+    {
+      "Source": "greenhouse:acme",
+      "ExternalID": "4000001",
+      "Company": "ACME Robotics",
+      "Title": "Backend Engineer (m/w/d)",
+      "Location": "Berlin",
+      "URL": "https://job-boards.greenhouse.io/acme/jobs/4000001",
+      "ApplyURL": "",
+      "Description": "About the role\n\nBuild APIs in Go.\n\n• PostgreSQL\n\n• Kubernetes",
+      "Posted": "2026-10-20",
+      "Workplace": "",
+      "Extra": null
+    },
+    {
+      "Source": "greenhouse:acme",
+      "ExternalID": "4000002",
+      "Company": "ACME Robotics",
+      "Title": "Site Reliability Engineer",
+      "Location": "Remote; Hamburg, München",
+      "URL": "https://job-boards.greenhouse.io/acme/jobs/4000002",
+      "ApplyURL": "",
+      "Description": "Keep things running.",
+      "Posted": "2026-11-02",
+      "Workplace": "",
+      "Extra": null
+    }
+  ]
+}

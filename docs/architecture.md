@@ -125,7 +125,8 @@ sequenceDiagram
 job-board copy of a company job is counted as a duplicate and a company board that appears later replaces the
 job-board entry (merge, old link kept in `alt_urls`). Every change is a snapshot. A job that a complete source no
 longer lists is closed at once; one from a capped source (search, page limit) after 21 days unseen; a failing source
-closes nothing.
+closes nothing. Sources are applicant tracking systems (one board per company), job boards and the career sites of
+large companies; every request names itself as `getafjob/<version>` and goes through the egress proxy.
 
 **Handoff:** a CAPTCHA, login checkpoint, security code or open question pauses the run; the user gets a Web Push
 and continues in the remote browser (CDP screencast); after the hold time the run is parked.

@@ -1,0 +1,31 @@
+{
+  "complete": false,
+  "postings": [
+    {
+      "Source": "arbeitsagentur",
+      "ExternalID": "12345-1000000001-S",
+      "Company": "Musterfirma GmbH",
+      "Title": "Softwareentwickler Java (m/w/d)",
+      "Location": "Berlin; Potsdam, Deutschland",
+      "URL": "https://www.arbeitsagentur.de/jobsuche/jobdetail/12345-1000000001-S",
+      "ApplyURL": "https://karriere.example.org/jobs/4711",
+      "Description": "Wir suchen Verstärkung.\nIhre Aufgaben: Software bauen.",
+      "Posted": "2026-10-27",
+      "Workplace": "hybrid",
+      "Extra": null
+    },
+    {
+      "Source": "arbeitsagentur",
+      "ExternalID": "12345-1000000002-S",
+      "Company": "Beispiel Software AG",
+      "Title": "Softwareentwickler Go",
+      "Location": "Berlin, Deutschland",
+      "URL": "https://www.arbeitsagentur.de/jobsuche/jobdetail/12345-1000000002-S",
+      "ApplyURL": "https://karriere.example.org/jobs/4711",
+      "Description": "Wir suchen Verstärkung.\nIhre Aufgaben: Software bauen.",
+      "Posted": "2026-10-30",
+      "Workplace": "hybrid",
+      "Extra": null
+    }
+  ]
+}
