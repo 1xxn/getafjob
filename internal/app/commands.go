@@ -19,13 +19,14 @@ const adminUsage = `Usage:
   getafjob admin <command>
 
 Commands:
+  boards         company boards for the crawler (admin boards import | list)
   check-config   validate the configuration (prints variable names, never values)
   env            list all configuration variables
   gen-secret     print 32 random bytes (base64url) for passwords and keys
   invite         create a one-time invitation link (admin invite -email … [-role admin] [-send])
 `
 
-// admin bundles administrative commands. Phase 1 adds "invite".
+// admin bundles administrative commands.
 func admin(ctx context.Context, args []string, env Env) int {
 	if len(args) == 0 {
 		_, _ = fmt.Fprint(env.Stderr, adminUsage)
@@ -50,6 +51,8 @@ func admin(ctx context.Context, args []string, env Env) int {
 		return ExitOK
 	case "invite":
 		return adminInvite(ctx, args[1:], env)
+	case "boards":
+		return adminBoards(ctx, args[1:], env)
 	case "gen-secret":
 		b := make([]byte, 32)
 		_, _ = rand.Read(b) // crypto/rand.Read never returns an error (it crashes instead)

@@ -1,0 +1,19 @@
+{
+  "status": 200,
+  "data": {
+    "count": 3,
+    "positions": [
+      {
+        "id": 1970000000000003,
+        "displayJobId": "100003",
+        "name": "Software Engineer II",
+        "locations": [
+          "Germany, Berlin, Berlin"
+        ],
+        "postedTs": 1793664000,
+        "workLocationOption": "remote",
+        "positionUrl": "/careers/job/1970000000000003"
+      }
+    ]
+  }
+}

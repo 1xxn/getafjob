@@ -1,0 +1,44 @@
+{
+  "complete": true,
+  "postings": [
+    {
+      "Source": "eightfold:example.com",
+      "ExternalID": "1970000000000001",
+      "Company": "Example Software",
+      "Title": "Cloud Solution Architect",
+      "Location": "Germany, Bavaria, Munich",
+      "URL": "https://apply.careers.example.com/careers/job/1970000000000001",
+      "ApplyURL": "",
+      "Description": "Overview\n\nDesign cloud systems.",
+      "Posted": "2026-11-03",
+      "Workplace": "hybrid",
+      "Extra": null
+    },
+    {
+      "Source": "eightfold:example.com",
+      "ExternalID": "1970000000000002",
+      "Company": "Example Software",
+      "Title": "Data Center Technician",
+      "Location": "Germany, Hesse, Frankfurt",
+      "URL": "https://apply.careers.example.com/careers/job/1970000000000002",
+      "ApplyURL": "",
+      "Description": "Overview\n\nDesign cloud systems.",
+      "Posted": "2026-11-03",
+      "Workplace": "onsite",
+      "Extra": null
+    },
+    {
+      "Source": "eightfold:example.com",
+      "ExternalID": "1970000000000003",
+      "Company": "Example Software",
+      "Title": "Software Engineer II",
+      "Location": "Germany, Berlin, Berlin",
+      "URL": "https://apply.careers.example.com/careers/job/1970000000000003",
+      "ApplyURL": "",
+      "Description": "Overview\n\nDesign cloud systems.",
+      "Posted": "2026-11-03",
+      "Workplace": "remote",
+      "Extra": null
+    }
+  ]
+}

@@ -1,0 +1,27 @@
+{
+  "positions": [
+    {
+      "id": 800000000001,
+      "name": "Studio Manager - DACH",
+      "locations": [
+        "Berlin,Germany"
+      ],
+      "t_create": 1793491200,
+      "canonicalPositionUrl": "https://careers.example.org/careers/job/800000000001",
+      "work_location_option": "onsite",
+      "job_description": ""
+    },
+    {
+      "id": 800000000002,
+      "name": "Content Engineer",
+      "locations": [
+        "Remote, Germany"
+      ],
+      "t_create": 1793577600,
+      "canonicalPositionUrl": "",
+      "work_location_option": "remote",
+      "job_description": ""
+    }
+  ],
+  "count": 2
+}

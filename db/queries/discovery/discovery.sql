@@ -55,3 +55,12 @@ RETURNING title, location, content_hash;
 
 -- name: DescribedJobs :many
 SELECT fingerprint FROM jobs WHERE fingerprint = ANY(sqlc.arg(fingerprints)::text[]) AND description <> '';
+
+-- name: UpsertBoard :one
+-- Keeps enabled, origin and crawl state; refreshes name and config.
+INSERT INTO boards (ats, slug, company, config, origin) VALUES ($1, $2, $3, $4, 'admin')
+ON CONFLICT (ats, slug) DO UPDATE SET company = EXCLUDED.company, config = EXCLUDED.config
+RETURNING (xmax = 0)::bool AS inserted;
+
+-- name: EnabledBoards :many
+SELECT id, ats, slug, company, config FROM boards WHERE enabled ORDER BY id;

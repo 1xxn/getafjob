@@ -2,7 +2,10 @@ package sources_test
 
 import (
 	"context"
+	"encoding/json"
+	"fmt"
 	"os"
+	"strings"
 	"testing"
 	"time"
 
@@ -38,6 +41,18 @@ func TestNetwork(t *testing.T) {
 			s := sources.NewArbeitsagentur(c, []string{"Softwareentwickler"}, []string{"Berlin"})
 			s.MaxPages = 1
 			return s
+		},
+		"google": func(*testing.T) discovery.Source { return sources.NewGoogle(c) },
+		"apple": func(*testing.T) discovery.Source {
+			s := sources.NewApple(c, "germany-DEU")
+			s.MaxPages = 2
+			return s
+		},
+		"netflix": func(t *testing.T) discovery.Source {
+			return board(t, c, "eightfold", "netflix.com", "Netflix", `{"host":"explore.jobs.netflix.net","api":"v2","max":100}`)
+		},
+		"microsoft": func(t *testing.T) discovery.Source {
+			return board(t, c, "eightfold", "microsoft.com", "Microsoft", `{"host":"apply.careers.microsoft.com","api":"pcsx","location":"Germany"}`)
 		},
 		"amazon": func(*testing.T) discovery.Source {
 			s := sources.NewAmazon(c, []string{"software"}, "DEU")
@@ -80,5 +95,64 @@ func TestNetwork(t *testing.T) {
 				}
 			}
 		})
+	}
+}
+
+// TestCatalog checks every catalog board against its live API: it must answer; boards without a job in Germany or
+// remote for Germany today are logged. With GETAFJOB_CATALOG_FILE it reports on a candidate list (curation).
+func TestCatalog(t *testing.T) {
+	if os.Getenv("GETAFJOB_NETWORK_TESTS") != "1" {
+		t.Skip("set GETAFJOB_NETWORK_TESTS=1 to read the real APIs")
+	}
+	boards, err := sources.Catalog()
+	if err != nil {
+		t.Fatal(err)
+	}
+	curate := os.Getenv("GETAFJOB_CATALOG_FILE")
+	if curate != "" {
+		b, err := os.ReadFile(curate)
+		if err != nil {
+			t.Fatal(err)
+		}
+		var c struct {
+			Boards []sources.Board `json:"boards"`
+		}
+		if err := json.Unmarshal(b, &c); err != nil {
+			t.Fatal(err)
+		}
+		boards = c.Boards
+	}
+	c := sources.NewClient(netguard.NewClient(netguard.ClientOptions{Timeout: 90 * time.Second}))
+	seen := map[string]bool{}
+	for _, b := range boards {
+		key := b.ATS + ":" + strings.ToLower(b.Slug)
+		if seen[key] {
+			t.Errorf("duplicate board %s", key)
+		}
+		seen[key] = true
+		src, err := sources.FromBoard(c, b)
+		if err != nil {
+			t.Errorf("%s: %v", key, err)
+			continue
+		}
+		ctx, cancel := context.WithTimeout(context.Background(), 2*time.Minute)
+		batch, err := src.Fetch(ctx)
+		cancel()
+		relevant := 0
+		for _, p := range batch.Postings {
+			if discovery.ValidPosting(p) && sources.ForGermany(p) {
+				relevant++
+			}
+		}
+		switch {
+		case curate != "":
+			fmt.Printf("CANDIDATE %-16s %-28s %-24q err=%v total=%d relevant=%d\n", b.ATS, b.Slug, b.Company, err, len(batch.Postings), relevant)
+		case err != nil:
+			t.Errorf("%s (%s): %v", key, b.Company, err)
+		case relevant == 0:
+			// Openings change daily; a board without one today is reported, not failed.
+			t.Logf("%s (%s): no job in Germany or remote among %d today", key, b.Company, len(batch.Postings))
+		}
+		time.Sleep(500 * time.Millisecond)
 	}
 }

@@ -1,0 +1,44 @@
+{
+  "complete": true,
+  "postings": [
+    {
+      "Source": "apple:germany-DEU",
+      "ExternalID": "200000001",
+      "Company": "Apple",
+      "Title": "DE - Specialist",
+      "Location": "Berlin, Germany",
+      "URL": "https://jobs.apple.com/en-us/details/200000001/de-specialist",
+      "ApplyURL": "",
+      "Description": "Help customers with \"Apple\" products.",
+      "Posted": "2026-11-03",
+      "Workplace": "",
+      "Extra": null
+    },
+    {
+      "Source": "apple:germany-DEU",
+      "ExternalID": "200000002",
+      "Company": "Apple",
+      "Title": "Software Engineer, Maps",
+      "Location": "Munich, Germany",
+      "URL": "https://jobs.apple.com/en-us/details/200000002/software-engineer-maps",
+      "ApplyURL": "",
+      "Description": "Help customers with \"Apple\" products.",
+      "Posted": "2026-11-03",
+      "Workplace": "",
+      "Extra": null
+    },
+    {
+      "Source": "apple:germany-DEU",
+      "ExternalID": "200000003",
+      "Company": "Apple",
+      "Title": "Remote Support Advisor",
+      "Location": "Germany",
+      "URL": "https://jobs.apple.com/en-us/details/200000003/remote-support-advisor",
+      "ApplyURL": "",
+      "Description": "Help customers with \"Apple\" products.",
+      "Posted": "2026-11-03",
+      "Workplace": "remote",
+      "Extra": null
+    }
+  ]
+}

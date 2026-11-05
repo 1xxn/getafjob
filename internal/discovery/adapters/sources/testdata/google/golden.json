@@ -1,0 +1,31 @@
+{
+  "complete": true,
+  "postings": [
+    {
+      "Source": "google",
+      "ExternalID": "90000000000000001",
+      "Company": "Google",
+      "Title": "Software Engineer, Cloud Storage",
+      "Location": "Munich, Bavaria, Germany; Berlin, Germany",
+      "URL": "https://careers.google.com/jobs/results/90000000000000001-software-engineer/",
+      "ApplyURL": "",
+      "Description": "Minimum qualifications:\n\n• Bachelor's degree",
+      "Posted": "2026-10-20",
+      "Workplace": "hybrid",
+      "Extra": null
+    },
+    {
+      "Source": "google",
+      "ExternalID": "90000000000000002",
+      "Company": "DeepMind",
+      "Title": "Research Engineer",
+      "Location": "Germany",
+      "URL": "https://careers.google.com/jobs/results/90000000000000002-research-engineer/",
+      "ApplyURL": "",
+      "Description": "Work on models.",
+      "Posted": "2026-11-01",
+      "Workplace": "remote",
+      "Extra": null
+    }
+  ]
+}

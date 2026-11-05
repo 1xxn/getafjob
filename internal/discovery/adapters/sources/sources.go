@@ -14,10 +14,10 @@ import (
 
 // Board is a company board of an applicant tracking system, as stored in the boards table.
 type Board struct {
-	ATS     string
-	Slug    string
-	Company string // display name; empty: from the API or the slug
-	Config  json.RawMessage
+	ATS     string          `json:"ats"`
+	Slug    string          `json:"slug"`
+	Company string          `json:"company,omitempty"` // display name; empty: from the API or the slug
+	Config  json.RawMessage `json:"config,omitempty"`
 }
 
 // ErrBadBoard reports a board that cannot be crawled (unknown system, unsafe slug, missing config).
@@ -28,6 +28,8 @@ var (
 	hostLabel = regexp.MustCompile(`^[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?$`)
 	// pathSlug is a slug that becomes one path segment.
 	pathSlug = regexp.MustCompile(`^[A-Za-z0-9][A-Za-z0-9._-]{0,99}$`)
+	// hostName is a public DNS name (Eightfold sites run on company domains).
+	hostName = regexp.MustCompile(`^([a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z]{2,63}$`)
 	// workdayHost limits Workday sites to Workday's own domains.
 	workdayHost = regexp.MustCompile(`^[a-z0-9-]{1,63}\.wd[0-9]{1,3}\.(myworkdayjobs|myworkdaysite)\.com$`)
 )
@@ -40,6 +42,11 @@ func FromBoard(c *Client, b Board) (discovery.Source, error) {
 	case "personio", "recruitee":
 		slug = strings.ToLower(slug)
 		if !hostLabel.MatchString(slug) {
+			return nil, bad("slug")
+		}
+	case "eightfold":
+		slug = strings.ToLower(slug)
+		if !hostName.MatchString(slug) {
 			return nil, bad("slug")
 		}
 	default:
@@ -82,6 +89,19 @@ func FromBoard(c *Client, b Board) (discovery.Source, error) {
 		}
 		return &Workday{c: c, host: cfg.Host, tenant: slug, site: cfg.Site, search: cfg.Search,
 			company: or(company, pretty(slug)), max: cfg.Max}, nil
+	case "eightfold":
+		var cfg struct {
+			Host     string `json:"host"`
+			API      string `json:"api"`
+			Location string `json:"location"`
+			Query    string `json:"query"`
+			Max      int    `json:"max"`
+		}
+		if err := config(b.Config, &cfg); err != nil || !hostName.MatchString(cfg.Host) || (cfg.API != "v2" && cfg.API != "pcsx") {
+			return nil, bad("config")
+		}
+		return &Eightfold{c: c, host: cfg.Host, domain: slug, company: or(company, pretty(strings.Split(slug, ".")[0])),
+			api: cfg.API, location: cfg.Location, query: cfg.Query, max: cfg.Max}, nil
 	}
 	return nil, bad("unknown system")
 }

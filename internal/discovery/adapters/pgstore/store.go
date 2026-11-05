@@ -23,7 +23,10 @@ import (
 // Store is the PostgreSQL job index.
 type Store struct{ pool *pgxpool.Pool }
 
-var _ discovery.Store = (*Store)(nil)
+var (
+	_ discovery.Store  = (*Store)(nil)
+	_ discovery.Boards = (*Store)(nil)
+)
 
 // New returns a store on pool.
 func New(pool *pgxpool.Pool) *Store { return &Store{pool: pool} }
@@ -257,4 +260,41 @@ func (s *Store) Close(ctx context.Context, runID int64, ids []int64, at time.Tim
 		}
 		return nil
 	})
+}
+
+// ImportBoards upserts boards in one transaction.
+func (s *Store) ImportBoards(ctx context.Context, boards []discovery.Board) (inserted, updated int, err error) {
+	err = s.system(ctx, func(qs *q.Queries) error {
+		inserted, updated = 0, 0
+		for _, b := range boards {
+			cfg := b.Config
+			if len(cfg) == 0 {
+				cfg = []byte("{}")
+			}
+			isNew, err := qs.UpsertBoard(ctx, q.UpsertBoardParams{Ats: b.ATS, Slug: b.Slug, Company: b.Company, Config: cfg})
+			if err != nil {
+				return err
+			}
+			if isNew {
+				inserted++
+			} else {
+				updated++
+			}
+		}
+		return nil
+	})
+	return inserted, updated, err
+}
+
+// EnabledBoards lists the boards to crawl.
+func (s *Store) EnabledBoards(ctx context.Context) ([]discovery.Board, error) {
+	var out []discovery.Board
+	err := s.system(ctx, func(qs *q.Queries) error {
+		rows, err := qs.EnabledBoards(ctx)
+		for _, r := range rows {
+			out = append(out, discovery.Board{ID: r.ID, ATS: r.Ats, Slug: r.Slug, Company: r.Company, Config: r.Config})
+		}
+		return err
+	})
+	return out, err
 }

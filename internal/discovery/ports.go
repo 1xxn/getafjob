@@ -45,3 +45,20 @@ type Store interface {
 	Close(ctx context.Context, runID int64, ids []int64, at time.Time) error
 	FinishRun(ctx context.Context, runID int64, s Stats, errs map[string]string, at time.Time) error
 }
+
+// Board is a company board of an applicant tracking system; Config holds system-specific JSON (Workday host and
+// site, Eightfold host and API).
+type Board struct {
+	ID      int64
+	ATS     string
+	Slug    string
+	Company string
+	Config  []byte
+}
+
+// Boards stores the boards to crawl.
+type Boards interface {
+	// ImportBoards adds new boards and refreshes name and config of known ones; enabled and crawl state stay.
+	ImportBoards(ctx context.Context, boards []Board) (inserted, updated int, err error)
+	EnabledBoards(ctx context.Context) ([]Board, error)
+}

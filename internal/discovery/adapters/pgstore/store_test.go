@@ -269,3 +269,30 @@ func TestCrawlCanceled(t *testing.T) {
 		t.Fatalf("err = %v, want canceled", err)
 	}
 }
+
+func TestImportBoards(t *testing.T) {
+	pool := dbtest.AppPool(t)
+	ctx := context.Background()
+	st := pgstore.New(pool)
+	boards := []discovery.Board{
+		{ATS: "greenhouse", Slug: "acme", Company: "ACME"},
+		{ATS: "eightfold", Slug: "example.org", Company: "Example", Config: []byte(`{"host":"careers.example.org","api":"v2"}`)},
+	}
+	if in, up, err := st.ImportBoards(ctx, boards); err != nil || in != 2 || up != 0 {
+		t.Fatalf("first import: %d added, %d updated, %v", in, up, err)
+	}
+	if _, err := pool.Exec(ctx, "UPDATE boards SET enabled = false WHERE slug = 'acme'"); err != nil {
+		t.Fatal(err)
+	}
+	boards[1].Company = "Example Streaming"
+	if in, up, err := st.ImportBoards(ctx, boards); err != nil || in != 0 || up != 2 {
+		t.Fatalf("second import: %d added, %d updated, %v", in, up, err)
+	}
+	got, err := st.EnabledBoards(ctx)
+	if err != nil || len(got) != 1 || got[0].Company != "Example Streaming" || string(got[0].Config) == "{}" {
+		t.Fatalf("enabled = %+v, %v (a disabled board stays disabled)", got, err)
+	}
+	if _, _, err := st.ImportBoards(ctx, []discovery.Board{{ATS: "taleo", Slug: "x", Company: "X"}}); err == nil {
+		t.Fatal("unknown system accepted")
+	}
+}
