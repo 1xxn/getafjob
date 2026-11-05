@@ -17,6 +17,8 @@ an error. Unknown `GETAFJOB_*` variables are reported as a warning (typos), with
 | `GETAFJOB_BROWSER_BIN` | lookup | runner | Chromium/headless-shell binary |
 | `GETAFJOB_EGRESS_PROXY` | none | runner, worker | egress proxy, e.g. `http://egress:4750` |
 | `GETAFJOB_SHUTDOWN_TIMEOUT` | `20s` | all | graceful shutdown limit (1s to 5m) |
+| `GETAFJOB_SMTP_URL` | none | serve, worker, admin | mail server: `smtps://user:pass@host:465` or `smtp://user:pass@host:587` (STARTTLS); `smtp+insecure://host:1025` for local development only; use `_FILE` |
+| `GETAFJOB_MAIL_FROM` | `getafjob@localhost` | serve, worker, admin | sender address of all mail |
 
 `getafjob admin env` lists all variables; `getafjob admin check-config` validates the current environment without
 printing values. Secret values never appear in logs or error messages.

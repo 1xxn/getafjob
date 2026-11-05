@@ -26,12 +26,14 @@ This document grows with every module.
 
 | # | Threat | Boundary | Control | Status / test |
 |---|---|---|---|---|
-| S1 | Account takeover by password attacks | 1 | No passwords: invitations, passkeys, magic links ([0020](adr/0020-authentication-invitations-passkeys.md)) | Phase 1 |
+| S1 | Account takeover by password attacks | 1 | No passwords: invitations, passkeys, magic links ([0020](adr/0020-authentication-invitations-passkeys.md)); one-time tokens stored as SHA-256 only | `TestInvitationFlow`, `TestMagicLinkFlow` |
+| S3 | Account enumeration and mail flooding via sign-in links | 1 | Same answer for unknown addresses; at most 3 links per account and 15 minutes | `TestMagicLinkFlow`, `TestMagicLinksAreRateLimited` |
 | S2 | Stolen runner token reused | 2 | Short-lived per-run tokens, lease bound to runner | Phase 2 |
 | T1 | CSRF changes data | 1 | `http.CrossOriginProtection`, `__Host-` cookies | `TestProtectSetsHeadersAndBlocksCrossOriginPosts` |
 | T2 | Page tricks the engine into a wrong field or domain | 5 | Provenance, field/domain checks, page content is data | Phase 2 |
 | T3 | Tampered images or binaries | 6 | Pinned actions/tools, cosign signatures, provenance, SBOM | CI |
 | R1 | User disputes an application | n/a | Evidence: values + sources, screenshot, confirmation, timeline; audit log | Phase 2 |
+| R2 | Security events cannot be traced or are altered | 4 | Append-only audit log (codes and params, no personal data) | `TestAuditEventsAreAppendOnly`, `TestAuditLogHasNoPersonalData` |
 | I1 | User reads another user's data | 4 | RLS for the application role `getafjob_app` (no bypass), tenant set per transaction ([0006](adr/0006-tenant-isolation-rls-and-envelope-encryption.md)) | `TestTenantSeparation`, `TestAppRoleCannotBypassRLS` |
 | I2 | SSRF to internal services or cloud metadata | 3 | `netguard`: URLs read like Chromium (WHATWG, UTS 46), every connection checked after DNS, redirects checked; egress proxy denies private/loopback/link-local; runner on internal networks only | `TestNonPublicURLs`, `TestClientRefusesPrivateTargetsPerConnection`, `FuzzPublicURL`, `deploy/smoke.sh` |
 | I3 | Secrets or personal data in logs or errors | all | `config.Secret` redaction, sensitive log attributes redacted, generic errors | `TestSecretIsRedactedEverywhere`, `TestErrorsNeverContainSecrets`, `TestSensitiveKeysAreRedacted` |
