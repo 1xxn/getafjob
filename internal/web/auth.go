@@ -93,7 +93,7 @@ func (s *Server) linkConfirm(w http.ResponseWriter, r *http.Request, _ *identity
 
 func (s *Server) linkSubmit(w http.ResponseWriter, r *http.Request, _ *identity.User) {
 	_, session, err := s.Identity.SignInWithMagicLink(r.Context(), r.PathValue("token"))
-	if errors.Is(err, identity.ErrInvalidToken) || errors.Is(err, identity.ErrUserDisabled) {
+	if errors.Is(err, identity.ErrInvalidToken) || errors.Is(err, identity.ErrUserDisabled) || errors.Is(err, identity.ErrRecoveryWait) {
 		s.invalidLink(w, r, err)
 		return
 	}
@@ -199,6 +199,15 @@ func (s *Server) renderAccount(w http.ResponseWriter, r *http.Request, u *identi
 			d.Passkeys = append(d.Passkeys, p)
 		}
 	}
+	rec, err := s.Identity.Recovery(r.Context(), u.ID)
+	if err != nil {
+		s.failed(w, r, u, err)
+		return
+	}
+	if rec != nil {
+		d.Recovery = views.T(r.Context(), "account.recovery.pending", "requested", views.When(r.Context(), rec.RequestedAt),
+			"ready", views.When(r.Context(), rec.ReadyAt), "until", views.When(r.Context(), rec.ExpiresAt))
+	}
 	s.render(w, r, http.StatusOK, views.Account(d))
 }
 
@@ -217,4 +226,17 @@ func (s *Server) signOutOthers(w http.ResponseWriter, r *http.Request, u *identi
 		return
 	}
 	s.renderAccount(w, r, u, views.T(r.Context(), "account.sessions.signed_out_others", "count", n))
+}
+
+// cancelRecovery stops a pending sign-in without passkey. Any signed-in session may do it: it only removes access.
+func (s *Server) cancelRecovery(w http.ResponseWriter, r *http.Request, u *identity.User) {
+	if u == nil {
+		http.Redirect(w, r, "/login", http.StatusSeeOther)
+		return
+	}
+	if _, err := s.Identity.CancelRecovery(r.Context(), u.ID); err != nil {
+		s.failed(w, r, u, err)
+		return
+	}
+	s.renderAccount(w, r, u, views.T(r.Context(), "account.recovery.canceled"))
 }

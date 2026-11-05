@@ -73,8 +73,14 @@ type Store interface {
 	AcceptInvitation(ctx context.Context, inv Invitation, u User, s NewSession, at time.Time) (User, error)
 	// CreateMagicLink stores a link unless the user already got limit links since 'since'; returns false then.
 	CreateMagicLink(ctx context.Context, userID uuid.UUID, h Hash, at, expires, since time.Time, limit int) (bool, error)
-	// ConsumeMagicLink marks the link used and creates the session atomically.
-	ConsumeMagicLink(ctx context.Context, h Hash, s NewSession, at time.Time) (User, error)
+	// ConsumeMagicLink marks the link used and creates the session atomically. For an account with a passkey it
+	// needs a ready recovery, which it uses up (recovered); otherwise ErrRecoveryWait and no session.
+	ConsumeMagicLink(ctx context.Context, h Hash, s NewSession, at time.Time) (u User, recovered bool, err error)
+	// RecoveryState tells whether the user has a passkey and returns a pending recovery (nil if none).
+	RecoveryState(ctx context.Context, userID uuid.UUID) (hasPasskeys bool, r *Recovery, err error)
+	// StartRecovery stores r unless a recovery is pending or ready; it returns the recovery in force.
+	StartRecovery(ctx context.Context, userID uuid.UUID, r Recovery, audit AuditEvent) (Recovery, bool, error)
+	CancelRecovery(ctx context.Context, userID uuid.UUID, audit AuditEvent) (bool, error)
 	SessionByHash(ctx context.Context, h Hash) (User, Session, error)
 	TouchSession(ctx context.Context, h Hash, at time.Time) error
 	// RotateSession gives the session old the new token next and marks old replaced; false when another request

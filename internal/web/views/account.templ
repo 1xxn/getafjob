@@ -23,6 +23,8 @@ type AccountData struct {
 	Sessions []SessionRow
 	Passkeys []PasskeyRow
 	Enabled  bool // passkeys configured
+	// Recovery describes a pending sign-in without passkey (empty: none).
+	Recovery string
 }
 
 templ Account(d AccountData) {
@@ -30,6 +32,15 @@ templ Account(d AccountData) {
 		@Section(T(ctx, "account.title")) {
 			if d.Notice != "" {
 				@Notice("info", d.Notice)
+			}
+			if d.Recovery != "" {
+				<p class="notice notice-error" role="alert">{ d.Recovery }</p>
+				<form method="post" action="/account/recovery/cancel">
+					<button type="submit" class="primary">{ T(ctx, "account.recovery.cancel") }</button>
+				</form>
+			}
+			if d.Enabled && len(d.Passkeys) == 0 {
+				<p class="notice notice-info">{ T(ctx, "passkey.nudge") }</p>
 			}
 			if d.Enabled {
 				<h2>{ T(ctx, "passkey.title") }</h2>

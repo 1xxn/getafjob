@@ -63,10 +63,13 @@ templ Invite(action, email, name, nameError string) {
 	}
 }
 
-templ Home(name string) {
+templ Home(name string, nudge bool) {
 	@Layout(Page{Title: T(ctx, "home.title"), UserName: name}) {
 		@Section(T(ctx, "home.title")) {
 			<p class="lead">{ T(ctx, "home.greeting", "name", name) }</p>
+			if nudge {
+				@PasskeyNudge()
+			}
 			<p class="muted">{ T(ctx, "home.empty") }</p>
 		}
 	}

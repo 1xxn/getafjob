@@ -431,3 +431,36 @@ func TestPasskeyRegistrationNeedsFreshSignIn(t *testing.T) {
 		t.Errorf("signed out: %d", rec.Code)
 	}
 }
+
+func TestPasskeyNudgeAndRecovery(t *testing.T) {
+	a := newApp(t)
+	session := signedIn(t, a)
+	if home := a.do(http.MethodGet, "/", nil, session, nil).Body.String(); !strings.Contains(home, "Add a passkey now") {
+		t.Fatalf("no nudge without passkey: %s", home)
+	}
+	key := softauthn.New("jobs.example.org", "https://jobs.example.org")
+	o := options(t, a.json("/account/passkeys/options", map[string]any{}, session))
+	cred, _ := key.Create(o.Options)
+	if rec := a.json("/account/passkeys", map[string]any{"challenge": o.Challenge, "credential": json.RawMessage(cred)}, session); rec.Code != http.StatusCreated {
+		t.Fatalf("register %d", rec.Code)
+	}
+	if home := a.do(http.MethodGet, "/", nil, session, nil).Body.String(); strings.Contains(home, "Add a passkey now") {
+		t.Error("nudge with a passkey")
+	}
+
+	// The login form answers as for anyone, but starts a recovery instead of mailing a link.
+	if rec := a.do(http.MethodPost, "/login", url.Values{"email": {"max.mustermann@example.com"}}, "", nil); rec.Code != http.StatusOK {
+		t.Fatalf("login %d", rec.Code)
+	}
+	if strings.Contains(a.mail.last.Text, "/login/link/") {
+		t.Fatal("a sign-in link was mailed to an account with a passkey")
+	}
+	page := a.do(http.MethodGet, "/account", nil, session, nil).Body.String()
+	if !strings.Contains(page, "without your passkey") || !strings.Contains(page, "Cancel this request") {
+		t.Fatalf("account page without the pending recovery: %s", page)
+	}
+	rec := a.do(http.MethodPost, "/account/recovery/cancel", url.Values{}, session, nil)
+	if rec.Code != http.StatusOK || !strings.Contains(rec.Body.String(), "The request was canceled") {
+		t.Fatalf("cancel %d", rec.Code)
+	}
+}

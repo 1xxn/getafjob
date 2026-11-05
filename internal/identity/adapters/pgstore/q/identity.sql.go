@@ -12,6 +12,18 @@ import (
 	"github.com/google/uuid"
 )
 
+const cancelRecovery = `-- name: CancelRecovery :execrows
+DELETE FROM recoveries WHERE user_id = $1
+`
+
+func (q *Queries) CancelRecovery(ctx context.Context, userID uuid.UUID) (int64, error) {
+	result, err := q.db.Exec(ctx, cancelRecovery, userID)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
+}
+
 const countMagicLinksSince = `-- name: CountMagicLinksSince :one
 SELECT count(*) FROM magic_links WHERE user_id = $1 AND created_at > $2
 `
@@ -282,6 +294,23 @@ func (q *Queries) GetInvitationByHash(ctx context.Context, tokenHash []byte) (Ge
 	return i, err
 }
 
+const getRecovery = `-- name: GetRecovery :one
+SELECT requested_at, ready_at, expires_at FROM recoveries WHERE user_id = $1
+`
+
+type GetRecoveryRow struct {
+	RequestedAt time.Time
+	ReadyAt     time.Time
+	ExpiresAt   time.Time
+}
+
+func (q *Queries) GetRecovery(ctx context.Context, userID uuid.UUID) (GetRecoveryRow, error) {
+	row := q.db.QueryRow(ctx, getRecovery, userID)
+	var i GetRecoveryRow
+	err := row.Scan(&i.RequestedAt, &i.ReadyAt, &i.ExpiresAt)
+	return i, err
+}
+
 const getSession = `-- name: GetSession :one
 SELECT s.user_id, s.method, s.created_at, s.last_seen_at, s.expires_at, s.rotated_at, s.replaced_at,
        u.email, u.display_name, u.role, u.locale, u.disabled_at
@@ -378,6 +407,17 @@ func (q *Queries) GetUserByEmail(ctx context.Context, email string) (GetUserByEm
 	return i, err
 }
 
+const hasPasskeys = `-- name: HasPasskeys :one
+SELECT EXISTS (SELECT 1 FROM passkeys WHERE user_id = $1)
+`
+
+func (q *Queries) HasPasskeys(ctx context.Context, userID uuid.UUID) (bool, error) {
+	row := q.db.QueryRow(ctx, hasPasskeys, userID)
+	var exists bool
+	err := row.Scan(&exists)
+	return exists, err
+}
+
 const insertAuditEvent = `-- name: InsertAuditEvent :exec
 INSERT INTO audit_events (user_id, actor, code, params) VALUES ($1, $2, $3, $4)
 `
@@ -472,6 +512,39 @@ func (q *Queries) ReplaceSession(ctx context.Context, arg ReplaceSessionParams) 
 	return i, err
 }
 
+const startRecovery = `-- name: StartRecovery :one
+INSERT INTO recoveries (user_id, requested_at, ready_at, expires_at) VALUES ($1, $2, $3, $4)
+ON CONFLICT (user_id) DO UPDATE
+SET requested_at = EXCLUDED.requested_at, ready_at = EXCLUDED.ready_at, expires_at = EXCLUDED.expires_at
+WHERE recoveries.expires_at <= EXCLUDED.requested_at
+RETURNING ready_at, expires_at
+`
+
+type StartRecoveryParams struct {
+	UserID      uuid.UUID
+	RequestedAt time.Time
+	ReadyAt     time.Time
+	ExpiresAt   time.Time
+}
+
+type StartRecoveryRow struct {
+	ReadyAt   time.Time
+	ExpiresAt time.Time
+}
+
+// A pending or ready recovery stays; only an expired one is replaced.
+func (q *Queries) StartRecovery(ctx context.Context, arg StartRecoveryParams) (StartRecoveryRow, error) {
+	row := q.db.QueryRow(ctx, startRecovery,
+		arg.UserID,
+		arg.RequestedAt,
+		arg.ReadyAt,
+		arg.ExpiresAt,
+	)
+	var i StartRecoveryRow
+	err := row.Scan(&i.ReadyAt, &i.ExpiresAt)
+	return i, err
+}
+
 const takeChallenge = `-- name: TakeChallenge :one
 DELETE FROM webauthn_challenges
 WHERE id = $1 AND kind = $2 AND expires_at > $3
@@ -547,6 +620,22 @@ func (q *Queries) UsePasskey(ctx context.Context, arg UsePasskeyParams) (uuid.UU
 		arg.Credential,
 		arg.LastUsedAt,
 	)
+	var user_id uuid.UUID
+	err := row.Scan(&user_id)
+	return user_id, err
+}
+
+const useRecovery = `-- name: UseRecovery :one
+DELETE FROM recoveries WHERE user_id = $1 AND ready_at <= $2 AND expires_at > $2 RETURNING user_id
+`
+
+type UseRecoveryParams struct {
+	UserID uuid.UUID
+	At     time.Time
+}
+
+func (q *Queries) UseRecovery(ctx context.Context, arg UseRecoveryParams) (uuid.UUID, error) {
+	row := q.db.QueryRow(ctx, useRecovery, arg.UserID, arg.At)
 	var user_id uuid.UUID
 	err := row.Scan(&user_id)
 	return user_id, err

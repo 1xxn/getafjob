@@ -50,7 +50,11 @@ const (
 	SessionRotate = time.Hour
 	sessionGrace  = time.Minute
 	// SessionFresh is how long after signing in a session may end other sessions or change sign-in methods.
-	SessionFresh    = 15 * time.Minute
+	SessionFresh = 15 * time.Minute
+	// RecoveryDelay is how long a user with a passkey waits before a mail link signs in (ADR 0022);
+	// RecoveryWindow is how long it then works.
+	RecoveryDelay   = 24 * time.Hour
+	RecoveryWindow  = 48 * time.Hour
 	magicLinkWindow = 15 * time.Minute
 	magicLinkLimit  = 3
 )
@@ -65,6 +69,7 @@ var (
 	ErrInvalidRole    = errors.New("identity: invalid role")
 	ErrNotFound       = errors.New("identity: not found")
 	ErrReauthRequired = errors.New("identity: sign in again to confirm")
+	ErrRecoveryWait   = errors.New("identity: sign in with a passkey or wait for the recovery")
 )
 
 // Msg maps an error to the text code shown to people.
@@ -72,6 +77,8 @@ func Msg(err error) i18n.Msg {
 	switch {
 	case errors.Is(err, ErrSessionExpired):
 		return i18n.Msg{Code: "identity.session_expired"}
+	case errors.Is(err, ErrRecoveryWait):
+		return i18n.Msg{Code: "identity.recovery_wait"}
 	case errors.Is(err, ErrReauthRequired):
 		return i18n.Msg{Code: "identity.reauth_required"}
 	case errors.Is(err, ErrUserDisabled):
@@ -185,3 +192,17 @@ func CleanDisplayName(s string) string {
 
 // Fresh reports whether the sign-in of this session is recent enough for sensitive account changes.
 func (s Session) Fresh(now time.Time) bool { return now.Sub(s.CreatedAt) < SessionFresh }
+
+// Recovery is a request to sign in with a mail link although the account has a passkey. It works from ReadyAt
+// until ExpiresAt, once; any passkey sign-in cancels it.
+type Recovery struct {
+	RequestedAt, ReadyAt, ExpiresAt time.Time
+}
+
+// Ready reports whether the waiting period is over and the recovery still valid at now.
+func (r Recovery) Ready(now time.Time) bool { return !now.Before(r.ReadyAt) && now.Before(r.ExpiresAt) }
+
+// NewRecovery starts the waiting period at now.
+func NewRecovery(now time.Time) Recovery {
+	return Recovery{RequestedAt: now, ReadyAt: now.Add(RecoveryDelay), ExpiresAt: now.Add(RecoveryDelay + RecoveryWindow)}
+}

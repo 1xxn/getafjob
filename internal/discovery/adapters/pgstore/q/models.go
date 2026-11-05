@@ -116,6 +116,13 @@ type Passkey struct {
 	LastUsedAt *time.Time
 }
 
+type Recovery struct {
+	UserID      uuid.UUID
+	RequestedAt time.Time
+	ReadyAt     time.Time
+	ExpiresAt   time.Time
+}
+
 type Session struct {
 	TokenHash  []byte
 	UserID     uuid.UUID

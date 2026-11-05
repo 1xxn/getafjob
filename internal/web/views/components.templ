@@ -70,3 +70,11 @@ templ StickyBar() {
 		{ children... }
 	</div>
 }
+
+// PasskeyNudge asks users without a passkey to add one; the single accent of the page.
+templ PasskeyNudge() {
+	<p class="notice notice-info">
+		{ T(ctx, "passkey.nudge") }
+		<a href="/account">{ T(ctx, "passkey.nudge_link") }</a>
+	</p>
+}

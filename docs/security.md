@@ -66,7 +66,7 @@ This document grows with every module.
 ## ASVS 5.0 L2: authentication (V6) and sessions (V7)
 
 getafjob has no passwords (ADR 0020), so the password requirements 6.1.2, 6.2.x and 6.5.2 for weak secrets do
-not apply. Federation and IdPs (6.8.x, 7.1.3, 7.6.1) do not apply either. Open points are issues.
+not apply. Federation and IdPs (6.8.x, 7.1.3, 7.6.1) do not apply either.
 
 Sign-in pathways (6.1.3, 6.3.4): invitation link (first sign-in only), magic link by mail, passkey. There are no
 others; API v1 has no sign-in yet.
@@ -75,10 +75,10 @@ others; API v1 has no sign-in yet.
 |---|---|---|---|
 | 6.1.1, 6.3.1 | Documented and enforced rate limits | Sign-in and invitation endpoints: token bucket per client address; at most 3 magic links per account in 15 minutes | `TestSignInIsRateLimited`, `TestMagicLinksAreRateLimited` |
 | 6.3.2 | No default accounts | Accounts only by invitation; no built-in users | `TestInvitationFlow` |
-| 6.3.3 | MFA or combined factors | Passkeys require user verification (device plus PIN or biometrics, two factors); a magic link alone is one factor: open, #76 | `TestPasskeys`, #76 |
+| 6.3.3 | MFA or combined factors | Passkeys require user verification (device plus PIN or biometrics, two factors). Once a passkey exists, a mail link alone no longer signs in ([0022](adr/0022-mail-link-as-delayed-recovery.md)). Accounts without a passkey still use the mail link alone and are asked on every visit to add one | `TestPasskeys`, `TestRecoveryInsteadOfMagicLink`, `TestPasskeyNudgeAndRecovery` |
 | 6.4.1 | Initial secrets random, short-lived, one-time | Invitation links: 256 random bits, 7 days, used once, stored as SHA-256 | `TestInvitationFlow`, `TestExpiredInvitation` |
 | 6.4.2 | No hints or secret questions | None exist | n/a |
-| 6.4.3, 6.4.4 | Recovery does not bypass stronger factors | Magic link also works for users with a passkey: open, #76 | #76 |
+| 6.4.3, 6.4.4 | Recovery does not bypass stronger factors | Recovery by mail link only after 24 hours, announced by mail, shown on the account page, canceled by any passkey sign-in; a notice after use | `TestRecoveryInsteadOfMagicLink`, `TestRecoveryWindow` |
 | 6.5.1, 6.6.2 | Out-of-band links used once, for their request only | A magic link is consumed in the transaction that creates the session and names one account | `TestMagicLinkFlow` |
 | 6.5.3, 6.5.4 | Random out-of-band codes with enough entropy | 256 bits from `crypto/rand` | `TestMagicLinkFlow` |
 | 6.5.5 | Out-of-band lifetime at most 10 minutes | Magic links expire after 10 minutes | `TestMagicLinkFlow` |
