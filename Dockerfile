@@ -19,6 +19,8 @@ RUN --mount=type=cache,target=/go/pkg/mod \
     GOOS=$TARGETOS GOARCH=$TARGETARCH go build \
       -ldflags="-s -w -X github.com/1xxn/getafjob/internal/platform/buildinfo.Version=${VERSION} -X github.com/1xxn/getafjob/internal/platform/buildinfo.Commit=${COMMIT} -X github.com/1xxn/getafjob/internal/platform/buildinfo.Date=${DATE}" \
       -o /out/getafjob ./cmd/getafjob
+# Empty blob directory, owned by the non-root user in the app image (named volumes copy its ownership).
+RUN mkdir -p /out/blobs
 
 # smokescreen comes from the build module in deploy/egress: a pinned release with dependencies raised to
 # versions without known vulnerabilities (go.sum verified, Renovate-managed).
@@ -34,6 +36,7 @@ RUN --mount=type=cache,target=/go/pkg/mod \
 
 FROM gcr.io/distroless/static-debian13:nonroot@sha256:25ac8f0c3b2334a9eb05452266bd4697864a8c8ef0ef71e5e6480d7f92868329 AS app
 COPY --from=build /out/getafjob /usr/local/bin/getafjob
+COPY --from=build --chown=65532:65532 /out/blobs /var/lib/getafjob/blobs
 USER 65532:65532
 EXPOSE 8080 8081
 ENTRYPOINT ["/usr/local/bin/getafjob"]
