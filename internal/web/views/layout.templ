@@ -22,6 +22,7 @@ templ Layout(p Page) {
 				if p.UserName != "" {
 					<nav aria-label={ T(ctx, "nav.main") }>
 						<span class="muted">{ T(ctx, "nav.signed_in_as", "name", p.UserName) }</span>
+						<a href="/jobs">{ T(ctx, "nav.jobs") }</a>
 						<a href="/profile">{ T(ctx, "nav.profile") }</a>
 						<a href="/preferences">{ T(ctx, "nav.preferences") }</a>
 						<a href="/documents">{ T(ctx, "nav.documents") }</a>

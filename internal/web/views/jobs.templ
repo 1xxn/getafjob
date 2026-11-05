@@ -1,0 +1,177 @@
+package views
+
+// JobRow is one job in the list.
+type JobRow struct {
+	ID        int64
+	Title     string
+	Company   string
+	Location  string
+	Workplace string // remote, hybrid, onsite or empty
+	Age       int    // days since posted or first seen, -1: unknown
+	Score     int
+	Decision  string
+}
+
+// JobsData fills the job list.
+type JobsData struct {
+	Name      string
+	Query     string
+	Decision  string // relevant, match, maybe, skip or all
+	Workplace string
+	Rows      []JobRow
+	Total     int
+	Page      int
+	Pages     int
+	Counts    map[string]int
+	Pending   bool // no results for the user yet
+	PrevURL   string
+	NextURL   string
+}
+
+// Reason is one translated part of a score.
+type Reason struct {
+	Text   string
+	Points int
+	Hard   bool
+}
+
+// JobData fills the job detail page.
+type JobData struct {
+	Name        string
+	Row         JobRow
+	Reasons     []Reason
+	Description string
+	URL         string // http(s) only, empty otherwise
+	ApplyURL    string
+	Open        bool
+	Computed    string
+	Back        string
+}
+
+templ jobMeta(r JobRow) {
+	<p class="muted job-meta">
+		{ r.Company }
+		if r.Location != "" {
+			· { r.Location }
+		}
+		if r.Workplace != "" {
+			· { T(ctx, "jobs.workplace." + r.Workplace) }
+		}
+		if r.Age == 0 {
+			· { T(ctx, "jobs.age_today") }
+		} else if r.Age > 0 {
+			· { T(ctx, "jobs.age_days", "days", r.Age) }
+		}
+	</p>
+}
+
+templ decision(r JobRow) {
+	<span class={ "decision", "decision-" + r.Decision }>
+		{ T(ctx, "match.decision." + r.Decision) }, { T(ctx, "jobs.score", "score", r.Score) }
+	</span>
+}
+
+templ option(value, current, label string) {
+	<option value={ value } selected?={ value == current }>{ label }</option>
+}
+
+templ JobsPage(d JobsData) {
+	@Layout(Page{Title: T(ctx, "jobs.title"), UserName: d.Name}) {
+		@Section(T(ctx, "jobs.title")) {
+			<form method="get" action="/jobs" class="filters" role="search">
+				@Field(FieldProps{Name: "q", Label: T(ctx, "jobs.search_label"), Type: "search", Value: d.Query,
+					Hint: T(ctx, "jobs.search_hint"), MaxLength: 200})
+				<div class="field">
+					<label for="f-decision">{ T(ctx, "jobs.decision") }</label>
+					<select id="f-decision" name="decision">
+						@option("relevant", d.Decision, T(ctx, "jobs.decision.relevant"))
+						@option("match", d.Decision, T(ctx, "match.decision.match"))
+						@option("maybe", d.Decision, T(ctx, "match.decision.maybe"))
+						@option("skip", d.Decision, T(ctx, "match.decision.skip"))
+						@option("all", d.Decision, T(ctx, "jobs.decision.all"))
+					</select>
+				</div>
+				<div class="field">
+					<label for="f-workplace">{ T(ctx, "jobs.workplace") }</label>
+					<select id="f-workplace" name="workplace">
+						@option("", d.Workplace, T(ctx, "jobs.workplace.any"))
+						@option("remote", d.Workplace, T(ctx, "jobs.workplace.remote"))
+						@option("hybrid", d.Workplace, T(ctx, "jobs.workplace.hybrid"))
+						@option("onsite", d.Workplace, T(ctx, "jobs.workplace.onsite"))
+					</select>
+				</div>
+				<button type="submit">{ T(ctx, "jobs.apply_filter") }</button>
+			</form>
+			if d.Pending {
+				@Notice("info", T(ctx, "jobs.pending"))
+			} else {
+				<p class="muted" role="status">
+					{ T(ctx, "jobs.count", "total", d.Total) }.
+					{ T(ctx, "jobs.counts", "match", d.Counts["match"], "maybe", d.Counts["maybe"], "skip", d.Counts["skip"]) }
+				</p>
+				if len(d.Rows) == 0 {
+					<p>{ T(ctx, "jobs.none") }</p>
+				}
+				<ol class="jobs">
+					for _, r := range d.Rows {
+						<li>
+							<h2><a href={ templ.SafeURL("/jobs/" + i64(r.ID)) }>{ r.Title }</a></h2>
+							@jobMeta(r)
+							@decision(r)
+						</li>
+					}
+				</ol>
+				if d.Pages > 1 {
+					<nav class="pager" aria-label={ T(ctx, "jobs.pages") }>
+						if d.PrevURL != "" {
+							<a href={ templ.SafeURL(d.PrevURL) } rel="prev">{ T(ctx, "jobs.prev") }</a>
+						}
+						<span>{ T(ctx, "jobs.page", "page", d.Page, "pages", d.Pages) }</span>
+						if d.NextURL != "" {
+							<a href={ templ.SafeURL(d.NextURL) } rel="next">{ T(ctx, "jobs.next") }</a>
+						}
+					</nav>
+				}
+			}
+		}
+	}
+}
+
+templ JobPage(d JobData) {
+	@Layout(Page{Title: d.Row.Title, UserName: d.Name}) {
+		@Section(d.Row.Title) {
+			<p><a href={ templ.SafeURL(d.Back) }>{ T(ctx, "jobs.back") }</a></p>
+			@jobMeta(d.Row)
+			if !d.Open {
+				@Notice("info", T(ctx, "jobs.closed"))
+			}
+			<p>
+				if d.URL != "" {
+					<a href={ templ.SafeURL(d.URL) } rel="noopener noreferrer external">{ T(ctx, "jobs.open_posting") }</a>
+				}
+				if d.ApplyURL != "" && d.ApplyURL != d.URL {
+					· <a href={ templ.SafeURL(d.ApplyURL) } rel="noopener noreferrer external">{ T(ctx, "jobs.apply_link") }</a>
+				}
+			</p>
+			<h2>{ T(ctx, "jobs.reasons") }</h2>
+			<p>@decision(d.Row)</p>
+			<ul class="reasons">
+				for _, r := range d.Reasons {
+					<li>
+						if r.Hard {
+							<strong>{ T(ctx, "jobs.reason_filter") }:</strong>
+						} else {
+							<span class="points">{ points(r.Points) }</span>
+						}
+						{ r.Text }
+					</li>
+				}
+			</ul>
+			<p class="muted">{ T(ctx, "jobs.computed", "when", d.Computed) }</p>
+			if d.Description != "" {
+				<h2>{ T(ctx, "jobs.description") }</h2>
+				<div class="description">{ d.Description }</div>
+			}
+		}
+	}
+}

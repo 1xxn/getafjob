@@ -17,6 +17,7 @@ import (
 	"golang.org/x/time/rate"
 
 	"github.com/1xxn/getafjob/internal/identity"
+	"github.com/1xxn/getafjob/internal/matching"
 	"github.com/1xxn/getafjob/internal/platform/i18n"
 	"github.com/1xxn/getafjob/internal/profile"
 	"github.com/1xxn/getafjob/internal/profile/cvimport"
@@ -35,6 +36,7 @@ type Server struct {
 	Documents *profile.Documents
 	Items     *profile.Items
 	Importer  *cvimport.Importer // nil: no CV import
+	Jobs      *matching.Listings
 	Logger    *slog.Logger
 	limiter   *limiter
 }
@@ -54,6 +56,8 @@ func (s *Server) Register(mux *http.ServeMux) {
 	mux.Handle("GET /invite/{token}", s.page(s.inviteForm))
 	mux.Handle("POST /invite/{token}", s.limited(s.page(s.inviteSubmit)))
 	mux.Handle("POST /logout", s.page(s.logout))
+	mux.Handle("GET /jobs", s.page(s.jobsPage))
+	mux.Handle("GET /jobs/{id}", s.page(s.jobPage))
 	mux.Handle("GET /profile", s.page(s.profilePage))
 	mux.Handle("POST /profile", s.page(s.profileSave))
 	mux.Handle("GET /preferences", s.page(s.preferencesPage))
