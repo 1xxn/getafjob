@@ -3,6 +3,7 @@ package app
 import (
 	"context"
 	"errors"
+	"fmt"
 	"log/slog"
 	"net/http"
 	"time"
@@ -16,9 +17,12 @@ import (
 	"github.com/1xxn/getafjob/internal/identity"
 	"github.com/1xxn/getafjob/internal/identity/adapters/pgstore"
 	"github.com/1xxn/getafjob/internal/platform/config"
+	"github.com/1xxn/getafjob/internal/platform/crypto"
 	"github.com/1xxn/getafjob/internal/platform/db"
 	"github.com/1xxn/getafjob/internal/platform/httpx"
 	"github.com/1xxn/getafjob/internal/platform/queue"
+	"github.com/1xxn/getafjob/internal/profile"
+	profilestore "github.com/1xxn/getafjob/internal/profile/adapters/pgstore"
 	"github.com/1xxn/getafjob/internal/runner/browser"
 	"github.com/1xxn/getafjob/internal/web"
 	"github.com/1xxn/getafjob/internal/web/apiv1"
@@ -50,7 +54,12 @@ func serve(ctx context.Context, cfg config.Config, logger *slog.Logger) error {
 	mux := http.NewServeMux()
 	health.Register(mux)
 	apiv1.Mount(mux)
-	(&web.Server{Identity: ids, Logger: logger}).Register(mux)
+	ring, err := crypto.NewKeyring(cfg.MasterKey, cfg.MasterKeyOld)
+	if err != nil {
+		return fmt.Errorf("GETAFJOB_MASTER_KEY: %w", err)
+	}
+	profiles := profile.NewService(profilestore.New(pool), crypto.NewEnvelope(ring, pool))
+	(&web.Server{Identity: ids, Profile: profiles, Logger: logger}).Register(mux)
 
 	h := httpx.Instrument(httpx.Protect(httpx.Routes(mux), maxBody, cfg.PublicURL.Scheme == "https"))
 	return httpx.Run(ctx, httpx.NewServer(cfg.HTTPAddr, h, logger), cfg.ShutdownTimeout, logger)

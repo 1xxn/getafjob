@@ -18,6 +18,7 @@ import (
 
 	"github.com/1xxn/getafjob/internal/identity"
 	"github.com/1xxn/getafjob/internal/platform/i18n"
+	"github.com/1xxn/getafjob/internal/profile"
 	"github.com/1xxn/getafjob/internal/web/views"
 )
 
@@ -29,6 +30,7 @@ var staticFiles embed.FS
 // Server holds the dependencies of the UI.
 type Server struct {
 	Identity *identity.Service
+	Profile  *profile.Service
 	Logger   *slog.Logger
 	limiter  *limiter
 }
@@ -48,6 +50,10 @@ func (s *Server) Register(mux *http.ServeMux) {
 	mux.Handle("GET /invite/{token}", s.page(s.inviteForm))
 	mux.Handle("POST /invite/{token}", s.limited(s.page(s.inviteSubmit)))
 	mux.Handle("POST /logout", s.page(s.logout))
+	mux.Handle("GET /profile", s.page(s.profilePage))
+	mux.Handle("POST /profile", s.page(s.profileSave))
+	mux.Handle("GET /preferences", s.page(s.preferencesPage))
+	mux.Handle("POST /preferences", s.page(s.preferencesSave))
 	mux.Handle("GET /account", s.page(s.account))
 	mux.Handle("POST /account/sessions/others", s.page(s.signOutOthers))
 	mux.Handle("POST /account/passkeys/options", s.page(s.passkeyAddOptions))

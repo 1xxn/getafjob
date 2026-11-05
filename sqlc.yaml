@@ -51,3 +51,13 @@ sql:
         sql_package: pgx/v5
         emit_pointers_for_null_types: true
         emit_empty_slices: true
+  - engine: postgresql
+    schema: db/migrations
+    queries: db/queries/profile
+    gen:
+      go:
+        package: q
+        out: internal/profile/adapters/pgstore/q
+        sql_package: pgx/v5
+        emit_pointers_for_null_types: true
+        emit_empty_slices: true

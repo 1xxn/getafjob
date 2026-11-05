@@ -7,7 +7,7 @@ This document grows with every module.
 
 | Asset | Where |
 |---|---|
-| Profiles, CVs, certificates, answers, application history | PostgreSQL, blob store (encrypted) |
+| Profiles, CVs, certificates, answers, application history | PostgreSQL, blob store (envelope-encrypted per user; search preferences stay readable for the crawler and hold no contact data) |
 | Mail credentials, portal sessions, AI keys | PostgreSQL (envelope-encrypted) |
 | Master key, database password | Docker secrets |
 | Evidence (screenshots, filled values) | blob store (encrypted, 90-day retention) |

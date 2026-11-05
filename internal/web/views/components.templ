@@ -78,3 +78,38 @@ templ PasskeyNudge() {
 		<a href="/account">{ T(ctx, "passkey.nudge_link") }</a>
 	</p>
 }
+
+// TextArea is a labelled multi-line field (one item per line where the hint says so).
+templ TextArea(f FieldProps) {
+	<div class={ "field", templ.KV("field-invalid", f.Error != "") }>
+		<label for={ "f-" + f.Name }>{ f.Label }</label>
+		<textarea
+			id={ "f-" + f.Name }
+			name={ f.Name }
+			rows="4"
+			if f.MaxLength > 0 {
+				maxlength={ itoa(f.MaxLength) }
+			}
+			if f.Hint != "" || f.Error != "" {
+				aria-describedby={ describedBy(f) }
+			}
+			if f.Error != "" {
+				aria-invalid="true"
+			}
+		>{ f.Value }</textarea>
+		if f.Hint != "" {
+			<p class="hint" id={ "f-" + f.Name + "-hint" }>{ f.Hint }</p>
+		}
+		if f.Error != "" {
+			<p class="error" id={ "f-" + f.Name + "-error" }>{ f.Error }</p>
+		}
+	</div>
+}
+
+// Check is a labelled checkbox.
+templ Check(name, label string, checked bool) {
+	<div class="field field-check">
+		<input id={ "f-" + name } name={ name } type="checkbox" value="on" checked?={ checked }/>
+		<label for={ "f-" + name }>{ label }</label>
+	</div>
+}

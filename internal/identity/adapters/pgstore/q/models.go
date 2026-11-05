@@ -116,6 +116,14 @@ type Passkey struct {
 	LastUsedAt *time.Time
 }
 
+type Profile struct {
+	UserID      uuid.UUID
+	Sealed      []byte
+	Preferences []byte
+	Version     int64
+	UpdatedAt   time.Time
+}
+
 type Recovery struct {
 	UserID      uuid.UUID
 	RequestedAt time.Time

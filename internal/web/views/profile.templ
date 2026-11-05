@@ -1,0 +1,118 @@
+package views
+
+import "context"
+
+// Form carries the values and errors of a form; Errors hold translated texts by field name.
+type Form struct {
+	Values  map[string]string
+	Checks  map[string]bool
+	Errors  map[string]string
+	Version string
+	Notice  string
+	Failed  bool // Notice is an error
+}
+
+// input builds the props of a one-line field labelled with profile.field.<name>.
+func input(ctx context.Context, f Form, name, typ, autocomplete string, maxLen int) FieldProps {
+	return FieldProps{Name: name, Label: T(ctx, "profile.field."+name), Type: typ, Value: f.Values[name],
+		Error: f.Errors[name], Autocomplete: autocomplete, MaxLength: maxLen}
+}
+
+// area builds the props of a multi-line field with a hint (profile.hint.<name>).
+func area(ctx context.Context, f Form, name string, maxLen int) FieldProps {
+	return FieldProps{Name: name, Label: T(ctx, "profile.field."+name), Value: f.Values[name], Error: f.Errors[name],
+		Hint: T(ctx, "profile.hint."+name), MaxLength: maxLen}
+}
+
+templ formNotice(f Form) {
+	if f.Notice != "" {
+		if f.Failed {
+			@Notice("error", f.Notice)
+		} else {
+			@Notice("info", f.Notice)
+		}
+	}
+}
+
+templ ProfilePage(name string, f Form) {
+	@Layout(Page{Title: T(ctx, "profile.title"), UserName: name}) {
+		@Section(T(ctx, "profile.title")) {
+			<p class="muted">{ T(ctx, "profile.text") }</p>
+			@formNotice(f)
+			<form method="post" action="/profile" class="stack" novalidate>
+				<input type="hidden" name="version" value={ f.Version }/>
+				<h2>{ T(ctx, "profile.section.personal") }</h2>
+				@Field(input(ctx, f, "first_name", "text", "given-name", 200))
+				@Field(input(ctx, f, "last_name", "text", "family-name", 200))
+				@Field(input(ctx, f, "email", "email", "email", 254))
+				@Field(input(ctx, f, "phone", "tel", "tel", 30))
+				@Field(input(ctx, f, "street", "text", "street-address", 200))
+				@Field(input(ctx, f, "postal_code", "text", "postal-code", 12))
+				@Field(input(ctx, f, "city", "text", "address-level2", 200))
+				@Field(input(ctx, f, "country", "text", "country-name", 200))
+				@Field(input(ctx, f, "linkedin", "url", "url", 200))
+				@Field(input(ctx, f, "github", "url", "url", 200))
+				@Field(input(ctx, f, "website", "url", "url", 200))
+				@Field(input(ctx, f, "pronouns", "text", "", 200))
+				<h2 class="form-section">{ T(ctx, "profile.section.work") }</h2>
+				@Field(input(ctx, f, "current_title", "text", "organization-title", 200))
+				@Field(input(ctx, f, "current_employer", "text", "organization", 200))
+				@Field(input(ctx, f, "years_total", "text", "", 200))
+				@Field(input(ctx, f, "years_relevant", "text", "", 200))
+				@Field(input(ctx, f, "notice_period", "text", "", 200))
+				@Field(input(ctx, f, "earliest_start", "text", "", 200))
+				@Field(input(ctx, f, "salary_expectation", "text", "", 200))
+				@Field(input(ctx, f, "workplace_preferred", "text", "", 200))
+				@Field(input(ctx, f, "drivers_license", "text", "", 200))
+				@Check("work_authorized_eu", T(ctx, "profile.field.work_authorized_eu"), f.Checks["work_authorized_eu"])
+				@Check("needs_sponsorship", T(ctx, "profile.field.needs_sponsorship"), f.Checks["needs_sponsorship"])
+				@Check("willing_to_relocate", T(ctx, "profile.field.willing_to_relocate"), f.Checks["willing_to_relocate"])
+				<h2 class="form-section">{ T(ctx, "profile.section.about") }</h2>
+				@TextArea(area(ctx, f, "summary", 5000))
+				@TextArea(area(ctx, f, "skills", 12000))
+				@TextArea(area(ctx, f, "languages", 3000))
+				@TextArea(area(ctx, f, "certifications", 12000))
+				@StickyBar() {
+					<button type="submit" class="primary">{ T(ctx, "profile.save") }</button>
+				}
+			</form>
+		}
+	}
+}
+
+templ PreferencesPage(name string, f Form) {
+	@Layout(Page{Title: T(ctx, "preferences.title"), UserName: name}) {
+		@Section(T(ctx, "preferences.title")) {
+			<p class="muted">{ T(ctx, "preferences.text") }</p>
+			@formNotice(f)
+			<form method="post" action="/preferences" class="stack" novalidate>
+				@TextArea(area(ctx, f, "titles", 12000))
+				@TextArea(area(ctx, f, "exclude_titles", 12000))
+				@TextArea(area(ctx, f, "locations", 12000))
+				@Check("remote", T(ctx, "profile.field.remote"), f.Checks["remote"])
+				@TextArea(area(ctx, f, "remote_regions", 3000))
+				@Field(input(ctx, f, "min_salary", "number", "", 9))
+				<div class="field">
+					<label for="f-cover_letter_lang">{ T(ctx, "profile.field.cover_letter_lang") }</label>
+					<select id="f-cover_letter_lang" name="cover_letter_lang">
+						for _, v := range []string{"auto", "en", "de"} {
+							<option value={ v } selected?={ f.Values["cover_letter_lang"] == v }>{ T(ctx, "profile.lang." + v) }</option>
+						}
+					</select>
+				</div>
+				<div class="field">
+					<label for="f-diversity">{ T(ctx, "profile.field.diversity") }</label>
+					<select id="f-diversity" name="diversity">
+						for _, v := range []string{"decline", "answer"} {
+							<option value={ v } selected?={ f.Values["diversity"] == v }>{ T(ctx, "profile.diversity." + v) }</option>
+						}
+					</select>
+				</div>
+				@Check("talent_pool", T(ctx, "profile.field.talent_pool"), f.Checks["talent_pool"])
+				@StickyBar() {
+					<button type="submit" class="primary">{ T(ctx, "profile.save") }</button>
+				}
+			</form>
+		}
+	}
+}
