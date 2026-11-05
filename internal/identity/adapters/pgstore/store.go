@@ -15,6 +15,7 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/jackc/pgx/v5/pgxpool"
 
 	"github.com/1xxn/getafjob/internal/identity"
@@ -277,4 +278,95 @@ func (s *Store) DeleteUserSessions(ctx context.Context, userID uuid.UUID, e iden
 		return audit(ctx, qs, e)
 	})
 	return n, err
+}
+
+// SaveChallenge stores a WebAuthn ceremony state.
+func (s *Store) SaveChallenge(ctx context.Context, c identity.Challenge) (id uuid.UUID, err error) {
+	err = s.system(ctx, func(qs *q.Queries) error {
+		id, err = qs.CreateChallenge(ctx, q.CreateChallengeParams{UserID: c.UserID, Kind: c.Kind, Data: c.Data, ExpiresAt: c.ExpiresAt})
+		return err
+	})
+	return id, err
+}
+
+// TakeChallenge returns and deletes a valid challenge.
+func (s *Store) TakeChallenge(ctx context.Context, id uuid.UUID, kind string, now time.Time) (c identity.Challenge, err error) {
+	err = s.system(ctx, func(qs *q.Queries) error {
+		r, err := qs.TakeChallenge(ctx, q.TakeChallengeParams{ID: id, Kind: kind, Now: now})
+		if err != nil {
+			return notFound(err)
+		}
+		c = identity.Challenge{UserID: r.UserID, Kind: kind, Data: r.Data}
+		return nil
+	})
+	return c, err
+}
+
+// UserByID returns an account and its passkeys.
+func (s *Store) UserByID(ctx context.Context, id uuid.UUID) (u identity.User, keys []identity.Passkey, err error) {
+	err = s.system(ctx, func(qs *q.Queries) error {
+		r, err := qs.GetUser(ctx, id)
+		if err != nil {
+			return notFound(err)
+		}
+		u = toUser(r.ID, r.Email, r.DisplayName, r.Role, r.Locale, r.DisabledAt)
+		rows, err := qs.UserPasskeys(ctx, id)
+		for _, p := range rows {
+			keys = append(keys, identity.Passkey{ID: p.ID, Name: p.Name, Credential: p.Credential, CreatedAt: p.CreatedAt,
+				LastUsed: deref(p.LastUsedAt)})
+		}
+		return err
+	})
+	return u, keys, err
+}
+
+// AddPasskey stores a new credential.
+func (s *Store) AddPasskey(ctx context.Context, userID uuid.UUID, p identity.Passkey, e identity.AuditEvent) error {
+	return s.user(ctx, userID, func(qs *q.Queries) error {
+		if err := qs.InsertPasskey(ctx, q.InsertPasskeyParams{ID: p.ID, UserID: userID, Name: p.Name, Credential: p.Credential,
+			CreatedAt: p.CreatedAt}); err != nil {
+			if pgErr := (*pgconn.PgError)(nil); errors.As(err, &pgErr) && pgErr.Code == "23505" {
+				return identity.ErrPasskeyFailed // the credential is registered already (by anyone)
+			}
+			return err
+		}
+		return audit(ctx, qs, e)
+	})
+}
+
+// SignInWithPasskey updates the credential (sign count) and creates the session.
+func (s *Store) SignInWithPasskey(ctx context.Context, userID uuid.UUID, id, credential []byte, sess identity.NewSession, at time.Time) (u identity.User, err error) {
+	err = s.system(ctx, func(qs *q.Queries) error {
+		if _, err := qs.UsePasskey(ctx, q.UsePasskeyParams{ID: id, UserID: userID, Credential: credential, LastUsedAt: &at}); err != nil {
+			return notFound(err)
+		}
+		r, err := qs.GetUser(ctx, userID)
+		if err != nil {
+			return err
+		}
+		u = toUser(r.ID, r.Email, r.DisplayName, r.Role, r.Locale, r.DisabledAt)
+		if u.Disabled {
+			return nil
+		}
+		if err := qs.CreateSession(ctx, q.CreateSessionParams{TokenHash: sess.Hash[:], UserID: u.ID, Method: string(sess.Method),
+			CreatedAt: sess.CreatedAt, ExpiresAt: sess.ExpiresAt}); err != nil {
+			return err
+		}
+		return audit(ctx, qs, identity.AuditEvent{UserID: &u.ID, Actor: "user", Code: "identity.signed_in",
+			Params: map[string]any{"method": sess.Method}})
+	})
+	return u, err
+}
+
+// DeletePasskey removes a credential of the user.
+func (s *Store) DeletePasskey(ctx context.Context, userID uuid.UUID, id []byte, e identity.AuditEvent) (ok bool, err error) {
+	err = s.user(ctx, userID, func(qs *q.Queries) error {
+		n, err := qs.DeletePasskey(ctx, q.DeletePasskeyParams{ID: id, UserID: userID})
+		if err != nil || n == 0 {
+			return err
+		}
+		ok = true
+		return audit(ctx, qs, e)
+	})
+	return ok, err
 }

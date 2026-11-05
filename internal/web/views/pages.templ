@@ -1,7 +1,7 @@
 package views
 
-templ Login(email, notice string) {
-	@Layout(Page{Title: T(ctx, "login.title")}) {
+templ Login(email, notice string, passkeys bool) {
+	@Layout(Page{Title: T(ctx, "login.title"), Passkeys: passkeys}) {
 		@Section(T(ctx, "login.title")) {
 			<p>{ T(ctx, "login.text") }</p>
 			if notice != "" {
@@ -12,6 +12,13 @@ templ Login(email, notice string) {
 					Hint: T(ctx, "login.email_hint"), Autocomplete: "email", Required: true, MaxLength: 254})
 				<button type="submit" class="primary">{ T(ctx, "login.submit") }</button>
 			</form>
+			if passkeys {
+				<div class="stack">
+					<button type="button" hidden data-passkey="sign-in" data-status="passkey-status"
+						data-error={ T(ctx, "passkey.failed") }>{ T(ctx, "passkey.sign_in") }</button>
+					<p id="passkey-status" role="status" class="muted"></p>
+				</div>
+			}
 		}
 	}
 }

@@ -159,6 +159,10 @@ internal `edge` (caddy and serve), `backend` (serve, worker, migrate, postgres),
 
 - **Configuration:** environment variables or `*_FILE` secrets ([configuration.md](configuration.md)).
 - **Security:** [security.md](security.md).
+- **Sign-in:** invitation, magic link (10 minutes, one use) or passkey (WebAuthn, discoverable, user verification
+  required). Session tokens rotate hourly; adding or removing passkeys and ending other sessions need a sign-in in
+  the last 15 minutes ([security.md](security.md#asvs-50-l2-authentication-v6-and-sessions-v7)). The passkey
+  script is a TypeScript island in `internal/web/ts`, bundled with the esbuild Go API by `go generate`.
 - **Encryption at rest:** `platform/crypto` seals user secrets and files with a per-user data key (AES-256-GCM,
   associated data = user and purpose); data keys live wrapped in `user_keys` under the master key from a Docker
   secret ([0006](adr/0006-tenant-isolation-rls-and-envelope-encryption.md),

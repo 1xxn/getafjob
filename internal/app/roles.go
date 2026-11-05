@@ -43,6 +43,9 @@ func serve(ctx context.Context, cfg config.Config, logger *slog.Logger) error {
 		return err
 	}
 	ids := identity.NewService(pgstore.New(pool), mailer, cfg.PublicURL)
+	if err := ids.EnablePasskeys(cfg.PublicURL); err != nil {
+		return err
+	}
 
 	mux := http.NewServeMux()
 	health.Register(mux)

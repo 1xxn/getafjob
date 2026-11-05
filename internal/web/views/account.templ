@@ -8,11 +8,72 @@ type SessionRow struct {
 	Current  bool
 }
 
-templ Account(name, notice string, sessions []SessionRow) {
-	@Layout(Page{Title: T(ctx, "account.title"), UserName: name}) {
+// PasskeyRow is one registered passkey; ID is base64url.
+type PasskeyRow struct {
+	ID       string
+	Name     string
+	Created  string
+	LastUsed string // empty: never
+}
+
+// AccountData is everything the account page shows.
+type AccountData struct {
+	Name     string
+	Notice   string
+	Sessions []SessionRow
+	Passkeys []PasskeyRow
+	Enabled  bool // passkeys configured
+}
+
+templ Account(d AccountData) {
+	@Layout(Page{Title: T(ctx, "account.title"), UserName: d.Name, Passkeys: d.Enabled}) {
 		@Section(T(ctx, "account.title")) {
-			if notice != "" {
-				@Notice("info", notice)
+			if d.Notice != "" {
+				@Notice("info", d.Notice)
+			}
+			if d.Enabled {
+				<h2>{ T(ctx, "passkey.title") }</h2>
+				<p class="muted">{ T(ctx, "passkey.text") }</p>
+				if len(d.Passkeys) > 0 {
+					<table class="table">
+						<thead>
+							<tr>
+								<th scope="col">{ T(ctx, "passkey.name") }</th>
+								<th scope="col">{ T(ctx, "passkey.created") }</th>
+								<th scope="col">{ T(ctx, "passkey.last_used") }</th>
+								<th scope="col"><span class="visually-hidden">{ T(ctx, "passkey.actions") }</span></th>
+							</tr>
+						</thead>
+						<tbody>
+							for _, p := range d.Passkeys {
+								<tr>
+									<td>{ p.Name }</td>
+									<td>{ p.Created }</td>
+									<td>
+										if p.LastUsed != "" {
+											{ p.LastUsed }
+										} else {
+											{ T(ctx, "passkey.never") }
+										}
+									</td>
+									<td>
+										<form method="post" action={ templ.SafeURL("/account/passkeys/" + p.ID + "/delete") }>
+											<button type="submit" class="link">{ T(ctx, "passkey.remove") }</button>
+										</form>
+									</td>
+								</tr>
+							}
+						</tbody>
+					</table>
+				}
+				<div class="stack">
+					@Field(FieldProps{Name: "passkey-name", Label: T(ctx, "passkey.name"), Type: "text",
+						Hint: T(ctx, "passkey.name_hint"), MaxLength: 100})
+					<button type="button" class="primary" hidden data-passkey="register" data-name="f-passkey-name"
+						data-status="passkey-status" data-error={ T(ctx, "passkey.failed") }>{ T(ctx, "passkey.add") }</button>
+					<p id="passkey-status" role="status" class="muted"></p>
+					<noscript><p class="muted">{ T(ctx, "passkey.needs_script") }</p></noscript>
+				</div>
 			}
 			<h2>{ T(ctx, "account.sessions.title") }</h2>
 			<p class="muted">{ T(ctx, "account.sessions.text") }</p>
@@ -26,7 +87,7 @@ templ Account(name, notice string, sessions []SessionRow) {
 					</tr>
 				</thead>
 				<tbody>
-					for _, s := range sessions {
+					for _, s := range d.Sessions {
 						<tr>
 							<td>{ T(ctx, "account.method." + s.Method) }</td>
 							<td>{ s.Created }</td>
@@ -40,7 +101,7 @@ templ Account(name, notice string, sessions []SessionRow) {
 					}
 				</tbody>
 			</table>
-			if len(sessions) > 1 {
+			if len(d.Sessions) > 1 {
 				<form method="post" action="/account/sessions/others">
 					<button type="submit">{ T(ctx, "account.sessions.sign_out_others") }</button>
 				</form>

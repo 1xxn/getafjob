@@ -74,3 +74,24 @@ DELETE FROM sessions o WHERE o.user_id = $1
 
 -- name: DeleteUserSessions :execrows
 DELETE FROM sessions WHERE user_id = $1;
+
+-- name: CreateChallenge :one
+INSERT INTO webauthn_challenges (user_id, kind, data, expires_at) VALUES ($1, $2, $3, $4) RETURNING id;
+
+-- name: TakeChallenge :one
+-- A challenge is used once.
+DELETE FROM webauthn_challenges
+WHERE id = $1 AND kind = $2 AND expires_at > sqlc.arg(now)
+RETURNING user_id, data;
+
+-- name: UserPasskeys :many
+SELECT id, name, credential, created_at, last_used_at FROM passkeys WHERE user_id = $1 ORDER BY created_at;
+
+-- name: InsertPasskey :exec
+INSERT INTO passkeys (id, user_id, name, credential, created_at) VALUES ($1, $2, $3, $4, $5);
+
+-- name: UsePasskey :one
+UPDATE passkeys SET credential = $3, last_used_at = $4 WHERE id = $1 AND user_id = $2 RETURNING user_id;
+
+-- name: DeletePasskey :execrows
+DELETE FROM passkeys WHERE id = $1 AND user_id = $2;

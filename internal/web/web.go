@@ -21,6 +21,8 @@ import (
 	"github.com/1xxn/getafjob/internal/web/views"
 )
 
+//go:generate go run ./tsbuild
+
 //go:embed static
 var staticFiles embed.FS
 
@@ -48,6 +50,11 @@ func (s *Server) Register(mux *http.ServeMux) {
 	mux.Handle("POST /logout", s.page(s.logout))
 	mux.Handle("GET /account", s.page(s.account))
 	mux.Handle("POST /account/sessions/others", s.page(s.signOutOthers))
+	mux.Handle("POST /account/passkeys/options", s.page(s.passkeyAddOptions))
+	mux.Handle("POST /account/passkeys", s.page(s.passkeyAdd))
+	mux.Handle("POST /account/passkeys/{id}/delete", s.page(s.passkeyDelete))
+	mux.Handle("POST /login/passkey/options", s.limited(s.page(s.passkeyLoginOptions)))
+	mux.Handle("POST /login/passkey", s.limited(s.page(s.passkeyLogin)))
 	mux.Handle("/", s.page(s.notFound))
 }
 

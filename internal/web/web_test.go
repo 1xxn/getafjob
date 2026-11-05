@@ -1,7 +1,10 @@
 package web_test
 
 import (
+	"bytes"
 	"context"
+	"encoding/base64"
+	"encoding/json"
 	"io"
 	"log/slog"
 	"net/http"
@@ -14,6 +17,7 @@ import (
 
 	"github.com/1xxn/getafjob/internal/identity"
 	"github.com/1xxn/getafjob/internal/identity/adapters/pgstore"
+	"github.com/1xxn/getafjob/internal/identity/softauthn"
 	"github.com/1xxn/getafjob/internal/platform/db/dbtest"
 	"github.com/1xxn/getafjob/internal/platform/httpx"
 	"github.com/1xxn/getafjob/internal/web"
@@ -45,6 +49,9 @@ func newApp(t *testing.T) *app {
 	base, _ := url.Parse("https://jobs.example.org")
 	mb := &mailbox{}
 	ids := identity.NewService(pgstore.New(pool), mb, base)
+	if err := ids.EnablePasskeys(base); err != nil {
+		t.Fatal(err)
+	}
 	mux := http.NewServeMux()
 	(&web.Server{Identity: ids, Logger: slog.New(slog.NewTextHandler(io.Discard, nil))}).Register(mux)
 	return &app{t: t, h: httpx.Protect(mux, 1<<20, true), ids: ids, mail: mb}
@@ -323,5 +330,104 @@ func TestSignOutOthersAsksForFreshSignIn(t *testing.T) {
 	page := a.do(http.MethodGet, "/login?reauth=1", nil, here, nil)
 	if page.Code != http.StatusOK || !strings.Contains(page.Body.String(), "Sign in again to confirm") {
 		t.Fatalf("reauth page %d", page.Code)
+	}
+}
+
+func (a *app) json(path string, body any, cookie string) *httptest.ResponseRecorder {
+	a.t.Helper()
+	b, err := json.Marshal(body)
+	if err != nil {
+		a.t.Fatal(err)
+	}
+	req := httptest.NewRequest(http.MethodPost, "https://jobs.example.org"+path, bytes.NewReader(b))
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Sec-Fetch-Site", "same-origin")
+	if cookie != "" {
+		req.AddCookie(&http.Cookie{Name: web.SessionCookie, Value: cookie})
+	}
+	rec := httptest.NewRecorder()
+	a.h.ServeHTTP(rec, req)
+	return rec
+}
+
+type optionsReply struct {
+	Challenge string          `json:"challenge"`
+	Options   json.RawMessage `json:"options"`
+}
+
+func options(t *testing.T, rec *httptest.ResponseRecorder) optionsReply {
+	t.Helper()
+	var o optionsReply
+	if rec.Code != http.StatusOK || json.Unmarshal(rec.Body.Bytes(), &o) != nil || o.Challenge == "" {
+		t.Fatalf("options %d: %s", rec.Code, rec.Body.String())
+	}
+	return o
+}
+
+func TestPasskeyPages(t *testing.T) {
+	a := newApp(t)
+	session := signedIn(t, a)
+	key := softauthn.New("jobs.example.org", "https://jobs.example.org")
+
+	o := options(t, a.json("/account/passkeys/options", map[string]any{}, session))
+	cred, err := key.Create(o.Options)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if rec := a.json("/account/passkeys", map[string]any{"challenge": o.Challenge, "name": "Laptop", "credential": json.RawMessage(cred)}, session); rec.Code != http.StatusCreated {
+		t.Fatalf("register %d: %s", rec.Code, rec.Body.String())
+	}
+	page := a.do(http.MethodGet, "/account?added=1", nil, session, nil).Body.String()
+	if !strings.Contains(page, "Laptop") || !strings.Contains(page, "Passkey added") || !strings.Contains(page, `src="/static/js/passkey.js"`) {
+		t.Fatalf("account page: %s", page)
+	}
+	if rec := a.json("/account/passkeys", map[string]any{"challenge": o.Challenge, "credential": json.RawMessage(cred), "extra": 1}, session); rec.Code != http.StatusBadRequest {
+		t.Errorf("unknown field: %d", rec.Code)
+	}
+
+	login := a.do(http.MethodGet, "/login", nil, "", nil).Body.String()
+	if !strings.Contains(login, `data-passkey="sign-in"`) || !strings.Contains(login, "Sign in with a passkey") {
+		t.Fatalf("login page: %s", login)
+	}
+	o = options(t, a.json("/login/passkey/options", map[string]any{}, ""))
+	assertion, err := key.Get(o.Options)
+	if err != nil {
+		t.Fatal(err)
+	}
+	rec := a.json("/login/passkey", map[string]any{"challenge": o.Challenge, "credential": json.RawMessage(assertion)}, "")
+	if rec.Code != http.StatusNoContent {
+		t.Fatalf("passkey login %d: %s", rec.Code, rec.Body.String())
+	}
+	fresh := sessionFrom(t, rec)
+	if home := a.do(http.MethodGet, "/", nil, fresh, nil); home.Code != http.StatusOK {
+		t.Fatalf("home after passkey login: %d", home.Code)
+	}
+	// The same answer again: refused, with a translated message.
+	rec = a.json("/login/passkey", map[string]any{"challenge": o.Challenge, "credential": json.RawMessage(assertion)}, "")
+	if rec.Code != http.StatusBadRequest || !strings.Contains(rec.Body.String(), "did not work") {
+		t.Errorf("replay %d: %s", rec.Code, rec.Body.String())
+	}
+
+	js := a.do(http.MethodGet, "/static/js/passkey.js", nil, "", nil)
+	if js.Code != http.StatusOK || !strings.Contains(js.Header().Get("Content-Type"), "javascript") {
+		t.Errorf("script %d %q", js.Code, js.Header().Get("Content-Type"))
+	}
+	if rec := a.do(http.MethodPost, "/account/passkeys/"+base64.RawURLEncoding.EncodeToString(key.ID)+"/delete", url.Values{}, fresh, nil); rec.Code != http.StatusOK || !strings.Contains(rec.Body.String(), "Passkey removed") {
+		t.Errorf("remove %d", rec.Code)
+	}
+}
+
+func TestPasskeyRegistrationNeedsFreshSignIn(t *testing.T) {
+	a := newApp(t)
+	now := time.Now()
+	a.ids.WithClock(func() time.Time { return now })
+	session := signedIn(t, a)
+	now = now.Add(identity.SessionFresh)
+	rec := a.json("/account/passkeys/options", map[string]any{}, session)
+	if rec.Code != http.StatusForbidden || !strings.Contains(rec.Body.String(), "sign in again") {
+		t.Fatalf("stale session %d: %s", rec.Code, rec.Body.String())
+	}
+	if rec := a.json("/account/passkeys/options", map[string]any{}, ""); rec.Code != http.StatusForbidden {
+		t.Errorf("signed out: %d", rec.Code)
 	}
 }
