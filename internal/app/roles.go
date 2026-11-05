@@ -8,12 +8,16 @@ import (
 	"time"
 
 	"github.com/go-rod/rod/lib/proto"
+	"github.com/riverqueue/river"
 
+	"github.com/1xxn/getafjob/internal/discovery"
+	discoverystore "github.com/1xxn/getafjob/internal/discovery/adapters/pgstore"
 	"github.com/1xxn/getafjob/internal/identity"
 	"github.com/1xxn/getafjob/internal/identity/adapters/pgstore"
 	"github.com/1xxn/getafjob/internal/platform/config"
 	"github.com/1xxn/getafjob/internal/platform/db"
 	"github.com/1xxn/getafjob/internal/platform/httpx"
+	"github.com/1xxn/getafjob/internal/platform/queue"
 	"github.com/1xxn/getafjob/internal/runner/browser"
 	"github.com/1xxn/getafjob/internal/web"
 	"github.com/1xxn/getafjob/internal/web/apiv1"
@@ -48,7 +52,7 @@ func serve(ctx context.Context, cfg config.Config, logger *slog.Logger) error {
 	return httpx.Run(ctx, httpx.NewServer(cfg.HTTPAddr, h, logger), cfg.ShutdownTimeout, logger)
 }
 
-// worker: background jobs (River follows); for now the periodic identity cleanup.
+// worker: background jobs on River (crawl, identity cleanup); health on the internal address.
 func worker(ctx context.Context, cfg config.Config, logger *slog.Logger) error {
 	pool, err := db.Open(ctx, cfg.DatabaseURL, cfg.DatabasePassword, "getafjob-worker")
 	if err != nil {
@@ -56,30 +60,30 @@ func worker(ctx context.Context, cfg config.Config, logger *slog.Logger) error {
 	}
 	defer pool.Close()
 
+	store := discoverystore.New(pool)
+	workers := river.NewWorkers()
+	river.AddWorker(workers, &crawlWorker{svc: discovery.NewService(store), boards: store, client: sourceClient(cfg),
+		cfg: cfg, logger: logger, timeout: 90 * time.Minute})
+	river.AddWorker(workers, &cleanupWorker{ids: identity.NewService(pgstore.New(pool), nil, cfg.PublicURL)})
+	jobs, err := queue.NewWorker(pool, queue.Options{Workers: workers, Periodic: periodicJobs(cfg), Logger: logger})
+	if err != nil {
+		return err
+	}
+	if err := jobs.Start(ctx); err != nil {
+		return err
+	}
+	defer func() {
+		stop, cancel := context.WithTimeout(context.WithoutCancel(ctx), cfg.ShutdownTimeout)
+		defer cancel()
+		if err := jobs.Stop(stop); err != nil {
+			logger.Warn("queue stop", "err", err)
+		}
+	}()
+
 	health := httpx.NewHealth(logger)
 	health.Add("database", db.Ping(pool))
 	health.Add("schema", db.SchemaCurrent(pool))
-	ids := identity.NewService(pgstore.New(pool), nil, cfg.PublicURL)
-	go every(ctx, 15*time.Minute, func() {
-		if err := ids.Cleanup(ctx); err != nil && ctx.Err() == nil {
-			logger.Warn("identity cleanup failed", "err", err)
-		}
-	})
 	return serveHealth(ctx, cfg, health, logger)
-}
-
-// every runs fn now and then every d until ctx ends.
-func every(ctx context.Context, d time.Duration, fn func()) {
-	t := time.NewTicker(d)
-	defer t.Stop()
-	for {
-		fn()
-		select {
-		case <-ctx.Done():
-			return
-		case <-t.C:
-		}
-	}
 }
 
 // runner: browser runner. Phase 0: self-test at start-up (Chromium starts with sandbox, a page opens),
@@ -133,6 +137,13 @@ func migrate(ctx context.Context, cfg config.Config, logger *slog.Logger) error 
 	}
 	if err != nil {
 		return err
+	}
+	riverVersions, err := queue.Migrate(ctx, pool)
+	if err != nil {
+		return err
+	}
+	if len(riverVersions) > 0 {
+		logger.Info("queue migrations applied", "versions", riverVersions)
 	}
 	if err := db.SetAppRolePassword(ctx, pool, cfg.DatabaseAppPassword); err != nil {
 		return err

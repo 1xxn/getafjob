@@ -52,6 +52,11 @@ type Config struct {
 	MailFrom string
 	// ShutdownTimeout bounds the graceful shutdown.
 	ShutdownTimeout time.Duration
+	// CrawlInterval is the time between two crawls (worker).
+	CrawlInterval time.Duration
+	// CrawlQueries and CrawlCities feed the search-based sources (job boards, amazon.jobs). Empty: those are skipped.
+	CrawlQueries []string
+	CrawlCities  []string
 
 	// Unknown lists GETAFJOB_* variables that are set but read by nobody (typos); names only, never values.
 	Unknown []string
@@ -93,6 +98,9 @@ var specs = []spec{
 	{"SHUTDOWN_TIMEOUT", "20s", setShutdownTimeout},
 	{"SMTP_URL", "", func(c *Config, v string) error { c.SMTPURL = Secret(v); return nil }},
 	{"MAIL_FROM", "getafjob@localhost", setMailFrom},
+	{"CRAWL_INTERVAL", "6h", setCrawlInterval},
+	{"CRAWL_QUERIES", "", func(c *Config, v string) error { return setList(&c.CrawlQueries, v) }},
+	{"CRAWL_CITIES", "", func(c *Config, v string) error { return setList(&c.CrawlCities, v) }},
 }
 
 // Names returns all known variable names (with prefix), e.g. for the docs.
@@ -239,6 +247,33 @@ func setShutdownTimeout(c *Config, v string) error {
 		return errors.New("must be a duration between 1s and 5m")
 	}
 	c.ShutdownTimeout = d
+	return nil
+}
+
+func setCrawlInterval(c *Config, v string) error {
+	d, err := time.ParseDuration(v)
+	if err != nil || d < 30*time.Minute || d > 7*24*time.Hour {
+		return errors.New("must be a duration between 30m and 168h")
+	}
+	c.CrawlInterval = d
+	return nil
+}
+
+// setList reads a comma-separated list: at most 50 entries of up to 100 characters each.
+func setList(dst *[]string, v string) error {
+	var out []string
+	for _, item := range strings.Split(v, ",") {
+		if item = strings.TrimSpace(item); item != "" {
+			if len(item) > 100 || strings.ContainsAny(item, "\r\n") {
+				return errors.New("entries must be single lines of at most 100 characters")
+			}
+			out = append(out, item)
+		}
+	}
+	if len(out) > 50 {
+		return errors.New("at most 50 entries")
+	}
+	*dst = out
 	return nil
 }
 

@@ -126,7 +126,9 @@ job-board copy of a company job is counted as a duplicate and a company board th
 job-board entry (merge, old link kept in `alt_urls`). Every change is a snapshot. A job that a complete source no
 longer lists is closed at once; one from a capped source (search, page limit) after 21 days unseen; a failing source
 closes nothing. Sources are applicant tracking systems (one board per company), job boards and the career sites of
-large companies; every request names itself as `getafjob/<version>` and goes through the egress proxy.
+large companies; every request names itself as `getafjob/<version>` and goes through the egress proxy. The crawl is a
+River job on the `crawl` queue (one at a time, at most one waiting), scheduled every `GETAFJOB_CRAWL_INTERVAL` and
+started by hand with `getafjob admin crawl`; migrate applies River's schema after the own migrations.
 
 **Handoff:** a CAPTCHA, login checkpoint, security code or open question pauses the run; the user gets a Web Push
 and continues in the remote browser (CDP screencast); after the hold time the run is parked.
