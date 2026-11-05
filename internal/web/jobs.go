@@ -74,6 +74,10 @@ func (s *Server) jobsPage(w http.ResponseWriter, r *http.Request, u *identity.Us
 	if f.Page < d.Pages {
 		d.NextURL = link(f.Page + 1)
 	}
+	if partial(r) {
+		s.render(w, r, http.StatusOK, views.JobResults(d))
+		return
+	}
 	s.render(w, r, http.StatusOK, views.JobsPage(d))
 }
 
@@ -140,4 +144,10 @@ func webLink(s string) string {
 		return ""
 	}
 	return u.String()
+}
+
+// partial reports an htmx request for a fragment; history restores and plain requests get the whole page.
+func partial(r *http.Request) bool {
+	return r.Header.Get("HX-Request") == "true" && r.Header.Get("HX-Request-Type") != "full" &&
+		r.Header.Get("HX-History-Restore-Request") != "true"
 }

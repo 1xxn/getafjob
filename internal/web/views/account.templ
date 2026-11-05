@@ -80,8 +80,15 @@ templ Account(d AccountData) {
 				<div class="stack">
 					@Field(FieldProps{Name: "passkey-name", Label: T(ctx, "passkey.name"), Type: "text",
 						Hint: T(ctx, "passkey.name_hint"), MaxLength: 100})
-					<button type="button" class="primary" hidden data-passkey="register" data-name="f-passkey-name"
-						data-status="passkey-status" data-error={ T(ctx, "passkey.failed") }>{ T(ctx, "passkey.add") }</button>
+					<button
+						type="button"
+						class="primary"
+						hidden
+						data-passkey="register"
+						data-name="f-passkey-name"
+						data-status="passkey-status"
+						data-error={ T(ctx, "passkey.failed") }
+					>{ T(ctx, "passkey.add") }</button>
 					<p id="passkey-status" role="status" class="muted"></p>
 					<noscript><p class="muted">{ T(ctx, "passkey.needs_script") }</p></noscript>
 				</div>

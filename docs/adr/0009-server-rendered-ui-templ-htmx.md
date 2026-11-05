@@ -1,6 +1,6 @@
 # 0009. Server-rendered UI with templ, htmx and SSE
 
-- Status: accepted
+- Status: accepted; htmx version and CSP superseded by [0024](0024-htmx-4-with-hx-csp.md)
 - Date: 2026-11-04
 - Deciders: maintainer
 
@@ -23,5 +23,6 @@ other clients ([0010](0010-spec-first-json-api.md)).
 
 ### Consequences
 
-- Good, because CSP stays `script-src 'self'` and the build is pure Go.
+- Good, because the CSP stays strict (since [0024](0024-htmx-4-with-hx-csp.md): nonce and Trusted Types) and the
+  build is pure Go.
 - Bad, because rich client interactions need deliberate islands.

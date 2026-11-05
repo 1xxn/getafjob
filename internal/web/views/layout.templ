@@ -11,8 +11,12 @@ templ Layout(p Page) {
 			<link rel="stylesheet" href="/static/app.css"/>
 			<link rel="icon" href="/static/icon.svg" type="image/svg+xml"/>
 			<link rel="manifest" href="/static/manifest.webmanifest"/>
+			<meta name="htmx-config" content={ htmxConfig }/>
+			<script src="/static/vendor/htmx/htmx.min.js" nonce={ templ.GetNonce(ctx) } defer></script>
+			<script src="/static/vendor/htmx/hx-csp.min.js" nonce={ templ.GetNonce(ctx) } defer></script>
+			<script src="/static/vendor/htmx/hx-sse.min.js" nonce={ templ.GetNonce(ctx) } defer></script>
 			if p.Passkeys {
-				<script type="module" src="/static/js/passkey.js"></script>
+				<script type="module" src="/static/js/passkey.js" nonce={ templ.GetNonce(ctx) }></script>
 			}
 		</head>
 		<body>

@@ -14,7 +14,7 @@ rewritten once accepted: a changed decision gets a new ADR that supersedes the o
 | [0006](0006-tenant-isolation-rls-and-envelope-encryption.md) | Tenant isolation with RLS, envelope encryption | accepted |
 | [0007](0007-runner-isolation-and-gateway.md) | Runner isolation and the runner gateway | accepted |
 | [0008](0008-egress-proxy.md) | Egress proxy for runners and source fetches | accepted |
-| [0009](0009-server-rendered-ui-templ-htmx.md) | Server-rendered UI with templ, htmx and SSE | accepted |
+| [0009](0009-server-rendered-ui-templ-htmx.md) | Server-rendered UI with templ, htmx and SSE | accepted, partly superseded by 0024 |
 | [0010](0010-spec-first-json-api.md) | Spec-first JSON API v1 | accepted |
 | [0011](0011-browser-automation-go-rod.md) | Browser automation with go-rod | accepted |
 | [0012](0012-no-ai-by-default.md) | Works without AI; optional AI module | accepted |
@@ -29,3 +29,4 @@ rewritten once accepted: a changed decision gets a new ADR that supersedes the o
 | [0021](0021-observability-slog-opentelemetry.md) | Observability with slog and OpenTelemetry | accepted |
 | [0022](0022-mail-link-as-delayed-recovery.md) | Mail link only as delayed recovery once a passkey exists | accepted |
 | [0023](0023-rule-based-matching.md) | Rule-based matching with stored reasons | accepted |
+| [0024](0024-htmx-4-with-hx-csp.md) | htmx 4 with hx-csp under a nonce CSP and Trusted Types | accepted |

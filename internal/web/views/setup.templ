@@ -81,7 +81,7 @@ templ setupButtons(step string) {
 
 templ SetupPage(d SetupData) {
 	@Layout(Page{Title: T(ctx, "setup.title"), UserName: d.Name}) {
-		@Section(T(ctx, "setup.title") + ": " + T(ctx, "setup.step." + d.Step)) {
+		@Section(T(ctx, "setup.title") + ": " + T(ctx, "setup.step."+d.Step)) {
 			@setupNav(d.Step)
 			<p class="muted">{ T(ctx, "setup.text." + d.Step) }</p>
 			@formNotice(d.Form)

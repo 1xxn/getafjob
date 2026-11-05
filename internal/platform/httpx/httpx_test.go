@@ -90,8 +90,14 @@ func TestProtectSetsHeadersAndBlocksCrossOriginPosts(t *testing.T) {
 			t.Errorf("header %s missing", k)
 		}
 	}
-	if !strings.Contains(rec.Header().Get("Content-Security-Policy"), "script-src 'self'") {
-		t.Errorf("CSP = %q", rec.Header().Get("Content-Security-Policy"))
+	csp := rec.Header().Get("Content-Security-Policy")
+	if !strings.Contains(csp, "script-src 'nonce-") || !strings.Contains(csp, "trusted-types htmx") || strings.Contains(csp, "unsafe") {
+		t.Errorf("CSP = %q", csp)
+	}
+	again := httptest.NewRecorder()
+	h.ServeHTTP(again, httptest.NewRequest(http.MethodGet, "/", nil))
+	if again.Header().Get("Content-Security-Policy") == csp {
+		t.Error("nonce reused")
 	}
 
 	// A foreign site sends a POST with the user's cookie (CSRF) → rejected.

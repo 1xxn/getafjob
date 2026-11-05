@@ -3,6 +3,8 @@ package web_test
 import (
 	"context"
 	"net/http"
+	"net/http/httptest"
+	"regexp"
 	"strconv"
 	"strings"
 	"testing"
@@ -79,7 +81,12 @@ func TestJobPages(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	list := a.do(http.MethodGet, "/jobs", nil, session, nil).Body.String()
+	rec := a.do(http.MethodGet, "/jobs", nil, session, nil)
+	checkNonces(t, rec)
+	list := rec.Body.String()
+	if !strings.Contains(list, `hx-nonce="`) || !strings.Contains(list, `name="htmx-config"`) {
+		t.Fatal("list without htmx")
+	}
 	if !strings.Contains(list, `href="/jobs/`) || !strings.Contains(list, "Go Developer") || strings.Contains(list, "Sales Manager") {
 		t.Fatalf("default list:\n%s", list)
 	}
@@ -94,7 +101,21 @@ func TestJobPages(t *testing.T) {
 		t.Fatalf("odd input: %d", rec.Code)
 	}
 
-	detail := a.do(http.MethodGet, "/jobs/"+strconv.FormatInt(goID, 10), nil, session, nil).Body.String()
+	// htmx gets only the results; a history restore gets the whole page.
+	part := a.do(http.MethodGet, "/jobs?page=1", nil, session, map[string]string{"HX-Request": "true", "HX-Request-Type": "partial"})
+	checkNonces(t, part)
+	if body := part.Body.String(); !strings.HasPrefix(strings.TrimSpace(body), `<div id="results">`) || strings.Contains(body, "<html") ||
+		!strings.Contains(part.Header().Get("Vary"), "HX-Request") {
+		t.Fatalf("partial: %s", body)
+	}
+	restore := a.do(http.MethodGet, "/jobs", nil, session, map[string]string{"HX-Request": "true", "HX-History-Restore-Request": "true"})
+	if !strings.Contains(restore.Body.String(), "<html") {
+		t.Fatal("history restore got a fragment")
+	}
+
+	drec := a.do(http.MethodGet, "/jobs/"+strconv.FormatInt(goID, 10), nil, session, nil)
+	checkNonces(t, drec)
+	detail := drec.Body.String()
 	for _, want := range []string{`The title matches &#34;Go Developer&#34;.`, `href="https://example.org/1"`, "&lt;b&gt;PostgreSQL",
 		"The posting is in English, a language you work in."} {
 		if !strings.Contains(detail, want) {
@@ -110,6 +131,29 @@ func TestJobPages(t *testing.T) {
 	for _, path := range []string{"/jobs/0", "/jobs/abc", "/jobs/999999"} {
 		if rec := a.do(http.MethodGet, path, nil, session, nil); rec.Code != http.StatusNotFound {
 			t.Errorf("%s: %d", path, rec.Code)
+		}
+	}
+}
+
+var (
+	cspNonce = regexp.MustCompile(`script-src 'nonce-([A-Za-z0-9_-]+)'`)
+	tagRx    = regexp.MustCompile(`<[a-z]+\s[^>]*>`)
+	hxAttr   = regexp.MustCompile(`\shx-[a-z-]+=`)
+)
+
+// checkNonces: every script and every element with htmx attributes carries the response's CSP nonce.
+func checkNonces(t *testing.T, rec *httptest.ResponseRecorder) {
+	t.Helper()
+	m := cspNonce.FindStringSubmatch(rec.Header().Get("Content-Security-Policy"))
+	if m == nil {
+		t.Fatalf("no nonce in CSP %q", rec.Header().Get("Content-Security-Policy"))
+	}
+	for _, tag := range tagRx.FindAllString(rec.Body.String(), -1) {
+		if strings.HasPrefix(tag, "<script") && !strings.Contains(tag, `nonce="`+m[1]+`"`) {
+			t.Errorf("script without nonce: %s", tag)
+		}
+		if hxAttr.MatchString(strings.ReplaceAll(tag, " hx-nonce=", " x=")) && !strings.Contains(tag, `hx-nonce="`+m[1]+`"`) {
+			t.Errorf("htmx element without nonce: %s", tag)
 		}
 	}
 }

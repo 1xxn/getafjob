@@ -78,7 +78,14 @@ templ option(value, current, label string) {
 templ JobsPage(d JobsData) {
 	@Layout(Page{Title: T(ctx, "jobs.title"), UserName: d.Name}) {
 		@Section(T(ctx, "jobs.title")) {
-			<form method="get" action="/jobs" class="filters" role="search">
+			<form
+				method="get"
+				action="/jobs"
+				class="filters"
+				role="search"
+				{ HX(ctx, "hx-get", "/jobs", "hx-target", "#results", "hx-swap", "outerHTML", "hx-push-url", "true",
+					"hx-trigger", "submit, change, input delay:300ms")... }
+			>
 				@Field(FieldProps{Name: "q", Label: T(ctx, "jobs.search_label"), Type: "search", Value: d.Query,
 					Hint: T(ctx, "jobs.search_hint"), MaxLength: 200})
 				<div class="field">
@@ -102,39 +109,46 @@ templ JobsPage(d JobsData) {
 				</div>
 				<button type="submit">{ T(ctx, "jobs.apply_filter") }</button>
 			</form>
-			if d.Pending {
-				@Notice("info", T(ctx, "jobs.pending"))
-			} else {
-				<p class="muted" role="status">
-					{ T(ctx, "jobs.count", "total", d.Total) }.
-					{ T(ctx, "jobs.counts", "match", d.Counts["match"], "maybe", d.Counts["maybe"], "skip", d.Counts["skip"]) }
-				</p>
-				if len(d.Rows) == 0 {
-					<p>{ T(ctx, "jobs.none") }</p>
-				}
-				<ol class="jobs">
-					for _, r := range d.Rows {
-						<li>
-							<h2><a href={ templ.SafeURL("/jobs/" + i64(r.ID)) }>{ r.Title }</a></h2>
-							@jobMeta(r)
-							@decision(r)
-						</li>
-					}
-				</ol>
-				if d.Pages > 1 {
-					<nav class="pager" aria-label={ T(ctx, "jobs.pages") }>
-						if d.PrevURL != "" {
-							<a href={ templ.SafeURL(d.PrevURL) } rel="prev">{ T(ctx, "jobs.prev") }</a>
-						}
-						<span>{ T(ctx, "jobs.page", "page", d.Page, "pages", d.Pages) }</span>
-						if d.NextURL != "" {
-							<a href={ templ.SafeURL(d.NextURL) } rel="next">{ T(ctx, "jobs.next") }</a>
-						}
-					</nav>
-				}
-			}
+			@JobResults(d)
 		}
 	}
+}
+
+// JobResults is the part of the list that htmx swaps on search, filters and pages.
+templ JobResults(d JobsData) {
+	<div id="results">
+		if d.Pending {
+			@Notice("info", T(ctx, "jobs.pending"))
+		} else {
+			<p class="muted" role="status">
+				{ T(ctx, "jobs.count", "total", d.Total) }.
+				{ T(ctx, "jobs.counts", "match", d.Counts["match"], "maybe", d.Counts["maybe"], "skip", d.Counts["skip"]) }
+			</p>
+			if len(d.Rows) == 0 {
+				<p>{ T(ctx, "jobs.none") }</p>
+			}
+			<ol class="jobs">
+				for _, r := range d.Rows {
+					<li>
+						<h2><a href={ templ.SafeURL("/jobs/" + i64(r.ID)) }>{ r.Title }</a></h2>
+						@jobMeta(r)
+						@decision(r)
+					</li>
+				}
+			</ol>
+			if d.Pages > 1 {
+				<nav class="pager" aria-label={ T(ctx, "jobs.pages") }>
+					if d.PrevURL != "" {
+						<a href={ templ.SafeURL(d.PrevURL) } rel="prev" { pageLink(ctx, d.PrevURL)... }>{ T(ctx, "jobs.prev") }</a>
+					}
+					<span>{ T(ctx, "jobs.page", "page", d.Page, "pages", d.Pages) }</span>
+					if d.NextURL != "" {
+						<a href={ templ.SafeURL(d.NextURL) } rel="next" { pageLink(ctx, d.NextURL)... }>{ T(ctx, "jobs.next") }</a>
+					}
+				</nav>
+			}
+		}
+	</div>
 }
 
 templ JobPage(d JobData) {

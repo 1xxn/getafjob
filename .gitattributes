@@ -16,3 +16,5 @@
 internal/gen/** linguist-generated=true
 # Test fixture pages do not count as project language
 testdata/** linguist-vendored=true
+
+internal/web/static/vendor/** linguist-vendored

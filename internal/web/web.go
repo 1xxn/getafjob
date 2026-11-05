@@ -18,6 +18,7 @@ import (
 
 	"github.com/1xxn/getafjob/internal/identity"
 	"github.com/1xxn/getafjob/internal/matching"
+	"github.com/1xxn/getafjob/internal/platform/httpx"
 	"github.com/1xxn/getafjob/internal/platform/i18n"
 	"github.com/1xxn/getafjob/internal/profile"
 	"github.com/1xxn/getafjob/internal/profile/cvimport"
@@ -47,6 +48,7 @@ func (s *Server) Register(mux *http.ServeMux) {
 	sub, _ := fs.Sub(staticFiles, "static")
 	static := http.StripPrefix("/static/", http.FileServerFS(sub))
 	mux.Handle("GET /static/", cacheFor(time.Hour, static))
+	mux.Handle("GET /speculation-rules", cacheFor(time.Hour, http.HandlerFunc(speculationRules)))
 
 	mux.Handle("GET /{$}", s.page(s.home))
 	mux.Handle("GET /login", s.page(s.loginForm))
@@ -96,12 +98,15 @@ func (s *Server) Register(mux *http.ServeMux) {
 func (s *Server) page(h func(http.ResponseWriter, *http.Request, *identity.User)) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Cache-Control", "no-store")
+		w.Header().Set("Speculation-Rules", `"/speculation-rules"`)
+		w.Header().Add("Vary", "HX-Request")
 		u, token := s.currentUser(w, r)
 		l := i18n.FromAcceptLanguage(r.Header.Get("Accept-Language"))
 		if u != nil {
 			l = u.Locale
 		}
 		ctx := context.WithValue(views.WithLocale(r.Context(), l), tokenKey{}, token)
+		ctx = templ.WithNonce(ctx, httpx.Nonce(ctx))
 		h(w, r.WithContext(ctx), u)
 	})
 }
@@ -226,4 +231,12 @@ func (s *Server) limited(h http.Handler) http.Handler {
 
 func isCanceled(err error) bool {
 	return errors.Is(err, context.Canceled) || errors.Is(err, context.DeadlineExceeded)
+}
+
+// speculation prefetches job pages a user is about to open (hover or touch); prefetch only, nothing runs early.
+const speculation = `{"prefetch":[{"where":{"href_matches":"/jobs/*"},"eagerness":"moderate"}]}`
+
+func speculationRules(w http.ResponseWriter, _ *http.Request) {
+	w.Header().Set("Content-Type", "application/speculationrules+json")
+	_, _ = w.Write([]byte(speculation))
 }
