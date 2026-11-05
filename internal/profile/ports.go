@@ -51,3 +51,20 @@ type Sealer interface {
 	Seal(ctx context.Context, userID uuid.UUID, purpose string, plaintext []byte) ([]byte, error)
 	Open(ctx context.Context, userID uuid.UUID, purpose string, ciphertext []byte) ([]byte, error)
 }
+
+// StoredItem is a sealed answer or text block.
+type StoredItem struct {
+	ID        uuid.UUID
+	Sealed    []byte
+	UpdatedAt time.Time
+}
+
+// ItemStore persists answers and text blocks per user (row-level security).
+type ItemStore interface {
+	Items(ctx context.Context, userID uuid.UUID, kind string) ([]StoredItem, error)
+	CountItems(ctx context.Context, userID uuid.UUID, kind string) (int, error)
+	InsertItem(ctx context.Context, userID uuid.UUID, kind string, it StoredItem) error
+	// UpdateItem and DeleteItem report false when the item does not exist for the user.
+	UpdateItem(ctx context.Context, userID uuid.UUID, kind string, it StoredItem) (bool, error)
+	DeleteItem(ctx context.Context, userID uuid.UUID, kind string, id uuid.UUID) (bool, error)
+}

@@ -12,10 +12,10 @@ func itoa(n int) string { return strconv.Itoa(n) }
 func describedBy(f FieldProps) string {
 	var ids []string
 	if f.Hint != "" {
-		ids = append(ids, "f-"+f.Name+"-hint")
+		ids = append(ids, fieldID(f)+"-hint")
 	}
 	if f.Error != "" {
-		ids = append(ids, "f-"+f.Name+"-error")
+		ids = append(ids, fieldID(f)+"-error")
 	}
 	return strings.Join(ids, " ")
 }
@@ -65,4 +65,11 @@ func Size(n int) string {
 	default:
 		return strconv.Itoa(n) + " B"
 	}
+}
+
+func fieldID(f FieldProps) string {
+	if f.ID != "" {
+		return f.ID
+	}
+	return "f-" + f.Name
 }

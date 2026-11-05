@@ -32,6 +32,7 @@ type Server struct {
 	Identity  *identity.Service
 	Profile   *profile.Service
 	Documents *profile.Documents
+	Items     *profile.Items
 	Logger    *slog.Logger
 	limiter   *limiter
 }
@@ -60,6 +61,14 @@ func (s *Server) Register(mux *http.ServeMux) {
 	mux.Handle("GET /documents/{id}", s.page(s.documentDownload))
 	mux.Handle("POST /documents/{id}/variant", s.page(s.documentVariant))
 	mux.Handle("POST /documents/{id}/delete", s.page(s.documentDelete))
+	mux.Handle("GET /answers", s.page(s.answersPage))
+	mux.Handle("POST /answers", s.page(s.answerSave))
+	mux.Handle("POST /answers/{id}", s.page(s.answerSave))
+	mux.Handle("POST /answers/{id}/delete", s.page(s.itemDelete(profile.ItemAnswer, "/answers")))
+	mux.Handle("GET /texts", s.page(s.textsPage))
+	mux.Handle("POST /texts", s.page(s.textSave))
+	mux.Handle("POST /texts/{id}", s.page(s.textSave))
+	mux.Handle("POST /texts/{id}/delete", s.page(s.itemDelete(profile.ItemText, "/texts")))
 	mux.Handle("GET /account", s.page(s.account))
 	mux.Handle("POST /account/sessions/others", s.page(s.signOutOthers))
 	mux.Handle("POST /account/passkeys/options", s.page(s.passkeyAddOptions))
