@@ -228,9 +228,11 @@ func (s *Service) details(ctx context.Context, items []item, st *Stats) error {
 	return ctx.Err()
 }
 
-// parallel runs fn for 0..n-1 with at most s.parallelism at a time.
-func (s *Service) parallel(n int, fn func(int)) {
-	sem := make(chan struct{}, s.parallelism)
+func (s *Service) parallel(n int, fn func(int)) { parallel(n, s.parallelism, fn) }
+
+// parallel runs fn for 0..n-1 with at most k at a time.
+func parallel(n, k int, fn func(int)) {
+	sem := make(chan struct{}, k)
 	var wg sync.WaitGroup
 	for i := range n {
 		wg.Go(func() {

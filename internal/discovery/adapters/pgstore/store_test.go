@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"slices"
 	"sync/atomic"
 	"testing"
 	"time"
@@ -348,5 +349,74 @@ func TestCrawlStubs(t *testing.T) {
 	rep, err = svc.Crawl(ctx, []discovery.Source{src})
 	if err != nil || rep.Stats.Closed != 1 {
 		t.Fatalf("crawl 3: job 2 left the complete sitemap and must close: %+v, %v", rep.Stats, err)
+	}
+}
+
+func TestBoardChecks(t *testing.T) {
+	pool := dbtest.AppPool(t)
+	ctx := context.Background()
+	st := pgstore.New(pool)
+	now := time.Date(2026, 11, 5, 12, 0, 0, 0, time.UTC)
+	run, err := st.StartRun(ctx, []string{}, now)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, p := range []discovery.Posting{
+		posting("arbeitnow", "1", "Acme GmbH", "Go Developer", "Berlin"),
+		posting("himalayas", "2", "Muster AG", "SRE", "Remote"),
+		posting("arbeitsagentur", "3", "Offline", "Ops", "Hamburg"),
+		posting("greenhouse:beispiel", "4", "Beispiel", "QA", "Berlin"),
+	} {
+		if _, _, err := st.Upsert(ctx, run, p, now); err != nil {
+			t.Fatal(err)
+		}
+	}
+	keys := func(at time.Time) []string {
+		t.Helper()
+		hits, err := st.BoardCandidates(ctx, at, 100)
+		if err != nil {
+			t.Fatal(err)
+		}
+		var out []string
+		for _, h := range hits {
+			out = append(out, h.MatchKey)
+		}
+		slices.Sort(out)
+		return out
+	}
+	if got := keys(now); !equal(got, []string{"acme|go developer", "muster|sre", "offline|ops"}) {
+		t.Fatalf("candidates = %v", got)
+	}
+
+	if _, _, err := st.ImportBoards(ctx, []discovery.Board{{ATS: "ashby", Slug: "acme", Company: "Acme"}}); err != nil {
+		t.Fatal(err)
+	}
+	added, err := st.RecordBoardChecks(ctx, []discovery.BoardCheck{
+		{CompanyKey: "acme", Result: discovery.CheckFound, Board: &discovery.Board{ATS: "ashby", Slug: "ACME", Company: "Acme GmbH"}},
+		{CompanyKey: "muster", Result: discovery.CheckFound, Board: &discovery.Board{ATS: "lever", Slug: "muster", Company: "Muster AG"}},
+		{CompanyKey: "offline", Result: discovery.CheckError},
+	}, now)
+	if err != nil || added != 1 {
+		t.Fatalf("added = %d, %v (a known slug in other case is not added)", added, err)
+	}
+	var origin string
+	if err := pool.QueryRow(ctx, "SELECT origin FROM boards WHERE ats = 'lever' AND slug = 'muster'").Scan(&origin); err != nil || origin != "discovered" {
+		t.Fatalf("origin = %q, %v", origin, err)
+	}
+	var linked int
+	if err := pool.QueryRow(ctx, "SELECT count(*) FROM board_checks WHERE board_id IS NOT NULL").Scan(&linked); err != nil || linked != 2 {
+		t.Fatalf("linked checks = %d, %v", linked, err)
+	}
+	if got := keys(now.Add(time.Hour)); len(got) != 0 {
+		t.Errorf("checked companies still candidates: %v", got)
+	}
+	if got := keys(now.Add(discovery.BoardRetry + time.Minute)); !equal(got, []string{"offline|ops"}) {
+		t.Errorf("after a day = %v (only the inconclusive check expires)", got)
+	}
+	if got := keys(now.Add(discovery.BoardRecheck + time.Minute)); len(got) != 3 {
+		t.Errorf("after 30 days = %v", got)
+	}
+	if _, err := st.RecordBoardChecks(ctx, []discovery.BoardCheck{{CompanyKey: "muster", Result: discovery.CheckNone}}, now); err != nil {
+		t.Fatalf("re-recording a check: %v", err)
 	}
 }

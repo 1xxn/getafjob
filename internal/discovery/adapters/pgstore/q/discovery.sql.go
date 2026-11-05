@@ -12,6 +12,75 @@ import (
 	"github.com/jackc/pgx/v5/pgtype"
 )
 
+const boardBySlug = `-- name: BoardBySlug :one
+SELECT id FROM boards WHERE ats = $1 AND lower(slug) = lower($2::text) ORDER BY id LIMIT 1
+`
+
+type BoardBySlugParams struct {
+	Ats  string
+	Slug string
+}
+
+func (q *Queries) BoardBySlug(ctx context.Context, arg BoardBySlugParams) (int64, error) {
+	row := q.db.QueryRow(ctx, boardBySlug, arg.Ats, arg.Slug)
+	var id int64
+	err := row.Scan(&id)
+	return id, err
+}
+
+const boardCandidates = `-- name: BoardCandidates :many
+SELECT company, title, url, apply_url, match_key
+FROM jobs j
+WHERE j.status = 'open'
+  AND split_part(j.source, ':', 1) = ANY($1::text[])
+  AND split_part(j.match_key, '|', 1) <> ''
+  AND NOT EXISTS (SELECT 1 FROM board_checks c
+                  WHERE c.company_key = split_part(j.match_key, '|', 1) AND c.recheck_at > $2)
+ORDER BY j.first_seen DESC, j.id
+LIMIT $3
+`
+
+type BoardCandidatesParams struct {
+	Aggregators []string
+	Now         time.Time
+	MaxRows     int32
+}
+
+type BoardCandidatesRow struct {
+	Company  string
+	Title    string
+	Url      string
+	ApplyUrl string
+	MatchKey string
+}
+
+// Open job-board hits of companies whose own board was not looked for recently, newest first.
+func (q *Queries) BoardCandidates(ctx context.Context, arg BoardCandidatesParams) ([]BoardCandidatesRow, error) {
+	rows, err := q.db.Query(ctx, boardCandidates, arg.Aggregators, arg.Now, arg.MaxRows)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []BoardCandidatesRow{}
+	for rows.Next() {
+		var i BoardCandidatesRow
+		if err := rows.Scan(
+			&i.Company,
+			&i.Title,
+			&i.Url,
+			&i.ApplyUrl,
+			&i.MatchKey,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const closeJob = `-- name: CloseJob :one
 UPDATE jobs SET status = 'closed', closed_at = $2 WHERE id = $1 AND status = 'open'
 RETURNING title, location, content_hash
@@ -116,6 +185,31 @@ func (q *Queries) FinishRun(ctx context.Context, arg FinishRunParams) error {
 		arg.Errors,
 	)
 	return err
+}
+
+const insertDiscoveredBoard = `-- name: InsertDiscoveredBoard :one
+INSERT INTO boards (ats, slug, company, config, origin) VALUES ($1, $2, $3, $4, 'discovered')
+ON CONFLICT (ats, slug) DO NOTHING
+RETURNING id
+`
+
+type InsertDiscoveredBoardParams struct {
+	Ats     string
+	Slug    string
+	Company string
+	Config  []byte
+}
+
+func (q *Queries) InsertDiscoveredBoard(ctx context.Context, arg InsertDiscoveredBoardParams) (int64, error) {
+	row := q.db.QueryRow(ctx, insertDiscoveredBoard,
+		arg.Ats,
+		arg.Slug,
+		arg.Company,
+		arg.Config,
+	)
+	var id int64
+	err := row.Scan(&id)
+	return id, err
 }
 
 const insertJob = `-- name: InsertJob :one
@@ -306,6 +400,32 @@ func (q *Queries) OpenJobsOfSources(ctx context.Context, sources []string) ([]Op
 		return nil, err
 	}
 	return items, nil
+}
+
+const recordBoardCheck = `-- name: RecordBoardCheck :exec
+INSERT INTO board_checks (company_key, checked_at, recheck_at, result, board_id) VALUES ($1, $2, $3, $4, $5)
+ON CONFLICT (company_key) DO UPDATE
+SET checked_at = EXCLUDED.checked_at, recheck_at = EXCLUDED.recheck_at, result = EXCLUDED.result,
+    board_id = EXCLUDED.board_id
+`
+
+type RecordBoardCheckParams struct {
+	CompanyKey string
+	CheckedAt  time.Time
+	RecheckAt  time.Time
+	Result     string
+	BoardID    *int64
+}
+
+func (q *Queries) RecordBoardCheck(ctx context.Context, arg RecordBoardCheckParams) error {
+	_, err := q.db.Exec(ctx, recordBoardCheck,
+		arg.CompanyKey,
+		arg.CheckedAt,
+		arg.RecheckAt,
+		arg.Result,
+		arg.BoardID,
+	)
+	return err
 }
 
 const startRun = `-- name: StartRun :one

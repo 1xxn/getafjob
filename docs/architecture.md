@@ -135,6 +135,12 @@ stored descriptions are never fetched again. Sitemaps (Meta) list only job URLs 
 seen again, a new one becomes a posting from the schema.org `JobPosting` on its page. Careers pages are read the same
 way; links into supported systems name a company's board (`sources.DetectBoards`).
 
+**Board discovery:** after each crawl a River job looks for the own boards of up to 30 companies that appear only on
+job boards: first the boards their links point to, then slugs guessed from the company name (Greenhouse, Ashby,
+Lever, Recruitee, Workable, Personio), each fetched once without retries. A board is added (`origin = 'discovered'`)
+only if it lists one of the company's jobs with the same `MatchKey`; it then replaces the job-board entries in the
+next crawl. `board_checks` remembers every company for 30 days, or one day if no system answered.
+
 **Handoff:** a CAPTCHA, login checkpoint, security code or open question pauses the run; the user gets a Web Push
 and continues in the remote browser (CDP screencast); after the hold time the run is parked.
 

@@ -35,6 +35,14 @@ type Board struct {
 	CreatedAt     time.Time
 }
 
+type BoardCheck struct {
+	CompanyKey string
+	CheckedAt  time.Time
+	RecheckAt  time.Time
+	Result     string
+	BoardID    *int64
+}
+
 type CrawlRun struct {
 	ID         int64
 	StartedAt  time.Time
