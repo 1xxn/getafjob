@@ -15,8 +15,9 @@ import (
 var (
 	emailRx    = regexp.MustCompile(`[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}`)
 	phoneRx    = regexp.MustCompile(`(?:\+\d{1,3}[\s./-]?)?(?:\(\d{1,5}\)[\s./-]?)?\d[\d\s./-]{6,18}\d`)
-	linkedinRx = regexp.MustCompile(`(?i)(?:https?://)?(?:[a-z]{2,3}\.)?linkedin\.com/in/[A-Za-z0-9_%-]+/?`)
-	githubRx   = regexp.MustCompile(`(?i)(?:https?://)?github\.com/[A-Za-z0-9-]{1,39}/?`)
+	// The host must start the line or follow a separator, so evil-linkedin.com or xgithub.com never count.
+	linkedinRx = regexp.MustCompile(`(?i)(?:^|[\s(<|,;:])((?:https?://)?(?:www\.|[a-z]{2}\.)?linkedin\.com/in/[A-Za-z0-9_%-]+/?)`)
+	githubRx   = regexp.MustCompile(`(?i)(?:^|[\s(<|,;:])((?:https?://)?(?:www\.)?github\.com/[A-Za-z0-9-]{1,39}/?)`)
 	webRx      = regexp.MustCompile(`(?i)\bhttps?://[A-Za-z0-9.-]+\.[A-Za-z]{2,}(?:/[^\s]*)?`)
 	postalRx   = regexp.MustCompile(`\b(\d{5})\s+([\p{Lu}][\p{L}.-]+(?:\s[\p{Lu}][\p{L}.-]+)?)`)
 	monthName  = `(?:jan|feb|mar|mär|apr|may|mai|jun|jul|aug|sep|oct|okt|nov|dec|dez)[a-zä]*\.?`
@@ -64,14 +65,14 @@ func Parse(text string) profile.Profile {
 		p.Personal.Email = strings.ToLower(m)
 	}
 	p.Personal.Phone = phone(text)
-	if m := linkedinRx.FindString(text); m != "" {
-		p.Personal.LinkedIn = profile.WebURL(m)
+	if m := linkedinRx.FindStringSubmatch(text); m != nil {
+		p.Personal.LinkedIn = profile.WebURL(m[1])
 	}
-	if m := githubRx.FindString(text); m != "" {
-		p.Personal.GitHub = profile.WebURL(m)
+	if m := githubRx.FindStringSubmatch(text); m != nil {
+		p.Personal.GitHub = profile.WebURL(m[1])
 	}
 	for _, m := range webRx.FindAllString(text, 10) {
-		if !linkedinRx.MatchString(m) && !githubRx.MatchString(m) {
+		if !linkedinRx.MatchString(" "+m) && !githubRx.MatchString(" "+m) {
 			p.Personal.Website = strings.TrimRight(m, ".,;)")
 			break
 		}
