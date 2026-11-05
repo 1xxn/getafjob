@@ -1,6 +1,7 @@
 package web_test
 
 import (
+	"archive/zip"
 	"bytes"
 	"context"
 	"encoding/base64"
@@ -11,6 +12,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"net/url"
+	"os"
 	"strings"
 	"sync"
 	"testing"
@@ -26,6 +28,7 @@ import (
 	"github.com/1xxn/getafjob/internal/platform/httpx"
 	"github.com/1xxn/getafjob/internal/profile"
 	profilestore "github.com/1xxn/getafjob/internal/profile/adapters/pgstore"
+	"github.com/1xxn/getafjob/internal/profile/cvimport"
 	"github.com/1xxn/getafjob/internal/web"
 )
 
@@ -72,7 +75,12 @@ func newApp(t *testing.T) *app {
 	pstore := profilestore.New(pool)
 	profiles := profile.NewService(pstore, env)
 	docs := profile.NewDocuments(pstore, blob.NewSealed(dir, env), env)
-	(&web.Server{Identity: ids, Profile: profiles, Documents: docs, Items: profile.NewItems(pstore, env),
+	exe, err := os.Executable()
+	if err != nil {
+		t.Fatal(err)
+	}
+	importer := cvimport.NewImporter(docs, profiles, cvimport.NewExtractorFor(exe, 20*time.Second))
+	(&web.Server{Identity: ids, Profile: profiles, Documents: docs, Items: profile.NewItems(pstore, env), Importer: importer,
 		Logger: slog.New(slog.NewTextHandler(io.Discard, nil))}).Register(mux)
 	return &app{t: t, h: httpx.Protect(mux, 1<<20, true, httpx.Upload{Path: "/documents", Max: web.MaxUpload}), ids: ids, mail: mb}
 }
@@ -653,5 +661,65 @@ func TestAnswersAndTexts(t *testing.T) {
 	}
 	if rec := a.do(http.MethodPost, "/answers/"+id+"/delete", url.Values{}, session, nil); rec.Code != http.StatusSeeOther {
 		t.Errorf("delete %d", rec.Code)
+	}
+}
+
+// TestMain lets the test binary act as the CV text child process.
+func TestMain(m *testing.M) {
+	if len(os.Args) > 1 && os.Args[1] == cvimport.ChildCommand {
+		os.Exit(cvimport.RunChild(os.Args[2:], os.Stdin, os.Stdout))
+	}
+	os.Exit(m.Run())
+}
+
+func cvDocx(t *testing.T, lines ...string) []byte {
+	t.Helper()
+	var buf bytes.Buffer
+	zw := zip.NewWriter(&buf)
+	w, _ := zw.Create("[Content_Types].xml")
+	_, _ = w.Write([]byte("<Types/>"))
+	w, _ = zw.Create("word/document.xml")
+	_, _ = w.Write([]byte(`<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:body>`))
+	for _, l := range lines {
+		_, _ = w.Write([]byte("<w:p><w:r><w:t>" + l + "</w:t></w:r></w:p>"))
+	}
+	_, _ = w.Write([]byte("</w:body></w:document>"))
+	_ = zw.Close()
+	return buf.Bytes()
+}
+
+func TestCVImport(t *testing.T) {
+	a := newApp(t)
+	session := signedIn(t, a)
+	if rec := a.do(http.MethodPost, "/profile", url.Values{"version": {"0"}, "first_name": {"Maximilian"}}, session, nil); rec.Code != http.StatusSeeOther {
+		t.Fatalf("profile %d", rec.Code)
+	}
+	cv := cvDocx(t, "Max Mustermann", "10115 Berlin", "max.mustermann@example.org | +49 30 1234567",
+		"Summary", "Platform engineer with eight years of experience in Go, Kubernetes and PostgreSQL in production.",
+		"Experience", "Senior Platform Engineer at Muster GmbH 01/2021 - present", "Skills", "Go, Kubernetes, PostgreSQL",
+		"Languages", "German: native", "English: C1")
+	if rec := a.upload("cv", "cv.docx", cv, session); rec.Code != http.StatusSeeOther {
+		t.Fatalf("upload %d", rec.Code)
+	}
+	page := a.do(http.MethodGet, "/documents", nil, session, nil).Body.String()
+	i := strings.Index(page, `formaction="/documents/`)
+	if i < 0 {
+		t.Fatalf("no import button: %s", page)
+	}
+	path := page[i+len(`formaction="`):i+len(`formaction="`)+len("/documents/")+36] + "/import"
+	rec := a.do(http.MethodPost, path, url.Values{}, session, nil)
+	if rec.Code != http.StatusSeeOther || rec.Header().Get("Location") != "/profile?imported=1" {
+		t.Fatalf("import %d: %s", rec.Code, rec.Body.String())
+	}
+	body := a.do(http.MethodGet, "/profile?imported=1", nil, session, nil).Body.String()
+	for _, want := range []string{`value="Maximilian"`, `value="Mustermann"`, `value="max.mustermann@example.org"`, `value="Berlin"`,
+		"Go\nKubernetes\nPostgreSQL", "German: native", `value="Senior Platform Engineer"`, "nothing you entered was changed"} {
+		if !strings.Contains(body, want) {
+			t.Errorf("profile lacks %q", want)
+		}
+	}
+	// A second import has nothing to add.
+	if rec := a.do(http.MethodPost, path, url.Values{}, session, nil); rec.Code != http.StatusOK || !strings.Contains(rec.Body.String(), "nothing to add") {
+		t.Errorf("second import %d", rec.Code)
 	}
 }

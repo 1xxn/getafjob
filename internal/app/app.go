@@ -11,12 +11,14 @@ import (
 	"fmt"
 	"io"
 	"log/slog"
+	"os"
 	"time"
 
 	"github.com/1xxn/getafjob/internal/platform/buildinfo"
 	"github.com/1xxn/getafjob/internal/platform/config"
 	"github.com/1xxn/getafjob/internal/platform/log"
 	"github.com/1xxn/getafjob/internal/platform/otel"
+	"github.com/1xxn/getafjob/internal/profile/cvimport"
 )
 
 // Exit codes.
@@ -75,6 +77,8 @@ func Main(ctx context.Context, args []string, env Env) int {
 		return admin(ctx, args[1:], env)
 	case "healthcheck":
 		return healthcheck(ctx, args[1:], env)
+	case cvimport.ChildCommand: // hidden: text extraction in a limited child process
+		return cvimport.RunChild(args[1:], os.Stdin, env.Stdout)
 	case "version", "--version":
 		_, _ = fmt.Fprintln(env.Stdout, "getafjob", buildinfo.Get().String())
 		return ExitOK
