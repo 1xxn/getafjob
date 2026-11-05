@@ -217,3 +217,24 @@ func TestPublicPages(t *testing.T) {
 		t.Fatalf("garbage cookie: %d", rec.Code)
 	}
 }
+
+func TestErrorLogHasNoToken(t *testing.T) {
+	pool := dbtest.AppPool(t)
+	base, _ := url.Parse("https://jobs.example.org")
+	var logs strings.Builder
+	mux := http.NewServeMux()
+	(&web.Server{Identity: identity.NewService(pgstore.New(pool), &mailbox{}, base),
+		Logger: slog.New(slog.NewTextHandler(&logs, nil))}).Register(mux)
+	a := &app{t: t, h: httpx.Protect(mux, 1<<20, true)}
+	pool.Close() // every query fails from here on
+
+	tok, _ := identity.NewToken()
+	token := string(tok)
+	rec := a.do(http.MethodPost, "/login/link/"+token, url.Values{}, "", nil)
+	if rec.Code != http.StatusInternalServerError {
+		t.Fatalf("status %d", rec.Code)
+	}
+	if out := logs.String(); strings.Contains(out, token) || !strings.Contains(out, "/login/link/{token}") {
+		t.Fatalf("log = %q", out)
+	}
+}

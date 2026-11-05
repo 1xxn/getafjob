@@ -86,9 +86,10 @@ func (s *Server) problem(w http.ResponseWriter, r *http.Request, u *identity.Use
 	s.render(w, r, status, views.Problem(views.T(r.Context(), title), text, name))
 }
 
-// failed logs an unexpected error and shows a generic page (no details for the client).
+// failed logs an unexpected error and shows a generic page (no details for the client). It logs the route pattern,
+// not the path: paths of sign-in and invitation links carry one-time tokens.
 func (s *Server) failed(w http.ResponseWriter, r *http.Request, u *identity.User, err error) {
-	s.Logger.ErrorContext(r.Context(), "request failed", "path", r.URL.Path, "err", err)
+	s.Logger.ErrorContext(r.Context(), "request failed", "route", r.Pattern, "err", err)
 	s.problem(w, r, u, http.StatusInternalServerError, "error.generic.title", views.T(r.Context(), "error.generic.text"))
 }
 
