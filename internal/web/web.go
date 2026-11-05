@@ -19,6 +19,7 @@ import (
 	"github.com/1xxn/getafjob/internal/identity"
 	"github.com/1xxn/getafjob/internal/platform/i18n"
 	"github.com/1xxn/getafjob/internal/profile"
+	"github.com/1xxn/getafjob/internal/profile/cvimport"
 	"github.com/1xxn/getafjob/internal/web/views"
 )
 
@@ -33,6 +34,7 @@ type Server struct {
 	Profile   *profile.Service
 	Documents *profile.Documents
 	Items     *profile.Items
+	Importer  *cvimport.Importer // nil: no CV import
 	Logger    *slog.Logger
 	limiter   *limiter
 }
@@ -61,6 +63,7 @@ func (s *Server) Register(mux *http.ServeMux) {
 	mux.Handle("GET /documents/{id}", s.page(s.documentDownload))
 	mux.Handle("POST /documents/{id}/variant", s.page(s.documentVariant))
 	mux.Handle("POST /documents/{id}/delete", s.page(s.documentDelete))
+	mux.Handle("POST /documents/{id}/import", s.limited(s.page(s.documentImport)))
 	mux.Handle("GET /answers", s.page(s.answersPage))
 	mux.Handle("POST /answers", s.page(s.answerSave))
 	mux.Handle("POST /answers/{id}", s.page(s.answerSave))

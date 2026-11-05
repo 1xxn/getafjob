@@ -49,6 +49,7 @@ This document grows with every module.
 | D3 | Guessing or flooding on sign-in endpoints | 1 | Rate limit per client address (burst 10, then one request per 6 s); pages are `no-store` | `TestSignInIsRateLimited` |
 | D2 | Hostile page exhausts the runner | 2/3 | Per-run limits, memory/pids limits, browser restarted per run | Phase 2 |
 | D4 | Huge or endless source responses | 1 | Body cap (`sources.MaxBody`), request timeouts, page caps per source, bounded fetch and detail parallelism, at most 3 attempts with backoff and `Retry-After` up to 30 s | `TestPagingIsBounded`, `TestClientErrors`, `FuzzSources` |
+| D5 | Hostile CV (PDF or DOCX) crashes or exhausts `serve` during import | 1 | Text extraction runs in a child process of the binary without environment (no secrets), with address space, CPU time and file size limits (Linux), a 20 second timeout and bounded output; DOCX parts and PDF pages are bounded; the parser panics are recovered | `TestExtractorChild`, `FuzzText`, `FuzzParse`, `TestCVImport` |
 | E1 | Browser exploit escapes to the host | 2 | Chromium sandbox on (seccomp profile), site isolation, non-root, read-only rootfs, `cap_drop: ALL`, no DB access | `TestRendererRunsInItsOwnNamespaces`, `TestLaunchKeepsSandboxAndSiteIsolation` |
 | E2 | Compromised runner reaches data | 2 | Runner has no database access, depguard rule | `.golangci.yml` |
 | E3 | Malicious workflow change escalates | 6 | `permissions: {}`, read-only default token, SHA pinning enforced, zizmor, ruleset | CI, repository settings |

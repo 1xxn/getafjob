@@ -12,6 +12,7 @@ import (
 
 	"github.com/1xxn/getafjob/internal/identity"
 	"github.com/1xxn/getafjob/internal/profile"
+	"github.com/1xxn/getafjob/internal/profile/cvimport"
 	"github.com/1xxn/getafjob/internal/web/views"
 )
 
@@ -39,7 +40,8 @@ func (s *Server) renderDocuments(w http.ResponseWriter, r *http.Request, u *iden
 	rows := make([]views.DocumentRow, len(docs))
 	for i, d := range docs {
 		rows[i] = views.DocumentRow{ID: d.ID.String(), Name: d.Name, Kind: d.Kind, Size: views.Size(d.Size),
-			Created: views.When(r.Context(), d.CreatedAt), Label: d.Label, Language: d.Language, Focus: strings.Join(d.Focus, ", ")}
+			Created: views.When(r.Context(), d.CreatedAt), Label: d.Label, Language: d.Language, Focus: strings.Join(d.Focus, ", "),
+			Import: s.Importer != nil && (d.Mime == profile.MimePDF || d.Mime == profile.MimeDOCX)}
 	}
 	s.render(w, r, status, views.DocumentsPage(u.DisplayName, notice, failed, rows))
 }
@@ -180,6 +182,36 @@ func (s *Server) documentDelete(w http.ResponseWriter, r *http.Request, u *ident
 		s.renderDocuments(w, r, u, http.StatusOK, views.T(r.Context(), "documents.deleted"), false)
 	case errors.Is(err, profile.ErrNotFound):
 		s.notFound(w, r, u)
+	default:
+		s.failed(w, r, u, err)
+	}
+}
+
+// documentImport fills empty profile fields from a CV and shows the profile for checking.
+func (s *Server) documentImport(w http.ResponseWriter, r *http.Request, u *identity.User) {
+	if u == nil {
+		http.Redirect(w, r, "/login", http.StatusSeeOther)
+		return
+	}
+	id, ok := docID(r)
+	if !ok || s.Importer == nil {
+		s.notFound(w, r, u)
+		return
+	}
+	filled, err := s.Importer.Import(r.Context(), u.ID, id)
+	switch {
+	case err == nil && filled:
+		http.Redirect(w, r, "/profile?imported=1", http.StatusSeeOther)
+	case err == nil:
+		s.renderDocuments(w, r, u, http.StatusOK, views.T(r.Context(), "documents.import_nothing"), false)
+	case errors.Is(err, profile.ErrNotFound):
+		s.notFound(w, r, u)
+	case errors.Is(err, cvimport.ErrNoText):
+		s.renderDocuments(w, r, u, http.StatusUnprocessableEntity, views.T(r.Context(), "documents.import_no_text"), true)
+	case errors.Is(err, profile.ErrFileType), errors.Is(err, profile.ErrFileTooLarge):
+		s.renderDocuments(w, r, u, http.StatusUnprocessableEntity, views.T(r.Context(), "documents.import_unreadable"), true)
+	case errors.Is(err, profile.ErrConflict):
+		s.renderDocuments(w, r, u, http.StatusConflict, views.T(r.Context(), "profile.conflict"), true)
 	default:
 		s.failed(w, r, u, err)
 	}

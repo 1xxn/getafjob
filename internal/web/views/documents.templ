@@ -10,6 +10,7 @@ type DocumentRow struct {
 	Label    string
 	Language string
 	Focus    string
+	Import   bool // text can be read (PDF or DOCX)
 }
 
 templ DocumentsPage(name, notice string, failed bool, docs []DocumentRow) {
@@ -83,6 +84,9 @@ templ DocumentsPage(name, notice string, failed bool, docs []DocumentRow) {
 							@Field(FieldProps{Name: "focus-" + d.ID, Label: T(ctx, "documents.focus"), Type: "text", Value: d.Focus,
 								Hint: T(ctx, "documents.focus_hint"), MaxLength: 2000})
 							<button type="submit">{ T(ctx, "profile.save") }</button>
+							if d.Import {
+								<button type="submit" class="link" formaction={ templ.SafeURL("/documents/" + d.ID + "/import") }>{ T(ctx, "documents.import") }</button>
+							}
 						</form>
 					}
 				}

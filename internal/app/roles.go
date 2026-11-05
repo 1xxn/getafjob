@@ -24,6 +24,7 @@ import (
 	"github.com/1xxn/getafjob/internal/platform/queue"
 	"github.com/1xxn/getafjob/internal/profile"
 	profilestore "github.com/1xxn/getafjob/internal/profile/adapters/pgstore"
+	"github.com/1xxn/getafjob/internal/profile/cvimport"
 	"github.com/1xxn/getafjob/internal/runner/browser"
 	"github.com/1xxn/getafjob/internal/web"
 	"github.com/1xxn/getafjob/internal/web/apiv1"
@@ -68,8 +69,14 @@ func serve(ctx context.Context, cfg config.Config, logger *slog.Logger) error {
 		return err
 	}
 	pstore := profilestore.New(pool)
-	(&web.Server{Identity: ids, Logger: logger, Profile: profile.NewService(pstore, env),
-		Documents: profile.NewDocuments(pstore, blob.NewSealed(files, env), env), Items: profile.NewItems(pstore, env)}).Register(mux)
+	profiles := profile.NewService(pstore, env)
+	docs := profile.NewDocuments(pstore, blob.NewSealed(files, env), env)
+	extractor, err := cvimport.NewExtractor()
+	if err != nil {
+		return err
+	}
+	(&web.Server{Identity: ids, Logger: logger, Profile: profiles, Documents: docs, Items: profile.NewItems(pstore, env),
+		Importer: cvimport.NewImporter(docs, profiles, extractor)}).Register(mux)
 
 	h := httpx.Instrument(httpx.Protect(httpx.Routes(mux), maxBody, cfg.PublicURL.Scheme == "https",
 		httpx.Upload{Path: "/documents", Max: web.MaxUpload}))

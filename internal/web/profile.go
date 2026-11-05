@@ -91,8 +91,11 @@ func (s *Server) profilePage(w http.ResponseWriter, r *http.Request, u *identity
 		return
 	}
 	f := profileForm(snap)
-	if r.URL.Query().Get("saved") == "1" {
+	switch {
+	case r.URL.Query().Get("saved") == "1":
 		f.Notice = views.T(r.Context(), "profile.saved")
+	case r.URL.Query().Get("imported") == "1":
+		f.Notice = views.T(r.Context(), "profile.imported")
 	}
 	s.render(w, r, http.StatusOK, views.ProfilePage(u.DisplayName, f))
 }
