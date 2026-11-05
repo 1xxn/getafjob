@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/go-rod/rod/lib/proto"
+	"github.com/google/uuid"
 	"github.com/riverqueue/river"
 
 	"github.com/1xxn/getafjob/internal/discovery"
@@ -16,6 +17,8 @@ import (
 	"github.com/1xxn/getafjob/internal/discovery/adapters/sources"
 	"github.com/1xxn/getafjob/internal/identity"
 	"github.com/1xxn/getafjob/internal/identity/adapters/pgstore"
+	"github.com/1xxn/getafjob/internal/matching"
+	matchingstore "github.com/1xxn/getafjob/internal/matching/adapters/pgstore"
 	"github.com/1xxn/getafjob/internal/platform/blob"
 	"github.com/1xxn/getafjob/internal/platform/config"
 	"github.com/1xxn/getafjob/internal/platform/crypto"
@@ -69,7 +72,15 @@ func serve(ctx context.Context, cfg config.Config, logger *slog.Logger) error {
 		return err
 	}
 	pstore := profilestore.New(pool)
-	profiles := profile.NewService(pstore, env)
+	inserter, err := queue.NewInserter(pool, logger)
+	if err != nil {
+		return err
+	}
+	profiles := profile.NewService(pstore, env).WithOnChange(func(ctx context.Context, userID uuid.UUID) {
+		if _, err := inserter.Insert(context.WithoutCancel(ctx), MatchArgs{UserID: userID}, nil); err != nil {
+			logger.WarnContext(ctx, "matching not queued", "err", err)
+		}
+	})
 	docs := profile.NewDocuments(pstore, blob.NewSealed(files, env), env)
 	extractor, err := cvimport.NewExtractor()
 	if err != nil {
@@ -98,8 +109,16 @@ func worker(ctx context.Context, cfg config.Config, logger *slog.Logger) error {
 	if err != nil {
 		return err
 	}
+	ring, err := crypto.NewKeyring(cfg.MasterKey, cfg.MasterKeyOld)
+	if err != nil {
+		return fmt.Errorf("GETAFJOB_MASTER_KEY: %w", err)
+	}
+	pstore := profilestore.New(pool)
+	mstore := matchingstore.New(pool)
 	river.AddWorker(workers, &crawlWorker{svc: discovery.NewService(store), boards: store, states: store, client: client,
-		cfg: cfg, logger: logger, timeout: 90 * time.Minute, metrics: metrics})
+		terms: preferenceTerms(pstore, logger), logger: logger, timeout: 90 * time.Minute, metrics: metrics})
+	river.AddWorker(workers, &matchWorker{logger: logger, svc: matching.NewService(
+		profileCriteria{svc: profile.NewService(pstore, crypto.NewEnvelope(ring, pool)), store: pstore}, mstore, mstore)})
 	river.AddWorker(workers, &boardDiscoveryWorker{
 		discovery: discovery.NewBoardDiscovery(store, store, sources.NewFinder(client)), logger: logger, metrics: metrics})
 	river.AddWorker(workers, &cleanupWorker{ids: identity.NewService(pgstore.New(pool), nil, cfg.PublicURL)})

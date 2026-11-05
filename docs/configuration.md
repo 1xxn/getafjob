@@ -26,8 +26,6 @@ an error. Unknown `GETAFJOB_*` variables are reported as a warning (typos), with
 | `GETAFJOB_SMTP_URL` | none | serve, worker, admin | mail server: `smtps://user:pass@host:465` or `smtp://user:pass@host:587` (STARTTLS); `smtp+insecure://host:1025` for local development only; use `_FILE` |
 | `GETAFJOB_MAIL_FROM` | `getafjob@localhost` | serve, worker, admin | sender address of all mail |
 | `GETAFJOB_CRAWL_INTERVAL` | `6h` | worker | time between two crawls (30m to 168h) |
-| `GETAFJOB_CRAWL_QUERIES` | none | worker | comma-separated search terms for job boards and amazon.jobs, e.g. `Softwareentwickler,Go Developer`; empty skips those sources |
-| `GETAFJOB_CRAWL_CITIES` | none | worker | comma-separated cities for the Bundesagentur search, e.g. `Berlin,Hamburg` |
 
 `getafjob admin env` lists all variables; `getafjob admin check-config` validates the current environment without
 printing values. Secret values never appear in logs or error messages.

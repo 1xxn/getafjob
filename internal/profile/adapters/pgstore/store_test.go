@@ -2,6 +2,7 @@ package pgstore_test
 
 import (
 	"bytes"
+	"context"
 	"encoding/base64"
 	"errors"
 	"testing"
@@ -98,5 +99,37 @@ func TestProfileRoundTrip(t *testing.T) {
 	}
 	if snap, err := svc.Get(ctx, erika); err != nil || snap.Version != 0 || snap.Profile.Personal.LastName != "" {
 		t.Fatalf("erika's profile = %+v, %v", snap, err)
+	}
+}
+
+func TestActiveUsers(t *testing.T) {
+	pool := dbtest.AppPool(t)
+	ctx := t.Context()
+	st := pgstore.New(pool)
+	changed := map[uuid.UUID]int{}
+	svc := service(t, pool).WithOnChange(func(_ context.Context, id uuid.UUID) { changed[id]++ })
+	max, off := user(t, pool, "max@example.org"), user(t, pool, "off@example.org")
+	user(t, pool, "erika@example.org") // no profile
+	for _, u := range []uuid.UUID{max, off} {
+		if err := svc.SavePreferences(ctx, u, profile.Preferences{Titles: []string{"SRE"}}); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if err := db.InSystemTx(ctx, pool, func(tx pgx.Tx) error {
+		_, err := tx.Exec(ctx, "UPDATE users SET disabled_at = now() WHERE id = $1", off)
+		return err
+	}); err != nil {
+		t.Fatal(err)
+	}
+	if changed[max] != 1 || changed[off] != 1 {
+		t.Fatalf("changes = %v", changed)
+	}
+	ids, err := st.ActiveUsers(ctx)
+	if err != nil || len(ids) != 1 || ids[0] != max {
+		t.Fatalf("ActiveUsers = %v, %v", ids, err)
+	}
+	prefs, err := st.ActivePreferences(ctx)
+	if err != nil || len(prefs) != 1 || !bytes.Contains(prefs[0], []byte("SRE")) {
+		t.Fatalf("ActivePreferences = %q, %v", prefs, err)
 	}
 }

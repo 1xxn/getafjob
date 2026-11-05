@@ -11,7 +11,6 @@ import (
 
 	"github.com/1xxn/getafjob/internal/discovery"
 	"github.com/1xxn/getafjob/internal/discovery/adapters/sources"
-	"github.com/1xxn/getafjob/internal/platform/config"
 	"github.com/1xxn/getafjob/internal/platform/db/dbtest"
 )
 
@@ -40,16 +39,16 @@ func TestCrawlSources(t *testing.T) {
 		{ID: 3, ATS: "workday", Slug: "muster", Company: "Muster", Config: []byte(`{"host":"muster.wd3.myworkdayjobs.com","site":"External"}`)},
 	}
 	cases := []struct {
-		cfg  config.Config
-		want string
+		terms searchTerms
+		want  string
 	}{
-		{config.Config{}, "google apple:germany-DEU arbeitnow greenhouse:acme workday:muster/External"},
-		{config.Config{CrawlQueries: []string{"Go"}}, "google apple:germany-DEU arbeitnow himalayas amazon greenhouse:acme workday:muster/External"},
-		{config.Config{CrawlQueries: []string{"Go"}, CrawlCities: []string{"Berlin"}},
+		{searchTerms{}, "google apple:germany-DEU arbeitnow greenhouse:acme workday:muster/External"},
+		{searchTerms{Queries: []string{"Go"}}, "google apple:germany-DEU arbeitnow himalayas amazon greenhouse:acme workday:muster/External"},
+		{searchTerms{Queries: []string{"Go"}, Cities: []string{"Berlin"}},
 			"google apple:germany-DEU arbeitnow himalayas amazon arbeitsagentur greenhouse:acme workday:muster/External"},
 	}
 	for _, tc := range cases {
-		got, _, err := crawlSources(context.Background(), c, boards, tc.cfg, logger)
+		got, _, err := crawlSources(context.Background(), c, boards, tc.terms, logger)
 		if err != nil || names(got) != tc.want {
 			t.Errorf("sources = %q, %v; want %q", names(got), err, tc.want)
 		}

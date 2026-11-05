@@ -62,3 +62,21 @@ func (s *Store) SavePreferences(ctx context.Context, userID uuid.UUID, prefs []b
 		return qs.SavePreferences(ctx, q.SavePreferencesParams{UserID: userID, Preferences: prefs, UpdatedAt: at})
 	})
 }
+
+// ActiveUsers lists the enabled users with a profile or preferences (system role, for matching).
+func (s *Store) ActiveUsers(ctx context.Context) (ids []uuid.UUID, err error) {
+	err = db.InSystemTx(ctx, s.pool, func(tx pgx.Tx) error {
+		ids, err = q.New(tx).ActiveProfileUsers(ctx)
+		return err
+	})
+	return ids, err
+}
+
+// ActivePreferences returns the preferences JSON of enabled users (system role, for the crawl's search terms).
+func (s *Store) ActivePreferences(ctx context.Context) (prefs [][]byte, err error) {
+	err = db.InSystemTx(ctx, s.pool, func(tx pgx.Tx) error {
+		prefs, err = q.New(tx).ActivePreferences(ctx)
+		return err
+	})
+	return prefs, err
+}

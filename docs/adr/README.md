@@ -28,3 +28,4 @@ rewritten once accepted: a changed decision gets a new ADR that supersedes the o
 | [0020](0020-authentication-invitations-passkeys.md) | Invitations, passkeys and magic links; no passwords | accepted |
 | [0021](0021-observability-slog-opentelemetry.md) | Observability with slog and OpenTelemetry | accepted |
 | [0022](0022-mail-link-as-delayed-recovery.md) | Mail link only as delayed recovery once a passkey exists | accepted |
+| [0023](0023-rule-based-matching.md) | Rule-based matching with stored reasons | accepted |

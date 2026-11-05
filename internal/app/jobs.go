@@ -44,7 +44,7 @@ type crawlWorker struct {
 	boards  discovery.Boards
 	states  discovery.BoardStates
 	client  *sources.Client
-	cfg     config.Config
+	terms   func(context.Context) (searchTerms, error)
 	logger  *slog.Logger
 	timeout time.Duration
 	metrics *crawlMetrics
@@ -55,7 +55,11 @@ func (w *crawlWorker) Timeout(*river.Job[CrawlArgs]) time.Duration { return w.ti
 
 func (w *crawlWorker) Work(ctx context.Context, _ *river.Job[CrawlArgs]) error {
 	start := time.Now()
-	srcs, ids, err := crawlSources(ctx, w.client, w.boards, w.cfg, w.logger)
+	terms, err := w.terms(ctx)
+	if err != nil {
+		return err
+	}
+	srcs, ids, err := crawlSources(ctx, w.client, w.boards, terms, w.logger)
 	if err != nil {
 		return err
 	}
@@ -73,6 +77,9 @@ func (w *crawlWorker) Work(ctx context.Context, _ *river.Job[CrawlArgs]) error {
 	if c, err := river.ClientFromContextSafely[pgx.Tx](ctx); err == nil {
 		if _, err := c.Insert(ctx, BoardDiscoveryArgs{}, nil); err != nil {
 			w.logger.WarnContext(ctx, "board discovery not queued", "err", err)
+		}
+		if _, err := c.Insert(ctx, MatchArgs{}, nil); err != nil {
+			w.logger.WarnContext(ctx, "matching not queued", "err", err)
 		}
 	}
 	return nil
@@ -114,17 +121,17 @@ func (w *boardDiscoveryWorker) Work(ctx context.Context, _ *river.Job[BoardDisco
 	return nil
 }
 
-// crawlSources lists what a crawl reads: career sites and job boards, search-based sources when search terms are
-// configured, and every enabled company board. A board that cannot be built is skipped and logged. ids maps the
+// crawlSources lists what a crawl reads: career sites and job boards, search-based sources when users gave search
+// terms, and every enabled company board. A board that cannot be built is skipped and logged. ids maps the
 // source name of each board to its ID.
-func crawlSources(ctx context.Context, c *sources.Client, boards discovery.Boards, cfg config.Config, logger *slog.Logger) (
+func crawlSources(ctx context.Context, c *sources.Client, boards discovery.Boards, terms searchTerms, logger *slog.Logger) (
 	out []discovery.Source, ids map[string]int64, err error,
 ) {
 	out = []discovery.Source{sources.NewGoogle(c), sources.NewApple(c, "germany-DEU"), sources.NewArbeitnow(c, 10)}
-	if len(cfg.CrawlQueries) > 0 {
-		out = append(out, sources.NewHimalayas(c, cfg.CrawlQueries, "Germany"), sources.NewAmazon(c, cfg.CrawlQueries, "DEU"))
-		if len(cfg.CrawlCities) > 0 {
-			out = append(out, sources.NewArbeitsagentur(c, cfg.CrawlQueries, cfg.CrawlCities))
+	if len(terms.Queries) > 0 {
+		out = append(out, sources.NewHimalayas(c, terms.Queries, "Germany"), sources.NewAmazon(c, terms.Queries, "DEU"))
+		if len(terms.Cities) > 0 {
+			out = append(out, sources.NewArbeitsagentur(c, terms.Queries, terms.Cities))
 		}
 	}
 	list, err := boards.EnabledBoards(ctx)

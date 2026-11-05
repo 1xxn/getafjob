@@ -120,6 +120,16 @@ type MagicLink struct {
 	UsedAt    *time.Time
 }
 
+type Match struct {
+	UserID     uuid.UUID
+	JobID      int64
+	Score      int16
+	Decision   string
+	Reasons    []byte
+	Rules      int32
+	ComputedAt time.Time
+}
+
 type Passkey struct {
 	ID         []byte
 	UserID     uuid.UUID
