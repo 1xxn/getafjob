@@ -52,7 +52,7 @@ tasks:
       - >-
         docker run --rm -v "{{.ROOT_DIR}}:/src" -w /src
         -v getafjob-golangci-cache:/root/.cache
-        golangci/golangci-lint:{{.GOLANGCI_LINT_VERSION}} golangci-lint run ./...
+        golangci/golangci-lint:{{.GOLANGCI_LINT_VERSION}} golangci-lint run --build-tags browser ./...
 
   test:
     desc: Unit + integration tests (integration needs Docker) with race detector and shuffled order
