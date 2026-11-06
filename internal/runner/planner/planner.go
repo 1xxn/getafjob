@@ -5,6 +5,8 @@ package planner
 
 import (
 	"context"
+	"fmt"
+	"slices"
 	"strings"
 
 	"github.com/1xxn/getafjob/internal/runner/browser"
@@ -222,4 +224,18 @@ func split(f browser.Field, answer string) []string {
 		}
 	}
 	return out
+}
+
+// Precheck answers the questions an ATS publishes for a job before the run; the required ones it cannot answer
+// are asked before the browser starts.
+func (p *Planner) Precheck(ctx context.Context, fields []browser.Field) []engine.Question {
+	fs := slices.Clone(fields)
+	for i := range fs {
+		fs[i].ID = fmt.Sprintf("0-pre%d", i)
+	}
+	_, qs, _ := p.Plan(ctx, &browser.State{Frames: []*browser.Frame{{Fields: fs}}})
+	for i := range qs {
+		qs[i].FieldID = "" // not on a page yet
+	}
+	return qs
 }

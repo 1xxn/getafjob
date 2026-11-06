@@ -141,3 +141,22 @@ func TestQuestionsInsteadOfGuesses(t *testing.T) {
 		}
 	}
 }
+
+func TestPrecheck(t *testing.T) {
+	p := &Planner{K: know}
+	fields := []browser.Field{
+		{Kind: "text", Label: "First Name", Required: true},
+		{Kind: "select", Label: "Will you now or in the future require visa sponsorship?", Required: true,
+			Options: []browser.Option{{Label: "Yes"}, {Label: "No"}}},
+		{Kind: "select", Label: "Which of our values speaks to you most?", Required: true,
+			Options: []browser.Option{{Label: "Ownership"}, {Label: "Curiosity"}}},
+		{Kind: "text", Label: "LinkedIn Profile"},
+	}
+	qs := p.Precheck(context.Background(), fields)
+	if len(qs) != 1 || qs[0].Label != "Which of our values speaks to you most?" || qs[0].FieldID != "" {
+		t.Fatalf("questions = %+v", qs)
+	}
+	if fields[0].ID != "" {
+		t.Fatal("precheck changed the caller's fields")
+	}
+}
