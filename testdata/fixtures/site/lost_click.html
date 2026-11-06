@@ -1,0 +1,10 @@
+<!doctype html>
+<html lang="en">
+<head><meta charset="utf-8"><title>Lost click</title></head>
+<body>
+<!-- The iframe lets no pointer events through: a click on its button lands on this page instead. -->
+<h1>Apply</h1>
+<iframe id="form" style="pointer-events:none;width:400px;height:200px" srcdoc="<button type=button onclick='parent.hits=(parent.hits||0)+1'>Apply now</button>"></iframe>
+<script>window.parentDowns = 0; addEventListener("pointerdown", () => { window.parentDowns++; }, true);</script>
+</body>
+</html>

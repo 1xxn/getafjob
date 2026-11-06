@@ -44,9 +44,10 @@ func (e *NoEffectError) Error() string { return "submit had no effect, also on t
 // scrolling, invalid events (native validation) and loaded resources. It changes nothing on the page.
 const probeJS = `() => {
   if (!window.__gajProbe) {
-    const s = { dom: 0, input: 0, scroll: 0, invalid: [] };
+    const s = { dom: 0, input: 0, scroll: 0, pointer: 0, invalid: [] };
     new MutationObserver((rs) => { s.dom += rs.length; })
       .observe(document, { subtree: true, childList: true, attributes: true, characterData: true });
+    addEventListener("pointerdown", () => { s.pointer++; }, true);
     addEventListener("input", () => { s.input++; }, true);
     addEventListener("change", () => { s.input++; }, true);
     addEventListener("scroll", () => { s.scroll++; }, true);
@@ -56,7 +57,7 @@ const probeJS = `() => {
     window.__gajProbe = s;
   }
   const s = window.__gajProbe;
-  return { dom: s.dom, input: s.input, scroll: s.scroll, invalid: s.invalid.slice(),
+  return { dom: s.dom, input: s.input, scroll: s.scroll, pointer: s.pointer, invalid: s.invalid.slice(),
     href: location.href, origin: performance.timeOrigin,
     res: performance.getEntriesByType("resource").length };
 }`
@@ -65,6 +66,7 @@ type probe struct {
 	DOM     int      `json:"dom"`
 	Input   int      `json:"input"`
 	Scroll  int      `json:"scroll"`
+	Pointer int      `json:"pointer"`
 	Invalid []string `json:"invalid"`
 	Href    string   `json:"href"`
 	Origin  float64  `json:"origin"`
@@ -184,9 +186,14 @@ func (s *State) measure(id string) (point, error) {
 // pollEvery is how often a click's effect is checked.
 const pollEvery = 100 * time.Millisecond
 
+// arrivalWait is how long a click may take to reach its frame before it counts as lost.
+const arrivalWait = 400 * time.Millisecond
+
 // Click moves the mouse to an element in any frame (also out-of-process iframes and shadow roots) and clicks
 // where a person would. It then watches the element's frame and the top frame for up to wait and reports the
-// first effects it sees.
+// first effects it sees. A click that provably never reached the frame (no pointer event, no effect), as
+// happens with a freshly loaded out-of-process iframe, is measured and sent once more; a click that arrived
+// is never repeated here.
 func (s *State) Click(id string, wait time.Duration) (Effect, error) {
 	f, err := s.FrameOf(id)
 	if err != nil {
@@ -197,29 +204,39 @@ func (s *State) Click(id string, wait time.Duration) (Effect, error) {
 	if f != top {
 		watched = append(watched, f)
 	}
+	newTargets, stop := watchTargets(top.page)
+	defer stop()
+	for attempt := 0; ; attempt++ {
+		e, arrived, err := s.clickOnce(id, watched, newTargets, wait, attempt == 0)
+		if err != nil || arrived || e.Any() || attempt == 1 {
+			return e, err
+		}
+	}
+}
+
+// clickOnce clicks once and polls for effects. With lossCheck it returns early, arrived false, when the click
+// reached no frame within arrivalWait.
+func (s *State) clickOnce(id string, watched []*Frame, newTargets func() []string, wait time.Duration, lossCheck bool) (
+	e Effect, arrived bool, err error,
+) {
 	pt, err := s.point(id)
 	if err != nil {
-		return Effect{}, err
+		return Effect{}, false, err
 	}
 	before := make([]probe, len(watched))
 	for i, w := range watched {
 		if before[i], err = w.probe(); err != nil {
-			return Effect{}, fmt.Errorf("probe frame %d: %w", w.Index, err)
+			return Effect{}, false, fmt.Errorf("probe frame %d: %w", w.Index, err)
 		}
 	}
-
-	newTargets, stop := watchTargets(top.page)
-	defer stop()
-	page := top.page
+	page := s.Frames[0].page
 	if err := page.Mouse.MoveTo(proto.Point{X: pt.X, Y: pt.Y}); err != nil {
-		return Effect{}, err
+		return Effect{}, false, err
 	}
 	if err := page.Mouse.Click(proto.InputMouseButtonLeft, 1); err != nil {
-		return Effect{}, err
+		return Effect{}, false, err
 	}
-
-	var e Effect
-	deadline := time.Now().Add(wait)
+	start := time.Now()
 	for {
 		time.Sleep(pollEvery)
 		e = Effect{NewTargets: newTargets()}
@@ -227,7 +244,11 @@ func (s *State) Click(id string, wait time.Duration) (Effect, error) {
 			after, err := w.probe()
 			if err != nil || after.Origin != before[i].Origin || after.Href != before[i].Href {
 				e.Navigated = true // the old document is gone or was replaced
+				arrived = true
 				continue
+			}
+			if i == len(watched)-1 { // only the element's own frame proves that the click reached it
+				arrived = arrived || after.Pointer > before[i].Pointer
 			}
 			e.DOM = e.DOM || after.DOM > before[i].DOM
 			e.Input = e.Input || after.Input > before[i].Input
@@ -239,8 +260,14 @@ func (s *State) Click(id string, wait time.Duration) (Effect, error) {
 				}
 			}
 		}
-		if e.Any() || time.Now().After(deadline) {
-			return e, nil
+		elapsed := time.Since(start)
+		switch {
+		case e.Any():
+			return e, true, nil
+		case lossCheck && !arrived && elapsed >= arrivalWait:
+			return e, false, nil
+		case elapsed >= wait:
+			return e, arrived, nil
 		}
 	}
 }
