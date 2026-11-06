@@ -179,3 +179,14 @@ func TestFillRefuses(t *testing.T) {
 		t.Fatal(fmt.Errorf("fields were filled: %q", v))
 	}
 }
+
+func extract(f *form) (*browser.State, error) { return browser.Extract(f.page) }
+
+func mustButton(t *testing.T, st *browser.State, id string) browser.Button {
+	t.Helper()
+	b, ok := st.Button(id)
+	if !ok {
+		t.Fatalf("no button %s", id)
+	}
+	return b
+}

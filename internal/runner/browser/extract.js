@@ -269,7 +269,9 @@
         fields.push({ id: tag(el), kind: "combobox", label, required: isRequired(el, label),
           value: PLACEHOLDER_RX.test(shown) ? "" : shown });
       } else if ((role === "radio" || role === "checkbox" || role === "switch") && !el.querySelector("input")) {
-        const label = labelOf(el) || textOf(el);
+        // An ARIA radio or checkbox is named by its own label or text; the context would merge its neighbours.
+        const own = el.getAttribute("aria-label") || (el.getAttribute("aria-labelledby") ? labelOf(el) : "") || textOf(el);
+        const label = clean(own).slice(0, 300) || labelOf(el);
         fields.push({ id: tag(el), kind: role === "radio" ? "aria_radio" : "aria_checkbox", label,
           required: isRequired(el, label), value: el.getAttribute("aria-checked") === "true" ? "checked" : "" });
       }

@@ -1,0 +1,29 @@
+<!doctype html>
+<html lang="en">
+<head><meta charset="utf-8"><title>Widgets</title>
+<style>[role=radio],[role=checkbox],[role=switch]{display:inline-block;padding:4px;border:1px solid #999;cursor:pointer}</style></head>
+<body>
+<h1>More about you</h1>
+<p id="lbl-shift">Preferred shift</p>
+<div role="radiogroup" aria-labelledby="lbl-shift">
+  <span role="radio" aria-checked="false" tabindex="0">Early</span>
+  <span role="radio" aria-checked="false" tabindex="0">Late</span>
+</div>
+<span role="checkbox" aria-checked="false" tabindex="0">Share my profile with partner companies</span>
+<span role="switch" aria-checked="true" tabindex="0">Email updates</span>
+<label id="lbl-letter">Motivation</label>
+<div contenteditable="true" aria-labelledby="lbl-letter" style="min-height:60px;border:1px solid #999">Write here</div>
+<script>
+  for (const el of document.querySelectorAll('[role=radio],[role=checkbox],[role=switch]')) {
+    el.addEventListener("click", () => {
+      if (el.getAttribute("role") === "radio") {
+        for (const r of el.parentElement.querySelectorAll('[role=radio]')) r.setAttribute("aria-checked", "false");
+        el.setAttribute("aria-checked", "true");
+      } else {
+        el.setAttribute("aria-checked", el.getAttribute("aria-checked") === "true" ? "false" : "true");
+      }
+    });
+  }
+</script>
+</body>
+</html>
