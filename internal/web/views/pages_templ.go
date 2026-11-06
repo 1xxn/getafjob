@@ -107,7 +107,7 @@ func Login(email, notice string, passkeys bool) templ.Component {
 					var templ_7745c5c3_Var6 string
 					templ_7745c5c3_Var6, templ_7745c5c3_Err = templruntime.NewAttributeExpression(T(ctx, "passkey.failed")).Resolve(ctx)
 					if templ_7745c5c3_Err != nil {
-						return templ.Error{Err: templ_7745c5c3_Err, FileName: `pages.templ`, Line: 22, Col: 43}
+						return templ.Error{Err: templ_7745c5c3_Err, FileName: `pages.templ`, Line: 18, Col: 43}
 					}
 					_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var6)
 					if templ_7745c5c3_Err != nil {
@@ -120,7 +120,7 @@ func Login(email, notice string, passkeys bool) templ.Component {
 					var templ_7745c5c3_Var7 string
 					templ_7745c5c3_Var7, templ_7745c5c3_Err = templ.JoinStringErrs(T(ctx, "passkey.sign_in"))
 					if templ_7745c5c3_Err != nil {
-						return templ.Error{Err: templ_7745c5c3_Err, FileName: `pages.templ`, Line: 23, Col: 33}
+						return templ.Error{Err: templ_7745c5c3_Err, FileName: `pages.templ`, Line: 18, Col: 73}
 					}
 					_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var7))
 					if templ_7745c5c3_Err != nil {
@@ -257,7 +257,7 @@ func ConfirmLink(action string) templ.Component {
 				var templ_7745c5c3_Var14 string
 				templ_7745c5c3_Var14, templ_7745c5c3_Err = templ.JoinStringErrs(T(ctx, "link.text"))
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `pages.templ`, Line: 43, Col: 27}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `pages.templ`, Line: 38, Col: 27}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var14))
 				if templ_7745c5c3_Err != nil {
@@ -270,7 +270,7 @@ func ConfirmLink(action string) templ.Component {
 				var templ_7745c5c3_Var15 string
 				templ_7745c5c3_Var15, templ_7745c5c3_Err = templruntime.NewAttributeExpression(templ.SafeURL(action)).ResolveURL(ctx)
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `pages.templ`, Line: 44, Col: 53}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `pages.templ`, Line: 39, Col: 53}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var15)
 				if templ_7745c5c3_Err != nil {
@@ -283,7 +283,7 @@ func ConfirmLink(action string) templ.Component {
 				var templ_7745c5c3_Var16 string
 				templ_7745c5c3_Var16, templ_7745c5c3_Err = templ.JoinStringErrs(T(ctx, "link.submit"))
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `pages.templ`, Line: 45, Col: 65}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `pages.templ`, Line: 40, Col: 65}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var16))
 				if templ_7745c5c3_Err != nil {
@@ -357,7 +357,7 @@ func Invite(action, email, name, nameError string) templ.Component {
 				var templ_7745c5c3_Var20 string
 				templ_7745c5c3_Var20, templ_7745c5c3_Err = templ.JoinStringErrs(T(ctx, "invite.text", "email", email))
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `pages.templ`, Line: 54, Col: 45}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `pages.templ`, Line: 49, Col: 45}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var20))
 				if templ_7745c5c3_Err != nil {
@@ -370,7 +370,7 @@ func Invite(action, email, name, nameError string) templ.Component {
 				var templ_7745c5c3_Var21 string
 				templ_7745c5c3_Var21, templ_7745c5c3_Err = templruntime.NewAttributeExpression(templ.SafeURL(action)).ResolveURL(ctx)
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `pages.templ`, Line: 55, Col: 53}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `pages.templ`, Line: 50, Col: 53}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var21)
 				if templ_7745c5c3_Err != nil {
@@ -392,7 +392,7 @@ func Invite(action, email, name, nameError string) templ.Component {
 				var templ_7745c5c3_Var22 string
 				templ_7745c5c3_Var22, templ_7745c5c3_Err = templ.JoinStringErrs(T(ctx, "invite.locale_label"))
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `pages.templ`, Line: 59, Col: 58}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `pages.templ`, Line: 54, Col: 58}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var22))
 				if templ_7745c5c3_Err != nil {
@@ -415,7 +415,7 @@ func Invite(action, email, name, nameError string) templ.Component {
 				var templ_7745c5c3_Var23 string
 				templ_7745c5c3_Var23, templ_7745c5c3_Err = templ.JoinStringErrs(T(ctx, "locale.en"))
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `pages.templ`, Line: 61, Col: 80}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `pages.templ`, Line: 56, Col: 80}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var23))
 				if templ_7745c5c3_Err != nil {
@@ -438,7 +438,7 @@ func Invite(action, email, name, nameError string) templ.Component {
 				var templ_7745c5c3_Var24 string
 				templ_7745c5c3_Var24, templ_7745c5c3_Err = templ.JoinStringErrs(T(ctx, "locale.de"))
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `pages.templ`, Line: 62, Col: 80}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `pages.templ`, Line: 57, Col: 80}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var24))
 				if templ_7745c5c3_Err != nil {
@@ -451,7 +451,7 @@ func Invite(action, email, name, nameError string) templ.Component {
 				var templ_7745c5c3_Var25 string
 				templ_7745c5c3_Var25, templ_7745c5c3_Err = templ.JoinStringErrs(T(ctx, "invite.submit"))
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `pages.templ`, Line: 65, Col: 67}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `pages.templ`, Line: 60, Col: 67}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var25))
 				if templ_7745c5c3_Err != nil {
@@ -525,7 +525,7 @@ func Home(name string, nudge, setup bool) templ.Component {
 				var templ_7745c5c3_Var29 string
 				templ_7745c5c3_Var29, templ_7745c5c3_Err = templ.JoinStringErrs(T(ctx, "home.greeting", "name", name))
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `pages.templ`, Line: 74, Col: 58}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `pages.templ`, Line: 69, Col: 58}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var29))
 				if templ_7745c5c3_Err != nil {
@@ -543,7 +543,7 @@ func Home(name string, nudge, setup bool) templ.Component {
 					var templ_7745c5c3_Var30 string
 					templ_7745c5c3_Var30, templ_7745c5c3_Err = templ.JoinStringErrs(T(ctx, "setup.home"))
 					if templ_7745c5c3_Err != nil {
-						return templ.Error{Err: templ_7745c5c3_Err, FileName: `pages.templ`, Line: 77, Col: 27}
+						return templ.Error{Err: templ_7745c5c3_Err, FileName: `pages.templ`, Line: 72, Col: 27}
 					}
 					_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var30))
 					if templ_7745c5c3_Err != nil {
@@ -556,7 +556,7 @@ func Home(name string, nudge, setup bool) templ.Component {
 					var templ_7745c5c3_Var31 string
 					templ_7745c5c3_Var31, templ_7745c5c3_Err = templ.JoinStringErrs(T(ctx, "setup.home_link"))
 					if templ_7745c5c3_Err != nil {
-						return templ.Error{Err: templ_7745c5c3_Err, FileName: `pages.templ`, Line: 78, Col: 49}
+						return templ.Error{Err: templ_7745c5c3_Err, FileName: `pages.templ`, Line: 73, Col: 49}
 					}
 					_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var31))
 					if templ_7745c5c3_Err != nil {
@@ -584,7 +584,7 @@ func Home(name string, nudge, setup bool) templ.Component {
 				var templ_7745c5c3_Var32 string
 				templ_7745c5c3_Var32, templ_7745c5c3_Err = templ.JoinStringErrs(T(ctx, "home.jobs_link"))
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `pages.templ`, Line: 84, Col: 48}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `pages.templ`, Line: 79, Col: 48}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var32))
 				if templ_7745c5c3_Err != nil {

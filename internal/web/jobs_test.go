@@ -139,6 +139,7 @@ var (
 	cspNonce = regexp.MustCompile(`script-src 'nonce-([A-Za-z0-9_-]+)'`)
 	tagRx    = regexp.MustCompile(`<[a-z]+\s[^>]*>`)
 	hxAttr   = regexp.MustCompile(`\shx-[a-z-]+=`)
+	nonceRx  = regexp.MustCompile(`nonce="[^"]*"`)
 )
 
 // checkNonces: every script and every element with htmx attributes carries the response's CSP nonce.
@@ -157,3 +158,5 @@ func checkNonces(t *testing.T, rec *httptest.ResponseRecorder) {
 		}
 	}
 }
+
+func withoutNonces(s string) string { return nonceRx.ReplaceAllString(s, `nonce=""`) }
