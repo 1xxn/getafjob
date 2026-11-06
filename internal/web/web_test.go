@@ -185,7 +185,9 @@ func TestMagicLinkSignIn(t *testing.T) {
 
 	known := a.do(http.MethodPost, "/login", url.Values{"email": {"max@example.com"}}, "", nil)
 	unknown := a.do(http.MethodPost, "/login", url.Values{"email": {"nobody@example.com"}}, "", nil)
-	if known.Code != http.StatusOK || known.Body.String() != unknown.Body.String() {
+	// Equal apart from the per-response nonce, which has a fixed length.
+	if known.Code != http.StatusOK || withoutNonces(known.Body.String()) != withoutNonces(unknown.Body.String()) ||
+		known.Body.Len() != unknown.Body.Len() {
 		t.Fatal("answers for known and unknown addresses differ")
 	}
 	if a.mail.n != 1 {

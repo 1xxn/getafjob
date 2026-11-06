@@ -14,13 +14,8 @@ templ Login(email, notice string, passkeys bool) {
 			</form>
 			if passkeys {
 				<div class="stack">
-					<button
-						type="button"
-						hidden
-						data-passkey="sign-in"
-						data-status="passkey-status"
-						data-error={ T(ctx, "passkey.failed") }
-					>{ T(ctx, "passkey.sign_in") }</button>
+					<button type="button" hidden data-passkey="sign-in" data-status="passkey-status"
+						data-error={ T(ctx, "passkey.failed") }>{ T(ctx, "passkey.sign_in") }</button>
 					<p id="passkey-status" role="status" class="muted"></p>
 				</div>
 			}
