@@ -104,3 +104,48 @@ func (f *Frame) Origin() string {
 	}
 	return ""
 }
+
+// optionsJS tags the visible options of open listboxes in a frame (portals included) and returns them.
+const optionsJS = `(prefix) => {
+  const shown = (e) => { const r = e.getBoundingClientRect(); const cs = getComputedStyle(e);
+    return r.width >= 1 && r.height >= 1 && cs.visibility !== "hidden" && cs.display !== "none"; };
+  const out = [];
+  let n = 0;
+  for (const el of document.querySelectorAll('[role="option"]')) {
+    if (!shown(el) || el.getAttribute("aria-disabled") === "true") continue;
+    const id = prefix + "o" + (++n);
+    el.setAttribute("data-gaj", id);
+    out.push({ id, label: (el.innerText || el.textContent || "").replace(/\s+/g, " ").trim().slice(0, 200) });
+    if (out.length >= 300) break;
+  }
+  return out;
+}`
+
+// ListOptions returns the visible options of the open listboxes in the frame of an element, tagged so that
+// Click can choose one.
+func (s *State) ListOptions(id string) ([]Option, error) {
+	f, err := s.FrameOf(id)
+	if err != nil {
+		return nil, err
+	}
+	v, err := f.run(optionsJS, fmt.Sprintf("%d-", f.Index))
+	if err != nil {
+		return nil, err
+	}
+	var opts []Option
+	return opts, decode(v, &opts)
+}
+
+// Button returns the button with an ID.
+func (s *State) Button(id string) (Button, bool) {
+	f, err := s.FrameOf(id)
+	if err != nil {
+		return Button{}, false
+	}
+	for _, b := range f.Buttons {
+		if b.ID == id {
+			return b, true
+		}
+	}
+	return Button{}, false
+}

@@ -70,8 +70,11 @@ func (x *Executor) Fill(st *browser.State, p Plan) (*browser.State, []Filled, er
 		if st, err = x.fill(st, p, v); err != nil {
 			return st, done, fmt.Errorf("field %q: %w", v.Label, err)
 		}
-		f, _ := st.Field(v.FieldID)
-		done = append(done, Filled{FieldID: v.FieldID, Label: f.Label, Shown: f.Value, Source: v.Source})
+		label, shown := v.Label, v.Text
+		if f, ok := st.Field(v.FieldID); ok {
+			label, shown = f.Label, f.Value
+		}
+		done = append(done, Filled{FieldID: v.FieldID, Label: label, Shown: shown, Source: v.Source})
 	}
 	return st, done, nil
 }
@@ -86,6 +89,11 @@ func (x *Executor) wait() time.Duration {
 // fill fills one value and returns the page state after it, with the value verified.
 func (x *Executor) fill(st *browser.State, p Plan, v Value) (*browser.State, error) {
 	f, ok := st.Field(v.FieldID)
+	if !ok {
+		if b, isButton := st.Button(v.FieldID); isButton {
+			return x.toggle(st, p, b, v)
+		}
+	}
 	if !ok || normalize(f.Label) != normalize(v.Label) {
 		return st, ErrFieldChanged
 	}
@@ -114,7 +122,14 @@ func (x *Executor) fill(st *browser.State, p Plan, v Value) (*browser.State, err
 		}
 		want = f.Options[i].Label
 		err = st.SetValue(v.FieldID, f.Options[i].Value)
-	case "checkbox":
+	case "richtext":
+		err = st.Type(v.FieldID, v.Text)
+	case "combobox":
+		if want, err = x.combobox(st, v); err != nil {
+			return st, err
+		}
+		return x.verify(st, v.FieldID, want, sameChoice)
+	case "checkbox", "aria_checkbox", "aria_radio":
 		on := v.Text == "true"
 		if v.Text != "true" && v.Text != "false" {
 			return st, fmt.Errorf("%w: checkbox takes true or false", ErrNoOption)
@@ -143,15 +158,112 @@ func (x *Executor) fill(st *browser.State, p Plan, v Value) (*browser.State, err
 	if err != nil {
 		return st, err
 	}
-	next, err := st.Refresh()
+	if f.Kind == "richtext" { // the field reports at most its first 500 characters
+		return x.verify(st, v.FieldID, want, func(shown, want string) bool {
+			return strings.HasPrefix(strings.TrimSpace(want), strings.TrimSpace(shown)) && shown != ""
+		})
+	}
+	return x.verify(st, v.FieldID, want, func(shown, want string) bool {
+		return strings.TrimSpace(shown) == strings.TrimSpace(want)
+	})
+}
+
+// verify extracts the page again and checks what the field shows; some widgets render their value late.
+func (x *Executor) verify(st *browser.State, id, want string, same func(shown, want string) bool) (*browser.State, error) {
+	deadline := time.Now().Add(x.wait())
+	for {
+		next, err := st.Refresh()
+		if err != nil {
+			return st, err
+		}
+		got, ok := next.Field(id)
+		if ok && same(got.Value, want) {
+			return next, nil
+		}
+		if time.Now().After(deadline) {
+			return next, fmt.Errorf("%w: shows %q, want %q", ErrNotVerified, got.Value, want)
+		}
+		time.Sleep(150 * time.Millisecond)
+	}
+}
+
+// combobox opens the widget, finds the option that means the value (typing it when the list does not show it
+// yet) and picks it. It returns the chosen option's label.
+func (x *Executor) combobox(st *browser.State, v Value) (string, error) {
+	if _, err := st.Click(v.FieldID, x.wait()); err != nil {
+		return "", err
+	}
+	typed := false
+	deadline := time.Now().Add(2 * x.wait())
+	for {
+		opts, err := st.ListOptions(v.FieldID)
+		if err != nil {
+			return "", err
+		}
+		if i, ok := Match(v.Text, labels(opts)); ok {
+			if _, err := st.Click(opts[i].ID, x.wait()); err == nil {
+				return opts[i].Label, nil
+			} else if !errors.Is(err, browser.ErrUnknownID) && !errors.Is(err, browser.ErrNotVisible) {
+				return "", err
+			} // the list was rendered again: read it once more
+		}
+		if !typed {
+			typed = true
+			if f, ok := st.Field(v.FieldID); ok && isTypable(f) {
+				if err := st.Type(v.FieldID, v.Text); err != nil {
+					return "", err
+				}
+			}
+		}
+		if time.Now().After(deadline) {
+			return "", fmt.Errorf("%w: %q among %q", ErrNoOption, v.Text, labels(opts))
+		}
+		time.Sleep(200 * time.Millisecond)
+	}
+}
+
+// isTypable reports a combobox that is a text input (react-select, autocompletes), not a listbox button.
+func isTypable(f browser.Field) bool { return f.InputType != "" }
+
+// sameChoice compares what a combobox shows with the chosen option: widgets often show a short form ("+49" for
+// "Germany +49").
+func sameChoice(shown, chosen string) bool {
+	s, c := normalize(shown), normalize(chosen)
+	return s != "" && (s == c || strings.Contains(c, s) || strings.Contains(s, c))
+}
+
+// toggle presses or releases a button with aria-pressed (yes/no answers as buttons).
+func (x *Executor) toggle(st *browser.State, p Plan, b browser.Button, v Value) (*browser.State, error) {
+	if normalize(b.Text) != normalize(v.Label) || (v.Text != "true" && v.Text != "false") {
+		return st, ErrFieldChanged
+	}
+	fr, err := st.FrameOf(b.ID)
 	if err != nil {
 		return st, err
 	}
-	got, ok := next.Field(v.FieldID)
-	if !ok || strings.TrimSpace(got.Value) != strings.TrimSpace(want) {
-		return next, fmt.Errorf("%w: shows %q, want %q", ErrNotVerified, got.Value, want)
+	if !slices.Contains(p.Origins, fr.Origin()) {
+		return st, fmt.Errorf("%w: %s", ErrForeignOrigin, fr.Origin())
 	}
-	return next, nil
+	on := v.Text == "true"
+	if b.Pressed != on {
+		if _, err := st.Click(b.ID, x.wait()); err != nil {
+			return st, err
+		}
+	}
+	deadline := time.Now().Add(x.wait())
+	for {
+		next, err := st.Refresh()
+		if err != nil {
+			return st, err
+		}
+		if got, ok := next.Button(b.ID); ok && got.Pressed == on {
+			return next, nil
+		}
+		if time.Now().After(deadline) {
+			return next, fmt.Errorf("%w: button %q not pressed=%v", ErrNotVerified, b.Text, on)
+		}
+		time.Sleep(150 * time.Millisecond)
+	}
 }
 
 // group sets a checkbox group to exactly the wanted choices.
