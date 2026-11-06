@@ -127,6 +127,9 @@ services:
       GETAFJOB_LOG_LEVEL: ${GETAFJOB_LOG_LEVEL:-info}
       GETAFJOB_HEALTH_ADDR: ":8081"
       GETAFJOB_EGRESS_PROXY: http://egress:4750
+      GETAFJOB_GATEWAY_URL: http://serve:8090
+      GETAFJOB_RUNNER_SECRET_FILE: /run/secrets/runner_secret
+    secrets: [runner_secret]
     # Chromium's own sandbox stays on: the seccomp profile allows user namespaces instead of --no-sandbox.
     security_opt:
       - no-new-privileges:true
