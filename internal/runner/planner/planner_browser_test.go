@@ -22,7 +22,6 @@ import (
 )
 
 type coord struct {
-	mu        sync.Mutex
 	asked     []engine.Question
 	submitted bool
 }
