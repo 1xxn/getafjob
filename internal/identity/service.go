@@ -318,3 +318,12 @@ func (s *Service) Cleanup(ctx context.Context) error { return s.store.DeleteExpi
 
 // WithClock replaces the clock (tests).
 func (s *Service) WithClock(now func() time.Time) *Service { s.now = now; return s }
+
+// UserByEmail returns the account of an address; ErrNotFound if there is none.
+func (s *Service) UserByEmail(ctx context.Context, email string) (User, error) {
+	e, err := NormalizeEmail(email)
+	if err != nil {
+		return User{}, err
+	}
+	return s.store.UserByEmail(ctx, e)
+}
