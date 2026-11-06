@@ -6,8 +6,10 @@ import (
 	"fmt"
 	"log/slog"
 	"net/http"
+	"strings"
 	"time"
 
+	"connectrpc.com/connect"
 	"github.com/go-rod/rod/lib/proto"
 	"github.com/google/uuid"
 	"github.com/riverqueue/river"
@@ -18,6 +20,7 @@ import (
 	discoverystore "github.com/1xxn/getafjob/internal/discovery/adapters/pgstore"
 	"github.com/1xxn/getafjob/internal/discovery/adapters/sources"
 	"github.com/1xxn/getafjob/internal/gateway"
+	"github.com/1xxn/getafjob/internal/gen/proto/runner/v1/runnerv1connect"
 	"github.com/1xxn/getafjob/internal/identity"
 	"github.com/1xxn/getafjob/internal/identity/adapters/pgstore"
 	"github.com/1xxn/getafjob/internal/matching"
@@ -31,6 +34,7 @@ import (
 	"github.com/1xxn/getafjob/internal/profile"
 	profilestore "github.com/1xxn/getafjob/internal/profile/adapters/pgstore"
 	"github.com/1xxn/getafjob/internal/profile/cvimport"
+	"github.com/1xxn/getafjob/internal/runner/agent"
 	"github.com/1xxn/getafjob/internal/runner/browser"
 	"github.com/1xxn/getafjob/internal/web"
 	"github.com/1xxn/getafjob/internal/web/apiv1"
@@ -180,7 +184,22 @@ func runner(ctx context.Context, cfg config.Config, logger *slog.Logger) error {
 	health := httpx.NewHealth(logger)
 	selfTest := selfTestBrowser(ctx, cfg, logger)
 	health.Add("browser", func(context.Context) error { return selfTest })
-	return serveHealth(ctx, cfg, health, logger)
+	if cfg.GatewayURL == nil || cfg.RunnerSecret == "" || selfTest != nil {
+		logger.Info("runner leases no work: gateway URL or runner secret missing, or the browser self-test failed")
+		return serveHealth(ctx, cfg, health, logger)
+	}
+	// The gateway sits on the internal network; everything else the runner loads goes through the egress proxy.
+	client := runnerv1connect.NewRunnerServiceClient(&http.Client{Timeout: 2 * time.Minute}, strings.TrimSuffix(cfg.GatewayURL.String(), "/"),
+		connect.WithReadMaxBytes(gateway.MaxMessage), connect.WithSendMaxBytes(gateway.MaxMessage))
+	a := &agent.Agent{Client: client, Secret: cfg.RunnerSecret.Reveal(), Logger: logger,
+		Browser: browser.Options{Bin: cfg.BrowserBin, Proxy: cfg.EgressProxy}}
+	ctx, stop := context.WithCancel(ctx)
+	defer stop()
+	done := make(chan error, 1)
+	go func() { done <- a.Run(ctx); stop() }()
+	err := serveHealth(ctx, cfg, health, logger)
+	stop()
+	return errors.Join(err, <-done)
 }
 
 func selfTestBrowser(ctx context.Context, cfg config.Config, logger *slog.Logger) error {

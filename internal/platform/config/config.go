@@ -36,6 +36,8 @@ type Config struct {
 	GatewayAddr string
 	// RunnerSecret authenticates the server's runners at the gateway; empty: the gateway stays off.
 	RunnerSecret Secret
+	// GatewayURL is where a runner reaches the gateway (http://serve:8090). Empty: the runner only self-tests.
+	GatewayURL *url.URL
 	// PublicURL is the public address behind Caddy (links in mails, WebAuthn origin, cookies).
 	PublicURL *url.URL
 	// DatabaseURL is the PostgreSQL connection (postgres://…); the password should rather come from DatabasePassword.
@@ -100,6 +102,7 @@ var specs = []spec{
 	{"HEALTH_ADDR", ":8081", func(c *Config, v string) error { return setAddr(&c.HealthAddr, v) }},
 	{"GATEWAY_ADDR", ":8090", func(c *Config, v string) error { return setAddr(&c.GatewayAddr, v) }},
 	{"RUNNER_SECRET", "", setRunnerSecret},
+	{"GATEWAY_URL", "", setGatewayURL},
 	{"PUBLIC_URL", "https://localhost:8443", setPublicURL},
 	{"DATABASE_URL", "", setDatabaseURL},
 	{"DATABASE_PASSWORD", "", func(c *Config, v string) error { c.DatabasePassword = Secret(v); return nil }},
@@ -244,6 +247,18 @@ func setLogFormat(c *Config, v string) error {
 		return errors.New("must be json or text")
 	}
 	c.LogFormat = v
+	return nil
+}
+
+func setGatewayURL(c *Config, v string) error {
+	if v == "" {
+		return nil
+	}
+	u, err := url.Parse(v)
+	if err != nil || (u.Scheme != "http" && u.Scheme != "https") || u.Host == "" || u.User != nil || (u.Path != "" && u.Path != "/") {
+		return errors.New("must be an http(s) URL without path or credentials")
+	}
+	c.GatewayURL = u
 	return nil
 }
 
