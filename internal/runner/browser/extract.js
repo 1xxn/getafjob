@@ -280,7 +280,7 @@
 
   // Buttons and links that drive the flow ("open external page" leads to the employer's form).
   const ACTION_RX = /apply|bewerb|extern|submit|absenden|senden|send|weiter|next|continue|fortfahren|review|überprüf|ueberpruef|start|jetzt|interessiert|upload|hochladen|lebenslauf|resume|cv|manuell|manually|accept|akzeptier|zustimm|agree|allow|alle|cookie|ok\b|got it|verstanden|schließen|close|autofill|ausfüllen/i;
-  const AUTOFILL_RX = /auto-?fill|automatisch ausfüllen|(aus|mit) (dem |meinem )?lebenslauf (ausfüllen|befüllen|übernehmen|bewerben)|lebenslauf (importieren|hochladen und ausfüllen)|import (from )?(your )?(resume|cv)|(resume|cv) (import|parsing|autofill)|fill (out )?(the form )?(from|with) (your )?(resume|cv)|apply with (your )?(resume|cv)|mit lebenslauf bewerben|quick ?apply/i;
+  const AUTOFILL_RX = /(apply|bewerben) (with|via|mit|über) (linkedin|xing|indeed|google|seek|stepstone)|mit (linkedin|xing|indeed) bewerben|easy apply|auto-?fill|automatisch ausfüllen|(aus|mit) (dem |meinem )?lebenslauf (ausfüllen|befüllen|übernehmen|bewerben)|lebenslauf (importieren|hochladen und ausfüllen)|import (from )?(your )?(resume|cv)|(resume|cv) (import|parsing|autofill)|fill (out )?(the form )?(from|with) (your )?(resume|cv)|apply with (your )?(resume|cv)|mit lebenslauf bewerben|quick ?apply/i;
   const found = [];
   for (const el of all) {
     const t = el.tagName;
