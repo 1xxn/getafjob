@@ -12,6 +12,8 @@ import (
 	"github.com/google/uuid"
 	"github.com/riverqueue/river"
 
+	"github.com/1xxn/getafjob/internal/application"
+	applicationstore "github.com/1xxn/getafjob/internal/application/adapters/pgstore"
 	"github.com/1xxn/getafjob/internal/discovery"
 	discoverystore "github.com/1xxn/getafjob/internal/discovery/adapters/pgstore"
 	"github.com/1xxn/getafjob/internal/discovery/adapters/sources"
@@ -122,6 +124,7 @@ func worker(ctx context.Context, cfg config.Config, logger *slog.Logger) error {
 	river.AddWorker(workers, &boardDiscoveryWorker{
 		discovery: discovery.NewBoardDiscovery(store, store, sources.NewFinder(client)), logger: logger, metrics: metrics})
 	river.AddWorker(workers, &cleanupWorker{ids: identity.NewService(pgstore.New(pool), nil, cfg.PublicURL)})
+	river.AddWorker(workers, &recoverWorker{svc: application.NewService(applicationstore.New(pool)), logger: logger})
 	jobs, err := queue.NewWorker(pool, queue.Options{Workers: workers, Periodic: periodicJobs(cfg), Logger: logger})
 	if err != nil {
 		return err
