@@ -160,8 +160,8 @@ func TestRunnerHasNoDatabase(t *testing.T) {
 		n++
 		for _, d := range p.Deps {
 			if under(d, "github.com/jackc/pgx") || under(d, "internal/platform/db") || under(d, "github.com/riverqueue/river") ||
-				(moduleOf(d) != "" && strings.Contains(d, "/adapters/")) {
-				t.Errorf("%s depends on %s; the runner has no database or queue access (ADR 0007)", p.ImportPath, d)
+				moduleOf(d) != "" || under(d, "internal/gateway") {
+				t.Errorf("%s depends on %s; the runner has no database or queue access and knows the server only through the protocol (ADR 0007)", p.ImportPath, d)
 			}
 		}
 	}

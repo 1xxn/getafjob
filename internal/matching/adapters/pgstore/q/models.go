@@ -186,6 +186,31 @@ type Recovery struct {
 	ExpiresAt   time.Time
 }
 
+type Run struct {
+	ID            uuid.UUID
+	ApplicationID uuid.UUID
+	UserID        uuid.UUID
+	RunnerID      string
+	Host          string
+	TokenHash     []byte
+	LeasedAt      time.Time
+	ExpiresAt     time.Time
+	FinishedAt    *time.Time
+	Outcome       *string
+}
+
+type RunCheckpoint struct {
+	ID         int64
+	RunID      uuid.UUID
+	UserID     uuid.UUID
+	Step       string
+	Page       int32
+	Url        string
+	Data       []byte
+	Screenshot string
+	At         time.Time
+}
+
 type Session struct {
 	TokenHash  []byte
 	UserID     uuid.UUID

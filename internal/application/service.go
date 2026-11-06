@@ -43,6 +43,11 @@ func NewService(s Store) *Service { return &Service{store: s, now: time.Now} }
 // WithClock sets the clock (tests).
 func (s *Service) WithClock(now func() time.Time) *Service { s.now = now; return s }
 
+// Get returns an application of the user.
+func (s *Service) Get(ctx context.Context, userID, id uuid.UUID) (App, error) {
+	return s.store.Get(ctx, userID, id)
+}
+
 // Create returns the user's application for a job, creating it as matched.
 func (s *Service) Create(ctx context.Context, userID uuid.UUID, jobID int64) (uuid.UUID, error) {
 	return s.store.Create(ctx, userID, jobID, Matched, s.now())
