@@ -76,7 +76,10 @@ services:
       GETAFJOB_MASTER_KEY_FILE: /run/secrets/master_key
       GETAFJOB_BLOB_URL: file:///var/lib/getafjob/blobs
       GETAFJOB_MAIL_FROM: ${GETAFJOB_MAIL_FROM:-getafjob@localhost}
-    secrets: [db_app_password, master_key, smtp_url]
+      # Runner gateway, reachable only on the internal gateway network.
+      GETAFJOB_GATEWAY_ADDR: ":8090"
+      GETAFJOB_RUNNER_SECRET_FILE: /run/secrets/runner_secret
+    secrets: [db_app_password, master_key, smtp_url, runner_secret]
     volumes:
       - blobs:/var/lib/getafjob/blobs
     depends_on:
@@ -208,6 +211,8 @@ secrets:
     file: ${GETAFJOB_SECRETS_DIR:-./secrets}/master_key
   smtp_url:
     file: ${GETAFJOB_SECRETS_DIR:-./secrets}/smtp_url
+  runner_secret:
+    file: ${GETAFJOB_SECRETS_DIR:-./secrets}/runner_secret
 
 volumes:
   pgdata: {}

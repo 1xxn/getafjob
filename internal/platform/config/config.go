@@ -32,6 +32,10 @@ type Config struct {
 	HTTPAddr string
 	// HealthAddr is the internal address for /healthz and /readyz of the worker and runner roles.
 	HealthAddr string
+	// GatewayAddr is the internal address of the runner gateway (serve); only the gateway network reaches it.
+	GatewayAddr string
+	// RunnerSecret authenticates the server's runners at the gateway; empty: the gateway stays off.
+	RunnerSecret Secret
 	// PublicURL is the public address behind Caddy (links in mails, WebAuthn origin, cookies).
 	PublicURL *url.URL
 	// DatabaseURL is the PostgreSQL connection (postgres://…); the password should rather come from DatabasePassword.
@@ -94,6 +98,8 @@ type spec struct {
 var specs = []spec{
 	{"HTTP_ADDR", ":8080", func(c *Config, v string) error { return setAddr(&c.HTTPAddr, v) }},
 	{"HEALTH_ADDR", ":8081", func(c *Config, v string) error { return setAddr(&c.HealthAddr, v) }},
+	{"GATEWAY_ADDR", ":8090", func(c *Config, v string) error { return setAddr(&c.GatewayAddr, v) }},
+	{"RUNNER_SECRET", "", setRunnerSecret},
 	{"PUBLIC_URL", "https://localhost:8443", setPublicURL},
 	{"DATABASE_URL", "", setDatabaseURL},
 	{"DATABASE_PASSWORD", "", func(c *Config, v string) error { c.DatabasePassword = Secret(v); return nil }},
@@ -191,6 +197,15 @@ func lookup(src Source, name string) (string, bool, error) {
 	return s, true, nil
 }
 
+// setRunnerSecret takes a secret of at least 32 characters (admin gen-secret gives 43).
+func setRunnerSecret(c *Config, v string) error {
+	if v != "" && len(v) < 32 {
+		return errors.New("must be at least 32 characters (getafjob admin gen-secret)")
+	}
+	c.RunnerSecret = Secret(v)
+	return nil
+}
+
 func setAddr(dst *string, v string) error {
 	if _, _, err := net.SplitHostPort(v); err != nil {
 		return errors.New("must be host:port, e.g. :8080")
@@ -277,6 +292,7 @@ func (c Config) LogValue() slog.Value {
 		slog.String("health_addr", c.HealthAddr),
 		slog.String("public_url", urlString(c.PublicURL)),
 		slog.Bool("database_configured", c.DatabaseURL != ""),
+		slog.Bool("runner_secret_set", c.RunnerSecret != ""),
 		slog.String("log_level", c.LogLevel.String()),
 		slog.String("log_format", c.LogFormat),
 		slog.Bool("egress_proxy_set", c.EgressProxy != nil),
