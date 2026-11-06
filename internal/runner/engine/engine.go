@@ -49,6 +49,7 @@ type Question struct {
 	Kind    string `json:"kind"` // field, captcha
 	FieldID string `json:"field_id,omitempty"`
 	Label   string `json:"label"`
+	Draft   string `json:"draft,omitempty"` // an AI suggestion; used only after the user approved it
 }
 
 // Coordinator is the server side of a run (through the gateway).

@@ -4,9 +4,11 @@ import "testing"
 
 func TestValidSource(t *testing.T) {
 	good := []string{"profile.email", "profile.personal.first_name", "answer#123", "textblock#4",
-		"document#0192f3a4-5b6c-7d8e-9f01-23456789abcd", "ai_draft#9 (approved)"}
+		"document#0192f3a4-5b6c-7d8e-9f01-23456789abcd", "ai_draft#9 (approved)",
+		"answer#0192f3a4-5b6c-7d8e-9f01-23456789abcd", "textblock#0192f3a4-5b6c-7d8e-9f01-23456789abcd"}
 	bad := []string{"", "profile.", "Profile.email", "answer#", "answer#x", "textblock#4 ", "ai_draft#9",
-		"ai_draft#9 (pending)", "document#123", "guess", "page", "profile.email; answer#1"}
+		"ai_draft#9 (pending)", "document#123", "ai_draft#0192f3a4-5b6c-7d8e-9f01-23456789abcd",
+		"answer#0192F3A4-5b6c-7d8e-9f01-23456789abcd", "guess", "page", "profile.email; answer#1"}
 	for _, s := range good {
 		if !ValidSource(s) {
 			t.Errorf("%q refused", s)
@@ -31,11 +33,13 @@ func TestMatch(t *testing.T) {
 		{"Yes", []string{"Bitte wählen", "Ja", "Nein"}, 1, true},
 		{"Nein", []string{"Yes", "No"}, 1, true},
 		{"Keine Angabe", []string{"Male", "Female", "Prefer not to say"}, 2, true},
+		{"Prefer not to say", []string{"Male", "I don't wish to answer"}, 1, true},
 		{"Köln", []string{"Berlin", "Koeln", "Hamburg"}, 1, true},
 		{"Deutschland", []string{"France", "Germany", "Austria"}, 1, true},
 		{"Österreich", []string{"Germany", "Austria"}, 1, true},
 		{"UK", []string{"Ireland", "United Kingdom"}, 1, true},
 		{"Englisch", []string{"German", "English"}, 1, true},
+		{"Germany", []string{"Österreich +43", "Deutschland +49", "Schweiz +41"}, 1, true},
 		{"Café", []string{"Cafe", "Bar"}, 0, true},
 		{"Bachelor", []string{"Bachelor of Science", "Master of Science"}, 0, true},
 		{"Bachelor of Science", []string{"Bachelor", "Master"}, 0, true},

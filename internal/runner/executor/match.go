@@ -12,8 +12,17 @@ import (
 
 // sourceRx is the provenance of a value: a profile field, an answer, a text block, a document or an AI draft the
 // user approved.
-var sourceRx = regexp.MustCompile(`^(profile\.[a-z][a-z0-9_.]{0,60}|answer#[0-9]{1,18}|textblock#[0-9]{1,18}|` +
-	`document#[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}|ai_draft#[0-9]{1,18} \(approved\))$`)
+var sourceRx = regexp.MustCompile(`^(profile\.[a-z][a-z0-9_.]{0,60}|(answer|textblock)#(` + idRx + `)|document#` + uuidRx +
+	`|ai_draft#(` + idRx + `) \(approved\))$`)
+
+// Stored IDs: UUIDs (answers, text blocks, documents) or numbers.
+const (
+	uuidRx = `[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}`
+	idRx   = uuidRx + `|[0-9]{1,18}`
+)
+
+// Normalize lowercases, folds umlauts and accents and keeps words separated by single spaces.
+func Normalize(s string) string { return normalize(s) }
 
 // ValidSource reports whether s names where a value comes from.
 func ValidSource(s string) bool { return sourceRx.MatchString(s) }
@@ -69,7 +78,7 @@ func normalize(s string) string {
 	space := false
 	for _, r := range norm.NFKD.String(s) {
 		switch {
-		case unicode.Is(unicode.Mn, r):
+		case unicode.Is(unicode.Mn, r), r == 0x27, r == 0x2019: // accents and apostrophes ("don't" is "dont")
 		case unicode.IsLetter(r) || unicode.IsDigit(r):
 			if space && b.Len() > 0 {
 				b.WriteByte(' ')
@@ -111,6 +120,17 @@ func Match(want string, options []string) (int, bool) {
 	}
 	if g := synonymGroup(w); g >= 0 {
 		if i, ok := unique(norms, func(o string) bool { return synonymGroup(o) == g }); ok {
+			return i, true
+		}
+		// "Germany" for "Deutschland +49": an option that starts with a synonym
+		if i, ok := unique(norms, func(o string) bool {
+			for _, syn := range synonyms[g] {
+				if len(syn) >= 3 && strings.HasPrefix(o, syn+" ") {
+					return true
+				}
+			}
+			return false
+		}); ok {
 			return i, true
 		}
 	}
