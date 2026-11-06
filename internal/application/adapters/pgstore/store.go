@@ -66,7 +66,7 @@ func (s *Store) Apply(ctx context.Context, userID uuid.UUID, a application.App, 
 	}
 	return s.user(ctx, userID, func(qs *q.Queries) error {
 		n, err := qs.SetState(ctx, q.SetStateParams{ToState: string(c.To), At: c.At, ID: a.ID, UserID: userID,
-			FromState: string(c.From), Version: a.Version})
+			FromState: string(c.From), Version: a.Version, HandoffUntil: c.HandoffUntil})
 		if err != nil {
 			return err
 		}
@@ -124,4 +124,34 @@ func (s *Store) StaleSubmitting(ctx context.Context, before time.Time) (refs []a
 		return err
 	})
 	return refs, err
+}
+
+// HandoffsDue lists waiting applications whose window ends before the given time (system role).
+func (s *Store) HandoffsDue(ctx context.Context, before time.Time) (hs []application.Handoff, err error) {
+	err = db.InSystemTx(ctx, s.pool, func(tx pgx.Tx) error {
+		rows, err := q.New(tx).HandoffsDue(ctx, &before)
+		for _, r := range rows {
+			if r.HandoffUntil != nil {
+				hs = append(hs, application.Handoff{Ref: application.Ref{ID: r.ID, UserID: r.UserID}, Until: *r.HandoffUntil,
+					Warned: r.HandoffWarned})
+			}
+		}
+		return err
+	})
+	return hs, err
+}
+
+// MarkWarned records the handoff notice once, with an event.
+func (s *Store) MarkWarned(ctx context.Context, r application.Ref, at time.Time) (ok bool, err error) {
+	err = s.user(ctx, r.UserID, func(qs *q.Queries) error {
+		n, err := qs.MarkHandoffWarned(ctx, q.MarkHandoffWarnedParams{ID: r.ID, UserID: r.UserID})
+		if err != nil || n != 1 {
+			return err
+		}
+		ok = true
+		return qs.InsertEvent(ctx, q.InsertEventParams{ApplicationID: r.ID, UserID: r.UserID, Event: "handoff_warning",
+			FromState: string(application.NeedsInput), ToState: string(application.NeedsInput), Actor: string(application.ActorSystem),
+			Detail: []byte("{}"), At: at})
+	})
+	return ok, err
 }

@@ -164,6 +164,44 @@ func (q *Queries) GetApplication(ctx context.Context, arg GetApplicationParams) 
 	return i, err
 }
 
+const handoffsDue = `-- name: HandoffsDue :many
+SELECT id, user_id, handoff_until, handoff_warned FROM applications
+WHERE state = 'needs_input' AND handoff_until IS NOT NULL AND handoff_until < $1 ORDER BY handoff_until LIMIT 500
+`
+
+type HandoffsDueRow struct {
+	ID            uuid.UUID
+	UserID        uuid.UUID
+	HandoffUntil  *time.Time
+	HandoffWarned bool
+}
+
+// System role: waiting applications whose handoff window ends before the given time.
+func (q *Queries) HandoffsDue(ctx context.Context, handoffUntil *time.Time) ([]HandoffsDueRow, error) {
+	rows, err := q.db.Query(ctx, handoffsDue, handoffUntil)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []HandoffsDueRow{}
+	for rows.Next() {
+		var i HandoffsDueRow
+		if err := rows.Scan(
+			&i.ID,
+			&i.UserID,
+			&i.HandoffUntil,
+			&i.HandoffWarned,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const hardSkipped = `-- name: HardSkipped :one
 SELECT EXISTS (SELECT 1 FROM matches WHERE user_id = $1 AND job_id = $2 AND decision = 'skip'
   AND reasons @> '[{"hard": true}]')::boolean
@@ -227,6 +265,23 @@ func (q *Queries) InsertSubmitAttempt(ctx context.Context, arg InsertSubmitAttem
 	return err
 }
 
+const markHandoffWarned = `-- name: MarkHandoffWarned :execrows
+UPDATE applications SET handoff_warned = true WHERE id = $1 AND user_id = $2 AND state = 'needs_input' AND NOT handoff_warned
+`
+
+type MarkHandoffWarnedParams struct {
+	ID     uuid.UUID
+	UserID uuid.UUID
+}
+
+func (q *Queries) MarkHandoffWarned(ctx context.Context, arg MarkHandoffWarnedParams) (int64, error) {
+	result, err := q.db.Exec(ctx, markHandoffWarned, arg.ID, arg.UserID)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
+}
+
 const sameJobStates = `-- name: SameJobStates :many
 SELECT a.state FROM applications a JOIN jobs j ON j.id = a.job_id
 WHERE a.user_id = $1 AND a.job_id <> $2
@@ -260,23 +315,26 @@ func (q *Queries) SameJobStates(ctx context.Context, arg SameJobStatesParams) ([
 }
 
 const setState = `-- name: SetState :execrows
-UPDATE applications SET state = $1, version = version + 1, updated_at = $2
-WHERE id = $3 AND user_id = $4 AND state = $5 AND version = $6
+UPDATE applications SET state = $1, version = version + 1, updated_at = $2,
+  handoff_until = $3, handoff_warned = false
+WHERE id = $4 AND user_id = $5 AND state = $6 AND version = $7
 `
 
 type SetStateParams struct {
-	ToState   string
-	At        time.Time
-	ID        uuid.UUID
-	UserID    uuid.UUID
-	FromState string
-	Version   int64
+	ToState      string
+	At           time.Time
+	HandoffUntil *time.Time
+	ID           uuid.UUID
+	UserID       uuid.UUID
+	FromState    string
+	Version      int64
 }
 
 func (q *Queries) SetState(ctx context.Context, arg SetStateParams) (int64, error) {
 	result, err := q.db.Exec(ctx, setState,
 		arg.ToState,
 		arg.At,
+		arg.HandoffUntil,
 		arg.ID,
 		arg.UserID,
 		arg.FromState,

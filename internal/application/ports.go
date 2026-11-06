@@ -33,6 +33,20 @@ type Change struct {
 	At          time.Time
 	BeginSubmit bool   // insert the submit attempt (unique per application) in the same transaction
 	Outcome     string // finish the submit attempt: submitted, unknown or not_sent
+	// HandoffUntil is when the user's turn ends (set with EvAsk); every other transition clears it.
+	HandoffUntil *time.Time
+}
+
+// Handoff is an application waiting for the user.
+type Handoff struct {
+	Ref
+	Until  time.Time
+	Warned bool
+}
+
+// Notifier tells the user that a handoff window is about to close (Web Push, mail; #31).
+type Notifier interface {
+	HandoffClosing(ctx context.Context, r Ref, until time.Time) error
 }
 
 // Ref names an application of a user.
@@ -51,4 +65,8 @@ type Store interface {
 	Candidate(ctx context.Context, userID uuid.UUID, jobID int64) (Candidate, error)
 	// StaleSubmitting lists applications in submitting since before (system role).
 	StaleSubmitting(ctx context.Context, before time.Time) ([]Ref, error)
+	// HandoffsDue lists waiting applications whose window ends before the given time (system role).
+	HandoffsDue(ctx context.Context, before time.Time) ([]Handoff, error)
+	// MarkWarned records the notice once; false when it was recorded before or the application moved on.
+	MarkWarned(ctx context.Context, r Ref, at time.Time) (bool, error)
 }
