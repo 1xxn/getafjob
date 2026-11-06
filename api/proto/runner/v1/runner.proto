@@ -5,6 +5,7 @@ syntax = "proto3";
 package runner.v1;
 
 import "google/protobuf/duration.proto";
+import "google/protobuf/timestamp.proto";
 
 option go_package = "github.com/1xxn/getafjob/internal/gen/proto/runner/v1;runnerv1";
 
@@ -14,6 +15,23 @@ service RunnerService {
   rpc Register(RegisterRequest) returns (RegisterResponse) {}
   // Heartbeat keeps a registration alive and reports the current load.
   rpc Heartbeat(HeartbeatRequest) returns (HeartbeatResponse) {}
+  // Lease hands out the next run, if any, with only the data it needs and a token for its other calls.
+  rpc Lease(LeaseRequest) returns (LeaseResponse) {}
+
+  // The calls below belong to one run and carry its token ("Authorization: Bearer <token>").
+
+  // FetchDocument returns a document of the run.
+  rpc FetchDocument(FetchDocumentRequest) returns (FetchDocumentResponse) {}
+  // Checkpoint records a step of the run with a screenshot.
+  rpc Checkpoint(CheckpointRequest) returns (CheckpointResponse) {}
+  // Ask hands the run to the user.
+  rpc Ask(AskRequest) returns (AskResponse) {}
+  // BeginSubmit registers the submit; the runner clicks only after a successful answer.
+  rpc BeginSubmit(BeginSubmitRequest) returns (BeginSubmitResponse) {}
+  // Submitted reports a submit click with an effect.
+  rpc Submitted(SubmittedRequest) returns (SubmittedResponse) {}
+  // Park stops the run for a human look.
+  rpc Park(ParkRequest) returns (ParkResponse) {}
 }
 
 // RunnerKind tells where a runner lives.
@@ -47,3 +65,107 @@ message HeartbeatRequest {
 }
 
 message HeartbeatResponse {}
+
+message LeaseRequest {
+  string runner_id = 1;
+}
+
+message LeaseResponse {
+  // Unset when there is nothing to do.
+  Run run = 1;
+}
+
+// Run is one application run: where to go, what may be filled and with what.
+message Run {
+  string run_id = 1;
+  // Bearer token for the run's calls; valid until expires_at.
+  string token = 2;
+  google.protobuf.Timestamp expires_at = 3;
+  // The posting or application page to start from.
+  string start_url = 4;
+  // Origins the values may go to.
+  repeated string origins = 5;
+  // Language of the form: en or de.
+  string language = 6;
+  // Profile facts by key (personal.first_name, work.notice_period, preferences.diversity ...).
+  map<string, string> profile = 7;
+  repeated Answer answers = 8;
+  repeated Text texts = 9;
+  repeated Document documents = 10;
+  // The CV chosen for this job.
+  string cv_document_id = 11;
+}
+
+message Answer {
+  string id = 1;
+  string question = 2;
+  string answer = 3;
+}
+
+// Text is a text block with its placeholders filled for this job.
+message Text {
+  string id = 1;
+  string name = 2;
+  string language = 3;
+  string body = 4;
+}
+
+message Document {
+  string id = 1;
+  string file_name = 2;
+  // cv, cover_letter or certificate.
+  string kind = 3;
+  string language = 4;
+}
+
+message FetchDocumentRequest {
+  string document_id = 1;
+}
+
+message FetchDocumentResponse {
+  bytes content = 1;
+}
+
+message CheckpointRequest {
+  string step = 1;
+  int32 page = 2;
+  string url = 3;
+  // The checkpoint's page data as JSON (fields, filled values, effect, errors, dialogs).
+  bytes data_json = 4;
+  bytes screenshot = 5;
+}
+
+message CheckpointResponse {}
+
+message Question {
+  // field or captcha.
+  string kind = 1;
+  string label = 2;
+  // An AI suggestion, used only after the user approved it.
+  string draft = 3;
+}
+
+message AskRequest {
+  repeated Question questions = 1;
+}
+
+message AskResponse {}
+
+message BeginSubmitRequest {}
+
+message BeginSubmitResponse {}
+
+message SubmittedRequest {
+  bool confirmed = 1;
+  // The click's effect as JSON.
+  bytes effect_json = 2;
+}
+
+message SubmittedResponse {}
+
+message ParkRequest {
+  string reason = 1;
+  bytes screenshot = 2;
+}
+
+message ParkResponse {}

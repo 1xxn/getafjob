@@ -113,6 +113,27 @@ func (q *Queries) Events(ctx context.Context, arg EventsParams) ([]EventsRow, er
 	return items, nil
 }
 
+const finishRun = `-- name: FinishRun :exec
+UPDATE runs SET finished_at = $3, outcome = $4 WHERE id = $1 AND user_id = $2 AND finished_at IS NULL
+`
+
+type FinishRunParams struct {
+	ID         uuid.UUID
+	UserID     uuid.UUID
+	FinishedAt *time.Time
+	Outcome    *string
+}
+
+func (q *Queries) FinishRun(ctx context.Context, arg FinishRunParams) error {
+	_, err := q.db.Exec(ctx, finishRun,
+		arg.ID,
+		arg.UserID,
+		arg.FinishedAt,
+		arg.Outcome,
+	)
+	return err
+}
+
 const finishSubmitAttempt = `-- name: FinishSubmitAttempt :exec
 UPDATE submit_attempts SET outcome = $3, finished_at = $4 WHERE application_id = $1 AND user_id = $2
 `
@@ -220,6 +241,35 @@ func (q *Queries) HardSkipped(ctx context.Context, arg HardSkippedParams) (bool,
 	return column_1, err
 }
 
+const insertCheckpoint = `-- name: InsertCheckpoint :exec
+INSERT INTO run_checkpoints (run_id, user_id, step, page, url, data, screenshot, at) VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+`
+
+type InsertCheckpointParams struct {
+	RunID      uuid.UUID
+	UserID     uuid.UUID
+	Step       string
+	Page       int32
+	Url        string
+	Data       []byte
+	Screenshot string
+	At         time.Time
+}
+
+func (q *Queries) InsertCheckpoint(ctx context.Context, arg InsertCheckpointParams) error {
+	_, err := q.db.Exec(ctx, insertCheckpoint,
+		arg.RunID,
+		arg.UserID,
+		arg.Step,
+		arg.Page,
+		arg.Url,
+		arg.Data,
+		arg.Screenshot,
+		arg.At,
+	)
+	return err
+}
+
 const insertEvent = `-- name: InsertEvent :exec
 INSERT INTO application_events (application_id, user_id, event, from_state, to_state, actor, detail, at)
 VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
@@ -250,6 +300,36 @@ func (q *Queries) InsertEvent(ctx context.Context, arg InsertEventParams) error 
 	return err
 }
 
+const insertRun = `-- name: InsertRun :one
+INSERT INTO runs (application_id, user_id, runner_id, host, token_hash, leased_at, expires_at)
+VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING id
+`
+
+type InsertRunParams struct {
+	ApplicationID uuid.UUID
+	UserID        uuid.UUID
+	RunnerID      string
+	Host          string
+	TokenHash     []byte
+	LeasedAt      time.Time
+	ExpiresAt     time.Time
+}
+
+func (q *Queries) InsertRun(ctx context.Context, arg InsertRunParams) (uuid.UUID, error) {
+	row := q.db.QueryRow(ctx, insertRun,
+		arg.ApplicationID,
+		arg.UserID,
+		arg.RunnerID,
+		arg.Host,
+		arg.TokenHash,
+		arg.LeasedAt,
+		arg.ExpiresAt,
+	)
+	var id uuid.UUID
+	err := row.Scan(&id)
+	return id, err
+}
+
 const insertSubmitAttempt = `-- name: InsertSubmitAttempt :exec
 INSERT INTO submit_attempts (application_id, user_id, started_at) VALUES ($1, $2, $3)
 `
@@ -262,6 +342,55 @@ type InsertSubmitAttemptParams struct {
 
 func (q *Queries) InsertSubmitAttempt(ctx context.Context, arg InsertSubmitAttemptParams) error {
 	_, err := q.db.Exec(ctx, insertSubmitAttempt, arg.ApplicationID, arg.UserID, arg.StartedAt)
+	return err
+}
+
+const leaseCandidate = `-- name: LeaseCandidate :one
+SELECT a.id, a.user_id, a.job_id,
+  lower(coalesce(substring(coalesce(nullif(j.apply_url, ''), j.url) from '^[a-zA-Z]+://([^/:?#]+)'), ''))::text AS host
+FROM applications a JOIN jobs j ON j.id = a.job_id
+WHERE a.state = 'queued'
+  AND NOT EXISTS (SELECT 1 FROM runs r WHERE r.application_id = a.id AND r.finished_at IS NULL AND r.expires_at > $1::timestamptz)
+  AND NOT EXISTS (SELECT 1 FROM runs r WHERE r.host = lower(coalesce(substring(coalesce(nullif(j.apply_url, ''), j.url) from '^[a-zA-Z]+://([^/:?#]+)'), ''))
+    AND ((r.finished_at IS NULL AND r.expires_at > $1::timestamptz) OR r.leased_at > $2::timestamptz))
+ORDER BY a.updated_at, a.id
+LIMIT 1
+FOR UPDATE OF a SKIP LOCKED
+`
+
+type LeaseCandidateParams struct {
+	Now      time.Time
+	GapStart time.Time
+}
+
+type LeaseCandidateRow struct {
+	ID     uuid.UUID
+	UserID uuid.UUID
+	JobID  int64
+	Host   string
+}
+
+// System role: the oldest queued application whose host has no active run and no lease within the gap, and that
+// has no unfinished run itself.
+func (q *Queries) LeaseCandidate(ctx context.Context, arg LeaseCandidateParams) (LeaseCandidateRow, error) {
+	row := q.db.QueryRow(ctx, leaseCandidate, arg.Now, arg.GapStart)
+	var i LeaseCandidateRow
+	err := row.Scan(
+		&i.ID,
+		&i.UserID,
+		&i.JobID,
+		&i.Host,
+	)
+	return i, err
+}
+
+const lockLeases = `-- name: LockLeases :exec
+SELECT pg_advisory_xact_lock(7303470200)
+`
+
+// Leases run one at a time, so that two runners never pass the per-host check together.
+func (q *Queries) LockLeases(ctx context.Context) error {
+	_, err := q.db.Exec(ctx, lockLeases)
 	return err
 }
 
@@ -280,6 +409,68 @@ func (q *Queries) MarkHandoffWarned(ctx context.Context, arg MarkHandoffWarnedPa
 		return 0, err
 	}
 	return result.RowsAffected(), nil
+}
+
+const runByToken = `-- name: RunByToken :one
+SELECT id, application_id, user_id, expires_at, finished_at FROM runs WHERE token_hash = $1
+`
+
+type RunByTokenRow struct {
+	ID            uuid.UUID
+	ApplicationID uuid.UUID
+	UserID        uuid.UUID
+	ExpiresAt     time.Time
+	FinishedAt    *time.Time
+}
+
+// System role: the run a token belongs to.
+func (q *Queries) RunByToken(ctx context.Context, tokenHash []byte) (RunByTokenRow, error) {
+	row := q.db.QueryRow(ctx, runByToken, tokenHash)
+	var i RunByTokenRow
+	err := row.Scan(
+		&i.ID,
+		&i.ApplicationID,
+		&i.UserID,
+		&i.ExpiresAt,
+		&i.FinishedAt,
+	)
+	return i, err
+}
+
+const runJob = `-- name: RunJob :one
+SELECT j.id, j.url, j.apply_url, j.company, j.title, j.location, j.description FROM runs r
+JOIN applications a ON a.id = r.application_id JOIN jobs j ON j.id = a.job_id
+WHERE r.id = $1 AND r.user_id = $2
+`
+
+type RunJobParams struct {
+	ID     uuid.UUID
+	UserID uuid.UUID
+}
+
+type RunJobRow struct {
+	ID          int64
+	Url         string
+	ApplyUrl    string
+	Company     string
+	Title       string
+	Location    string
+	Description string
+}
+
+func (q *Queries) RunJob(ctx context.Context, arg RunJobParams) (RunJobRow, error) {
+	row := q.db.QueryRow(ctx, runJob, arg.ID, arg.UserID)
+	var i RunJobRow
+	err := row.Scan(
+		&i.ID,
+		&i.Url,
+		&i.ApplyUrl,
+		&i.Company,
+		&i.Title,
+		&i.Location,
+		&i.Description,
+	)
+	return i, err
 }
 
 const sameJobStates = `-- name: SameJobStates :many

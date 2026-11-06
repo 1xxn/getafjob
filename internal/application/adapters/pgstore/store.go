@@ -155,3 +155,70 @@ func (s *Store) MarkWarned(ctx context.Context, r application.Ref, at time.Time)
 	})
 	return ok, err
 }
+
+var _ application.RunStore = (*Store)(nil)
+
+// LeaseNext leases the next application in the system role: one lease at a time (advisory lock), so the
+// per-host check holds across runners.
+func (s *Store) LeaseNext(ctx context.Context, runnerID string, tokenHash []byte, now, expires, gapStart time.Time) (
+	l application.Lease, ok bool, err error,
+) {
+	err = db.InSystemTx(ctx, s.pool, func(tx pgx.Tx) error {
+		qs := q.New(tx)
+		if err := qs.LockLeases(ctx); err != nil {
+			return err
+		}
+		c, err := qs.LeaseCandidate(ctx, q.LeaseCandidateParams{Now: now, GapStart: gapStart})
+		if errors.Is(err, pgx.ErrNoRows) {
+			return nil
+		}
+		if err != nil {
+			return err
+		}
+		id, err := qs.InsertRun(ctx, q.InsertRunParams{ApplicationID: c.ID, UserID: c.UserID, RunnerID: runnerID,
+			Host: c.Host, TokenHash: tokenHash, LeasedAt: now, ExpiresAt: expires})
+		if err != nil {
+			return err
+		}
+		l = application.Lease{RunID: id, AppID: c.ID, UserID: c.UserID, JobID: c.JobID, Host: c.Host, ExpiresAt: expires}
+		ok = true
+		return nil
+	})
+	return l, ok, err
+}
+
+// RunByToken finds the run of a token (system role: the caller is a runner, not a user).
+func (s *Store) RunByToken(ctx context.Context, tokenHash []byte) (ref application.RunRef, expires time.Time, finished *time.Time, err error) {
+	err = db.InSystemTx(ctx, s.pool, func(tx pgx.Tx) error {
+		r, err := q.New(tx).RunByToken(ctx, tokenHash)
+		if errors.Is(err, pgx.ErrNoRows) {
+			return application.ErrNoRun
+		}
+		if err != nil {
+			return err
+		}
+		ref = application.RunRef{RunID: r.ID, AppID: r.ApplicationID, UserID: r.UserID}
+		expires, finished = r.ExpiresAt, r.FinishedAt
+		return nil
+	})
+	return ref, expires, finished, err
+}
+
+// FinishRun ends a run with its outcome.
+func (s *Store) FinishRun(ctx context.Context, r application.RunRef, outcome string, at time.Time) error {
+	return s.user(ctx, r.UserID, func(qs *q.Queries) error {
+		return qs.FinishRun(ctx, q.FinishRunParams{ID: r.RunID, UserID: r.UserID, FinishedAt: &at, Outcome: &outcome})
+	})
+}
+
+// AddCheckpoint stores a step of a run.
+func (s *Store) AddCheckpoint(ctx context.Context, r application.RunRef, c application.Checkpoint) error {
+	data := c.Data
+	if len(data) == 0 {
+		data = []byte("{}")
+	}
+	return s.user(ctx, r.UserID, func(qs *q.Queries) error {
+		return qs.InsertCheckpoint(ctx, q.InsertCheckpointParams{RunID: r.RunID, UserID: r.UserID, Step: c.Step,
+			Page: int32(min(max(c.Page, 0), 100)), Url: c.URL, Data: data, Screenshot: c.Screenshot, At: c.At})
+	})
+}

@@ -13,6 +13,7 @@ import (
 	protoreflect "google.golang.org/protobuf/reflect/protoreflect"
 	protoimpl "google.golang.org/protobuf/runtime/protoimpl"
 	durationpb "google.golang.org/protobuf/types/known/durationpb"
+	timestamppb "google.golang.org/protobuf/types/known/timestamppb"
 	reflect "reflect"
 	sync "sync"
 	unsafe "unsafe"
@@ -289,11 +290,1021 @@ func (*HeartbeatResponse) Descriptor() ([]byte, []int) {
 	return file_runner_v1_runner_proto_rawDescGZIP(), []int{3}
 }
 
+type LeaseRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	RunnerId      string                 `protobuf:"bytes,1,opt,name=runner_id,json=runnerId,proto3" json:"runner_id,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *LeaseRequest) Reset() {
+	*x = LeaseRequest{}
+	mi := &file_runner_v1_runner_proto_msgTypes[4]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *LeaseRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*LeaseRequest) ProtoMessage() {}
+
+func (x *LeaseRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_runner_v1_runner_proto_msgTypes[4]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use LeaseRequest.ProtoReflect.Descriptor instead.
+func (*LeaseRequest) Descriptor() ([]byte, []int) {
+	return file_runner_v1_runner_proto_rawDescGZIP(), []int{4}
+}
+
+func (x *LeaseRequest) GetRunnerId() string {
+	if x != nil {
+		return x.RunnerId
+	}
+	return ""
+}
+
+type LeaseResponse struct {
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// Unset when there is nothing to do.
+	Run           *Run `protobuf:"bytes,1,opt,name=run,proto3" json:"run,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *LeaseResponse) Reset() {
+	*x = LeaseResponse{}
+	mi := &file_runner_v1_runner_proto_msgTypes[5]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *LeaseResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*LeaseResponse) ProtoMessage() {}
+
+func (x *LeaseResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_runner_v1_runner_proto_msgTypes[5]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use LeaseResponse.ProtoReflect.Descriptor instead.
+func (*LeaseResponse) Descriptor() ([]byte, []int) {
+	return file_runner_v1_runner_proto_rawDescGZIP(), []int{5}
+}
+
+func (x *LeaseResponse) GetRun() *Run {
+	if x != nil {
+		return x.Run
+	}
+	return nil
+}
+
+// Run is one application run: where to go, what may be filled and with what.
+type Run struct {
+	state protoimpl.MessageState `protogen:"open.v1"`
+	RunId string                 `protobuf:"bytes,1,opt,name=run_id,json=runId,proto3" json:"run_id,omitempty"`
+	// Bearer token for the run's calls; valid until expires_at.
+	Token     string                 `protobuf:"bytes,2,opt,name=token,proto3" json:"token,omitempty"`
+	ExpiresAt *timestamppb.Timestamp `protobuf:"bytes,3,opt,name=expires_at,json=expiresAt,proto3" json:"expires_at,omitempty"`
+	// The posting or application page to start from.
+	StartUrl string `protobuf:"bytes,4,opt,name=start_url,json=startUrl,proto3" json:"start_url,omitempty"`
+	// Origins the values may go to.
+	Origins []string `protobuf:"bytes,5,rep,name=origins,proto3" json:"origins,omitempty"`
+	// Language of the form: en or de.
+	Language string `protobuf:"bytes,6,opt,name=language,proto3" json:"language,omitempty"`
+	// Profile facts by key (personal.first_name, work.notice_period, preferences.diversity ...).
+	Profile   map[string]string `protobuf:"bytes,7,rep,name=profile,proto3" json:"profile,omitempty" protobuf_key:"bytes,1,opt,name=key" protobuf_val:"bytes,2,opt,name=value"`
+	Answers   []*Answer         `protobuf:"bytes,8,rep,name=answers,proto3" json:"answers,omitempty"`
+	Texts     []*Text           `protobuf:"bytes,9,rep,name=texts,proto3" json:"texts,omitempty"`
+	Documents []*Document       `protobuf:"bytes,10,rep,name=documents,proto3" json:"documents,omitempty"`
+	// The CV chosen for this job.
+	CvDocumentId  string `protobuf:"bytes,11,opt,name=cv_document_id,json=cvDocumentId,proto3" json:"cv_document_id,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *Run) Reset() {
+	*x = Run{}
+	mi := &file_runner_v1_runner_proto_msgTypes[6]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *Run) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*Run) ProtoMessage() {}
+
+func (x *Run) ProtoReflect() protoreflect.Message {
+	mi := &file_runner_v1_runner_proto_msgTypes[6]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use Run.ProtoReflect.Descriptor instead.
+func (*Run) Descriptor() ([]byte, []int) {
+	return file_runner_v1_runner_proto_rawDescGZIP(), []int{6}
+}
+
+func (x *Run) GetRunId() string {
+	if x != nil {
+		return x.RunId
+	}
+	return ""
+}
+
+func (x *Run) GetToken() string {
+	if x != nil {
+		return x.Token
+	}
+	return ""
+}
+
+func (x *Run) GetExpiresAt() *timestamppb.Timestamp {
+	if x != nil {
+		return x.ExpiresAt
+	}
+	return nil
+}
+
+func (x *Run) GetStartUrl() string {
+	if x != nil {
+		return x.StartUrl
+	}
+	return ""
+}
+
+func (x *Run) GetOrigins() []string {
+	if x != nil {
+		return x.Origins
+	}
+	return nil
+}
+
+func (x *Run) GetLanguage() string {
+	if x != nil {
+		return x.Language
+	}
+	return ""
+}
+
+func (x *Run) GetProfile() map[string]string {
+	if x != nil {
+		return x.Profile
+	}
+	return nil
+}
+
+func (x *Run) GetAnswers() []*Answer {
+	if x != nil {
+		return x.Answers
+	}
+	return nil
+}
+
+func (x *Run) GetTexts() []*Text {
+	if x != nil {
+		return x.Texts
+	}
+	return nil
+}
+
+func (x *Run) GetDocuments() []*Document {
+	if x != nil {
+		return x.Documents
+	}
+	return nil
+}
+
+func (x *Run) GetCvDocumentId() string {
+	if x != nil {
+		return x.CvDocumentId
+	}
+	return ""
+}
+
+type Answer struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Id            string                 `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
+	Question      string                 `protobuf:"bytes,2,opt,name=question,proto3" json:"question,omitempty"`
+	Answer        string                 `protobuf:"bytes,3,opt,name=answer,proto3" json:"answer,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *Answer) Reset() {
+	*x = Answer{}
+	mi := &file_runner_v1_runner_proto_msgTypes[7]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *Answer) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*Answer) ProtoMessage() {}
+
+func (x *Answer) ProtoReflect() protoreflect.Message {
+	mi := &file_runner_v1_runner_proto_msgTypes[7]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use Answer.ProtoReflect.Descriptor instead.
+func (*Answer) Descriptor() ([]byte, []int) {
+	return file_runner_v1_runner_proto_rawDescGZIP(), []int{7}
+}
+
+func (x *Answer) GetId() string {
+	if x != nil {
+		return x.Id
+	}
+	return ""
+}
+
+func (x *Answer) GetQuestion() string {
+	if x != nil {
+		return x.Question
+	}
+	return ""
+}
+
+func (x *Answer) GetAnswer() string {
+	if x != nil {
+		return x.Answer
+	}
+	return ""
+}
+
+// Text is a text block with its placeholders filled for this job.
+type Text struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Id            string                 `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
+	Name          string                 `protobuf:"bytes,2,opt,name=name,proto3" json:"name,omitempty"`
+	Language      string                 `protobuf:"bytes,3,opt,name=language,proto3" json:"language,omitempty"`
+	Body          string                 `protobuf:"bytes,4,opt,name=body,proto3" json:"body,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *Text) Reset() {
+	*x = Text{}
+	mi := &file_runner_v1_runner_proto_msgTypes[8]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *Text) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*Text) ProtoMessage() {}
+
+func (x *Text) ProtoReflect() protoreflect.Message {
+	mi := &file_runner_v1_runner_proto_msgTypes[8]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use Text.ProtoReflect.Descriptor instead.
+func (*Text) Descriptor() ([]byte, []int) {
+	return file_runner_v1_runner_proto_rawDescGZIP(), []int{8}
+}
+
+func (x *Text) GetId() string {
+	if x != nil {
+		return x.Id
+	}
+	return ""
+}
+
+func (x *Text) GetName() string {
+	if x != nil {
+		return x.Name
+	}
+	return ""
+}
+
+func (x *Text) GetLanguage() string {
+	if x != nil {
+		return x.Language
+	}
+	return ""
+}
+
+func (x *Text) GetBody() string {
+	if x != nil {
+		return x.Body
+	}
+	return ""
+}
+
+type Document struct {
+	state    protoimpl.MessageState `protogen:"open.v1"`
+	Id       string                 `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
+	FileName string                 `protobuf:"bytes,2,opt,name=file_name,json=fileName,proto3" json:"file_name,omitempty"`
+	// cv, cover_letter or certificate.
+	Kind          string `protobuf:"bytes,3,opt,name=kind,proto3" json:"kind,omitempty"`
+	Language      string `protobuf:"bytes,4,opt,name=language,proto3" json:"language,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *Document) Reset() {
+	*x = Document{}
+	mi := &file_runner_v1_runner_proto_msgTypes[9]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *Document) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*Document) ProtoMessage() {}
+
+func (x *Document) ProtoReflect() protoreflect.Message {
+	mi := &file_runner_v1_runner_proto_msgTypes[9]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use Document.ProtoReflect.Descriptor instead.
+func (*Document) Descriptor() ([]byte, []int) {
+	return file_runner_v1_runner_proto_rawDescGZIP(), []int{9}
+}
+
+func (x *Document) GetId() string {
+	if x != nil {
+		return x.Id
+	}
+	return ""
+}
+
+func (x *Document) GetFileName() string {
+	if x != nil {
+		return x.FileName
+	}
+	return ""
+}
+
+func (x *Document) GetKind() string {
+	if x != nil {
+		return x.Kind
+	}
+	return ""
+}
+
+func (x *Document) GetLanguage() string {
+	if x != nil {
+		return x.Language
+	}
+	return ""
+}
+
+type FetchDocumentRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	DocumentId    string                 `protobuf:"bytes,1,opt,name=document_id,json=documentId,proto3" json:"document_id,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *FetchDocumentRequest) Reset() {
+	*x = FetchDocumentRequest{}
+	mi := &file_runner_v1_runner_proto_msgTypes[10]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *FetchDocumentRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*FetchDocumentRequest) ProtoMessage() {}
+
+func (x *FetchDocumentRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_runner_v1_runner_proto_msgTypes[10]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use FetchDocumentRequest.ProtoReflect.Descriptor instead.
+func (*FetchDocumentRequest) Descriptor() ([]byte, []int) {
+	return file_runner_v1_runner_proto_rawDescGZIP(), []int{10}
+}
+
+func (x *FetchDocumentRequest) GetDocumentId() string {
+	if x != nil {
+		return x.DocumentId
+	}
+	return ""
+}
+
+type FetchDocumentResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Content       []byte                 `protobuf:"bytes,1,opt,name=content,proto3" json:"content,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *FetchDocumentResponse) Reset() {
+	*x = FetchDocumentResponse{}
+	mi := &file_runner_v1_runner_proto_msgTypes[11]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *FetchDocumentResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*FetchDocumentResponse) ProtoMessage() {}
+
+func (x *FetchDocumentResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_runner_v1_runner_proto_msgTypes[11]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use FetchDocumentResponse.ProtoReflect.Descriptor instead.
+func (*FetchDocumentResponse) Descriptor() ([]byte, []int) {
+	return file_runner_v1_runner_proto_rawDescGZIP(), []int{11}
+}
+
+func (x *FetchDocumentResponse) GetContent() []byte {
+	if x != nil {
+		return x.Content
+	}
+	return nil
+}
+
+type CheckpointRequest struct {
+	state protoimpl.MessageState `protogen:"open.v1"`
+	Step  string                 `protobuf:"bytes,1,opt,name=step,proto3" json:"step,omitempty"`
+	Page  int32                  `protobuf:"varint,2,opt,name=page,proto3" json:"page,omitempty"`
+	Url   string                 `protobuf:"bytes,3,opt,name=url,proto3" json:"url,omitempty"`
+	// The checkpoint's page data as JSON (fields, filled values, effect, errors, dialogs).
+	DataJson      []byte `protobuf:"bytes,4,opt,name=data_json,json=dataJson,proto3" json:"data_json,omitempty"`
+	Screenshot    []byte `protobuf:"bytes,5,opt,name=screenshot,proto3" json:"screenshot,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *CheckpointRequest) Reset() {
+	*x = CheckpointRequest{}
+	mi := &file_runner_v1_runner_proto_msgTypes[12]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *CheckpointRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*CheckpointRequest) ProtoMessage() {}
+
+func (x *CheckpointRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_runner_v1_runner_proto_msgTypes[12]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use CheckpointRequest.ProtoReflect.Descriptor instead.
+func (*CheckpointRequest) Descriptor() ([]byte, []int) {
+	return file_runner_v1_runner_proto_rawDescGZIP(), []int{12}
+}
+
+func (x *CheckpointRequest) GetStep() string {
+	if x != nil {
+		return x.Step
+	}
+	return ""
+}
+
+func (x *CheckpointRequest) GetPage() int32 {
+	if x != nil {
+		return x.Page
+	}
+	return 0
+}
+
+func (x *CheckpointRequest) GetUrl() string {
+	if x != nil {
+		return x.Url
+	}
+	return ""
+}
+
+func (x *CheckpointRequest) GetDataJson() []byte {
+	if x != nil {
+		return x.DataJson
+	}
+	return nil
+}
+
+func (x *CheckpointRequest) GetScreenshot() []byte {
+	if x != nil {
+		return x.Screenshot
+	}
+	return nil
+}
+
+type CheckpointResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *CheckpointResponse) Reset() {
+	*x = CheckpointResponse{}
+	mi := &file_runner_v1_runner_proto_msgTypes[13]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *CheckpointResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*CheckpointResponse) ProtoMessage() {}
+
+func (x *CheckpointResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_runner_v1_runner_proto_msgTypes[13]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use CheckpointResponse.ProtoReflect.Descriptor instead.
+func (*CheckpointResponse) Descriptor() ([]byte, []int) {
+	return file_runner_v1_runner_proto_rawDescGZIP(), []int{13}
+}
+
+type Question struct {
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// field or captcha.
+	Kind  string `protobuf:"bytes,1,opt,name=kind,proto3" json:"kind,omitempty"`
+	Label string `protobuf:"bytes,2,opt,name=label,proto3" json:"label,omitempty"`
+	// An AI suggestion, used only after the user approved it.
+	Draft         string `protobuf:"bytes,3,opt,name=draft,proto3" json:"draft,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *Question) Reset() {
+	*x = Question{}
+	mi := &file_runner_v1_runner_proto_msgTypes[14]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *Question) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*Question) ProtoMessage() {}
+
+func (x *Question) ProtoReflect() protoreflect.Message {
+	mi := &file_runner_v1_runner_proto_msgTypes[14]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use Question.ProtoReflect.Descriptor instead.
+func (*Question) Descriptor() ([]byte, []int) {
+	return file_runner_v1_runner_proto_rawDescGZIP(), []int{14}
+}
+
+func (x *Question) GetKind() string {
+	if x != nil {
+		return x.Kind
+	}
+	return ""
+}
+
+func (x *Question) GetLabel() string {
+	if x != nil {
+		return x.Label
+	}
+	return ""
+}
+
+func (x *Question) GetDraft() string {
+	if x != nil {
+		return x.Draft
+	}
+	return ""
+}
+
+type AskRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Questions     []*Question            `protobuf:"bytes,1,rep,name=questions,proto3" json:"questions,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *AskRequest) Reset() {
+	*x = AskRequest{}
+	mi := &file_runner_v1_runner_proto_msgTypes[15]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *AskRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*AskRequest) ProtoMessage() {}
+
+func (x *AskRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_runner_v1_runner_proto_msgTypes[15]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use AskRequest.ProtoReflect.Descriptor instead.
+func (*AskRequest) Descriptor() ([]byte, []int) {
+	return file_runner_v1_runner_proto_rawDescGZIP(), []int{15}
+}
+
+func (x *AskRequest) GetQuestions() []*Question {
+	if x != nil {
+		return x.Questions
+	}
+	return nil
+}
+
+type AskResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *AskResponse) Reset() {
+	*x = AskResponse{}
+	mi := &file_runner_v1_runner_proto_msgTypes[16]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *AskResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*AskResponse) ProtoMessage() {}
+
+func (x *AskResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_runner_v1_runner_proto_msgTypes[16]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use AskResponse.ProtoReflect.Descriptor instead.
+func (*AskResponse) Descriptor() ([]byte, []int) {
+	return file_runner_v1_runner_proto_rawDescGZIP(), []int{16}
+}
+
+type BeginSubmitRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *BeginSubmitRequest) Reset() {
+	*x = BeginSubmitRequest{}
+	mi := &file_runner_v1_runner_proto_msgTypes[17]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *BeginSubmitRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*BeginSubmitRequest) ProtoMessage() {}
+
+func (x *BeginSubmitRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_runner_v1_runner_proto_msgTypes[17]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use BeginSubmitRequest.ProtoReflect.Descriptor instead.
+func (*BeginSubmitRequest) Descriptor() ([]byte, []int) {
+	return file_runner_v1_runner_proto_rawDescGZIP(), []int{17}
+}
+
+type BeginSubmitResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *BeginSubmitResponse) Reset() {
+	*x = BeginSubmitResponse{}
+	mi := &file_runner_v1_runner_proto_msgTypes[18]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *BeginSubmitResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*BeginSubmitResponse) ProtoMessage() {}
+
+func (x *BeginSubmitResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_runner_v1_runner_proto_msgTypes[18]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use BeginSubmitResponse.ProtoReflect.Descriptor instead.
+func (*BeginSubmitResponse) Descriptor() ([]byte, []int) {
+	return file_runner_v1_runner_proto_rawDescGZIP(), []int{18}
+}
+
+type SubmittedRequest struct {
+	state     protoimpl.MessageState `protogen:"open.v1"`
+	Confirmed bool                   `protobuf:"varint,1,opt,name=confirmed,proto3" json:"confirmed,omitempty"`
+	// The click's effect as JSON.
+	EffectJson    []byte `protobuf:"bytes,2,opt,name=effect_json,json=effectJson,proto3" json:"effect_json,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *SubmittedRequest) Reset() {
+	*x = SubmittedRequest{}
+	mi := &file_runner_v1_runner_proto_msgTypes[19]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *SubmittedRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*SubmittedRequest) ProtoMessage() {}
+
+func (x *SubmittedRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_runner_v1_runner_proto_msgTypes[19]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use SubmittedRequest.ProtoReflect.Descriptor instead.
+func (*SubmittedRequest) Descriptor() ([]byte, []int) {
+	return file_runner_v1_runner_proto_rawDescGZIP(), []int{19}
+}
+
+func (x *SubmittedRequest) GetConfirmed() bool {
+	if x != nil {
+		return x.Confirmed
+	}
+	return false
+}
+
+func (x *SubmittedRequest) GetEffectJson() []byte {
+	if x != nil {
+		return x.EffectJson
+	}
+	return nil
+}
+
+type SubmittedResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *SubmittedResponse) Reset() {
+	*x = SubmittedResponse{}
+	mi := &file_runner_v1_runner_proto_msgTypes[20]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *SubmittedResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*SubmittedResponse) ProtoMessage() {}
+
+func (x *SubmittedResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_runner_v1_runner_proto_msgTypes[20]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use SubmittedResponse.ProtoReflect.Descriptor instead.
+func (*SubmittedResponse) Descriptor() ([]byte, []int) {
+	return file_runner_v1_runner_proto_rawDescGZIP(), []int{20}
+}
+
+type ParkRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Reason        string                 `protobuf:"bytes,1,opt,name=reason,proto3" json:"reason,omitempty"`
+	Screenshot    []byte                 `protobuf:"bytes,2,opt,name=screenshot,proto3" json:"screenshot,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ParkRequest) Reset() {
+	*x = ParkRequest{}
+	mi := &file_runner_v1_runner_proto_msgTypes[21]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ParkRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ParkRequest) ProtoMessage() {}
+
+func (x *ParkRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_runner_v1_runner_proto_msgTypes[21]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ParkRequest.ProtoReflect.Descriptor instead.
+func (*ParkRequest) Descriptor() ([]byte, []int) {
+	return file_runner_v1_runner_proto_rawDescGZIP(), []int{21}
+}
+
+func (x *ParkRequest) GetReason() string {
+	if x != nil {
+		return x.Reason
+	}
+	return ""
+}
+
+func (x *ParkRequest) GetScreenshot() []byte {
+	if x != nil {
+		return x.Screenshot
+	}
+	return nil
+}
+
+type ParkResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ParkResponse) Reset() {
+	*x = ParkResponse{}
+	mi := &file_runner_v1_runner_proto_msgTypes[22]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ParkResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ParkResponse) ProtoMessage() {}
+
+func (x *ParkResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_runner_v1_runner_proto_msgTypes[22]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ParkResponse.ProtoReflect.Descriptor instead.
+func (*ParkResponse) Descriptor() ([]byte, []int) {
+	return file_runner_v1_runner_proto_rawDescGZIP(), []int{22}
+}
+
 var File_runner_v1_runner_proto protoreflect.FileDescriptor
 
 const file_runner_v1_runner_proto_rawDesc = "" +
 	"\n" +
-	"\x16runner/v1/runner.proto\x12\trunner.v1\x1a\x1egoogle/protobuf/duration.proto\"\x93\x01\n" +
+	"\x16runner/v1/runner.proto\x12\trunner.v1\x1a\x1egoogle/protobuf/duration.proto\x1a\x1fgoogle/protobuf/timestamp.proto\"\x93\x01\n" +
 	"\x0fRegisterRequest\x12\x18\n" +
 	"\aversion\x18\x01 \x01(\tR\aversion\x12\x18\n" +
 	"\abrowser\x18\x02 \x01(\tR\abrowser\x12)\n" +
@@ -306,15 +1317,93 @@ const file_runner_v1_runner_proto_rawDesc = "" +
 	"\trunner_id\x18\x01 \x01(\tR\brunnerId\x12\x1f\n" +
 	"\vactive_runs\x18\x02 \x01(\x05R\n" +
 	"activeRuns\"\x13\n" +
-	"\x11HeartbeatResponse*W\n" +
+	"\x11HeartbeatResponse\"+\n" +
+	"\fLeaseRequest\x12\x1b\n" +
+	"\trunner_id\x18\x01 \x01(\tR\brunnerId\"1\n" +
+	"\rLeaseResponse\x12 \n" +
+	"\x03run\x18\x01 \x01(\v2\x0e.runner.v1.RunR\x03run\"\xe0\x03\n" +
+	"\x03Run\x12\x15\n" +
+	"\x06run_id\x18\x01 \x01(\tR\x05runId\x12\x14\n" +
+	"\x05token\x18\x02 \x01(\tR\x05token\x129\n" +
+	"\n" +
+	"expires_at\x18\x03 \x01(\v2\x1a.google.protobuf.TimestampR\texpiresAt\x12\x1b\n" +
+	"\tstart_url\x18\x04 \x01(\tR\bstartUrl\x12\x18\n" +
+	"\aorigins\x18\x05 \x03(\tR\aorigins\x12\x1a\n" +
+	"\blanguage\x18\x06 \x01(\tR\blanguage\x125\n" +
+	"\aprofile\x18\a \x03(\v2\x1b.runner.v1.Run.ProfileEntryR\aprofile\x12+\n" +
+	"\aanswers\x18\b \x03(\v2\x11.runner.v1.AnswerR\aanswers\x12%\n" +
+	"\x05texts\x18\t \x03(\v2\x0f.runner.v1.TextR\x05texts\x121\n" +
+	"\tdocuments\x18\n" +
+	" \x03(\v2\x13.runner.v1.DocumentR\tdocuments\x12$\n" +
+	"\x0ecv_document_id\x18\v \x01(\tR\fcvDocumentId\x1a:\n" +
+	"\fProfileEntry\x12\x10\n" +
+	"\x03key\x18\x01 \x01(\tR\x03key\x12\x14\n" +
+	"\x05value\x18\x02 \x01(\tR\x05value:\x028\x01\"L\n" +
+	"\x06Answer\x12\x0e\n" +
+	"\x02id\x18\x01 \x01(\tR\x02id\x12\x1a\n" +
+	"\bquestion\x18\x02 \x01(\tR\bquestion\x12\x16\n" +
+	"\x06answer\x18\x03 \x01(\tR\x06answer\"Z\n" +
+	"\x04Text\x12\x0e\n" +
+	"\x02id\x18\x01 \x01(\tR\x02id\x12\x12\n" +
+	"\x04name\x18\x02 \x01(\tR\x04name\x12\x1a\n" +
+	"\blanguage\x18\x03 \x01(\tR\blanguage\x12\x12\n" +
+	"\x04body\x18\x04 \x01(\tR\x04body\"g\n" +
+	"\bDocument\x12\x0e\n" +
+	"\x02id\x18\x01 \x01(\tR\x02id\x12\x1b\n" +
+	"\tfile_name\x18\x02 \x01(\tR\bfileName\x12\x12\n" +
+	"\x04kind\x18\x03 \x01(\tR\x04kind\x12\x1a\n" +
+	"\blanguage\x18\x04 \x01(\tR\blanguage\"7\n" +
+	"\x14FetchDocumentRequest\x12\x1f\n" +
+	"\vdocument_id\x18\x01 \x01(\tR\n" +
+	"documentId\"1\n" +
+	"\x15FetchDocumentResponse\x12\x18\n" +
+	"\acontent\x18\x01 \x01(\fR\acontent\"\x8a\x01\n" +
+	"\x11CheckpointRequest\x12\x12\n" +
+	"\x04step\x18\x01 \x01(\tR\x04step\x12\x12\n" +
+	"\x04page\x18\x02 \x01(\x05R\x04page\x12\x10\n" +
+	"\x03url\x18\x03 \x01(\tR\x03url\x12\x1b\n" +
+	"\tdata_json\x18\x04 \x01(\fR\bdataJson\x12\x1e\n" +
+	"\n" +
+	"screenshot\x18\x05 \x01(\fR\n" +
+	"screenshot\"\x14\n" +
+	"\x12CheckpointResponse\"J\n" +
+	"\bQuestion\x12\x12\n" +
+	"\x04kind\x18\x01 \x01(\tR\x04kind\x12\x14\n" +
+	"\x05label\x18\x02 \x01(\tR\x05label\x12\x14\n" +
+	"\x05draft\x18\x03 \x01(\tR\x05draft\"?\n" +
+	"\n" +
+	"AskRequest\x121\n" +
+	"\tquestions\x18\x01 \x03(\v2\x13.runner.v1.QuestionR\tquestions\"\r\n" +
+	"\vAskResponse\"\x14\n" +
+	"\x12BeginSubmitRequest\"\x15\n" +
+	"\x13BeginSubmitResponse\"Q\n" +
+	"\x10SubmittedRequest\x12\x1c\n" +
+	"\tconfirmed\x18\x01 \x01(\bR\tconfirmed\x12\x1f\n" +
+	"\veffect_json\x18\x02 \x01(\fR\n" +
+	"effectJson\"\x13\n" +
+	"\x11SubmittedResponse\"E\n" +
+	"\vParkRequest\x12\x16\n" +
+	"\x06reason\x18\x01 \x01(\tR\x06reason\x12\x1e\n" +
+	"\n" +
+	"screenshot\x18\x02 \x01(\fR\n" +
+	"screenshot\"\x0e\n" +
+	"\fParkResponse*W\n" +
 	"\n" +
 	"RunnerKind\x12\x1b\n" +
 	"\x17RUNNER_KIND_UNSPECIFIED\x10\x00\x12\x16\n" +
 	"\x12RUNNER_KIND_SERVER\x10\x01\x12\x14\n" +
-	"\x10RUNNER_KIND_HOME\x10\x022\xa0\x01\n" +
+	"\x10RUNNER_KIND_HOME\x10\x022\x8e\x05\n" +
 	"\rRunnerService\x12E\n" +
 	"\bRegister\x12\x1a.runner.v1.RegisterRequest\x1a\x1b.runner.v1.RegisterResponse\"\x00\x12H\n" +
-	"\tHeartbeat\x12\x1b.runner.v1.HeartbeatRequest\x1a\x1c.runner.v1.HeartbeatResponse\"\x00B@Z>github.com/1xxn/getafjob/internal/gen/proto/runner/v1;runnerv1b\x06proto3"
+	"\tHeartbeat\x12\x1b.runner.v1.HeartbeatRequest\x1a\x1c.runner.v1.HeartbeatResponse\"\x00\x12<\n" +
+	"\x05Lease\x12\x17.runner.v1.LeaseRequest\x1a\x18.runner.v1.LeaseResponse\"\x00\x12T\n" +
+	"\rFetchDocument\x12\x1f.runner.v1.FetchDocumentRequest\x1a .runner.v1.FetchDocumentResponse\"\x00\x12K\n" +
+	"\n" +
+	"Checkpoint\x12\x1c.runner.v1.CheckpointRequest\x1a\x1d.runner.v1.CheckpointResponse\"\x00\x126\n" +
+	"\x03Ask\x12\x15.runner.v1.AskRequest\x1a\x16.runner.v1.AskResponse\"\x00\x12N\n" +
+	"\vBeginSubmit\x12\x1d.runner.v1.BeginSubmitRequest\x1a\x1e.runner.v1.BeginSubmitResponse\"\x00\x12H\n" +
+	"\tSubmitted\x12\x1b.runner.v1.SubmittedRequest\x1a\x1c.runner.v1.SubmittedResponse\"\x00\x129\n" +
+	"\x04Park\x12\x16.runner.v1.ParkRequest\x1a\x17.runner.v1.ParkResponse\"\x00B@Z>github.com/1xxn/getafjob/internal/gen/proto/runner/v1;runnerv1b\x06proto3"
 
 var (
 	file_runner_v1_runner_proto_rawDescOnce sync.Once
@@ -329,27 +1418,69 @@ func file_runner_v1_runner_proto_rawDescGZIP() []byte {
 }
 
 var file_runner_v1_runner_proto_enumTypes = make([]protoimpl.EnumInfo, 1)
-var file_runner_v1_runner_proto_msgTypes = make([]protoimpl.MessageInfo, 4)
+var file_runner_v1_runner_proto_msgTypes = make([]protoimpl.MessageInfo, 24)
 var file_runner_v1_runner_proto_goTypes = []any{
-	(RunnerKind)(0),             // 0: runner.v1.RunnerKind
-	(*RegisterRequest)(nil),     // 1: runner.v1.RegisterRequest
-	(*RegisterResponse)(nil),    // 2: runner.v1.RegisterResponse
-	(*HeartbeatRequest)(nil),    // 3: runner.v1.HeartbeatRequest
-	(*HeartbeatResponse)(nil),   // 4: runner.v1.HeartbeatResponse
-	(*durationpb.Duration)(nil), // 5: google.protobuf.Duration
+	(RunnerKind)(0),               // 0: runner.v1.RunnerKind
+	(*RegisterRequest)(nil),       // 1: runner.v1.RegisterRequest
+	(*RegisterResponse)(nil),      // 2: runner.v1.RegisterResponse
+	(*HeartbeatRequest)(nil),      // 3: runner.v1.HeartbeatRequest
+	(*HeartbeatResponse)(nil),     // 4: runner.v1.HeartbeatResponse
+	(*LeaseRequest)(nil),          // 5: runner.v1.LeaseRequest
+	(*LeaseResponse)(nil),         // 6: runner.v1.LeaseResponse
+	(*Run)(nil),                   // 7: runner.v1.Run
+	(*Answer)(nil),                // 8: runner.v1.Answer
+	(*Text)(nil),                  // 9: runner.v1.Text
+	(*Document)(nil),              // 10: runner.v1.Document
+	(*FetchDocumentRequest)(nil),  // 11: runner.v1.FetchDocumentRequest
+	(*FetchDocumentResponse)(nil), // 12: runner.v1.FetchDocumentResponse
+	(*CheckpointRequest)(nil),     // 13: runner.v1.CheckpointRequest
+	(*CheckpointResponse)(nil),    // 14: runner.v1.CheckpointResponse
+	(*Question)(nil),              // 15: runner.v1.Question
+	(*AskRequest)(nil),            // 16: runner.v1.AskRequest
+	(*AskResponse)(nil),           // 17: runner.v1.AskResponse
+	(*BeginSubmitRequest)(nil),    // 18: runner.v1.BeginSubmitRequest
+	(*BeginSubmitResponse)(nil),   // 19: runner.v1.BeginSubmitResponse
+	(*SubmittedRequest)(nil),      // 20: runner.v1.SubmittedRequest
+	(*SubmittedResponse)(nil),     // 21: runner.v1.SubmittedResponse
+	(*ParkRequest)(nil),           // 22: runner.v1.ParkRequest
+	(*ParkResponse)(nil),          // 23: runner.v1.ParkResponse
+	nil,                           // 24: runner.v1.Run.ProfileEntry
+	(*durationpb.Duration)(nil),   // 25: google.protobuf.Duration
+	(*timestamppb.Timestamp)(nil), // 26: google.protobuf.Timestamp
 }
 var file_runner_v1_runner_proto_depIdxs = []int32{
-	0, // 0: runner.v1.RegisterRequest.kind:type_name -> runner.v1.RunnerKind
-	5, // 1: runner.v1.RegisterResponse.heartbeat_interval:type_name -> google.protobuf.Duration
-	1, // 2: runner.v1.RunnerService.Register:input_type -> runner.v1.RegisterRequest
-	3, // 3: runner.v1.RunnerService.Heartbeat:input_type -> runner.v1.HeartbeatRequest
-	2, // 4: runner.v1.RunnerService.Register:output_type -> runner.v1.RegisterResponse
-	4, // 5: runner.v1.RunnerService.Heartbeat:output_type -> runner.v1.HeartbeatResponse
-	4, // [4:6] is the sub-list for method output_type
-	2, // [2:4] is the sub-list for method input_type
-	2, // [2:2] is the sub-list for extension type_name
-	2, // [2:2] is the sub-list for extension extendee
-	0, // [0:2] is the sub-list for field type_name
+	0,  // 0: runner.v1.RegisterRequest.kind:type_name -> runner.v1.RunnerKind
+	25, // 1: runner.v1.RegisterResponse.heartbeat_interval:type_name -> google.protobuf.Duration
+	7,  // 2: runner.v1.LeaseResponse.run:type_name -> runner.v1.Run
+	26, // 3: runner.v1.Run.expires_at:type_name -> google.protobuf.Timestamp
+	24, // 4: runner.v1.Run.profile:type_name -> runner.v1.Run.ProfileEntry
+	8,  // 5: runner.v1.Run.answers:type_name -> runner.v1.Answer
+	9,  // 6: runner.v1.Run.texts:type_name -> runner.v1.Text
+	10, // 7: runner.v1.Run.documents:type_name -> runner.v1.Document
+	15, // 8: runner.v1.AskRequest.questions:type_name -> runner.v1.Question
+	1,  // 9: runner.v1.RunnerService.Register:input_type -> runner.v1.RegisterRequest
+	3,  // 10: runner.v1.RunnerService.Heartbeat:input_type -> runner.v1.HeartbeatRequest
+	5,  // 11: runner.v1.RunnerService.Lease:input_type -> runner.v1.LeaseRequest
+	11, // 12: runner.v1.RunnerService.FetchDocument:input_type -> runner.v1.FetchDocumentRequest
+	13, // 13: runner.v1.RunnerService.Checkpoint:input_type -> runner.v1.CheckpointRequest
+	16, // 14: runner.v1.RunnerService.Ask:input_type -> runner.v1.AskRequest
+	18, // 15: runner.v1.RunnerService.BeginSubmit:input_type -> runner.v1.BeginSubmitRequest
+	20, // 16: runner.v1.RunnerService.Submitted:input_type -> runner.v1.SubmittedRequest
+	22, // 17: runner.v1.RunnerService.Park:input_type -> runner.v1.ParkRequest
+	2,  // 18: runner.v1.RunnerService.Register:output_type -> runner.v1.RegisterResponse
+	4,  // 19: runner.v1.RunnerService.Heartbeat:output_type -> runner.v1.HeartbeatResponse
+	6,  // 20: runner.v1.RunnerService.Lease:output_type -> runner.v1.LeaseResponse
+	12, // 21: runner.v1.RunnerService.FetchDocument:output_type -> runner.v1.FetchDocumentResponse
+	14, // 22: runner.v1.RunnerService.Checkpoint:output_type -> runner.v1.CheckpointResponse
+	17, // 23: runner.v1.RunnerService.Ask:output_type -> runner.v1.AskResponse
+	19, // 24: runner.v1.RunnerService.BeginSubmit:output_type -> runner.v1.BeginSubmitResponse
+	21, // 25: runner.v1.RunnerService.Submitted:output_type -> runner.v1.SubmittedResponse
+	23, // 26: runner.v1.RunnerService.Park:output_type -> runner.v1.ParkResponse
+	18, // [18:27] is the sub-list for method output_type
+	9,  // [9:18] is the sub-list for method input_type
+	9,  // [9:9] is the sub-list for extension type_name
+	9,  // [9:9] is the sub-list for extension extendee
+	0,  // [0:9] is the sub-list for field type_name
 }
 
 func init() { file_runner_v1_runner_proto_init() }
@@ -363,7 +1494,7 @@ func file_runner_v1_runner_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_runner_v1_runner_proto_rawDesc), len(file_runner_v1_runner_proto_rawDesc)),
 			NumEnums:      1,
-			NumMessages:   4,
+			NumMessages:   24,
 			NumExtensions: 0,
 			NumServices:   1,
 		},

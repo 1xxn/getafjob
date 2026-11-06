@@ -51,3 +51,40 @@ WHERE state = 'needs_input' AND handoff_until IS NOT NULL AND handoff_until < $1
 
 -- name: MarkHandoffWarned :execrows
 UPDATE applications SET handoff_warned = true WHERE id = $1 AND user_id = $2 AND state = 'needs_input' AND NOT handoff_warned;
+
+-- name: LeaseCandidate :one
+-- System role: the oldest queued application whose host has no active run and no lease within the gap, and that
+-- has no unfinished run itself.
+SELECT a.id, a.user_id, a.job_id,
+  lower(coalesce(substring(coalesce(nullif(j.apply_url, ''), j.url) from '^[a-zA-Z]+://([^/:?#]+)'), ''))::text AS host
+FROM applications a JOIN jobs j ON j.id = a.job_id
+WHERE a.state = 'queued'
+  AND NOT EXISTS (SELECT 1 FROM runs r WHERE r.application_id = a.id AND r.finished_at IS NULL AND r.expires_at > sqlc.arg(now)::timestamptz)
+  AND NOT EXISTS (SELECT 1 FROM runs r WHERE r.host = lower(coalesce(substring(coalesce(nullif(j.apply_url, ''), j.url) from '^[a-zA-Z]+://([^/:?#]+)'), ''))
+    AND ((r.finished_at IS NULL AND r.expires_at > sqlc.arg(now)::timestamptz) OR r.leased_at > sqlc.arg(gap_start)::timestamptz))
+ORDER BY a.updated_at, a.id
+LIMIT 1
+FOR UPDATE OF a SKIP LOCKED;
+
+-- name: InsertRun :one
+INSERT INTO runs (application_id, user_id, runner_id, host, token_hash, leased_at, expires_at)
+VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING id;
+
+-- name: RunByToken :one
+-- System role: the run a token belongs to.
+SELECT id, application_id, user_id, expires_at, finished_at FROM runs WHERE token_hash = $1;
+
+-- name: FinishRun :exec
+UPDATE runs SET finished_at = $3, outcome = $4 WHERE id = $1 AND user_id = $2 AND finished_at IS NULL;
+
+-- name: InsertCheckpoint :exec
+INSERT INTO run_checkpoints (run_id, user_id, step, page, url, data, screenshot, at) VALUES ($1, $2, $3, $4, $5, $6, $7, $8);
+
+-- name: RunJob :one
+SELECT j.id, j.url, j.apply_url, j.company, j.title, j.location, j.description FROM runs r
+JOIN applications a ON a.id = r.application_id JOIN jobs j ON j.id = a.job_id
+WHERE r.id = $1 AND r.user_id = $2;
+
+-- name: LockLeases :exec
+-- Leases run one at a time, so that two runners never pass the per-host check together.
+SELECT pg_advisory_xact_lock(7303470200);

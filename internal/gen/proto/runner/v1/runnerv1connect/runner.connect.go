@@ -39,6 +39,23 @@ const (
 	RunnerServiceRegisterProcedure = "/runner.v1.RunnerService/Register"
 	// RunnerServiceHeartbeatProcedure is the fully-qualified name of the RunnerService's Heartbeat RPC.
 	RunnerServiceHeartbeatProcedure = "/runner.v1.RunnerService/Heartbeat"
+	// RunnerServiceLeaseProcedure is the fully-qualified name of the RunnerService's Lease RPC.
+	RunnerServiceLeaseProcedure = "/runner.v1.RunnerService/Lease"
+	// RunnerServiceFetchDocumentProcedure is the fully-qualified name of the RunnerService's
+	// FetchDocument RPC.
+	RunnerServiceFetchDocumentProcedure = "/runner.v1.RunnerService/FetchDocument"
+	// RunnerServiceCheckpointProcedure is the fully-qualified name of the RunnerService's Checkpoint
+	// RPC.
+	RunnerServiceCheckpointProcedure = "/runner.v1.RunnerService/Checkpoint"
+	// RunnerServiceAskProcedure is the fully-qualified name of the RunnerService's Ask RPC.
+	RunnerServiceAskProcedure = "/runner.v1.RunnerService/Ask"
+	// RunnerServiceBeginSubmitProcedure is the fully-qualified name of the RunnerService's BeginSubmit
+	// RPC.
+	RunnerServiceBeginSubmitProcedure = "/runner.v1.RunnerService/BeginSubmit"
+	// RunnerServiceSubmittedProcedure is the fully-qualified name of the RunnerService's Submitted RPC.
+	RunnerServiceSubmittedProcedure = "/runner.v1.RunnerService/Submitted"
+	// RunnerServiceParkProcedure is the fully-qualified name of the RunnerService's Park RPC.
+	RunnerServiceParkProcedure = "/runner.v1.RunnerService/Park"
 )
 
 // RunnerServiceClient is a client for the runner.v1.RunnerService service.
@@ -47,6 +64,20 @@ type RunnerServiceClient interface {
 	Register(context.Context, *connect.Request[v1.RegisterRequest]) (*connect.Response[v1.RegisterResponse], error)
 	// Heartbeat keeps a registration alive and reports the current load.
 	Heartbeat(context.Context, *connect.Request[v1.HeartbeatRequest]) (*connect.Response[v1.HeartbeatResponse], error)
+	// Lease hands out the next run, if any, with only the data it needs and a token for its other calls.
+	Lease(context.Context, *connect.Request[v1.LeaseRequest]) (*connect.Response[v1.LeaseResponse], error)
+	// FetchDocument returns a document of the run.
+	FetchDocument(context.Context, *connect.Request[v1.FetchDocumentRequest]) (*connect.Response[v1.FetchDocumentResponse], error)
+	// Checkpoint records a step of the run with a screenshot.
+	Checkpoint(context.Context, *connect.Request[v1.CheckpointRequest]) (*connect.Response[v1.CheckpointResponse], error)
+	// Ask hands the run to the user.
+	Ask(context.Context, *connect.Request[v1.AskRequest]) (*connect.Response[v1.AskResponse], error)
+	// BeginSubmit registers the submit; the runner clicks only after a successful answer.
+	BeginSubmit(context.Context, *connect.Request[v1.BeginSubmitRequest]) (*connect.Response[v1.BeginSubmitResponse], error)
+	// Submitted reports a submit click with an effect.
+	Submitted(context.Context, *connect.Request[v1.SubmittedRequest]) (*connect.Response[v1.SubmittedResponse], error)
+	// Park stops the run for a human look.
+	Park(context.Context, *connect.Request[v1.ParkRequest]) (*connect.Response[v1.ParkResponse], error)
 }
 
 // NewRunnerServiceClient constructs a client for the runner.v1.RunnerService service. By default,
@@ -72,13 +103,62 @@ func NewRunnerServiceClient(httpClient connect.HTTPClient, baseURL string, opts 
 			connect.WithSchema(runnerServiceMethods.ByName("Heartbeat")),
 			connect.WithClientOptions(opts...),
 		),
+		lease: connect.NewClient[v1.LeaseRequest, v1.LeaseResponse](
+			httpClient,
+			baseURL+RunnerServiceLeaseProcedure,
+			connect.WithSchema(runnerServiceMethods.ByName("Lease")),
+			connect.WithClientOptions(opts...),
+		),
+		fetchDocument: connect.NewClient[v1.FetchDocumentRequest, v1.FetchDocumentResponse](
+			httpClient,
+			baseURL+RunnerServiceFetchDocumentProcedure,
+			connect.WithSchema(runnerServiceMethods.ByName("FetchDocument")),
+			connect.WithClientOptions(opts...),
+		),
+		checkpoint: connect.NewClient[v1.CheckpointRequest, v1.CheckpointResponse](
+			httpClient,
+			baseURL+RunnerServiceCheckpointProcedure,
+			connect.WithSchema(runnerServiceMethods.ByName("Checkpoint")),
+			connect.WithClientOptions(opts...),
+		),
+		ask: connect.NewClient[v1.AskRequest, v1.AskResponse](
+			httpClient,
+			baseURL+RunnerServiceAskProcedure,
+			connect.WithSchema(runnerServiceMethods.ByName("Ask")),
+			connect.WithClientOptions(opts...),
+		),
+		beginSubmit: connect.NewClient[v1.BeginSubmitRequest, v1.BeginSubmitResponse](
+			httpClient,
+			baseURL+RunnerServiceBeginSubmitProcedure,
+			connect.WithSchema(runnerServiceMethods.ByName("BeginSubmit")),
+			connect.WithClientOptions(opts...),
+		),
+		submitted: connect.NewClient[v1.SubmittedRequest, v1.SubmittedResponse](
+			httpClient,
+			baseURL+RunnerServiceSubmittedProcedure,
+			connect.WithSchema(runnerServiceMethods.ByName("Submitted")),
+			connect.WithClientOptions(opts...),
+		),
+		park: connect.NewClient[v1.ParkRequest, v1.ParkResponse](
+			httpClient,
+			baseURL+RunnerServiceParkProcedure,
+			connect.WithSchema(runnerServiceMethods.ByName("Park")),
+			connect.WithClientOptions(opts...),
+		),
 	}
 }
 
 // runnerServiceClient implements RunnerServiceClient.
 type runnerServiceClient struct {
-	register  *connect.Client[v1.RegisterRequest, v1.RegisterResponse]
-	heartbeat *connect.Client[v1.HeartbeatRequest, v1.HeartbeatResponse]
+	register      *connect.Client[v1.RegisterRequest, v1.RegisterResponse]
+	heartbeat     *connect.Client[v1.HeartbeatRequest, v1.HeartbeatResponse]
+	lease         *connect.Client[v1.LeaseRequest, v1.LeaseResponse]
+	fetchDocument *connect.Client[v1.FetchDocumentRequest, v1.FetchDocumentResponse]
+	checkpoint    *connect.Client[v1.CheckpointRequest, v1.CheckpointResponse]
+	ask           *connect.Client[v1.AskRequest, v1.AskResponse]
+	beginSubmit   *connect.Client[v1.BeginSubmitRequest, v1.BeginSubmitResponse]
+	submitted     *connect.Client[v1.SubmittedRequest, v1.SubmittedResponse]
+	park          *connect.Client[v1.ParkRequest, v1.ParkResponse]
 }
 
 // Register calls runner.v1.RunnerService.Register.
@@ -91,12 +171,61 @@ func (c *runnerServiceClient) Heartbeat(ctx context.Context, req *connect.Reques
 	return c.heartbeat.CallUnary(ctx, req)
 }
 
+// Lease calls runner.v1.RunnerService.Lease.
+func (c *runnerServiceClient) Lease(ctx context.Context, req *connect.Request[v1.LeaseRequest]) (*connect.Response[v1.LeaseResponse], error) {
+	return c.lease.CallUnary(ctx, req)
+}
+
+// FetchDocument calls runner.v1.RunnerService.FetchDocument.
+func (c *runnerServiceClient) FetchDocument(ctx context.Context, req *connect.Request[v1.FetchDocumentRequest]) (*connect.Response[v1.FetchDocumentResponse], error) {
+	return c.fetchDocument.CallUnary(ctx, req)
+}
+
+// Checkpoint calls runner.v1.RunnerService.Checkpoint.
+func (c *runnerServiceClient) Checkpoint(ctx context.Context, req *connect.Request[v1.CheckpointRequest]) (*connect.Response[v1.CheckpointResponse], error) {
+	return c.checkpoint.CallUnary(ctx, req)
+}
+
+// Ask calls runner.v1.RunnerService.Ask.
+func (c *runnerServiceClient) Ask(ctx context.Context, req *connect.Request[v1.AskRequest]) (*connect.Response[v1.AskResponse], error) {
+	return c.ask.CallUnary(ctx, req)
+}
+
+// BeginSubmit calls runner.v1.RunnerService.BeginSubmit.
+func (c *runnerServiceClient) BeginSubmit(ctx context.Context, req *connect.Request[v1.BeginSubmitRequest]) (*connect.Response[v1.BeginSubmitResponse], error) {
+	return c.beginSubmit.CallUnary(ctx, req)
+}
+
+// Submitted calls runner.v1.RunnerService.Submitted.
+func (c *runnerServiceClient) Submitted(ctx context.Context, req *connect.Request[v1.SubmittedRequest]) (*connect.Response[v1.SubmittedResponse], error) {
+	return c.submitted.CallUnary(ctx, req)
+}
+
+// Park calls runner.v1.RunnerService.Park.
+func (c *runnerServiceClient) Park(ctx context.Context, req *connect.Request[v1.ParkRequest]) (*connect.Response[v1.ParkResponse], error) {
+	return c.park.CallUnary(ctx, req)
+}
+
 // RunnerServiceHandler is an implementation of the runner.v1.RunnerService service.
 type RunnerServiceHandler interface {
 	// Register announces a runner and its capabilities and returns its ID.
 	Register(context.Context, *connect.Request[v1.RegisterRequest]) (*connect.Response[v1.RegisterResponse], error)
 	// Heartbeat keeps a registration alive and reports the current load.
 	Heartbeat(context.Context, *connect.Request[v1.HeartbeatRequest]) (*connect.Response[v1.HeartbeatResponse], error)
+	// Lease hands out the next run, if any, with only the data it needs and a token for its other calls.
+	Lease(context.Context, *connect.Request[v1.LeaseRequest]) (*connect.Response[v1.LeaseResponse], error)
+	// FetchDocument returns a document of the run.
+	FetchDocument(context.Context, *connect.Request[v1.FetchDocumentRequest]) (*connect.Response[v1.FetchDocumentResponse], error)
+	// Checkpoint records a step of the run with a screenshot.
+	Checkpoint(context.Context, *connect.Request[v1.CheckpointRequest]) (*connect.Response[v1.CheckpointResponse], error)
+	// Ask hands the run to the user.
+	Ask(context.Context, *connect.Request[v1.AskRequest]) (*connect.Response[v1.AskResponse], error)
+	// BeginSubmit registers the submit; the runner clicks only after a successful answer.
+	BeginSubmit(context.Context, *connect.Request[v1.BeginSubmitRequest]) (*connect.Response[v1.BeginSubmitResponse], error)
+	// Submitted reports a submit click with an effect.
+	Submitted(context.Context, *connect.Request[v1.SubmittedRequest]) (*connect.Response[v1.SubmittedResponse], error)
+	// Park stops the run for a human look.
+	Park(context.Context, *connect.Request[v1.ParkRequest]) (*connect.Response[v1.ParkResponse], error)
 }
 
 // NewRunnerServiceHandler builds an HTTP handler from the service implementation. It returns the
@@ -118,12 +247,68 @@ func NewRunnerServiceHandler(svc RunnerServiceHandler, opts ...connect.HandlerOp
 		connect.WithSchema(runnerServiceMethods.ByName("Heartbeat")),
 		connect.WithHandlerOptions(opts...),
 	)
+	runnerServiceLeaseHandler := connect.NewUnaryHandler(
+		RunnerServiceLeaseProcedure,
+		svc.Lease,
+		connect.WithSchema(runnerServiceMethods.ByName("Lease")),
+		connect.WithHandlerOptions(opts...),
+	)
+	runnerServiceFetchDocumentHandler := connect.NewUnaryHandler(
+		RunnerServiceFetchDocumentProcedure,
+		svc.FetchDocument,
+		connect.WithSchema(runnerServiceMethods.ByName("FetchDocument")),
+		connect.WithHandlerOptions(opts...),
+	)
+	runnerServiceCheckpointHandler := connect.NewUnaryHandler(
+		RunnerServiceCheckpointProcedure,
+		svc.Checkpoint,
+		connect.WithSchema(runnerServiceMethods.ByName("Checkpoint")),
+		connect.WithHandlerOptions(opts...),
+	)
+	runnerServiceAskHandler := connect.NewUnaryHandler(
+		RunnerServiceAskProcedure,
+		svc.Ask,
+		connect.WithSchema(runnerServiceMethods.ByName("Ask")),
+		connect.WithHandlerOptions(opts...),
+	)
+	runnerServiceBeginSubmitHandler := connect.NewUnaryHandler(
+		RunnerServiceBeginSubmitProcedure,
+		svc.BeginSubmit,
+		connect.WithSchema(runnerServiceMethods.ByName("BeginSubmit")),
+		connect.WithHandlerOptions(opts...),
+	)
+	runnerServiceSubmittedHandler := connect.NewUnaryHandler(
+		RunnerServiceSubmittedProcedure,
+		svc.Submitted,
+		connect.WithSchema(runnerServiceMethods.ByName("Submitted")),
+		connect.WithHandlerOptions(opts...),
+	)
+	runnerServiceParkHandler := connect.NewUnaryHandler(
+		RunnerServiceParkProcedure,
+		svc.Park,
+		connect.WithSchema(runnerServiceMethods.ByName("Park")),
+		connect.WithHandlerOptions(opts...),
+	)
 	return "/runner.v1.RunnerService/", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch r.URL.Path {
 		case RunnerServiceRegisterProcedure:
 			runnerServiceRegisterHandler.ServeHTTP(w, r)
 		case RunnerServiceHeartbeatProcedure:
 			runnerServiceHeartbeatHandler.ServeHTTP(w, r)
+		case RunnerServiceLeaseProcedure:
+			runnerServiceLeaseHandler.ServeHTTP(w, r)
+		case RunnerServiceFetchDocumentProcedure:
+			runnerServiceFetchDocumentHandler.ServeHTTP(w, r)
+		case RunnerServiceCheckpointProcedure:
+			runnerServiceCheckpointHandler.ServeHTTP(w, r)
+		case RunnerServiceAskProcedure:
+			runnerServiceAskHandler.ServeHTTP(w, r)
+		case RunnerServiceBeginSubmitProcedure:
+			runnerServiceBeginSubmitHandler.ServeHTTP(w, r)
+		case RunnerServiceSubmittedProcedure:
+			runnerServiceSubmittedHandler.ServeHTTP(w, r)
+		case RunnerServiceParkProcedure:
+			runnerServiceParkHandler.ServeHTTP(w, r)
 		default:
 			http.NotFound(w, r)
 		}
@@ -139,4 +324,32 @@ func (UnimplementedRunnerServiceHandler) Register(context.Context, *connect.Requ
 
 func (UnimplementedRunnerServiceHandler) Heartbeat(context.Context, *connect.Request[v1.HeartbeatRequest]) (*connect.Response[v1.HeartbeatResponse], error) {
 	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("runner.v1.RunnerService.Heartbeat is not implemented"))
+}
+
+func (UnimplementedRunnerServiceHandler) Lease(context.Context, *connect.Request[v1.LeaseRequest]) (*connect.Response[v1.LeaseResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("runner.v1.RunnerService.Lease is not implemented"))
+}
+
+func (UnimplementedRunnerServiceHandler) FetchDocument(context.Context, *connect.Request[v1.FetchDocumentRequest]) (*connect.Response[v1.FetchDocumentResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("runner.v1.RunnerService.FetchDocument is not implemented"))
+}
+
+func (UnimplementedRunnerServiceHandler) Checkpoint(context.Context, *connect.Request[v1.CheckpointRequest]) (*connect.Response[v1.CheckpointResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("runner.v1.RunnerService.Checkpoint is not implemented"))
+}
+
+func (UnimplementedRunnerServiceHandler) Ask(context.Context, *connect.Request[v1.AskRequest]) (*connect.Response[v1.AskResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("runner.v1.RunnerService.Ask is not implemented"))
+}
+
+func (UnimplementedRunnerServiceHandler) BeginSubmit(context.Context, *connect.Request[v1.BeginSubmitRequest]) (*connect.Response[v1.BeginSubmitResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("runner.v1.RunnerService.BeginSubmit is not implemented"))
+}
+
+func (UnimplementedRunnerServiceHandler) Submitted(context.Context, *connect.Request[v1.SubmittedRequest]) (*connect.Response[v1.SubmittedResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("runner.v1.RunnerService.Submitted is not implemented"))
+}
+
+func (UnimplementedRunnerServiceHandler) Park(context.Context, *connect.Request[v1.ParkRequest]) (*connect.Response[v1.ParkResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("runner.v1.RunnerService.Park is not implemented"))
 }
