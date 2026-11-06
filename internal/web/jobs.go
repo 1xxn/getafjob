@@ -131,6 +131,8 @@ func reasonText(ctx context.Context, rs matching.Reason) string {
 			v = views.T(ctx, "match.level."+v)
 		case "lang":
 			v = views.T(ctx, "match.lang."+v)
+		case "top", "min":
+			v = views.Amount(ctx, v)
 		}
 		params = append(params, k, v)
 	}
