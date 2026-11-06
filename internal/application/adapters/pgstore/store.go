@@ -1,0 +1,127 @@
+// Package pgstore implements application.Store on PostgreSQL; every call runs in the user's own transaction.
+package pgstore
+
+//go:generate go tool sqlc generate -f ../../../../sqlc.yaml
+
+import (
+	"context"
+	"encoding/json"
+	"errors"
+	"time"
+
+	"github.com/google/uuid"
+	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgconn"
+	"github.com/jackc/pgx/v5/pgxpool"
+
+	"github.com/1xxn/getafjob/internal/application"
+	"github.com/1xxn/getafjob/internal/application/adapters/pgstore/q"
+	"github.com/1xxn/getafjob/internal/platform/db"
+)
+
+// Store is the PostgreSQL application store.
+type Store struct{ pool *pgxpool.Pool }
+
+var _ application.Store = (*Store)(nil)
+
+// New returns a store on pool (application role).
+func New(pool *pgxpool.Pool) *Store { return &Store{pool: pool} }
+
+func (s *Store) user(ctx context.Context, userID uuid.UUID, fn func(*q.Queries) error) error {
+	return db.InUserTx(ctx, s.pool, userID, func(tx pgx.Tx) error { return fn(q.New(tx)) })
+}
+
+// Create returns the application of the user for the job, creating it if needed.
+func (s *Store) Create(ctx context.Context, userID uuid.UUID, jobID int64, state application.State, at time.Time) (
+	id uuid.UUID, err error,
+) {
+	err = s.user(ctx, userID, func(qs *q.Queries) error {
+		id, err = qs.CreateApplication(ctx, q.CreateApplicationParams{UserID: userID, JobID: jobID, State: string(state), CreatedAt: at})
+		return err
+	})
+	return id, err
+}
+
+// Get loads an application of the user.
+func (s *Store) Get(ctx context.Context, userID, id uuid.UUID) (a application.App, err error) {
+	err = s.user(ctx, userID, func(qs *q.Queries) error {
+		r, err := qs.GetApplication(ctx, q.GetApplicationParams{ID: id, UserID: userID})
+		if errors.Is(err, pgx.ErrNoRows) {
+			return application.ErrNotFound
+		}
+		a = application.App{ID: r.ID, JobID: r.JobID, State: application.State(r.State), Version: r.Version, UpdatedAt: r.UpdatedAt}
+		return err
+	})
+	return a, err
+}
+
+// Apply writes state, event and submit register in one transaction.
+func (s *Store) Apply(ctx context.Context, userID uuid.UUID, a application.App, c application.Change) error {
+	detail := []byte("{}")
+	if len(c.Detail) > 0 {
+		var err error
+		if detail, err = json.Marshal(c.Detail); err != nil {
+			return err
+		}
+	}
+	return s.user(ctx, userID, func(qs *q.Queries) error {
+		n, err := qs.SetState(ctx, q.SetStateParams{ToState: string(c.To), At: c.At, ID: a.ID, UserID: userID,
+			FromState: string(c.From), Version: a.Version})
+		if err != nil {
+			return err
+		}
+		if n != 1 {
+			return application.ErrConflict
+		}
+		if err := qs.InsertEvent(ctx, q.InsertEventParams{ApplicationID: a.ID, UserID: userID, Event: string(c.Event),
+			FromState: string(c.From), ToState: string(c.To), Actor: string(c.Actor), Detail: detail, At: c.At}); err != nil {
+			return err
+		}
+		if c.BeginSubmit {
+			err := qs.InsertSubmitAttempt(ctx, q.InsertSubmitAttemptParams{ApplicationID: a.ID, UserID: userID, StartedAt: c.At})
+			var pe *pgconn.PgError
+			if errors.As(err, &pe) && pe.Code == "23505" {
+				return application.ErrAlreadySubmitted
+			}
+			if err != nil {
+				return err
+			}
+		}
+		if c.Outcome != "" {
+			return qs.FinishSubmitAttempt(ctx, q.FinishSubmitAttemptParams{ApplicationID: a.ID, UserID: userID,
+				Outcome: &c.Outcome, FinishedAt: &c.At})
+		}
+		return nil
+	})
+}
+
+// Candidate collects the guard inputs for a job of the user.
+func (s *Store) Candidate(ctx context.Context, userID uuid.UUID, jobID int64) (c application.Candidate, err error) {
+	err = s.user(ctx, userID, func(qs *q.Queries) error {
+		if c.Excluded, err = qs.HardSkipped(ctx, q.HardSkippedParams{UserID: userID, JobID: jobID}); err != nil {
+			return err
+		}
+		states, err := qs.SameJobStates(ctx, q.SameJobStatesParams{UserID: userID, JobID: jobID})
+		if err != nil {
+			return err
+		}
+		for _, st := range states {
+			c.SameJob = append(c.SameJob, application.State(st))
+		}
+		c.CompanyApplied, err = qs.CompanySubmits(ctx, q.CompanySubmitsParams{UserID: userID, JobID: jobID})
+		return err
+	})
+	return c, err
+}
+
+// StaleSubmitting lists applications stuck in submitting (system role).
+func (s *Store) StaleSubmitting(ctx context.Context, before time.Time) (refs []application.Ref, err error) {
+	err = db.InSystemTx(ctx, s.pool, func(tx pgx.Tx) error {
+		rows, err := q.New(tx).StaleSubmitting(ctx, before)
+		for _, r := range rows {
+			refs = append(refs, application.Ref{ID: r.ID, UserID: r.UserID})
+		}
+		return err
+	})
+	return refs, err
+}

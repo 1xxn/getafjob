@@ -11,6 +11,28 @@ import (
 	"github.com/jackc/pgx/v5/pgtype"
 )
 
+type Application struct {
+	ID        uuid.UUID
+	UserID    uuid.UUID
+	JobID     int64
+	State     string
+	Version   int64
+	CreatedAt time.Time
+	UpdatedAt time.Time
+}
+
+type ApplicationEvent struct {
+	ID            int64
+	ApplicationID uuid.UUID
+	UserID        uuid.UUID
+	Event         string
+	FromState     string
+	ToState       string
+	Actor         string
+	Detail        []byte
+	At            time.Time
+}
+
 type AuditEvent struct {
 	ID        int64
 	UserID    *uuid.UUID
@@ -172,6 +194,14 @@ type Session struct {
 	Family     uuid.UUID
 	RotatedAt  *time.Time
 	ReplacedAt *time.Time
+}
+
+type SubmitAttempt struct {
+	ApplicationID uuid.UUID
+	UserID        uuid.UUID
+	StartedAt     time.Time
+	FinishedAt    *time.Time
+	Outcome       *string
 }
 
 type User struct {
