@@ -192,3 +192,14 @@ func TestMasterKeys(t *testing.T) {
 		t.Fatalf("err = %v", err)
 	}
 }
+
+func TestRunnerSecret(t *testing.T) {
+	if _, err := Load(fakeSource(map[string]string{"GETAFJOB_RUNNER_SECRET": "short"}, nil)); err == nil ||
+		!strings.Contains(err.Error(), "GETAFJOB_RUNNER_SECRET") {
+		t.Fatalf("short secret: %v", err)
+	}
+	c, err := Load(fakeSource(map[string]string{"GETAFJOB_RUNNER_SECRET": strings.Repeat("s", 43)}, nil))
+	if err != nil || c.RunnerSecret.Reveal() != strings.Repeat("s", 43) || c.GatewayAddr != ":8090" {
+		t.Fatalf("secret: %v %q", err, c.GatewayAddr)
+	}
+}

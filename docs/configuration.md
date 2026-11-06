@@ -8,6 +8,8 @@ an error. Unknown `GETAFJOB_*` variables are reported as a warning (typos), with
 |---|---|---|---|
 | `GETAFJOB_HTTP_ADDR` | `:8080` | serve | address of web UI, API and gateway |
 | `GETAFJOB_HEALTH_ADDR` | `:8081` | worker, runner | internal `/healthz` and `/readyz` |
+| `GETAFJOB_GATEWAY_ADDR` | `:8090` | serve | runner gateway (Connect RPC), only on the internal gateway network |
+| `GETAFJOB_RUNNER_SECRET` | none | serve | shared secret of the server's runners, at least 32 characters (`admin gen-secret`); empty keeps the gateway off |
 | `GETAFJOB_PUBLIC_URL` | `https://localhost:8443` | serve, worker | public address behind Caddy (links, cookies, WebAuthn) |
 | `GETAFJOB_DATABASE_URL` | none | serve, worker, migrate | `postgres://user@host:5432/db?sslmode=…` |
 | `GETAFJOB_DATABASE_PASSWORD` | none | serve, worker, migrate | overrides the password in the URL; use `_FILE` |

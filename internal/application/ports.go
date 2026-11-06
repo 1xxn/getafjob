@@ -49,6 +49,13 @@ type Notifier interface {
 	HandoffClosing(ctx context.Context, r Ref, until time.Time) error
 }
 
+// Job is what a run needs to know about the job.
+type Job struct {
+	ID                                           int64
+	Source, Company, Title, Location, URL, Apply string
+	Description                                  string
+}
+
 // Ref names an application of a user.
 type Ref struct {
 	ID, UserID uuid.UUID

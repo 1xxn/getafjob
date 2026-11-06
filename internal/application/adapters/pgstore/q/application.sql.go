@@ -185,6 +185,37 @@ func (q *Queries) GetApplication(ctx context.Context, arg GetApplicationParams) 
 	return i, err
 }
 
+const getJob = `-- name: GetJob :one
+SELECT id, source, company, title, location, url, apply_url, description FROM jobs WHERE id = $1
+`
+
+type GetJobRow struct {
+	ID          int64
+	Source      string
+	Company     string
+	Title       string
+	Location    string
+	Url         string
+	ApplyUrl    string
+	Description string
+}
+
+func (q *Queries) GetJob(ctx context.Context, id int64) (GetJobRow, error) {
+	row := q.db.QueryRow(ctx, getJob, id)
+	var i GetJobRow
+	err := row.Scan(
+		&i.ID,
+		&i.Source,
+		&i.Company,
+		&i.Title,
+		&i.Location,
+		&i.Url,
+		&i.ApplyUrl,
+		&i.Description,
+	)
+	return i, err
+}
+
 const handoffsDue = `-- name: HandoffsDue :many
 SELECT id, user_id, handoff_until, handoff_warned FROM applications
 WHERE state = 'needs_input' AND handoff_until IS NOT NULL AND handoff_until < $1 ORDER BY handoff_until LIMIT 500

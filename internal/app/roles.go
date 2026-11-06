@@ -17,6 +17,7 @@ import (
 	"github.com/1xxn/getafjob/internal/discovery"
 	discoverystore "github.com/1xxn/getafjob/internal/discovery/adapters/pgstore"
 	"github.com/1xxn/getafjob/internal/discovery/adapters/sources"
+	"github.com/1xxn/getafjob/internal/gateway"
 	"github.com/1xxn/getafjob/internal/identity"
 	"github.com/1xxn/getafjob/internal/identity/adapters/pgstore"
 	"github.com/1xxn/getafjob/internal/matching"
@@ -83,7 +84,8 @@ func serve(ctx context.Context, cfg config.Config, logger *slog.Logger) error {
 			logger.WarnContext(ctx, "matching not queued", "err", err)
 		}
 	})
-	docs := profile.NewDocuments(pstore, blob.NewSealed(files, env), env)
+	sealedFiles := blob.NewSealed(files, env)
+	docs := profile.NewDocuments(pstore, sealedFiles, env)
 	extractor, err := cvimport.NewExtractor()
 	if err != nil {
 		return err
@@ -93,7 +95,31 @@ func serve(ctx context.Context, cfg config.Config, logger *slog.Logger) error {
 
 	h := httpx.Instrument(httpx.Protect(httpx.Routes(mux), maxBody, cfg.PublicURL.Scheme == "https",
 		httpx.Upload{Path: "/documents", Max: web.MaxUpload}, httpx.Upload{Path: "/setup/cv", Max: web.MaxUpload}))
-	return httpx.Run(ctx, httpx.NewServer(cfg.HTTPAddr, h, logger), cfg.ShutdownTimeout, logger)
+
+	// UI and gateway stop together: when one fails, the other is shut down.
+	ctx, stop := context.WithCancel(ctx)
+	defer stop()
+	gatewayDone := make(chan error, 1)
+	if cfg.RunnerSecret == "" {
+		logger.Info("runner gateway off: GETAFJOB_RUNNER_SECRET is not set")
+		close(gatewayDone)
+	} else {
+		astore := applicationstore.New(pool)
+		apps := application.NewService(astore)
+		gw := &gateway.Server{Runs: application.NewRuns(apps, astore), Apps: apps, Shots: sealedFiles,
+			Secret: cfg.RunnerSecret.Reveal(), Logger: logger,
+			Data: runData{profiles: profiles, items: profile.NewItems(pstore, env), docs: docs, jobs: astore, now: time.Now}}
+		gmux := http.NewServeMux()
+		gmux.Handle(gw.Handler())
+		go func() {
+			err := httpx.Run(ctx, httpx.NewServer(cfg.GatewayAddr, httpx.Instrument(gmux), logger), cfg.ShutdownTimeout, logger)
+			stop()
+			gatewayDone <- err
+		}()
+	}
+	err = httpx.Run(ctx, httpx.NewServer(cfg.HTTPAddr, h, logger), cfg.ShutdownTimeout, logger)
+	stop()
+	return errors.Join(err, <-gatewayDone)
 }
 
 // worker: background jobs on River (crawl, identity cleanup); health on the internal address.

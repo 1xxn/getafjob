@@ -222,3 +222,13 @@ func (s *Store) AddCheckpoint(ctx context.Context, r application.RunRef, c appli
 			Page: int32(min(max(c.Page, 0), 100)), Url: c.URL, Data: data, Screenshot: c.Screenshot, At: c.At})
 	})
 }
+
+// Job reads a job of the global index.
+func (s *Store) Job(ctx context.Context, id int64) (application.Job, error) {
+	r, err := q.New(s.pool).GetJob(ctx, id)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return application.Job{}, application.ErrNotFound
+	}
+	return application.Job{ID: r.ID, Source: r.Source, Company: r.Company, Title: r.Title, Location: r.Location,
+		URL: r.Url, Apply: r.ApplyUrl, Description: r.Description}, err
+}

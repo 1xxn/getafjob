@@ -88,3 +88,6 @@ WHERE r.id = $1 AND r.user_id = $2;
 -- name: LockLeases :exec
 -- Leases run one at a time, so that two runners never pass the per-host check together.
 SELECT pg_advisory_xact_lock(7303470200);
+
+-- name: GetJob :one
+SELECT id, source, company, title, location, url, apply_url, description FROM jobs WHERE id = $1;
