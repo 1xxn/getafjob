@@ -73,6 +73,12 @@ The first account needs an invitation. Locally all mail lands in Mailpit (http:/
 docker compose -f deploy/compose.yaml exec serve getafjob admin invite -email max.mustermann@example.com -role admin -send
 ```
 
+For a filled UI without crawling, create invented users (sign in with a mail link) and 2000 invented jobs:
+
+```bash
+docker compose -f deploy/compose.yaml exec serve getafjob admin demo
+```
+
 The worker crawls every 6 hours (`GETAFJOB_CRAWL_INTERVAL`). Add the built-in company boards and start a crawl now:
 
 ```bash

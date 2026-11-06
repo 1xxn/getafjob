@@ -94,6 +94,10 @@ C4Container
 | `ai` | optional Planner, Drafter, Extractor, Classifier |
 | `platform` | config, logging, OpenTelemetry, crypto, database, queue, blob, HTTP, netguard |
 
+Boundaries are tested on the whole dependency graph (`internal/archtest`): modules do not depend on each other,
+only `internal/app` wires adapters, a module's core package has no database, queue or browser dependency, the
+runner reaches no database or queue, and `platform` knows no module. depguard catches direct imports earlier.
+
 ## 6. Runtime
 
 **Application run:** the application state machine (`discovered → matched → queued → running ⇄ needs_input →
@@ -191,7 +195,7 @@ internal `edge` (caddy and serve), `backend` (serve, worker, migrate, postgres),
 
 | Scenario | Target |
 |---|---|
-| Dashboard page | p95 < 200 ms |
+| Dashboard page | p95 < 200 ms on the demo data (`TestJobListLatency`, 2000 postings) |
 | Crash during submit | `submit_unknown`, no second click |
 | Value without source | refused by the executor |
 | Another user's row | invisible (RLS) |
