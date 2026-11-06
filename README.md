@@ -56,6 +56,16 @@ The web UI is rendered on the server with templ and works without JavaScript; ht
 status under a strict CSP with Trusted Types.
 Design decisions are recorded as [ADRs](docs/adr/README.md).
 
+## Screenshots
+
+The job list ranks open jobs per user; the detail explains every point of the score. Shown with invented demo data
+(`getafjob admin demo`).
+
+<p>
+  <img src="docs/images/job-list.png" alt="Job list with search, filters and scored jobs" width="49%">
+  <img src="docs/images/job-detail.png" alt="Job detail with the reasons behind the score" width="49%">
+</p>
+
 ## Quickstart
 
 Requirements: Go 1.27.3 and Docker with Compose. All other tools are pinned in `go.mod` and run with `go tool`.
