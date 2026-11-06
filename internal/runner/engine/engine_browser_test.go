@@ -238,3 +238,38 @@ func TestUnknownRequiredFieldAsksTheUser(t *testing.T) {
 		t.Fatalf("filled before asking: %q", v)
 	}
 }
+
+func TestPrepareReachesTheForm(t *testing.T) {
+	cases := map[string]string{
+		"posting.html":                  "/apply.html",                    // link opens a new tab with an embedded form
+		"lazy_embed.html":               "/lazy_embed.html",               // lazy iframe below the fold
+		"popup_posting.html":            "/apply.html",                    // self-closing popup, the opener moves on
+		"cookie_posting.html":           "/greenhouse_header_submit.html", // cookie banner over the page
+		"greenhouse_header_submit.html": "/greenhouse_header_submit.html",
+	}
+	for fixture, want := range cases {
+		t.Run(fixture, func(t *testing.T) {
+			r := start(t, fixture)
+			p, err := r.engine(nil).Prepare(t.Context(), r.page)
+			if err != nil {
+				t.Fatalf("prepare: %v", err)
+			}
+			info, err := p.Info()
+			if err != nil || !strings.HasSuffix(info.URL, want) {
+				t.Fatalf("at %v, want %s", info, want)
+			}
+			if fixture == "cookie_posting.html" {
+				if c := p.MustEval(`() => document.cookie`).Str(); c != "consent=necessary" {
+					t.Fatalf("cookie = %q", c)
+				}
+			}
+		})
+	}
+}
+
+func TestPrepareGivesUpWithoutAForm(t *testing.T) {
+	r := start(t, "clicks.html")
+	if _, err := r.engine(nil).Prepare(t.Context(), r.page); !errors.Is(err, ErrNoForm) {
+		t.Fatalf("prepare: %v", err)
+	}
+}
