@@ -103,3 +103,22 @@ func HX(ctx context.Context, kv ...string) templ.Attributes {
 func pageLink(ctx context.Context, url string) templ.Attributes {
 	return HX(ctx, "hx-get", url, "hx-target", "#results", "hx-swap", "outerHTML", "hx-push-url", "true")
 }
+
+// Amount groups the digits of a whole number for the reader's locale: 90,000 or 90.000.
+func Amount(ctx context.Context, digits string) string {
+	if digits == "" || strings.Trim(digits, "0123456789") != "" {
+		return digits
+	}
+	sep := ","
+	if Locale(ctx) == "de" {
+		sep = "."
+	}
+	var b strings.Builder
+	for i, r := range digits {
+		if i > 0 && (len(digits)-i)%3 == 0 {
+			b.WriteString(sep)
+		}
+		b.WriteRune(r)
+	}
+	return b.String()
+}

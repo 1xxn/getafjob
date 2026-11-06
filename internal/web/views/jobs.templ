@@ -1,5 +1,7 @@
 package views
 
+import "strings"
+
 // JobRow is one job in the list.
 type JobRow struct {
 	ID        int64
@@ -54,7 +56,7 @@ templ jobMeta(r JobRow) {
 		if r.Location != "" {
 			· { r.Location }
 		}
-		if r.Workplace != "" {
+		if r.Workplace != "" && !strings.Contains(strings.ToLower(r.Location), r.Workplace) {
 			· { T(ctx, "jobs.workplace." + r.Workplace) }
 		}
 		if r.Age == 0 {
