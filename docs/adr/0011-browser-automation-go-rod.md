@@ -59,4 +59,4 @@ does well.
 
 - Good, because the hardest known quirks work today, inside the hardened runner image.
 - Bad, because out-of-process iframes need our own CDP path for actions (click, upload), planned in #24.
-- Follow-up: report the `Element.Frame` panic upstream.
+- Follow-up: the `Element.Frame` panic is reported upstream in [go-rod/rod#1234](https://github.com/go-rod/rod/issues/1234#issuecomment-6682040439).

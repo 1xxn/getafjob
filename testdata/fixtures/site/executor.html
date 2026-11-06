@@ -1,0 +1,28 @@
+<!doctype html>
+<html lang="en">
+<head><meta charset="utf-8"><title>Application</title></head>
+<body>
+<h1>Apply: Backend Engineer</h1>
+<form id="apply">
+  <label>First name <input name="first" required></label>
+  <label>Email <input name="email" type="email" required></label>
+  <label>Short pitch <textarea name="pitch" maxlength="40"></textarea></label>
+  <label>Earliest start <input name="start" type="date"></label>
+  <label>Country
+    <select name="country"><option value="">Please select</option><option value="fr">France</option>
+      <option value="de">Germany</option><option value="at">Austria</option></select></label>
+  <label><input type="checkbox" name="consent"> I agree to the privacy notice</label>
+  <fieldset><legend>Do you need a work permit?</legend>
+    <label><input type="radio" name="permit" value="y"> Ja</label>
+    <label><input type="radio" name="permit" value="n"> Nein</label></fieldset>
+  <fieldset><legend>Languages</legend>
+    <label><input type="checkbox" name="lang" value="de" checked> German</label>
+    <label><input type="checkbox" name="lang" value="en"> English</label>
+    <label><input type="checkbox" name="lang" value="fr"> French</label></fieldset>
+  <label>CV <input type="file" name="cv"></label>
+  <label>Password <input type="password" name="pw"></label>
+</form>
+<iframe id="ads" style="width:400px;height:80px"></iframe>
+<script>document.getElementById("ads").src = new URLSearchParams(location.search).get("ads") || "about:blank";</script>
+</body>
+</html>
