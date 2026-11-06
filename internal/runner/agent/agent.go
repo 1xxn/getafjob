@@ -70,7 +70,7 @@ func (a *Agent) Run(ctx context.Context) error {
 		l, err := a.Client.Lease(ctx, auth(&runnerv1.LeaseRequest{RunnerId: id}, a.Secret))
 		switch {
 		case ctx.Err() != nil:
-			return nil
+			return ctx.Err()
 		case err != nil:
 			a.Logger.WarnContext(ctx, "lease failed", "err", err)
 		case l.Msg.GetRun() != nil:
