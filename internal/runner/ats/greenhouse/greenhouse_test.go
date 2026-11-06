@@ -1,20 +1,21 @@
 package greenhouse
 
 import (
+	_ "embed"
 	"errors"
 	"net/http"
 	"net/http/httptest"
-	"os"
 	"strings"
 	"testing"
 )
 
+// The fixture is embedded: the browser suite runs the test binaries without the source tree.
+//
+//go:embed testdata/job.json
+var body []byte
+
 func server(t *testing.T) *httptest.Server {
 	t.Helper()
-	body, err := os.ReadFile("testdata/job.json")
-	if err != nil {
-		t.Fatal(err)
-	}
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch r.URL.Path {
 		case "/muster/jobs/4012345":
