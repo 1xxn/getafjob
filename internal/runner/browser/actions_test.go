@@ -116,3 +116,28 @@ func TestClickRejectsHiddenAndUnknownElements(t *testing.T) {
 		t.Fatalf("unknown frame: %v", err)
 	}
 }
+
+func TestLostClickIsSentOnceMore(t *testing.T) {
+	s := newSpike(t, "lost_click.html")
+	var st *State
+	eventually(t, 5*time.Second, func() error {
+		var err error
+		if st, err = Extract(s.page); err != nil {
+			return err
+		}
+		if len(st.Buttons()) == 0 {
+			return errors.New("iframe button not extracted")
+		}
+		return nil
+	})
+	e, err := st.Click(s.button(st, "Apply now", false).ID, time.Second)
+	if err != nil || e.Any() {
+		t.Fatalf("effect %+v, %v", e, err)
+	}
+	if downs := s.page.MustEval(`() => window.parentDowns`).Int(); downs != 2 {
+		t.Fatalf("clicks sent = %d, want 2 (one resend of a lost click)", downs)
+	}
+	if hits := s.page.MustEval(`() => window.hits || 0`).Int(); hits != 0 {
+		t.Fatalf("button pressed %d times", hits)
+	}
+}
