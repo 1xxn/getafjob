@@ -1,0 +1,27 @@
+{
+  "id": 4012345,
+  "title": "Backend Engineer (Go)",
+  "company_name": "Muster Software GmbH",
+  "questions": [
+    {"required": true, "label": "First Name", "fields": [{"name": "first_name", "type": "input_text", "values": []}]},
+    {"required": true, "label": "Last Name", "fields": [{"name": "last_name", "type": "input_text", "values": []}]},
+    {"required": true, "label": "Email", "fields": [{"name": "email", "type": "input_text", "values": []}]},
+    {"required": true, "label": "Resume/CV", "fields": [{"name": "resume", "type": "input_file", "values": []},
+      {"name": "resume_text", "type": "textarea", "values": []}]},
+    {"required": false, "label": "LinkedIn Profile", "fields": [{"name": "question_1", "type": "input_text", "values": []}]},
+    {"required": true, "label": "Will you now or in the future require <b>visa sponsorship</b>?",
+      "fields": [{"name": "question_2", "type": "multi_value_single_select", "values": [{"label": "Yes", "value": 1}, {"label": "No", "value": 0}]}]},
+    {"required": true, "label": "Which of our values speaks to you most?",
+      "fields": [{"name": "question_3", "type": "multi_value_single_select", "values": [{"label": "Ownership", "value": 1}, {"label": "Curiosity", "value": 2}]}]},
+    {"required": false, "label": "Hidden", "fields": [{"name": "question_4", "type": "input_hidden", "values": []}]}
+  ],
+  "location_questions": [
+    {"required": true, "label": "Location (City)", "fields": [{"name": "location", "type": "input_text", "values": []}]}
+  ],
+  "compliance": [
+    {"type": "eeoc", "questions": [
+      {"required": false, "label": "Gender", "fields": [{"name": "gender", "type": "multi_value_single_select",
+        "values": [{"label": "Male"}, {"label": "Female"}, {"label": "Decline To Self Identify"}]}]}
+    ]}
+  ]
+}
