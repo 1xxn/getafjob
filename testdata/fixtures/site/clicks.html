@@ -1,0 +1,21 @@
+<!doctype html>
+<html lang="en">
+<head><meta charset="utf-8"><title>Clicks</title>
+<style>#more[hidden]{display:none} .spacer{height:2000px}</style></head>
+<body>
+<h1>Click effects</h1>
+<button id="dead" type="button" onclick="window.deadClicks = (window.deadClicks || 0) + 1">Does nothing</button>
+<button id="toggle" type="button" onclick="document.getElementById('more').hidden = false">Show more</button>
+<p id="more" hidden>More details</p>
+<label><input id="agree" type="checkbox"> I agree</label>
+<button id="save" type="button" onclick="fetch('/submit', { method: 'POST', body: '{}' })">Save draft</button>
+<button id="popup" type="button" onclick="window.open('/posting.html', '_blank')">Open posting</button>
+<a id="jump" href="#bottom">Jump to the end</a>
+<form id="f" action="/posting.html">
+  <label>Email <input name="email" type="email" required></label>
+  <button id="send" type="submit">Send</button>
+</form>
+<div class="spacer"></div>
+<p id="bottom">End</p>
+</body>
+</html>

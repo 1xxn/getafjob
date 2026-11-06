@@ -96,8 +96,10 @@ type Frame struct {
 	Headings []string  `json:"headings"`
 	Text     string    `json:"text"`
 
-	page *rod.Page // in-process frame
-	sess *session  // out-of-process iframe (own CDP target)
+	page   *rod.Page    // in-process frame
+	sess   *session     // out-of-process iframe (own CDP target)
+	parent *Frame       // nil for the top frame
+	iframe *rod.Element // the iframe element in the parent frame
 }
 
 // State is the extraction result of a page and all its frames (index 0 = top).
@@ -138,7 +140,7 @@ func (s *session) eval(expr string, byValue bool) (*proto.RuntimeRemoteObject, e
 // Extract reads every frame of p, including nested and out-of-process iframes and open shadow roots.
 func Extract(p *rod.Page) (*State, error) {
 	s := &State{}
-	if err := s.extract(p, nil, 0); err != nil {
+	if err := s.extract(p, nil, nil, nil, 0); err != nil {
 		return nil, err
 	}
 	return s, nil
@@ -187,7 +189,7 @@ func childFrame(p *rod.Page, el *rod.Element) (*rod.Page, *session, error) {
 	return fp, nil, err
 }
 
-func (s *State) extract(p *rod.Page, sess *session, depth int) error {
+func (s *State) extract(p *rod.Page, sess *session, parent *Frame, iframe *rod.Element, depth int) error {
 	idx := len(s.Frames)
 	res, err := evalExtract(p, sess, idx)
 	if err != nil {
@@ -196,7 +198,7 @@ func (s *State) extract(p *rod.Page, sess *session, depth int) error {
 		}
 		return nil // detached or not yet loaded frame: skip
 	}
-	f := &Frame{Index: idx, page: p, sess: sess}
+	f := &Frame{Index: idx, page: p, sess: sess, parent: parent, iframe: iframe}
 	if err := res.Value.Unmarshal(f); err != nil {
 		return fmt.Errorf("decode frame %d: %w", idx, err)
 	}
@@ -213,7 +215,7 @@ func (s *State) extract(p *rod.Page, sess *session, depth int) error {
 		if err != nil {
 			continue
 		}
-		if err := s.extract(fp, fs, depth+1); err != nil {
+		if err := s.extract(fp, fs, f, el, depth+1); err != nil {
 			return err
 		}
 	}
