@@ -1,6 +1,7 @@
 package pgstore_test
 
 import (
+	"context"
 	"errors"
 	"sync"
 	"testing"
@@ -50,9 +51,8 @@ func setup(t *testing.T) (*pgxpool.Pool, *pgstore.Store, *application.Service, *
 	return pool, st, svc, &now
 }
 
-func running(t *testing.T, svc *application.Service, u uuid.UUID, jobID int64) uuid.UUID {
+func running(ctx context.Context, t *testing.T, svc *application.Service, u uuid.UUID, jobID int64) uuid.UUID {
 	t.Helper()
-	ctx := t.Context()
 	id, err := svc.Create(ctx, u, jobID)
 	if err != nil {
 		t.Fatal(err)
@@ -70,7 +70,7 @@ func TestSubmitRegister(t *testing.T) {
 	pool, st, svc, _ := setup(t)
 	ctx := t.Context()
 	max, erika := user(t, pool, "max@example.org"), user(t, pool, "erika@example.org")
-	id := running(t, svc, max, job(t, pool, "greenhouse:acme", "Acme GmbH", "acme|go"))
+	id := running(ctx, t, svc, max, job(t, pool, "greenhouse:acme", "Acme GmbH", "acme|go"))
 
 	// Two runners race to submit: exactly one gets through.
 	var wg sync.WaitGroup
@@ -114,7 +114,7 @@ func TestParkedAfterSubmitIsNeverSentAgain(t *testing.T) {
 	pool, _, svc, _ := setup(t)
 	ctx := t.Context()
 	max := user(t, pool, "max@example.org")
-	id := running(t, svc, max, job(t, pool, "lever:acme", "Acme GmbH", "acme|sre"))
+	id := running(ctx, t, svc, max, job(t, pool, "lever:acme", "Acme GmbH", "acme|sre"))
 	if err := svc.BeginSubmit(ctx, max, id); err != nil {
 		t.Fatal(err)
 	}
@@ -136,7 +136,7 @@ func TestCrashWhileSubmittingBecomesUnknown(t *testing.T) {
 	pool, st, svc, now := setup(t)
 	ctx := t.Context()
 	max := user(t, pool, "max@example.org")
-	id := running(t, svc, max, job(t, pool, "ashby:acme", "Acme GmbH", "acme|platform"))
+	id := running(ctx, t, svc, max, job(t, pool, "ashby:acme", "Acme GmbH", "acme|platform"))
 	if err := svc.BeginSubmit(ctx, max, id); err != nil {
 		t.Fatal(err)
 	}
@@ -175,7 +175,7 @@ func TestGuardsBeforeStart(t *testing.T) {
 		return id, svc.Start(ctx, max, id, application.ActorRunner)
 	}
 	submit := func(jobID int64) {
-		id := running(t, svc, max, jobID)
+		id := running(ctx, t, svc, max, jobID)
 		if err := svc.BeginSubmit(ctx, max, id); err != nil {
 			t.Fatal(err)
 		}
@@ -206,5 +206,53 @@ func TestGuardsBeforeStart(t *testing.T) {
 	}
 	if _, err := start(excluded); !errors.Is(err, application.ErrExcluded) {
 		t.Fatalf("excluded: %v", err)
+	}
+}
+
+type notices struct{ refs []application.Ref }
+
+func (n *notices) HandoffClosing(_ context.Context, r application.Ref, _ time.Time) error {
+	n.refs = append(n.refs, r)
+	return nil
+}
+
+func TestHandoffWindow(t *testing.T) {
+	pool, st, svc, now := setup(t)
+	ctx := t.Context()
+	max := user(t, pool, "max@example.org")
+	answered := running(ctx, t, svc, max, job(t, pool, "greenhouse:acme", "Acme GmbH", "acme|go"))
+	waiting := running(ctx, t, svc, max, job(t, pool, "greenhouse:beispiel", "Beispiel AG", "beispiel|go"))
+	for _, id := range []uuid.UUID{answered, waiting} {
+		if _, err := svc.Fire(ctx, max, id, application.EvAsk, application.ActorRunner, map[string]any{"kind": "captcha"}); err != nil {
+			t.Fatal(err)
+		}
+	}
+	n := &notices{}
+	if w, p, err := svc.WatchHandoffs(ctx, n); err != nil || w+p != 0 {
+		t.Fatalf("fresh handoffs: %d, %d, %v", w, p, err)
+	}
+	if _, err := svc.Fire(ctx, max, answered, application.EvAnswer, application.ActorUser, nil); err != nil {
+		t.Fatal(err)
+	}
+
+	*now = now.Add(application.HandoffWindow - application.HandoffNotice + time.Minute)
+	for range 2 { // the notice goes out once
+		if w, p, err := svc.WatchHandoffs(ctx, n); err != nil || p != 0 {
+			t.Fatalf("notice: %d, %d, %v", w, p, err)
+		}
+	}
+	if len(n.refs) != 1 || n.refs[0].ID != waiting {
+		t.Fatalf("notices = %+v", n.refs)
+	}
+
+	*now = now.Add(application.HandoffNotice)
+	if w, p, err := svc.WatchHandoffs(ctx, n); err != nil || p != 1 || w != 0 {
+		t.Fatalf("expiry: %d, %d, %v", w, p, err)
+	}
+	if a, _ := st.Get(ctx, max, waiting); a.State != application.Parked {
+		t.Fatalf("waiting = %s", a.State)
+	}
+	if a, _ := st.Get(ctx, max, answered); a.State != application.Running {
+		t.Fatalf("answered = %s", a.State)
 	}
 }

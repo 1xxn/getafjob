@@ -20,6 +20,13 @@ const (
 	ActorSystem Actor = "system"
 )
 
+// The user's turn in a run: the runner keeps the browser for HandoffWindow; a notice goes out HandoffNotice
+// before the end, and an unanswered handoff is parked.
+const (
+	HandoffWindow = 20 * time.Minute
+	HandoffNotice = 5 * time.Minute
+)
+
 // StuckAfter is how long an application may stay in submitting before it counts as crashed: a submit click with
 // its verification takes seconds.
 const StuckAfter = 15 * time.Minute
@@ -75,6 +82,10 @@ func (s *Service) apply(ctx context.Context, userID, id uuid.UUID, ev Event, act
 	}
 	c := Change{Event: ev, From: app.State, To: to, Actor: actor, Detail: detail, At: s.now(), BeginSubmit: submit,
 		Outcome: outcome(app.State, ev)}
+	if ev == EvAsk {
+		until := c.At.Add(HandoffWindow)
+		c.HandoffUntil = &until
+	}
 	if err := s.store.Apply(ctx, userID, app, c); err != nil {
 		return app.State, err
 	}
@@ -132,4 +143,43 @@ func (s *Service) RecoverCrashed(ctx context.Context) (int, error) {
 		}
 	}
 	return n, errors.Join(errs...)
+}
+
+// WatchHandoffs sends the notice for handoff windows that close within HandoffNotice (once) and parks
+// applications whose window has closed. It returns how many it warned and parked.
+func (s *Service) WatchHandoffs(ctx context.Context, n Notifier) (warned, parked int, err error) {
+	now := s.now()
+	due, err := s.store.HandoffsDue(ctx, now.Add(HandoffNotice))
+	if err != nil {
+		return 0, 0, err
+	}
+	var errs []error
+	for _, h := range due {
+		if !now.Before(h.Until) {
+			_, err := s.apply(ctx, h.UserID, h.ID, EvPark, ActorSystem, map[string]any{"reason": "handoff window closed"}, false)
+			switch {
+			case err == nil:
+				parked++
+			case errors.Is(err, ErrConflict), errors.Is(err, ErrTransition):
+			default:
+				errs = append(errs, err)
+			}
+			continue
+		}
+		if h.Warned {
+			continue
+		}
+		ok, err := s.store.MarkWarned(ctx, h.Ref, now)
+		if err != nil {
+			errs = append(errs, err)
+			continue
+		}
+		if ok {
+			warned++
+			if err := n.HandoffClosing(ctx, h.Ref, h.Until); err != nil {
+				errs = append(errs, err)
+			}
+		}
+	}
+	return warned, parked, errors.Join(errs...)
 }

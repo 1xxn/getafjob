@@ -187,7 +187,8 @@ func (w *cleanupWorker) Work(ctx context.Context, _ *river.Job[CleanupArgs]) err
 	return w.ids.Cleanup(ctx)
 }
 
-// periodicJobs schedules the crawl, the cleanup and the recovery of stuck submits; all also run once at start.
+// periodicJobs schedules the crawl, the cleanup, the recovery of stuck submits and the handoff watch; all also run
+// once at start.
 func periodicJobs(cfg config.Config) []*river.PeriodicJob {
 	start := &river.PeriodicJobOpts{RunOnStart: true}
 	return []*river.PeriodicJob{
@@ -197,5 +198,7 @@ func periodicJobs(cfg config.Config) []*river.PeriodicJob {
 			func() (river.JobArgs, *river.InsertOpts) { return CleanupArgs{}, nil }, start),
 		river.NewPeriodicJob(river.PeriodicInterval(5*time.Minute),
 			func() (river.JobArgs, *river.InsertOpts) { return RecoverArgs{}, nil }, start),
+		river.NewPeriodicJob(river.PeriodicInterval(time.Minute),
+			func() (river.JobArgs, *river.InsertOpts) { return HandoffArgs{}, nil }, start),
 	}
 }

@@ -12,13 +12,15 @@ import (
 )
 
 type Application struct {
-	ID        uuid.UUID
-	UserID    uuid.UUID
-	JobID     int64
-	State     string
-	Version   int64
-	CreatedAt time.Time
-	UpdatedAt time.Time
+	ID            uuid.UUID
+	UserID        uuid.UUID
+	JobID         int64
+	State         string
+	Version       int64
+	CreatedAt     time.Time
+	UpdatedAt     time.Time
+	HandoffUntil  *time.Time
+	HandoffWarned bool
 }
 
 type ApplicationEvent struct {

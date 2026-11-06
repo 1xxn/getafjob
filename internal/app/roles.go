@@ -124,7 +124,9 @@ func worker(ctx context.Context, cfg config.Config, logger *slog.Logger) error {
 	river.AddWorker(workers, &boardDiscoveryWorker{
 		discovery: discovery.NewBoardDiscovery(store, store, sources.NewFinder(client)), logger: logger, metrics: metrics})
 	river.AddWorker(workers, &cleanupWorker{ids: identity.NewService(pgstore.New(pool), nil, cfg.PublicURL)})
-	river.AddWorker(workers, &recoverWorker{svc: application.NewService(applicationstore.New(pool)), logger: logger})
+	apps := application.NewService(applicationstore.New(pool))
+	river.AddWorker(workers, &recoverWorker{svc: apps, logger: logger})
+	river.AddWorker(workers, &handoffWorker{svc: apps, notifier: logNotifier{logger}, logger: logger})
 	jobs, err := queue.NewWorker(pool, queue.Options{Workers: workers, Periodic: periodicJobs(cfg), Logger: logger})
 	if err != nil {
 		return err

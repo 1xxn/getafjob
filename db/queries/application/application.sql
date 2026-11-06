@@ -7,7 +7,8 @@ RETURNING id;
 SELECT id, job_id, state, version, updated_at FROM applications WHERE id = $1 AND user_id = $2;
 
 -- name: SetState :execrows
-UPDATE applications SET state = sqlc.arg(to_state), version = version + 1, updated_at = sqlc.arg(at)
+UPDATE applications SET state = sqlc.arg(to_state), version = version + 1, updated_at = sqlc.arg(at),
+  handoff_until = sqlc.narg(handoff_until), handoff_warned = false
 WHERE id = sqlc.arg(id) AND user_id = sqlc.arg(user_id) AND state = sqlc.arg(from_state) AND version = sqlc.arg(version);
 
 -- name: InsertEvent :exec
@@ -42,3 +43,11 @@ SELECT EXISTS (SELECT 1 FROM matches WHERE user_id = $1 AND job_id = $2 AND deci
 -- name: StaleSubmitting :many
 -- System role: applications that have been submitting for too long (the run died).
 SELECT id, user_id FROM applications WHERE state = 'submitting' AND updated_at < $1 ORDER BY updated_at LIMIT 500;
+
+-- name: HandoffsDue :many
+-- System role: waiting applications whose handoff window ends before the given time.
+SELECT id, user_id, handoff_until, handoff_warned FROM applications
+WHERE state = 'needs_input' AND handoff_until IS NOT NULL AND handoff_until < $1 ORDER BY handoff_until LIMIT 500;
+
+-- name: MarkHandoffWarned :execrows
+UPDATE applications SET handoff_warned = true WHERE id = $1 AND user_id = $2 AND state = 'needs_input' AND NOT handoff_warned;
