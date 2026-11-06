@@ -1,0 +1,11 @@
+<!doctype html>
+<html lang="en">
+<head><meta charset="utf-8"><title>Nested</title></head>
+<body>
+<!-- Embedded from another site; holds a same-site frame and a frame of a third site. -->
+<h2>Application portal</h2>
+<iframe id="inner" style="width:600px;height:160px" srcdoc="<form onsubmit='event.preventDefault(); document.body.dataset.sent = 1'><label>Postal code <input name=plz required></label><button>Check</button></form>"></iframe>
+<iframe id="third" style="width:600px;height:420px"></iframe>
+<script>document.getElementById("third").src = new URLSearchParams(location.search).get("third") || "about:blank";</script>
+</body>
+</html>
