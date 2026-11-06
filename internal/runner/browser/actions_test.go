@@ -6,6 +6,7 @@ import (
 	"bytes"
 	"errors"
 	"fmt"
+	"net/url"
 	"strings"
 	"testing"
 	"time"
@@ -139,5 +140,52 @@ func TestLostClickIsSentOnceMore(t *testing.T) {
 	}
 	if hits := s.page.MustEval(`() => window.hits || 0`).Int(); hits != 0 {
 		t.Fatalf("button pressed %d times", hits)
+	}
+}
+
+func TestFramesInsideOutOfProcessIframe(t *testing.T) {
+	s := newSpike(t, "posting.html")
+	third := s.site.URL + "/step1.html" // back on the first site: a third, separate process
+	middle := strings.Replace(s.site.URL, "127.0.0.1", "localhost", 1) + "/nested.html?third=" + third
+	s.open(s.site.URL + "/oopif?src=" + url.QueryEscape(middle))
+	var st *State
+	eventually(t, 10*time.Second, func() error {
+		var err error
+		if st, err = Extract(s.page); err != nil {
+			return err
+		}
+		if len(st.Frames) < 4 {
+			return fmt.Errorf("%d frames", len(st.Frames))
+		}
+		for _, f := range st.Frames {
+			if f.sess == nil && f.Index > 0 {
+				return fmt.Errorf("frame %d not reached over a session", f.Index)
+			}
+		}
+		return nil
+	})
+	plz := s.field(st, "text", "Postal code")
+	vorname := s.field(st, "text", "Vorname")
+
+	// Same-site frame inside the OOPIF: native validation, then typing and a submit.
+	e, err := st.Click(s.button(st, "Check", true).ID, 3*time.Second)
+	if err != nil || len(e.Invalid) != 1 {
+		t.Fatalf("empty postal code: %+v, %v", e, err)
+	}
+	if err := st.Focus(plz.ID); err != nil {
+		t.Fatal(err)
+	}
+	if err := (proto.InputInsertText{Text: "10115"}).Call(s.page); err != nil {
+		t.Fatal(err)
+	}
+	if e, err = st.Click(s.button(st, "Check", true).ID, 3*time.Second); err != nil || !e.DOM {
+		t.Fatalf("postal code sent: %+v, %v", e, err)
+	}
+	// Third-site frame inside the OOPIF.
+	if e, err = st.Click(s.button(st, "Weiter", true).ID, 3*time.Second); err != nil || len(e.Invalid) == 0 {
+		t.Fatalf("third site: %+v, %v", e, err)
+	}
+	if err := st.Focus(vorname.ID); err != nil {
+		t.Fatal(err)
 	}
 }

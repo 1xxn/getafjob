@@ -154,7 +154,7 @@ func (s *State) measure(id string) (point, error) {
 		chain = append(chain, fr)
 	}
 	for i := len(chain) - 1; i >= 0; i-- { // outermost iframe first
-		if _, err := chain[i].iframe.Eval(offsetJS); err != nil {
+		if _, _, err := chain[i].iframe.offset(); err != nil {
 			return point{}, err
 		}
 	}
@@ -173,12 +173,12 @@ func (s *State) measure(id string) (point, error) {
 		return point{}, fmt.Errorf("%w: %q", ErrNotVisible, id)
 	}
 	for _, fr := range chain {
-		ov, err := fr.iframe.Eval(offsetJS)
+		x, y, err := fr.iframe.offset()
 		if err != nil {
 			return point{}, err
 		}
-		pt.X += ov.Value.Get("x").Num()
-		pt.Y += ov.Value.Get("y").Num()
+		pt.X += x
+		pt.Y += y
 	}
 	return pt, nil
 }

@@ -96,10 +96,42 @@ type Frame struct {
 	Headings []string  `json:"headings"`
 	Text     string    `json:"text"`
 
-	page   *rod.Page    // in-process frame
-	sess   *session     // out-of-process iframe (own CDP target)
-	parent *Frame       // nil for the top frame
-	iframe *rod.Element // the iframe element in the parent frame
+	page   *rod.Page // in-process frame of a rod page
+	sess   *session  // frame reached over a CDP session (out-of-process iframes and the frames inside them)
+	parent *Frame    // nil for the top frame
+	iframe iframeRef // the iframe element in the parent frame
+}
+
+// iframeRef is an iframe element in its parent frame.
+type iframeRef interface {
+	// offset scrolls the iframe into view and returns where its content starts in the parent frame.
+	offset() (x, y float64, err error)
+}
+
+type rodIframe struct{ el *rod.Element }
+
+func (r rodIframe) offset() (float64, float64, error) {
+	v, err := r.el.Eval(offsetJS)
+	if err != nil {
+		return 0, 0, err
+	}
+	return v.Value.Get("x").Num(), v.Value.Get("y").Num(), nil
+}
+
+type sessionIframe struct {
+	s   *session
+	obj proto.RuntimeRemoteObjectID
+}
+
+func (r sessionIframe) offset() (float64, float64, error) {
+	res, err := proto.RuntimeCallFunctionOn{FunctionDeclaration: offsetJS, ObjectID: r.obj, ReturnByValue: true}.Call(r.s)
+	if err != nil {
+		return 0, 0, err
+	}
+	if res.ExceptionDetails != nil {
+		return 0, 0, fmt.Errorf("js exception: %s", res.ExceptionDetails.Text)
+	}
+	return res.Result.Value.Get("x").Num(), res.Result.Value.Get("y").Num(), nil
 }
 
 // State is the extraction result of a page and all its frames (index 0 = top).
@@ -116,6 +148,9 @@ type session struct {
 	b   *rod.Browser
 	id  proto.TargetSessionID
 	ctx context.Context
+	// world is the execution context of a same-site frame inside an out-of-process iframe (an isolated world
+	// created for it); 0 means the main frame of the session.
+	world proto.RuntimeExecutionContextID
 }
 
 func (s *session) Call(ctx context.Context, sessionID, method string, params any) ([]byte, error) {
@@ -127,7 +162,7 @@ func (s *session) GetContext() context.Context         { return s.ctx }
 
 // eval runs a JS expression in the iframe's main world.
 func (s *session) eval(expr string, byValue bool) (*proto.RuntimeRemoteObject, error) {
-	res, err := proto.RuntimeEvaluate{Expression: expr, ReturnByValue: byValue}.Call(s)
+	res, err := proto.RuntimeEvaluate{Expression: expr, ReturnByValue: byValue, ContextID: s.world}.Call(s)
 	if err != nil {
 		return nil, err
 	}
@@ -189,7 +224,7 @@ func childFrame(p *rod.Page, el *rod.Element) (*rod.Page, *session, error) {
 	return fp, nil, err
 }
 
-func (s *State) extract(p *rod.Page, sess *session, parent *Frame, iframe *rod.Element, depth int) error {
+func (s *State) extract(p *rod.Page, sess *session, parent *Frame, iframe iframeRef, depth int) error {
 	idx := len(s.Frames)
 	res, err := evalExtract(p, sess, idx)
 	if err != nil {
@@ -203,8 +238,11 @@ func (s *State) extract(p *rod.Page, sess *session, parent *Frame, iframe *rod.E
 		return fmt.Errorf("decode frame %d: %w", idx, err)
 	}
 	s.Frames = append(s.Frames, f)
-	if depth >= maxFrameDepth || sess != nil {
-		return nil // iframes inside out-of-process iframes: Phase 2 (#24)
+	if depth >= maxFrameDepth {
+		return nil
+	}
+	if sess != nil {
+		return s.extractSessionChildren(f, sess, depth)
 	}
 	iframes, _ := p.Elements("iframe") // a frame that navigates away mid-read has none to follow
 	for _, el := range iframes {
@@ -215,11 +253,78 @@ func (s *State) extract(p *rod.Page, sess *session, parent *Frame, iframe *rod.E
 		if err != nil {
 			continue
 		}
-		if err := s.extract(fp, fs, f, el, depth+1); err != nil {
+		if err := s.extract(fp, fs, f, rodIframe{el}, depth+1); err != nil {
 			return err
 		}
 	}
 	return nil
+}
+
+// extractSessionChildren follows the iframes of a frame reached over a CDP session: another site gets its own
+// target, a same-site frame an isolated world in the same session.
+func (s *State) extractSessionChildren(f *Frame, sess *session, depth int) error {
+	for _, obj := range sess.iframes() {
+		if len(s.Frames) >= maxFrames {
+			return nil
+		}
+		child, err := sess.childFrame(obj)
+		if err != nil {
+			continue // not loaded yet or gone
+		}
+		if err := s.extract(nil, child, f, sessionIframe{sess, obj}, depth+1); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+// iframes returns the iframe elements of the session's frame; none if the frame cannot be read (navigating).
+func (sess *session) iframes() []proto.RuntimeRemoteObjectID {
+	list, err := sess.eval(`Array.from(document.querySelectorAll("iframe"))`, false)
+	if err != nil || list.ObjectID == "" {
+		return nil
+	}
+	props, err := proto.RuntimeGetProperties{ObjectID: list.ObjectID, OwnProperties: true}.Call(sess)
+	if err != nil {
+		return nil
+	}
+	var out []proto.RuntimeRemoteObjectID
+	for _, prop := range props.Result {
+		if prop.Value != nil && prop.Value.ObjectID != "" && prop.Value.Subtype == proto.RuntimeRemoteObjectSubtypeNode {
+			out = append(out, prop.Value.ObjectID)
+		}
+	}
+	return out
+}
+
+// childFrame opens the frame of an iframe element of the session.
+func (sess *session) childFrame(obj proto.RuntimeRemoteObjectID) (*session, error) {
+	node, err := proto.DOMDescribeNode{ObjectID: obj}.Call(sess)
+	if err != nil {
+		return nil, err
+	}
+	frameID := node.Node.FrameID
+	if frameID == "" {
+		return nil, errors.New("iframe without frame")
+	}
+	targets, err := proto.TargetGetTargets{}.Call(sess.b)
+	if err != nil {
+		return nil, err
+	}
+	for _, ti := range targets.TargetInfos {
+		if ti.Type == "iframe" && string(ti.TargetID) == string(frameID) {
+			res, err := proto.TargetAttachToTarget{TargetID: ti.TargetID, Flatten: true}.Call(sess.b)
+			if err != nil {
+				return nil, err
+			}
+			return &session{b: sess.b, id: res.SessionID, ctx: sess.ctx}, nil
+		}
+	}
+	world, err := proto.PageCreateIsolatedWorld{FrameID: frameID, WorldName: "getafjob"}.Call(sess)
+	if err != nil {
+		return nil, err
+	}
+	return &session{b: sess.b, id: sess.id, ctx: sess.ctx, world: world.ExecutionContextID}, nil
 }
 
 // Fields returns all fields of all frames.
