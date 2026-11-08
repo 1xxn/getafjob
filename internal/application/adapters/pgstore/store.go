@@ -641,3 +641,67 @@ func (s *Store) SetAdapter(ctx context.Context, r application.RunRef, adapter st
 		})
 	})
 }
+
+// PlanUsers lists active users whose autonomy level enables auto-planning and who have daily quota > 0 (system role).
+func (s *Store) PlanUsers(ctx context.Context) (ids []uuid.UUID, err error) {
+	err = db.InSystemTx(ctx, s.pool, func(tx pgx.Tx) error {
+		ids, err = q.New(tx).PlanUsers(ctx)
+		return err
+	})
+	return ids, err
+}
+
+// ActiveApplicationsCount counts applications in queued, running, or submitting for the user.
+func (s *Store) ActiveApplicationsCount(ctx context.Context, userID uuid.UUID) (n int, err error) {
+	err = s.user(ctx, userID, func(qs *q.Queries) error {
+		c, err := qs.ActiveApplicationsCount(ctx, userID)
+		if err != nil {
+			return err
+		}
+		n = int(c)
+		return nil
+	})
+	return n, err
+}
+
+// UserLastPacedAt returns the most recent timestamp an application was queued, run leased, or submit started for pacing.
+func (s *Store) UserLastPacedAt(ctx context.Context, userID uuid.UUID) (at time.Time, err error) {
+	err = s.user(ctx, userID, func(qs *q.Queries) error {
+		at, err = qs.UserLastPacedAt(ctx, userID)
+		return err
+	})
+	return at, err
+}
+
+// PlannerCandidates returns open matching jobs for the user ordered by match score descending.
+func (s *Store) PlannerCandidates(ctx context.Context, userID uuid.UUID, minScore int) (out []application.PlannerCandidate, err error) {
+	if minScore < 0 || minScore > 100 {
+		return nil, fmt.Errorf("%w: min_score out of range", application.ErrInvalidSettings)
+	}
+	score := int16(minScore)
+	err = s.user(ctx, userID, func(qs *q.Queries) error {
+		rows, err := qs.PlannerCandidates(ctx, q.PlannerCandidatesParams{UserID: userID, MinScore: score})
+		if err != nil {
+			return err
+		}
+		out = make([]application.PlannerCandidate, len(rows))
+		for i, r := range rows {
+			out[i] = application.PlannerCandidate{JobID: r.ID, Score: int(r.Score)}
+		}
+		return nil
+	})
+	return out, err
+}
+
+// SubmitsSince counts the submit attempts of the user started since at.
+func (s *Store) SubmitsSince(ctx context.Context, userID uuid.UUID, since time.Time) (n int, err error) {
+	err = s.user(ctx, userID, func(qs *q.Queries) error {
+		c, err := qs.SubmitsSince(ctx, q.SubmitsSinceParams{UserID: userID, StartedAt: since})
+		if err != nil {
+			return err
+		}
+		n = int(c)
+		return nil
+	})
+	return n, err
+}
