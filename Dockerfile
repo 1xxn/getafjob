@@ -59,9 +59,11 @@ CMD ["--listen-ip=0.0.0.0", "--listen-port=4750", "--timeout=15s", \
 
 FROM chromedp/headless-shell:157.0.8103.27@sha256:7bee201478b2f6266aae01243740ee85c16281e32f42d3aed9fdf04f4eace7a1 AS runner
 USER root
-# The upstream image ships locales readable by root only; the runner user needs them. The runner needs no
-# package manager at run time, so apt goes (fewer files to attack, no apt advisories in the image scan).
+# The upstream image ships locales readable by root only; the runner user needs them. Upgrade any packages with
+# Debian security updates before removing apt, so the runner needs no package manager at run time and has no
+# unpatched OS libraries or apt advisories in the image scan.
 RUN chmod -R a+rX /headless-shell && \
+    apt-get update && apt-get -y --only-upgrade install zlib1g && rm -rf /var/lib/apt/lists/* && \
     dpkg --purge --force-depends apt libapt-pkg7.0 && \
     groupadd --gid 10001 runner && \
     useradd --uid 10001 --gid 10001 --no-create-home --home-dir /tmp --shell /usr/sbin/nologin runner
