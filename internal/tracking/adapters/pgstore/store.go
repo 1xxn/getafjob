@@ -221,7 +221,7 @@ func (s *Store) CreateSuggestion(ctx context.Context, sug tracking.StatusSuggest
 			MessageSubject: sug.MessageSubject,
 			MessageDate:    sug.MessageDate,
 			Category:       string(sug.Category),
-			SuggestedState: string(sug.SuggestedState),
+			SuggestedState: sug.SuggestedState,
 			Reasons:        reasonsJSON,
 			CreatedAt:      sug.CreatedAt,
 		})
