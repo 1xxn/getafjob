@@ -147,6 +147,9 @@ func TestRunFlowAndGuardAtLease(t *testing.T) {
 		Data: []byte(`{"fields":[]}`), Screenshot: "runs/x/1.png"}); err != nil {
 		t.Fatal(err)
 	}
+	if _, err := svc.Approve(ctx, max, good); err != nil {
+		t.Fatal(err)
+	}
 	if err := runs.BeginSubmit(ctx, ref); err != nil {
 		t.Fatal(err)
 	}

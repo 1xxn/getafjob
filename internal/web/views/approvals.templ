@@ -1,0 +1,65 @@
+package views
+
+import "time"
+
+// ApprovalRow is one application awaiting human approval.
+type ApprovalRow struct {
+	ID      string
+	JobID   int64
+	State   string
+	Title   string
+	Company string
+	Score   int
+	Reasons []string
+	AskedAt time.Time
+}
+
+// ApprovalsData fills the approval list page.
+type ApprovalsData struct {
+	Name   string
+	Rows   []ApprovalRow
+	Notice string
+}
+
+templ ApprovalsPage(d ApprovalsData) {
+	@Layout(Page{Title: T(ctx, "approvals.title"), UserName: d.Name}) {
+		@Section(T(ctx, "approvals.title")) {
+			<p class="muted">{ T(ctx, "approvals.text") }</p>
+			if d.Notice != "" {
+				@Notice("info", d.Notice)
+			}
+			if len(d.Rows) == 0 {
+				<p>{ T(ctx, "approvals.empty") }</p>
+			} else {
+				<ol class="jobs">
+					for _, r := range d.Rows {
+						<li>
+							<h2><a href={ templ.SafeURL("/applications/" + r.ID) }>{ r.Title }</a></h2>
+							<p class="meta">
+								<strong>{ r.Company }</strong>
+								<span> • </span>
+								<span>{ T(ctx, "approvals.score", "score", r.Score) }</span>
+								<span> • </span>
+								<span class="muted">{ T(ctx, "approvals.asked", "when", When(ctx, r.AskedAt)) }</span>
+							</p>
+							<div class="approval-reasons">
+								<strong>{ T(ctx, "approvals.reasons_title") }</strong>
+								<ul class="reasons">
+									for _, re := range r.Reasons {
+										<li>{ re }</li>
+									}
+								</ul>
+							</div>
+							<div class="actions">
+								<form method="post" action={ templ.SafeURL("/approvals/" + r.ID + "/approve") }>
+									<button type="submit" class="primary">{ T(ctx, "approvals.approve") }</button>
+								</form>
+								<a href={ templ.SafeURL("/applications/" + r.ID) } class="button secondary">{ T(ctx, "approvals.view_evidence") }</a>
+							</div>
+						</li>
+					}
+				</ol>
+			}
+		}
+	}
+}

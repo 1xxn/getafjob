@@ -9,6 +9,7 @@ import (
 	"encoding/json"
 	"errors"
 	"slices"
+	"strings"
 	"time"
 
 	"github.com/google/uuid"
@@ -51,7 +52,20 @@ func (s *Store) Get(ctx context.Context, userID, id uuid.UUID) (a application.Ap
 		if errors.Is(err, pgx.ErrNoRows) {
 			return application.ErrNotFound
 		}
-		a = application.App{ID: r.ID, JobID: r.JobID, State: application.State(r.State), Version: r.Version, UpdatedAt: r.UpdatedAt}
+		var reasons []application.Reason
+		for _, re := range r.ApprovalReasons {
+			reasons = append(reasons, application.Reason(re))
+		}
+		a = application.App{
+			ID:              r.ID,
+			JobID:           r.JobID,
+			State:           application.State(r.State),
+			Version:         r.Version,
+			UpdatedAt:       r.UpdatedAt,
+			ApprovalAsked:   r.ApprovalAskedAt,
+			ApprovalReasons: reasons,
+			Approved:        r.ApprovedAt,
+		}
 		return err
 	})
 	return a, err
@@ -103,6 +117,15 @@ func (s *Store) Apply(ctx context.Context, userID uuid.UUID, a application.App, 
 		if err := qs.InsertEvent(ctx, q.InsertEventParams{ApplicationID: a.ID, UserID: userID, Event: string(c.Event),
 			FromState: string(c.From), ToState: string(c.To), Actor: string(c.Actor), Detail: detail, At: c.At}); err != nil {
 			return err
+		}
+		if len(c.Approval) > 0 {
+			reasons := make([]string, len(c.Approval))
+			for i, r := range c.Approval {
+				reasons[i] = string(r)
+			}
+			if err := qs.AskApproval(ctx, q.AskApprovalParams{ID: a.ID, UserID: userID, At: &c.At, Reasons: reasons}); err != nil {
+				return err
+			}
 		}
 		if c.BeginSubmit {
 			err := qs.InsertSubmitAttempt(ctx, q.InsertSubmitAttemptParams{ApplicationID: a.ID, UserID: userID, StartedAt: c.At})
@@ -393,4 +416,218 @@ func (s *Store) Job(ctx context.Context, id int64) (application.Job, error) {
 	}
 	return application.Job{ID: r.ID, Source: r.Source, Company: r.Company, Title: r.Title, Location: r.Location,
 		URL: r.Url, Apply: r.ApplyUrl, Description: r.Description}, err
+}
+
+// Settings returns the user's autonomy settings, DefaultSettings if they saved none.
+func (s *Store) Settings(ctx context.Context, userID uuid.UUID) (st application.Settings, err error) {
+	err = s.user(ctx, userID, func(qs *q.Queries) error {
+		r, err := qs.GetSettings(ctx, userID)
+		if errors.Is(err, pgx.ErrNoRows) {
+			st = application.DefaultSettings
+			return nil
+		}
+		if err != nil {
+			return err
+		}
+		st = application.Settings{
+			Level:      application.Level(r.Level),
+			MinScore:   int(r.MinScore),
+			DailyLimit: int(r.DailyLimit),
+		}
+		return nil
+	})
+	return st, err
+}
+
+// SaveSettings validates and stores the user's autonomy settings.
+func (s *Store) SaveSettings(ctx context.Context, userID uuid.UUID, st application.Settings, at time.Time) error {
+	minScore := int16(min(max(st.MinScore, 0), 100))
+	dailyLimit := int16(min(max(st.DailyLimit, 0), application.MaxDailyLimit))
+	return s.user(ctx, userID, func(qs *q.Queries) error {
+		return qs.SaveSettings(ctx, q.SaveSettingsParams{
+			UserID:     userID,
+			Level:      string(st.Level),
+			MinScore:   minScore,
+			DailyLimit: dailyLimit,
+			UpdatedAt:  at,
+		})
+	})
+}
+
+// RuleInput collects what the rule needs before the submit of a run.
+func (s *Store) RuleInput(ctx context.Context, userID uuid.UUID, app application.App, runID uuid.UUID, now time.Time) (
+	in application.RuleInput, err error,
+) {
+	st, err := s.Settings(ctx, userID)
+	if err != nil {
+		return in, err
+	}
+	in.Settings = st
+
+	cand, err := s.Candidate(ctx, userID, app.JobID)
+	if err != nil {
+		return in, err
+	}
+	in.Candidate = cand
+
+	err = s.user(ctx, userID, func(qs *q.Queries) error {
+		score, err := qs.MatchScore(ctx, q.MatchScoreParams{UserID: userID, JobID: app.JobID})
+		if err == nil {
+			in.Matched = true
+			in.Score = int(score)
+		} else if !errors.Is(err, pgx.ErrNoRows) {
+			return err
+		}
+
+		submits, err := qs.SubmitsSince(ctx, q.SubmitsSinceParams{UserID: userID, StartedAt: now.Add(-application.QuotaWindow)})
+		if err != nil {
+			return err
+		}
+		in.Submits = int(submits)
+
+		adapter, err := qs.RunAdapter(ctx, q.RunAdapterParams{ID: runID, UserID: userID})
+		if err != nil && !errors.Is(err, pgx.ErrNoRows) {
+			return err
+		}
+		in.Adapter = adapter
+
+		cps, err := qs.RunCheckpoints(ctx, q.RunCheckpointsParams{RunID: runID, UserID: userID})
+		if err != nil {
+			return err
+		}
+		fieldKind := make(map[string]string)
+		filledMap := make(map[string]string)
+		for _, cp := range cps {
+			var d struct {
+				Fields []struct {
+					ID       string `json:"id"`
+					Kind     string `json:"kind"`
+					Required bool   `json:"required"`
+					Value    string `json:"value"`
+					Invalid  bool   `json:"invalid"`
+				} `json:"fields"`
+				Filled []struct {
+					FieldID string `json:"field_id"`
+					Source  string `json:"source"`
+				} `json:"filled"`
+				Errors []string `json:"errors"`
+			}
+			if err := json.Unmarshal(cp.Data, &d); err != nil {
+				continue
+			}
+			for _, f := range d.Fields {
+				if f.Kind != "" {
+					fieldKind[f.ID] = f.Kind
+				}
+			}
+			for _, f := range d.Filled {
+				filledMap[f.FieldID] = f.Source
+			}
+			if cp.Step == "submit" {
+				open := 0
+				formErrors := len(d.Errors)
+				for _, f := range d.Fields {
+					if f.Required && strings.TrimSpace(f.Value) == "" {
+						open++
+					}
+					if f.Invalid {
+						formErrors++
+					}
+				}
+				in.OpenFields = open
+				in.FormErrors = formErrors
+			}
+		}
+		for fieldID, src := range filledMap {
+			in.Filled = append(in.Filled, application.SubmitField{
+				Kind:   fieldKind[fieldID],
+				Source: src,
+			})
+		}
+		return nil
+	})
+	if err != nil {
+		return in, err
+	}
+
+	if in.Adapter != "" {
+		since := now.Add(-application.MaturityWindow)
+		err = db.InSystemTx(ctx, s.pool, func(tx pgx.Tx) error {
+			row, err := q.New(tx).AdapterRuns(ctx, q.AdapterRunsParams{Adapter: in.Adapter, FinishedAt: &since})
+			if err != nil {
+				return err
+			}
+			in.AdapterRuns = int(row.Runs)
+			in.AdapterSubmitted = int(row.Submitted)
+			return nil
+		})
+	}
+	return in, err
+}
+
+// Approve records the user's approval if the application is still at app.Version; ErrConflict otherwise.
+func (s *Store) Approve(ctx context.Context, userID uuid.UUID, app application.App, at time.Time) error {
+	return s.user(ctx, userID, func(qs *q.Queries) error {
+		n, err := qs.ApproveApplication(ctx, q.ApproveApplicationParams{
+			ID:      app.ID,
+			UserID:  userID,
+			Version: app.Version,
+			At:      &at,
+		})
+		if err != nil {
+			return err
+		}
+		if n != 1 {
+			return application.ErrConflict
+		}
+		return qs.InsertEvent(ctx, q.InsertEventParams{
+			ApplicationID: app.ID,
+			UserID:        userID,
+			Event:         "approve",
+			FromState:     string(app.State),
+			ToState:       string(app.State),
+			Actor:         string(application.ActorUser),
+			Detail:        []byte("{}"),
+			At:            at,
+		})
+	})
+}
+
+// Approvals lists the applications on the user's approval list, oldest request first.
+func (s *Store) Approvals(ctx context.Context, userID uuid.UUID) (out []application.Approval, err error) {
+	err = s.user(ctx, userID, func(qs *q.Queries) error {
+		rows, err := qs.Approvals(ctx, userID)
+		if err != nil {
+			return err
+		}
+		for _, r := range rows {
+			var reasons []application.Reason
+			for _, re := range r.ApprovalReasons {
+				reasons = append(reasons, application.Reason(re))
+			}
+			out = append(out, application.Approval{
+				ID:      r.ID,
+				JobID:   r.JobID,
+				State:   application.State(r.State),
+				Title:   r.Title,
+				Company: r.Company,
+				Score:   int(r.Score),
+				Reasons: reasons,
+				Asked:   r.AskedAt,
+			})
+		}
+		return nil
+	})
+	return out, err
+}
+
+// SetAdapter records the ATS adapter of a run.
+func (s *Store) SetAdapter(ctx context.Context, r application.RunRef, adapter string) error {
+	return s.user(ctx, r.UserID, func(qs *q.Queries) error {
+		return qs.SetRunAdapter(ctx, q.SetRunAdapterParams{
+			ID:      r.RunID,
+			UserID:  r.UserID,
+			Adapter: adapter,
+		})
+	})
 }

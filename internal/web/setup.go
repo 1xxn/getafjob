@@ -7,6 +7,7 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/1xxn/getafjob/internal/application"
 	"github.com/1xxn/getafjob/internal/identity"
 	"github.com/1xxn/getafjob/internal/profile"
 	"github.com/1xxn/getafjob/internal/profile/cvimport"
@@ -45,7 +46,13 @@ func (s *Server) renderSetup(w http.ResponseWriter, r *http.Request, u *identity
 	d := views.SetupData{Name: u.DisplayName, Step: step}
 	switch step {
 	case "search":
-		d.Form = preferencesForm(snap.Preferences)
+		st := application.DefaultSettings
+		if s.Apps != nil {
+			if cfg, err := s.Apps.Settings(r.Context(), u.ID); err == nil {
+				st = cfg
+			}
+		}
+		d.Form = preferencesForm(snap.Preferences, st)
 	default:
 		d.Form = profileForm(snap)
 	}
@@ -130,7 +137,13 @@ func (s *Server) setupSave(w http.ResponseWriter, r *http.Request, u *identity.U
 		if serr == nil {
 			serr = s.Profile.SavePreferences(r.Context(), u.ID, keep)
 		}
-		s.setupSaved(w, r, u, step, next, serr, preferencesForm(keep))
+		st := application.DefaultSettings
+		if s.Apps != nil {
+			if cfg, err := s.Apps.Settings(r.Context(), u.ID); err == nil {
+				st = cfg
+			}
+		}
+		s.setupSaved(w, r, u, step, next, serr, preferencesForm(keep, st))
 		return
 	}
 	snap, err := s.Profile.Get(r.Context(), u.ID)

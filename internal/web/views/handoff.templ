@@ -43,6 +43,8 @@ type HandoffData struct {
 	Company             string
 	State               string
 	Status              string
+	ApprovalAsked       bool
+	ApprovalReasons     []string
 	Questions           []HandoffQuestion
 	Fields              []EvidenceFieldRow
 	BeforeSubmitURL     string
@@ -86,6 +88,20 @@ templ HandoffPage(d HandoffData) {
 					<button type="button" id="btn-push" class="secondary">{ T(ctx, "handoff.push") }</button>
 				</div>
 			</div>
+
+			if d.ApprovalAsked {
+				<div class="form-section stack">
+					<h2>{ T(ctx, "handoff.approval_reasons") }</h2>
+					<ul class="reasons">
+						for _, r := range d.ApprovalReasons {
+							<li>{ r }</li>
+						}
+					</ul>
+					<form method="post" action={ templ.SafeURL("/approvals/" + d.AppID + "/approve") }>
+						<button type="submit" class="primary">{ T(ctx, "handoff.approve") }</button>
+					</form>
+				</div>
+			}
 
 			if len(d.Questions) > 0 {
 				<div class="form-section stack">

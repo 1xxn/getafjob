@@ -109,6 +109,18 @@ templ PreferencesPage(name string, f Form) {
 					</select>
 				</div>
 				@Check("talent_pool", T(ctx, "profile.field.talent_pool"), f.Checks["talent_pool"])
+				<h2>{ T(ctx, "profile.autonomy.title") }</h2>
+				<p class="muted">{ T(ctx, "profile.autonomy.hint") }</p>
+				<div class="field">
+					<label for="f-autonomy_level">{ T(ctx, "profile.field.autonomy_level") }</label>
+					<select id="f-autonomy_level" name="autonomy_level">
+						for _, v := range []string{"suggest", "approve", "autonomous"} {
+							<option value={ v } selected?={ f.Values["autonomy_level"] == v }>{ T(ctx, "profile.autonomy." + v) }</option>
+						}
+					</select>
+				</div>
+				@Field(input(ctx, f, "min_score", "number", "", 3))
+				@Field(input(ctx, f, "daily_limit", "number", "", 3))
 				@StickyBar() {
 					<button type="submit" class="primary">{ T(ctx, "profile.save") }</button>
 				}

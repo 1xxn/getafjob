@@ -4,7 +4,8 @@ ON CONFLICT (user_id, job_id) DO UPDATE SET user_id = EXCLUDED.user_id
 RETURNING id;
 
 -- name: GetApplication :one
-SELECT id, job_id, state, version, updated_at FROM applications WHERE id = $1 AND user_id = $2;
+SELECT id, job_id, state, version, updated_at, approval_asked_at, approval_reasons, approved_at
+FROM applications WHERE id = $1 AND user_id = $2;
 
 -- name: SetState :execrows
 UPDATE applications SET state = sqlc.arg(to_state), version = version + 1, updated_at = sqlc.arg(at),

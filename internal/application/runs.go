@@ -6,6 +6,7 @@ import (
 	"crypto/sha256"
 	"encoding/base64"
 	"errors"
+	"fmt"
 	"time"
 
 	"github.com/google/uuid"
@@ -52,6 +53,8 @@ type RunStore interface {
 	RunByToken(ctx context.Context, tokenHash []byte) (RunRef, time.Time, *time.Time, error)
 	FinishRun(ctx context.Context, r RunRef, outcome string, at time.Time) error
 	AddCheckpoint(ctx context.Context, r RunRef, c Checkpoint) error
+	// SetAdapter records the ATS adapter of a run.
+	SetAdapter(ctx context.Context, r RunRef, adapter string) error
 }
 
 func tokenHash(token string) []byte {
@@ -123,9 +126,54 @@ func (r *Runs) Ask(ctx context.Context, ref RunRef, questions any) error {
 	return err
 }
 
-// BeginSubmit registers the submit of the run's application.
+// BeginSubmit checks the guards and the autonomy rule (ADR 0016), then registers the submit of the run's
+// application. A failing guard parks the application and returns the guard's error. Without the user's approval
+// and a green rule the run asks for the approval instead: the application waits on the approval list and an
+// *ApprovalError (ErrNeedsApproval) is returned. Only a nil answer allows the click.
 func (r *Runs) BeginSubmit(ctx context.Context, ref RunRef) error {
-	return r.apps.BeginSubmit(ctx, ref.UserID, ref.AppID)
+	s := r.apps
+	app, err := s.store.Get(ctx, ref.UserID, ref.AppID)
+	if err != nil {
+		return err
+	}
+	if app.State != Running {
+		return fmt.Errorf("%w: %s on %s", ErrTransition, EvBeginSubmit, app.State)
+	}
+	c, err := s.store.Candidate(ctx, ref.UserID, app.JobID)
+	if err != nil {
+		return err
+	}
+	now := s.now()
+	if gerr := Guard(c, now); gerr != nil {
+		if _, err := s.apply(ctx, ref.UserID, ref.AppID, EvPark, ActorSystem, map[string]any{"guard": gerr.Error()}, false); err != nil {
+			return err
+		}
+		return gerr
+	}
+	via := "approval"
+	if app.Approved == nil {
+		in, err := s.store.RuleInput(ctx, ref.UserID, app, ref.RunID, now)
+		if err != nil {
+			return err
+		}
+		if reasons := Rule(in, now); len(reasons) > 0 {
+			qs := []Question{{Kind: QuestionApproval, Label: QuestionApproval}}
+			if _, err := s.applyChange(ctx, ref.UserID, ref.AppID, Change{Event: EvAsk, Actor: ActorRunner,
+				Detail: map[string]any{"questions": qs, "reasons": reasons}, Approval: reasons}); err != nil {
+				return err
+			}
+			return &ApprovalError{Reasons: reasons}
+		}
+		via = "rule"
+	}
+	_, err = s.applyChange(ctx, ref.UserID, ref.AppID, Change{Event: EvBeginSubmit, Actor: ActorRunner,
+		Detail: map[string]any{"via": via}, BeginSubmit: true})
+	return err
+}
+
+// SetAdapter records the ATS adapter of a run; finished runs per adapter measure its maturity.
+func (r *Runs) SetAdapter(ctx context.Context, ref RunRef, adapter string) error {
+	return r.store.SetAdapter(ctx, ref, adapter)
 }
 
 // Submitted records the submit and, if the page confirmed it, the confirmation; the run ends.

@@ -87,7 +87,7 @@ func queue(t *testing.T, pool *pgxpool.Pool, apps *application.Service) uuid.UUI
 	if err != nil {
 		t.Fatal(err)
 	}
-	if _, err := apps.Fire(ctx, u, id, application.EvQueue, application.ActorWorker, nil); err != nil {
+	if _, err := apps.Approve(ctx, u, id); err != nil {
 		t.Fatal(err)
 	}
 	return u

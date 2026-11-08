@@ -178,6 +178,8 @@ func (s *Server) Lease(ctx context.Context, req *connect.Request[runnerv1.LeaseR
 		return nil, err
 	}
 	run.RunId, run.Token, run.ExpiresAt = l.RunID.String(), l.Token, timestamppb.New(l.ExpiresAt)
+	urls := append([]string{run.GetStartUrl()}, run.GetOrigins()...)
+	_ = s.Runs.SetAdapter(ctx, ref, ats.Detect("", urls...))
 	s.Logger.InfoContext(ctx, "run leased", "run", l.RunID, "runner", runnerID, "host", l.Host)
 	return connect.NewResponse(&runnerv1.LeaseResponse{Run: run}), nil
 }

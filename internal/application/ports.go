@@ -22,6 +22,29 @@ type App struct {
 	State     State
 	Version   int64
 	UpdatedAt time.Time
+	// ApprovalAsked is when a run asked for the user's approval before the submit, with the rule's reasons.
+	ApprovalAsked   *time.Time
+	ApprovalReasons []Reason
+	// Approved is when the user approved the submit; the next submit of the application needs no green rule.
+	Approved *time.Time
+}
+
+// AwaitingApproval reports an application on the approval list: a run asked for the approval, the user has not
+// given it yet, and the application has not been sent or dropped.
+func (a App) AwaitingApproval() bool {
+	return a.ApprovalAsked != nil && a.Approved == nil && (a.State == NeedsInput || a.State == Parked)
+}
+
+// Approval is an application on the user's approval list.
+type Approval struct {
+	ID      uuid.UUID
+	JobID   int64
+	State   State
+	Title   string
+	Company string
+	Score   int
+	Reasons []Reason
+	Asked   time.Time
 }
 
 // Change is one transition as the store writes it: state, event and, for the submit, the register row.
@@ -35,6 +58,8 @@ type Change struct {
 	Outcome     string // finish the submit attempt: submitted, unknown or not_sent
 	// HandoffUntil is when the user's turn ends (set with EvAsk); every other transition clears it.
 	HandoffUntil *time.Time
+	// Approval, when not nil, puts the application on the approval list with these reasons (set with EvAsk).
+	Approval []Reason
 }
 
 // Handoff is an application waiting for the user.
@@ -142,4 +167,15 @@ type Store interface {
 	ExpiredScreenshots(ctx context.Context, before time.Time) ([]ExpiredScreenshot, error)
 	// ClearScreenshot clears the screenshot blob reference on a checkpoint after its blob was deleted.
 	ClearScreenshot(ctx context.Context, userID uuid.UUID, checkpointID int64) error
+
+	// Settings returns the user's autonomy settings, DefaultSettings if they saved none.
+	Settings(ctx context.Context, userID uuid.UUID) (Settings, error)
+	SaveSettings(ctx context.Context, userID uuid.UUID, st Settings, at time.Time) error
+	// RuleInput collects what the rule needs before the submit of a run: settings, match score, guard inputs,
+	// the run's filled fields and final page, the user's recent submits and the maturity of the run's adapter.
+	RuleInput(ctx context.Context, userID uuid.UUID, app App, runID uuid.UUID, now time.Time) (RuleInput, error)
+	// Approve records the user's approval if the application is still at app.Version; ErrConflict otherwise.
+	Approve(ctx context.Context, userID uuid.UUID, app App, at time.Time) error
+	// Approvals lists the applications on the user's approval list, oldest request first.
+	Approvals(ctx context.Context, userID uuid.UUID) ([]Approval, error)
 }

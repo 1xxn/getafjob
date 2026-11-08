@@ -275,7 +275,8 @@ func (q *Queries) FinishSubmitAttempt(ctx context.Context, arg FinishSubmitAttem
 }
 
 const getApplication = `-- name: GetApplication :one
-SELECT id, job_id, state, version, updated_at FROM applications WHERE id = $1 AND user_id = $2
+SELECT id, job_id, state, version, updated_at, approval_asked_at, approval_reasons, approved_at
+FROM applications WHERE id = $1 AND user_id = $2
 `
 
 type GetApplicationParams struct {
@@ -284,11 +285,14 @@ type GetApplicationParams struct {
 }
 
 type GetApplicationRow struct {
-	ID        uuid.UUID
-	JobID     int64
-	State     string
-	Version   int64
-	UpdatedAt time.Time
+	ID              uuid.UUID
+	JobID           int64
+	State           string
+	Version         int64
+	UpdatedAt       time.Time
+	ApprovalAskedAt *time.Time
+	ApprovalReasons []string
+	ApprovedAt      *time.Time
 }
 
 func (q *Queries) GetApplication(ctx context.Context, arg GetApplicationParams) (GetApplicationRow, error) {
@@ -300,6 +304,9 @@ func (q *Queries) GetApplication(ctx context.Context, arg GetApplicationParams) 
 		&i.State,
 		&i.Version,
 		&i.UpdatedAt,
+		&i.ApprovalAskedAt,
+		&i.ApprovalReasons,
+		&i.ApprovedAt,
 	)
 	return i, err
 }

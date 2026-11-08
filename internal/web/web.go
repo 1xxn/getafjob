@@ -71,6 +71,8 @@ func (s *Server) Register(mux *http.ServeMux) {
 	mux.Handle("POST /logout", s.page(s.logout))
 	mux.Handle("GET /jobs", s.page(s.jobsPage))
 	mux.Handle("GET /jobs/{id}", s.page(s.jobPage))
+	mux.Handle("GET /approvals", s.page(s.approvalsPage))
+	mux.Handle("POST /approvals/{id}/approve", s.page(s.approvalApprove))
 	mux.Handle("GET /applications/{id}", s.page(s.applicationPage))
 	mux.Handle("GET /applications/{id}/screenshots/{checkpoint}", s.page(s.applicationScreenshot))
 	mux.Handle("GET /applications/{id}/screen", s.page(s.screenWebSocket))
