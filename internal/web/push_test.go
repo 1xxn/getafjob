@@ -15,9 +15,11 @@ import (
 	"github.com/coder/websocket"
 	"github.com/google/uuid"
 
+	"github.com/1xxn/getafjob/internal/application"
 	"github.com/1xxn/getafjob/internal/gateway"
 	runnerv1 "github.com/1xxn/getafjob/internal/gen/proto/runner/v1"
 	"github.com/1xxn/getafjob/internal/identity"
+	"github.com/1xxn/getafjob/internal/platform/blob"
 	"github.com/1xxn/getafjob/internal/platform/webpush"
 )
 
@@ -230,5 +232,163 @@ func TestHandoffPageAnswerAndPark(t *testing.T) {
 	ev = <-sess.Input
 	if !ev.GetPark() {
 		t.Fatalf("park event = %+v", ev)
+	}
+}
+
+type fakeAppStore struct {
+	userID uuid.UUID
+	app    application.App
+	ev     application.Evidence
+	shots  map[int64]string
+}
+
+func (f *fakeAppStore) Create(context.Context, uuid.UUID, int64, application.State, time.Time) (uuid.UUID, error) {
+	return f.app.ID, nil
+}
+
+func (f *fakeAppStore) Get(_ context.Context, userID, id uuid.UUID) (application.App, error) {
+	if userID != f.userID || id != f.app.ID {
+		return application.App{}, application.ErrNotFound
+	}
+	return f.app, nil
+}
+
+func (f *fakeAppStore) Questions(context.Context, uuid.UUID, uuid.UUID) ([]application.Question, error) {
+	return nil, nil
+}
+
+func (f *fakeAppStore) Evidence(_ context.Context, userID, id uuid.UUID) (application.Evidence, error) {
+	if userID != f.userID || id != f.app.ID {
+		return application.Evidence{}, application.ErrNotFound
+	}
+	return f.ev, nil
+}
+
+func (f *fakeAppStore) CheckpointScreenshot(_ context.Context, userID, appID uuid.UUID, checkpointID int64) (string, error) {
+	if userID != f.userID || appID != f.app.ID {
+		return "", application.ErrNotFound
+	}
+	k, ok := f.shots[checkpointID]
+	if !ok || k == "" {
+		return "", application.ErrNotFound
+	}
+	return k, nil
+}
+
+func (f *fakeAppStore) Apply(context.Context, uuid.UUID, application.App, application.Change) error {
+	return nil
+}
+
+func (f *fakeAppStore) Candidate(context.Context, uuid.UUID, int64) (application.Candidate, error) {
+	return application.Candidate{}, nil
+}
+
+func (f *fakeAppStore) StaleSubmitting(context.Context, time.Time) ([]application.Ref, error) {
+	return nil, nil
+}
+
+func (f *fakeAppStore) HandoffsDue(context.Context, time.Time) ([]application.Handoff, error) {
+	return nil, nil
+}
+
+func (f *fakeAppStore) MarkWarned(context.Context, application.Ref, time.Time) (bool, error) {
+	return false, nil
+}
+
+func (f *fakeAppStore) ExpiredScreenshots(context.Context, time.Time) ([]application.ExpiredScreenshot, error) {
+	return nil, nil
+}
+
+func (f *fakeAppStore) ClearScreenshot(context.Context, uuid.UUID, int64) error {
+	return nil
+}
+
+type fakeShots map[string][]byte
+
+func (s fakeShots) Get(_ context.Context, _ uuid.UUID, key string) ([]byte, error) {
+	b, ok := s[key]
+	if !ok {
+		return nil, blob.ErrNotFound
+	}
+	return b, nil
+}
+
+func TestEvidencePageAndScreenshotEndpoint(t *testing.T) {
+	u := &identity.User{ID: uuid.New(), DisplayName: "Max"}
+	other := &identity.User{ID: uuid.New(), DisplayName: "Erika"}
+	appID := uuid.New()
+	now := time.Date(2026, 11, 8, 12, 0, 0, 0, time.UTC)
+
+	st := &fakeAppStore{
+		userID: u.ID,
+		app:    application.App{ID: appID, JobID: 42, State: application.Confirmed, Version: 5, UpdatedAt: now},
+		ev: application.Evidence{
+			Fields: []application.EvidenceField{
+				{Page: 1, ID: "f-1", Label: "First name", Value: "Max", Source: "profile:personal.first_name"},
+				{Page: 1, ID: "f-2", Label: "Salary expectation", Value: "95000", Source: "answer:0192f3a4"},
+			},
+			BeforeSubmitCheckpointID: 10,
+			ConfirmationCheckpointID: 11,
+			ConfirmationURL:          "https://jobs.example.org/apply/thanks",
+			Confirmed:                true,
+			Timeline: []application.TimelineEntry{
+				{At: now.Add(-2 * time.Minute), Kind: "checkpoint", Step: "execute", Page: 1, URL: "https://jobs.example.org/apply", CheckpointID: 9},
+				{At: now.Add(-time.Minute), Kind: "checkpoint", Step: "submit", Page: 1, URL: "https://jobs.example.org/apply", CheckpointID: 10},
+				{At: now, Kind: "event", Step: "confirm", FromState: application.Submitted, ToState: application.Confirmed, Actor: application.ActorRunner, Detail: "page"},
+			},
+		},
+		shots: map[int64]string{
+			10: "runs/1/submit.png",
+			11: "runs/1/confirm.png",
+		},
+	}
+	pngBytes := []byte("\x89PNG\r\n\x1a\ntest-png")
+	srv := &Server{
+		Apps:   application.NewService(st),
+		Shots:  fakeShots{"runs/1/submit.png": pngBytes, "runs/1/confirm.png": pngBytes},
+		Logger: slog.Default(),
+	}
+
+	rec := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodGet, "/applications/"+appID.String(), nil)
+	req.SetPathValue("id", appID.String())
+	srv.applicationPage(rec, req, u)
+	body := rec.Body.String()
+	if rec.Code != http.StatusOK {
+		t.Fatalf("evidence page status = %d", rec.Code)
+	}
+	for _, want := range []string{
+		"First name",
+		"profile:personal.first_name",
+		"Salary expectation",
+		"answer:0192f3a4",
+		"/applications/" + appID.String() + "/screenshots/10",
+		"/applications/" + appID.String() + "/screenshots/11",
+		"https://jobs.example.org/apply/thanks",
+		"submitted -&gt; confirmed",
+	} {
+		if !strings.Contains(body, want) {
+			t.Fatalf("evidence page missing %q in body:\n%s", want, body)
+		}
+	}
+
+	// Owner can fetch the decrypted screenshot.
+	rec = httptest.NewRecorder()
+	req = httptest.NewRequest(http.MethodGet, "/applications/"+appID.String()+"/screenshots/10", nil)
+	req.SetPathValue("id", appID.String())
+	req.SetPathValue("checkpoint", "10")
+	srv.applicationScreenshot(rec, req, u)
+	if rec.Code != http.StatusOK || rec.Header().Get("Content-Type") != "image/png" || !bytes.Equal(rec.Body.Bytes(), pngBytes) {
+		t.Fatalf("screenshot response: status=%d type=%q body=%q", rec.Code, rec.Header().Get("Content-Type"), rec.Body.Bytes())
+	}
+
+	// Another user gets 404.
+	rec = httptest.NewRecorder()
+	req = httptest.NewRequest(http.MethodGet, "/applications/"+appID.String()+"/screenshots/10", nil)
+	req.SetPathValue("id", appID.String())
+	req.SetPathValue("checkpoint", "10")
+	srv.applicationScreenshot(rec, req, other)
+	if rec.Code != http.StatusNotFound {
+		t.Fatalf("other user screenshot status = %d, want 404", rec.Code)
 	}
 }

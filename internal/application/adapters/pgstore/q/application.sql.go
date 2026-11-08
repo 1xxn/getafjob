@@ -12,6 +12,91 @@ import (
 	"github.com/google/uuid"
 )
 
+const applicationCheckpoints = `-- name: ApplicationCheckpoints :many
+SELECT c.id, c.run_id, c.step, c.page, c.url, c.data, c.screenshot, c.at
+FROM run_checkpoints c JOIN runs r ON r.id = c.run_id
+WHERE r.application_id = $1 AND c.user_id = $2
+ORDER BY c.id
+`
+
+type ApplicationCheckpointsParams struct {
+	ApplicationID uuid.UUID
+	UserID        uuid.UUID
+}
+
+type ApplicationCheckpointsRow struct {
+	ID         int64
+	RunID      uuid.UUID
+	Step       string
+	Page       int32
+	Url        string
+	Data       []byte
+	Screenshot string
+	At         time.Time
+}
+
+func (q *Queries) ApplicationCheckpoints(ctx context.Context, arg ApplicationCheckpointsParams) ([]ApplicationCheckpointsRow, error) {
+	rows, err := q.db.Query(ctx, applicationCheckpoints, arg.ApplicationID, arg.UserID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []ApplicationCheckpointsRow{}
+	for rows.Next() {
+		var i ApplicationCheckpointsRow
+		if err := rows.Scan(
+			&i.ID,
+			&i.RunID,
+			&i.Step,
+			&i.Page,
+			&i.Url,
+			&i.Data,
+			&i.Screenshot,
+			&i.At,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const checkpointScreenshot = `-- name: CheckpointScreenshot :one
+SELECT c.screenshot
+FROM run_checkpoints c JOIN runs r ON r.id = c.run_id
+WHERE r.application_id = $1 AND c.id = $2 AND c.user_id = $3
+`
+
+type CheckpointScreenshotParams struct {
+	ApplicationID uuid.UUID
+	ID            int64
+	UserID        uuid.UUID
+}
+
+func (q *Queries) CheckpointScreenshot(ctx context.Context, arg CheckpointScreenshotParams) (string, error) {
+	row := q.db.QueryRow(ctx, checkpointScreenshot, arg.ApplicationID, arg.ID, arg.UserID)
+	var screenshot string
+	err := row.Scan(&screenshot)
+	return screenshot, err
+}
+
+const clearCheckpointScreenshot = `-- name: ClearCheckpointScreenshot :exec
+UPDATE run_checkpoints SET screenshot = '' WHERE id = $1 AND user_id = $2
+`
+
+type ClearCheckpointScreenshotParams struct {
+	ID     int64
+	UserID uuid.UUID
+}
+
+func (q *Queries) ClearCheckpointScreenshot(ctx context.Context, arg ClearCheckpointScreenshotParams) error {
+	_, err := q.db.Exec(ctx, clearCheckpointScreenshot, arg.ID, arg.UserID)
+	return err
+}
+
 const companySubmits = `-- name: CompanySubmits :many
 SELECT s.started_at FROM submit_attempts s JOIN applications a ON a.id = s.application_id JOIN jobs j ON j.id = a.job_id
 WHERE a.user_id = $1 AND lower(j.company) = lower((SELECT x.company FROM jobs x WHERE x.id = $2))
@@ -103,6 +188,40 @@ func (q *Queries) Events(ctx context.Context, arg EventsParams) ([]EventsRow, er
 			&i.Detail,
 			&i.At,
 		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const expiredCheckpointScreenshots = `-- name: ExpiredCheckpointScreenshots :many
+SELECT id, user_id, screenshot FROM run_checkpoints
+WHERE screenshot <> '' AND at < $1
+ORDER BY at, id
+LIMIT 500
+`
+
+type ExpiredCheckpointScreenshotsRow struct {
+	ID         int64
+	UserID     uuid.UUID
+	Screenshot string
+}
+
+// System role: checkpoint screenshots older than the retention window.
+func (q *Queries) ExpiredCheckpointScreenshots(ctx context.Context, at time.Time) ([]ExpiredCheckpointScreenshotsRow, error) {
+	rows, err := q.db.Query(ctx, expiredCheckpointScreenshots, at)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []ExpiredCheckpointScreenshotsRow{}
+	for rows.Next() {
+		var i ExpiredCheckpointScreenshotsRow
+		if err := rows.Scan(&i.ID, &i.UserID, &i.Screenshot); err != nil {
 			return nil, err
 		}
 		items = append(items, i)

@@ -112,7 +112,7 @@ func serve(ctx context.Context, cfg config.Config, logger *slog.Logger) error {
 
 	(&web.Server{Identity: ids, Logger: logger, Profile: profiles, Documents: docs, Items: profile.NewItems(pstore, env),
 		Importer: cvimport.NewImporter(docs, profiles, extractor), Jobs: matching.NewListings(matchingstore.New(pool)),
-		PushStore: webpush.NewStore(pool), VAPIDPublicKey: vapidPub, Apps: apps, Handoffs: gw}).Register(mux)
+		PushStore: webpush.NewStore(pool), VAPIDPublicKey: vapidPub, Apps: apps, Shots: sealedFiles, Handoffs: gw}).Register(mux)
 
 	h := httpx.Instrument(httpx.Protect(httpx.Routes(mux), maxBody, cfg.PublicURL.Scheme == "https",
 		httpx.Upload{Path: "/documents", Max: web.MaxUpload}, httpx.Upload{Path: "/setup/cv", Max: web.MaxUpload}))
@@ -157,16 +157,26 @@ func worker(ctx context.Context, cfg config.Config, logger *slog.Logger) error {
 	if err != nil {
 		return fmt.Errorf("GETAFJOB_MASTER_KEY: %w", err)
 	}
+	env := crypto.NewEnvelope(ring, pool)
+	var sealedFiles application.ScreenshotDeleter
+	if cfg.BlobURL != "" {
+		files, err := blob.Open(cfg.BlobURL, blob.S3Credentials{AccessKey: cfg.BlobAccessKey, SecretKey: cfg.BlobSecretKey})
+		if err != nil {
+			return err
+		}
+		sealedFiles = blob.NewSealed(files, env)
+	}
 	pstore := profilestore.New(pool)
 	mstore := matchingstore.New(pool)
 	river.AddWorker(workers, &crawlWorker{svc: discovery.NewService(store), boards: store, states: store, client: client,
 		terms: preferenceTerms(pstore, logger), logger: logger, timeout: 90 * time.Minute, metrics: metrics})
 	river.AddWorker(workers, &matchWorker{logger: logger, svc: matching.NewService(
-		profileCriteria{svc: profile.NewService(pstore, crypto.NewEnvelope(ring, pool)), store: pstore}, mstore, mstore)})
+		profileCriteria{svc: profile.NewService(pstore, env), store: pstore}, mstore, mstore)})
 	river.AddWorker(workers, &boardDiscoveryWorker{
 		discovery: discovery.NewBoardDiscovery(store, store, sources.NewFinder(client)), logger: logger, metrics: metrics})
-	river.AddWorker(workers, &cleanupWorker{ids: identity.NewService(pgstore.New(pool), nil, cfg.PublicURL)})
 	apps := application.NewService(applicationstore.New(pool))
+	river.AddWorker(workers, &cleanupWorker{ids: identity.NewService(pgstore.New(pool), nil, cfg.PublicURL),
+		apps: apps, blobs: sealedFiles})
 	river.AddWorker(workers, &recoverWorker{svc: apps, logger: logger})
 	notifier, _ := newPushNotifier(pool, cfg, logger)
 	river.AddWorker(workers, &handoffWorker{svc: apps, notifier: notifier, logger: logger})

@@ -3,6 +3,7 @@ package app
 import (
 	"cmp"
 	"context"
+	"errors"
 	"log/slog"
 	"slices"
 	"time"
@@ -13,6 +14,7 @@ import (
 	"go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp"
 	"go.opentelemetry.io/otel/propagation"
 
+	"github.com/1xxn/getafjob/internal/application"
 	"github.com/1xxn/getafjob/internal/discovery"
 	"github.com/1xxn/getafjob/internal/discovery/adapters/sources"
 	"github.com/1xxn/getafjob/internal/identity"
@@ -172,7 +174,7 @@ func sourceClient(cfg config.Config) *sources.Client {
 	return sources.NewClient(hc)
 }
 
-// CleanupArgs removes expired sign-in tokens, sessions and invitations.
+// CleanupArgs removes expired sign-in tokens, sessions, invitations, and screenshots past retention.
 type CleanupArgs struct{}
 
 // Kind implements river.JobArgs.
@@ -180,11 +182,18 @@ func (CleanupArgs) Kind() string { return "identity_cleanup" }
 
 type cleanupWorker struct {
 	river.WorkerDefaults[CleanupArgs]
-	ids *identity.Service
+	ids   *identity.Service
+	apps  *application.Service
+	blobs application.ScreenshotDeleter
 }
 
 func (w *cleanupWorker) Work(ctx context.Context, _ *river.Job[CleanupArgs]) error {
-	return w.ids.Cleanup(ctx)
+	err := w.ids.Cleanup(ctx)
+	if w.apps != nil {
+		_, sErr := w.apps.PurgeExpiredScreenshots(ctx, w.blobs)
+		err = errors.Join(err, sErr)
+	}
+	return err
 }
 
 // periodicJobs schedules the crawl, the cleanup, the recovery of stuck submits and the handoff watch; all also run

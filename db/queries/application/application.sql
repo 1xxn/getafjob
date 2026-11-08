@@ -91,3 +91,24 @@ SELECT pg_advisory_xact_lock(7303470200);
 
 -- name: GetJob :one
 SELECT id, source, company, title, location, url, apply_url, description FROM jobs WHERE id = $1;
+
+-- name: ApplicationCheckpoints :many
+SELECT c.id, c.run_id, c.step, c.page, c.url, c.data, c.screenshot, c.at
+FROM run_checkpoints c JOIN runs r ON r.id = c.run_id
+WHERE r.application_id = $1 AND c.user_id = $2
+ORDER BY c.id;
+
+-- name: CheckpointScreenshot :one
+SELECT c.screenshot
+FROM run_checkpoints c JOIN runs r ON r.id = c.run_id
+WHERE r.application_id = $1 AND c.id = $2 AND c.user_id = $3;
+
+-- name: ExpiredCheckpointScreenshots :many
+-- System role: checkpoint screenshots older than the retention window.
+SELECT id, user_id, screenshot FROM run_checkpoints
+WHERE screenshot <> '' AND at < $1
+ORDER BY at, id
+LIMIT 500;
+
+-- name: ClearCheckpointScreenshot :exec
+UPDATE run_checkpoints SET screenshot = '' WHERE id = $1 AND user_id = $2;
