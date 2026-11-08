@@ -23,6 +23,7 @@ x-app-env: &app-env
   GETAFJOB_PUBLIC_URL: ${GETAFJOB_PUBLIC_URL:-https://localhost:8443}
   GETAFJOB_LOG_FORMAT: json
   GETAFJOB_LOG_LEVEL: ${GETAFJOB_LOG_LEVEL:-info}
+  GETAFJOB_OTEL_ENDPOINT: ${GETAFJOB_OTEL_ENDPOINT:-}
 
 services:
   postgres:
@@ -90,7 +91,7 @@ services:
       timeout: 5s
       start_period: 10s
       start_interval: 1s
-    networks: [edge, backend, gateway, proxy]
+    networks: [edge, backend, gateway, proxy, observability]
 
   worker:
     <<: *hardening
@@ -115,7 +116,7 @@ services:
       timeout: 5s
       start_period: 10s
       start_interval: 1s
-    networks: [backend, proxy]
+    networks: [backend, proxy, observability]
 
   runner:
     <<: *hardening
@@ -197,6 +198,91 @@ services:
       start_interval: 1s
     networks: [edge, internet]
 
+  # Observability profile: Prometheus, Tempo, Loki, Grafana and OpenTelemetry collector.
+  otel-collector:
+    image: otel/opentelemetry-collector-contrib:0.120.0@sha256:85ac41c2db88d0df9bd6145e608a3cb023f5d8443868adbfbbf66efb51087917
+    profiles: [observability]
+    read_only: true
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    command: ["--config=/etc/otelcol-contrib/config.yaml"]
+    volumes:
+      - ./observability/otel-collector.yaml:/etc/otelcol-contrib/config.yaml:ro
+    ports:
+      - "127.0.0.1:4318:4318"
+    networks: [observability]
+    restart: unless-stopped
+
+  prometheus:
+    image: prom/prometheus:v3.2.1@sha256:6927e0919a144aa7616fd0137d4816816d42f6b816de3af269ab065250859a62
+    profiles: [observability]
+    read_only: true
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    command:
+      - --config.file=/etc/prometheus/prometheus.yaml
+      - --storage.tsdb.path=/prometheus
+      - --web.enable-lifecycle
+    volumes:
+      - ./observability/prometheus.yaml:/etc/prometheus/prometheus.yaml:ro
+      - prometheus_data:/prometheus
+    ports:
+      - "127.0.0.1:9090:9090"
+    networks: [observability]
+    restart: unless-stopped
+
+  tempo:
+    image: grafana/tempo:2.7.2@sha256:4b0277a9b572a4b1fa43b01468e58911ec214dd69d033f2cd476596d14de9fe3
+    profiles: [observability]
+    read_only: true
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    command: ["-config.file=/etc/tempo/tempo.yaml"]
+    volumes:
+      - ./observability/tempo.yaml:/etc/tempo/tempo.yaml:ro
+      - tempo_data:/var/tempo
+    ports:
+      - "127.0.0.1:3200:3200"
+    networks: [observability]
+    restart: unless-stopped
+
+  loki:
+    image: grafana/loki:3.4.2@sha256:58a6c186ce78ba04d58bfe2a927eff296ba733a430df09645d56cdc158f3ba08
+    profiles: [observability]
+    read_only: true
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    command: ["-config.file=/etc/loki/loki.yaml"]
+    volumes:
+      - ./observability/loki.yaml:/etc/loki/loki.yaml:ro
+      - loki_data:/var/loki
+    ports:
+      - "127.0.0.1:3100:3100"
+    networks: [observability]
+    restart: unless-stopped
+
+  grafana:
+    image: grafana/grafana:11.5.2@sha256:8b37a2f028f164ce7b9889e1765b9d6ee23fec80f871d156fbf436d6198d32b7
+    profiles: [observability]
+    read_only: true
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    environment:
+      GF_AUTH_ANONYMOUS_ENABLED: "true"
+      GF_AUTH_ANONYMOUS_ORG_ROLE: Admin
+      GF_AUTH_DISABLE_LOGIN_FORM: "true"
+      GF_USERS_ALLOW_SIGN_UP: "false"
+    volumes:
+      - ./observability/grafana/provisioning:/etc/grafana/provisioning:ro
+      - ./observability/grafana/dashboards:/var/lib/grafana/dashboards:ro
+      - grafana_data:/var/lib/grafana
+    tmpfs:
+      - /tmp
+    ports:
+      - "127.0.0.1:3000:3000"
+    networks: [observability]
+    restart: unless-stopped
+
 networks:
   internet: {}
   edge: { internal: true }
@@ -204,6 +290,7 @@ networks:
   gateway: { internal: true }
   proxy: { internal: true }
   devtools: {}
+  observability: { internal: true }
 
 secrets:
   db_password:
@@ -222,3 +309,7 @@ volumes:
   caddy_data: {}
   caddy_config: {}
   blobs: {}
+  prometheus_data: {}
+  tempo_data: {}
+  loki_data: {}
+  grafana_data: {}
