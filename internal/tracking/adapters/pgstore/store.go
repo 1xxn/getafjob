@@ -15,7 +15,6 @@ import (
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 
-	"github.com/1xxn/getafjob/internal/application"
 	"github.com/1xxn/getafjob/internal/platform/db"
 	"github.com/1xxn/getafjob/internal/tracking"
 	"github.com/1xxn/getafjob/internal/tracking/adapters/pgstore/q"
@@ -187,7 +186,7 @@ func (s *Store) ListActiveApplications(ctx context.Context, userID uuid.UUID) ([
 				ID:           r.ID,
 				UserID:       r.UserID,
 				JobID:        r.JobID,
-				CurrentState: application.State(r.State),
+				CurrentState: r.State,
 				Company:      r.Company,
 				Title:        r.Title,
 				MatchKey:     r.MatchKey,
@@ -347,13 +346,13 @@ func mapSuggestionRow(id, userID, appID uuid.UUID, msgUID int64, msgID *string,
 		MessageSubject: subject,
 		MessageDate:    date,
 		Category:       tracking.Category(category),
-		SuggestedState: application.State(suggestedState),
+		SuggestedState: suggestedState,
 		Reasons:        reasons,
 		Status:         status,
 		CreatedAt:      createdAt,
 		UpdatedAt:      updatedAt,
 		Company:        company,
 		JobTitle:       title,
-		CurrentState:   application.State(currentState),
+		CurrentState:   currentState,
 	}
 }

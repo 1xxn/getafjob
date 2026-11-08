@@ -6,7 +6,6 @@ import (
 
 	"github.com/google/uuid"
 
-	"github.com/1xxn/getafjob/internal/application"
 	"github.com/1xxn/getafjob/internal/tracking"
 )
 
@@ -124,14 +123,14 @@ func TestMatchApplication(t *testing.T) {
 		ID:           uuid.New(),
 		Company:      "Acme Cloud",
 		Title:        "Go Backend Developer",
-		CurrentState: application.Submitted,
+		CurrentState: "submitted",
 		URL:          "https://jobs.acmecloud.example.org/123",
 	}
 	app2 := tracking.ApplicationSummary{
 		ID:           uuid.New(),
 		Company:      "Initech",
 		Title:        "Site Reliability Engineer",
-		CurrentState: application.Submitted,
+		CurrentState: "submitted",
 		URL:          "https://careers.initech.example.com/apply/456",
 	}
 

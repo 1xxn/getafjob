@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"net"
 	"strings"
+	"sync"
 	"testing"
 
 	"github.com/google/uuid"
@@ -23,10 +24,16 @@ func TestImapClientReadOnlyAndPeek(t *testing.T) {
 	defer clientConn.Close()
 	defer serverConn.Close()
 
-	commandsReceived := make(chan string, 10)
+	var (
+		mu               sync.Mutex
+		commandsReceived []string
+		wg               sync.WaitGroup
+	)
 
+	wg.Add(1)
 	// Mock IMAP Server goroutine
 	go func() {
+		defer wg.Done()
 		reader := bufio.NewReader(serverConn)
 		// 1. Send greeting
 		_, _ = fmt.Fprintf(serverConn, "* OK IMAP4rev1 Server Ready\r\n")
@@ -37,7 +44,9 @@ func TestImapClientReadOnlyAndPeek(t *testing.T) {
 				return
 			}
 			trimmed := strings.TrimSpace(line)
-			commandsReceived <- trimmed
+			mu.Lock()
+			commandsReceived = append(commandsReceived, trimmed)
+			mu.Unlock()
 
 			parts := strings.SplitN(trimmed, " ", 2)
 			if len(parts) < 2 {
@@ -121,6 +130,9 @@ func TestImapClientReadOnlyAndPeek(t *testing.T) {
 		t.Errorf("messages[1] = %+v", messages[1])
 	}
 
+	// Wait for server goroutine to terminate after LOGOUT
+	wg.Wait()
+
 	// Verify all protocol commands sent by client:
 	// - Must use EXAMINE (not SELECT)
 	// - Must use BODY.PEEK (never plain BODY)
@@ -128,8 +140,12 @@ func TestImapClientReadOnlyAndPeek(t *testing.T) {
 	hasPeek := false
 	hasSelect := false
 
-	close(commandsReceived)
-	for cmd := range commandsReceived {
+	mu.Lock()
+	cmds := make([]string, len(commandsReceived))
+	copy(cmds, commandsReceived)
+	mu.Unlock()
+
+	for _, cmd := range cmds {
 		if strings.Contains(cmd, "EXAMINE") {
 			hasExamine = true
 		}

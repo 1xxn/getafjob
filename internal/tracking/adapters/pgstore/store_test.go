@@ -10,7 +10,6 @@ import (
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 
-	"github.com/1xxn/getafjob/internal/application"
 	"github.com/1xxn/getafjob/internal/platform/db"
 	"github.com/1xxn/getafjob/internal/platform/db/dbtest"
 	"github.com/1xxn/getafjob/internal/tracking"
@@ -146,7 +145,7 @@ func TestPgstoreTracking(t *testing.T) {
 		MessageSubject: "Invitation to interview",
 		MessageDate:    now,
 		Category:       tracking.CategoryInvitation,
-		SuggestedState: application.Interview,
+		SuggestedState: tracking.StateInterview,
 		Reasons:        []string{"Interview invitation keyword", "Company name matched"},
 		CreatedAt:      now,
 		UpdatedAt:      now,

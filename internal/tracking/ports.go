@@ -42,6 +42,11 @@ type PasswordCipher interface {
 	OpenPassword(ctx context.Context, userID uuid.UUID, ciphertext []byte) (string, error)
 }
 
+// ApplicationUpdater executes status transitions on applications when suggestions are accepted.
+type ApplicationUpdater interface {
+	Transition(ctx context.Context, userID, appID uuid.UUID, state string, detail map[string]any) error
+}
+
 // Store persists mailbox configurations, cursors, and suggestions.
 type Store interface {
 	GetMailbox(ctx context.Context, userID uuid.UUID) (MailboxAccount, error)

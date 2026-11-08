@@ -8,7 +8,6 @@ import (
 
 	"github.com/google/uuid"
 
-	"github.com/1xxn/getafjob/internal/application"
 	"github.com/1xxn/getafjob/internal/tracking"
 )
 
@@ -134,15 +133,15 @@ func (f *fakeCipher) OpenPassword(_ context.Context, _ uuid.UUID, ciphertext []b
 	return "", errors.New("bad ciphertext")
 }
 
-type fakeAppService struct {
-	firedEvents []application.Event
+type fakeAppUpdater struct {
+	transitions []string
 	firedAppID  uuid.UUID
 }
 
-func (f *fakeAppService) Fire(_ context.Context, _, appID uuid.UUID, ev application.Event, _ application.Actor, _ map[string]any) (application.State, error) {
-	f.firedEvents = append(f.firedEvents, ev)
+func (f *fakeAppUpdater) Transition(_ context.Context, _, appID uuid.UUID, state string, _ map[string]any) error {
+	f.transitions = append(f.transitions, state)
 	f.firedAppID = appID
-	return application.Interview, nil
+	return nil
 }
 
 func TestTrackingService(t *testing.T) {
@@ -151,7 +150,7 @@ func TestTrackingService(t *testing.T) {
 	st := newFakeStore()
 	cl := &fakeClient{}
 	ci := &fakeCipher{}
-	apps := &fakeAppService{}
+	apps := &fakeAppUpdater{}
 
 	svc := tracking.NewService(st, cl, ci, apps)
 	now := time.Date(2026, 11, 8, 15, 0, 0, 0, time.UTC)
@@ -177,7 +176,7 @@ func TestTrackingService(t *testing.T) {
 			ID:           targetAppID,
 			UserID:       u,
 			JobID:        42,
-			CurrentState: application.Submitted,
+			CurrentState: "submitted",
 			Company:      "Acme Cloud",
 			Title:        "Go Engineer",
 			URL:          "https://jobs.acmecloud.example.org/1",
@@ -224,8 +223,8 @@ func TestTrackingService(t *testing.T) {
 	if sug.Category != tracking.CategoryInvitation {
 		t.Errorf("sug.Category = %v, want %v", sug.Category, tracking.CategoryInvitation)
 	}
-	if sug.SuggestedState != application.Interview {
-		t.Errorf("sug.SuggestedState = %v, want %v", sug.SuggestedState, application.Interview)
+	if sug.SuggestedState != tracking.StateInterview {
+		t.Errorf("sug.SuggestedState = %v, want %v", sug.SuggestedState, tracking.StateInterview)
 	}
 
 	// Verify cursor updated
@@ -237,8 +236,8 @@ func TestTrackingService(t *testing.T) {
 	if err := svc.AcceptSuggestion(ctx, u, sug.ID); err != nil {
 		t.Fatalf("AcceptSuggestion: %v", err)
 	}
-	if len(apps.firedEvents) != 1 || apps.firedEvents[0] != application.EvInterview {
-		t.Errorf("firedEvents = %v, want [interview]", apps.firedEvents)
+	if len(apps.transitions) != 1 || apps.transitions[0] != tracking.StateInterview {
+		t.Errorf("transitions = %v, want [interview]", apps.transitions)
 	}
 	if apps.firedAppID != targetAppID {
 		t.Errorf("firedAppID = %v, want %v", apps.firedAppID, targetAppID)
