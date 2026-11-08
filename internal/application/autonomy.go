@@ -45,11 +45,11 @@ var ErrInvalidSettings = errors.New("invalid autonomy settings")
 func (s Settings) Validate() error {
 	switch {
 	case s.Level != LevelSuggest && s.Level != LevelApprove && s.Level != LevelAutonomous:
-		return fmt.Errorf("%w: level %q", ErrInvalidSettings, s.Level)
+		return fmt.Errorf("%w: unknown autonomy level", ErrInvalidSettings)
 	case s.MinScore < 0 || s.MinScore > 100:
-		return fmt.Errorf("%w: min score %d", ErrInvalidSettings, s.MinScore)
+		return fmt.Errorf("%w: min score out of range", ErrInvalidSettings)
 	case s.DailyLimit < 0 || s.DailyLimit > MaxDailyLimit:
-		return fmt.Errorf("%w: daily limit %d", ErrInvalidSettings, s.DailyLimit)
+		return fmt.Errorf("%w: daily limit out of range", ErrInvalidSettings)
 	}
 	return nil
 }

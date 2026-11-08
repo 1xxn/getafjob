@@ -8,6 +8,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"slices"
 	"strings"
 	"time"
@@ -441,8 +442,17 @@ func (s *Store) Settings(ctx context.Context, userID uuid.UUID) (st application.
 
 // SaveSettings validates and stores the user's autonomy settings.
 func (s *Store) SaveSettings(ctx context.Context, userID uuid.UUID, st application.Settings, at time.Time) error {
-	minScore := int16(min(max(st.MinScore, 0), 100))
-	dailyLimit := int16(min(max(st.DailyLimit, 0), application.MaxDailyLimit))
+	if err := st.Validate(); err != nil {
+		return err
+	}
+	if st.MinScore < 0 || st.MinScore > 100 {
+		return fmt.Errorf("%w: min_score out of range", application.ErrInvalidSettings)
+	}
+	if st.DailyLimit < 0 || st.DailyLimit > 50 {
+		return fmt.Errorf("%w: daily_limit out of range", application.ErrInvalidSettings)
+	}
+	minScore := int16(st.MinScore)
+	dailyLimit := int16(st.DailyLimit)
 	return s.user(ctx, userID, func(qs *q.Queries) error {
 		return qs.SaveSettings(ctx, q.SaveSettingsParams{
 			UserID:     userID,

@@ -191,26 +191,46 @@ func (s *Server) preferencesSave(w http.ResponseWriter, r *http.Request, u *iden
 		n, err := strconv.Atoi(v)
 		p.MinSalary, salaryErr = n, err != nil
 	}
-	autoLevel := application.Level(strings.TrimSpace(r.PostFormValue("autonomy_level")))
-	if autoLevel == "" {
+	autoLevel := application.LevelApprove
+	var errLevel bool
+	switch strings.TrimSpace(r.PostFormValue("autonomy_level")) {
+	case "":
 		autoLevel = application.LevelApprove
+	case string(application.LevelSuggest):
+		autoLevel = application.LevelSuggest
+	case string(application.LevelApprove):
+		autoLevel = application.LevelApprove
+	case string(application.LevelAutonomous):
+		autoLevel = application.LevelAutonomous
+	default:
+		errLevel = true
 	}
 	minScore := application.DefaultSettings.MinScore
 	var errScore error
 	if v := strings.TrimSpace(r.PostFormValue("min_score")); v != "" {
-		minScore, errScore = strconv.Atoi(v)
+		n, err := strconv.ParseInt(v, 10, 16)
+		if err != nil || n < 0 || n > 100 {
+			errScore = errors.New("invalid min_score")
+		} else {
+			minScore = int(n)
+		}
 	}
 	dailyLimit := application.DefaultSettings.DailyLimit
 	var errLimit error
 	if v := strings.TrimSpace(r.PostFormValue("daily_limit")); v != "" {
-		dailyLimit, errLimit = strconv.Atoi(v)
+		n, err := strconv.ParseInt(v, 10, 16)
+		if err != nil || n < 0 || n > 50 {
+			errLimit = errors.New("invalid daily_limit")
+		} else {
+			dailyLimit = int(n)
+		}
 	}
 	autoSettings := application.Settings{
 		Level:      autoLevel,
 		MinScore:   minScore,
 		DailyLimit: dailyLimit,
 	}
-	autoErr := errScore != nil || errLimit != nil || autoSettings.Validate() != nil
+	autoErr := errLevel || errScore != nil || errLimit != nil || autoSettings.Validate() != nil
 
 	if salaryErr || autoErr {
 		f := preferencesForm(p, autoSettings)
@@ -222,6 +242,9 @@ func (s *Server) preferencesSave(w http.ResponseWriter, r *http.Request, u *iden
 			f.Errors["min_salary"] = views.T(r.Context(), "profile.error.invalid")
 		}
 		if autoErr {
+			if errLevel {
+				f.Errors["autonomy_level"] = views.T(r.Context(), "profile.error.invalid")
+			}
 			if errScore != nil || minScore < 0 || minScore > 100 {
 				f.Errors["min_score"] = views.T(r.Context(), "profile.error.invalid")
 			}
