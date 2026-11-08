@@ -33,12 +33,6 @@ func (s *Store) user(ctx context.Context, userID uuid.UUID, fn func(*q.Queries) 
 	})
 }
 
-func (s *Store) system(ctx context.Context, fn func(*q.Queries) error) error {
-	return db.InSystemTx(ctx, s.pool, func(tx pgx.Tx) error {
-		return fn(q.New(tx))
-	})
-}
-
 func notFound(err error) error {
 	if errors.Is(err, pgx.ErrNoRows) {
 		return portals.ErrSessionNotFound
@@ -67,7 +61,7 @@ func (s *Store) SaveSession(ctx context.Context, sess portals.Session) error {
 			Portal:           sess.Portal,
 			Status:           sess.Status,
 			EncryptedCookies: sess.EncryptedCookies,
-			DailyLimit:       int32(sess.DailyLimit),
+			DailyLimit:       int32(sess.DailyLimit), //nolint:gosec // daily limit bounded 1..20
 			LastUsedAt:       sess.LastUsedAt,
 			CreatedAt:        sess.CreatedAt,
 		})

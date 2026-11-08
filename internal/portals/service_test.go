@@ -201,16 +201,16 @@ func TestServiceRateLimitsAndConcurrency(t *testing.T) {
 	// Simulate active run (one run per account)
 	store.active[userID.String()+":"+PortalIndeed] = 1
 	ok, reason, err = svc.CanApply(context.Background(), userID, PortalIndeed)
-	if ok || reason == "" {
-		t.Fatalf("CanApply during active run should be blocked: ok=%v, reason=%q", ok, reason)
+	if err != nil || ok || reason == "" {
+		t.Fatalf("CanApply during active run should be blocked: ok=%v, reason=%q, err=%v", ok, reason, err)
 	}
 	store.active[userID.String()+":"+PortalIndeed] = 0
 
 	// Simulate hitting daily limit (3 submits)
 	store.submits[userID.String()+":"+PortalIndeed] = 3
 	ok, reason, err = svc.CanApply(context.Background(), userID, PortalIndeed)
-	if ok || reason == "" {
-		t.Fatalf("CanApply when daily limit reached should be blocked: ok=%v, reason=%q", ok, reason)
+	if err != nil || ok || reason == "" {
+		t.Fatalf("CanApply when daily limit reached should be blocked: ok=%v, reason=%q, err=%v", ok, reason, err)
 	}
 }
 
