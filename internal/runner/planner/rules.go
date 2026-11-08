@@ -19,15 +19,19 @@ var rules = []rule{
 	r("cover_letter", "file", `cover letter|anschreiben|motivationsschreiben`),
 	r("certificates", "file", `certificat|zeugnis|zertifikat|transcript`),
 	r("cv", "file", `resume|\bcv\b|lebenslauf|curriculum`),
+	// location questions whose help text may mention visa sponsorship or relocation
+	r("personal.city", "", `city and country of residence`),
+	r("personal.country", "", `preferred (main )?location for your contract`),
 	// yes/no facts; "do you need a work permit" is about sponsorship, "are you permitted to work" about authorization
 	r("work.needs_sponsorship", "bool", `sponsor|\bvisa\b|\bvisum\b|(need|require|benoetig|brauch)\w* .*(permit|authori[sz]ation|erlaubnis|genehmigung)`),
 	r("work.work_authorized_eu", "bool", `(authori[sz]ed|eligible|permitted|legally able|berechtigt) .*(to )?work|work (permit|authori[sz]ation)|arbeitserlaubnis|arbeitsgenehmigung`),
 	r("work.willing_to_relocate", "bool", `relocat|umzug|umzuziehen|umziehen`),
-	r("preferences.talent_pool", "bool", `talent ?pool|future (openings|opportunities|positions)|zukuenftige (stellen|positionen|vakanzen)`),
+	r("preferences.talent_pool", "optin", `talent ?pool|future (openings|opportunities|positions)|zukuenftige (stellen|positionen|vakanzen)`),
 	r("preferences.diversity", "diversity", `gender|geschlecht|ethnic|\brace\b|veteran|disabilit|behinderung|hispanic|latin|sexual orientation`),
 	// text blocks
 	r("cover_letter", "text", `cover letter|anschreiben|motivation|why do you want|why are you interested|warum (moechtest|moechten|willst)`),
 	// profile facts
+	r("personal.full_name", "", `^(full )?name\b|^your name|first and last name|vor-? und nachname|vollstaendiger name|^name$`),
 	r("personal.first_name", "", `\b(first|given) ?name\b|\bvorname\b`),
 	r("personal.last_name", "", `\b(last|family|sur) ?name\b|\bnachname\b|\bfamilienname\b`),
 	r("personal.email", "", `e ?mail`),
@@ -40,7 +44,6 @@ var rules = []rule{
 	r("personal.street", "", `street|strasse|address line|anschrift|\badresse\b|^address$`),
 	r("personal.city", "", `\bcity\b|\bort\b|\bstadt\b|wohnort|\btown\b|^location\b`),
 	r("personal.country", "", `country|\bland\b|wohnsitzland`),
-	r("personal.full_name", "", `^(full )?name\b|^your name|vollstaendiger name|^name$`),
 	r("work.current_title", "", `current (job )?(title|role|position)|aktuelle (position|stelle|berufsbezeichnung)|jobtitel`),
 	r("work.current_employer", "", `current (employer|company)|aktuelle[rn]? (arbeitgeber|firma|unternehmen)`),
 	r("work.years_total", "", `years of (professional )?experience|berufserfahrung|jahre (an )?erfahrung`),

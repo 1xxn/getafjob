@@ -62,7 +62,7 @@ func (p *Planner) Plan(ctx context.Context, st *browser.State) (executor.Plan, [
 	plan := executor.Plan{Origins: p.K.Origins}
 	var qs []engine.Question
 	for _, f := range st.Fields() {
-		if f.Kind == "password" {
+		if f.Kind == "password" || (f.Kind == "file" && strings.Contains(executor.Normalize(f.Label), "autofill")) {
 			continue
 		}
 		if engine.IsSecurityCode(f) {
@@ -115,6 +115,10 @@ func (p *Planner) answer(f browser.Field) (executor.Value, bool) {
 		}
 		return v, true
 	}
+	if strings.Contains(label, "additional context") || strings.Contains(label, "additional details") ||
+		strings.Contains(label, "additional information") {
+		return executor.Value{}, false
+	}
 	for _, r := range rules {
 		if !r.rx.MatchString(label) || !fits(r.kind, f.Kind) {
 			continue
@@ -124,7 +128,7 @@ func (p *Planner) answer(f browser.Field) (executor.Value, bool) {
 			return p.file(r.key)
 		case "text":
 			return p.text(r.key)
-		case "bool":
+		case "bool", "optin":
 			fact, ok := p.K.Profile[r.key]
 			if !ok || (fact != "true" && fact != "false") {
 				return executor.Value{}, false
@@ -140,21 +144,30 @@ func (p *Planner) answer(f browser.Field) (executor.Value, bool) {
 			if !ok || strings.TrimSpace(v) == "" {
 				return executor.Value{}, false
 			}
+			if r.key == "personal.city" && f.Kind == "combobox" {
+				if c := strings.TrimSpace(p.K.Profile["personal.country"]); c != "" && !strings.Contains(executor.Normalize(v), executor.Normalize(c)) {
+					v = v + ", " + c
+				}
+			}
 			return executor.Value{Text: v, Source: "profile." + r.key}, true
 		}
 	}
 	return executor.Value{}, false
 }
 
-// fits keeps file rules to file fields and text rules to long text fields.
+// fits keeps file rules to file fields, text rules to long text fields and non-opt-in rules off single checkboxes.
 func fits(ruleKind, fieldKind string) bool {
 	switch ruleKind {
 	case "file":
 		return fieldKind == "file"
 	case "text":
 		return fieldKind == "textarea" || fieldKind == "richtext"
-	default:
+	case "optin":
 		return fieldKind != "file"
+	case "bool":
+		return fieldKind != "file" && fieldKind != "checkbox" && fieldKind != "aria_checkbox"
+	default:
+		return fieldKind != "file" && fieldKind != "checkbox" && fieldKind != "aria_checkbox" && fieldKind != "aria_radio"
 	}
 }
 

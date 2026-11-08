@@ -71,8 +71,14 @@ func (x *Executor) Fill(st *browser.State, p Plan) (*browser.State, []Filled, er
 			return st, done, fmt.Errorf("field %q: %w", v.Label, err)
 		}
 		label, shown := v.Label, v.Text
+		if len(v.Files) > 0 {
+			shown = strings.Join(v.Files, ", ")
+		}
 		if f, ok := st.Field(v.FieldID); ok {
-			label, shown = f.Label, f.Value
+			label = f.Label
+			if f.Value != "" || len(v.Files) == 0 {
+				shown = f.Value
+			}
 		}
 		done = append(done, Filled{FieldID: v.FieldID, Label: label, Shown: shown, Source: v.Source})
 	}
@@ -158,6 +164,9 @@ func (x *Executor) fill(st *browser.State, p Plan, v Value) (*browser.State, err
 	if err != nil {
 		return st, err
 	}
+	if f.Kind == "file" {
+		return x.verifyFile(st, v.FieldID, v.Files)
+	}
 	if f.Kind == "richtext" { // the field reports at most its first 500 characters
 		return x.verify(st, v.FieldID, want, func(shown, want string) bool {
 			return strings.HasPrefix(strings.TrimSpace(want), strings.TrimSpace(shown)) && shown != ""
@@ -166,6 +175,38 @@ func (x *Executor) fill(st *browser.State, p Plan, v Value) (*browser.State, err
 	return x.verify(st, v.FieldID, want, func(shown, want string) bool {
 		return strings.TrimSpace(shown) == strings.TrimSpace(want)
 	})
+}
+
+// verifyFile checks that a file upload is reflected either on the file input or as a file chip in the frame text.
+func (x *Executor) verifyFile(st *browser.State, id string, files []string) (*browser.State, error) {
+	want := strings.Join(files, ", ")
+	deadline := time.Now().Add(x.wait())
+	for {
+		next, err := st.Refresh()
+		if err != nil {
+			return st, err
+		}
+		got, ok := next.Field(id)
+		if ok && strings.TrimSpace(got.Value) == strings.TrimSpace(want) {
+			return next, nil
+		}
+		if fr, err := next.FrameOf(id); err == nil && hasAllFiles(fr.Text, files) {
+			return next, nil
+		}
+		if time.Now().After(deadline) {
+			return next, fmt.Errorf("%w: shows %q, want %q", ErrNotVerified, got.Value, want)
+		}
+		time.Sleep(150 * time.Millisecond)
+	}
+}
+
+func hasAllFiles(text string, files []string) bool {
+	for _, fn := range files {
+		if !strings.Contains(text, fn) {
+			return false
+		}
+	}
+	return len(files) > 0
 }
 
 // verify extracts the page again and checks what the field shows; some widgets render their value late.

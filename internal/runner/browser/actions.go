@@ -82,12 +82,20 @@ var pointJS = `(id) => {
   return { x: r.left + r.width / 2, y: r.top + r.height / 2, w: r.width, h: r.height };
 }`
 
-// offsetJS returns where an iframe's content starts in its own frame, after scrolling it into view.
-const offsetJS = `function () {
-  this.scrollIntoView({ block: "center", inline: "center" });
-  const r = this.getBoundingClientRect();
+// offsetJS scrolls the parent frame so that the target point pt inside the iframe sits near the middle of the
+// parent viewport, then returns where the iframe's content starts in its own frame.
+const offsetJS = `function (pt) {
   const cs = getComputedStyle(this);
-  return { x: r.left + this.clientLeft + parseFloat(cs.paddingLeft), y: r.top + this.clientTop + parseFloat(cs.paddingTop) };
+  const padX = this.clientLeft + (parseFloat(cs.paddingLeft) || 0);
+  const padY = this.clientTop + (parseFloat(cs.paddingTop) || 0);
+  let r = this.getBoundingClientRect();
+  if (pt) {
+    window.scrollBy(r.left + padX + pt.x - window.innerWidth / 2, r.top + padY + pt.y - window.innerHeight / 2);
+  } else {
+    this.scrollIntoView({ block: "center", inline: "center" });
+  }
+  r = this.getBoundingClientRect();
+  return { x: r.left + padX, y: r.top + padY };
 }`
 
 type point struct {
@@ -153,11 +161,6 @@ func (s *State) measure(id string) (point, error) {
 	for fr := f; fr.parent != nil; fr = fr.parent {
 		chain = append(chain, fr)
 	}
-	for i := len(chain) - 1; i >= 0; i-- { // outermost iframe first
-		if _, _, err := chain[i].iframe.offset(); err != nil {
-			return point{}, err
-		}
-	}
 	v, err := f.run(pointJS, id)
 	if err != nil {
 		return point{}, err
@@ -173,7 +176,7 @@ func (s *State) measure(id string) (point, error) {
 		return point{}, fmt.Errorf("%w: %q", ErrNotVisible, id)
 	}
 	for _, fr := range chain {
-		x, y, err := fr.iframe.offset()
+		x, y, err := fr.iframe.offset(pt)
 		if err != nil {
 			return point{}, err
 		}
