@@ -165,7 +165,26 @@ tasks:
 
   dev:logs:
     cmds:
-      - '{{.COMPOSE}} logs -f {{.CLI_ARGS}}'
+      - '{{.COMPOSE}} --profile dev logs -f {{.CLI_ARGS}}'
+
+  obs:up:
+    desc: Start the stack with observability (Prometheus, Tempo, Loki, Grafana on http://127.0.0.1:3000)
+    deps: [dev:secrets]
+    env:
+      GETAFJOB_OTEL_ENDPOINT: http://otel-collector:4318
+    cmds:
+      - '{{.COMPOSE}} --profile dev --profile observability up -d --build --wait --wait-timeout 300'
+      - '{{.COMPOSE}} ps'
+
+  obs:down:
+    desc: Stop the stack including the observability profile
+    cmds:
+      - '{{.COMPOSE}} --profile dev --profile observability down'
+
+  obs:logs:
+    desc: Tail logs including the observability profile
+    cmds:
+      - '{{.COMPOSE}} --profile dev --profile observability logs -f {{.CLI_ARGS}}'
 
   release:snapshot:
     desc: goreleaser dry run (no publishing)

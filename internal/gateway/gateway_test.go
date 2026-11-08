@@ -6,6 +6,7 @@ import (
 	"log/slog"
 	"net/http"
 	"net/http/httptest"
+	"slices"
 	"testing"
 	"time"
 
@@ -13,6 +14,10 @@ import (
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
+	gotel "go.opentelemetry.io/otel"
+	"go.opentelemetry.io/otel/attribute"
+	sdkmetric "go.opentelemetry.io/otel/sdk/metric"
+	"go.opentelemetry.io/otel/sdk/metric/metricdata"
 
 	"github.com/1xxn/getafjob/internal/application"
 	"github.com/1xxn/getafjob/internal/application/adapters/pgstore"
@@ -269,5 +274,67 @@ func TestGatewayHomeRunnerAuthenticationAndLeasing(t *testing.T) {
 	}
 	if hl.Msg.GetRun().GetProfile()["personal.first_name"] != "Max" {
 		t.Fatalf("unexpected profile: %+v", hl.Msg.GetRun().GetProfile())
+	}
+}
+
+func TestGatewayStepDurationMetrics(t *testing.T) {
+	reader := sdkmetric.NewManualReader()
+	prev := gotel.GetMeterProvider()
+	mp := sdkmetric.NewMeterProvider(sdkmetric.WithReader(reader))
+	gotel.SetMeterProvider(mp)
+	t.Cleanup(func() { gotel.SetMeterProvider(prev) })
+
+	pool, apps, c, _ := setup(t)
+	ctx := t.Context()
+
+	reg, err := c.Register(ctx, with(&runnerv1.RegisterRequest{Version: "test"}, secret))
+	if err != nil {
+		t.Fatal(err)
+	}
+	runner := reg.Msg.GetRunnerId()
+
+	_ = queue(t, pool, apps)
+	l, err := c.Lease(ctx, with(&runnerv1.LeaseRequest{RunnerId: runner}, secret))
+	if err != nil || l.Msg.GetRun() == nil {
+		t.Fatalf("lease: %v", err)
+	}
+	run := l.Msg.GetRun()
+	tok := run.GetToken()
+
+	if _, err := c.Checkpoint(ctx, with(&runnerv1.CheckpointRequest{
+		Step: "extract", Page: 1, Url: run.GetStartUrl(),
+		DataJson: []byte(`{"fields":[]}`), Screenshot: png,
+	}, tok)); err != nil {
+		t.Fatal(err)
+	}
+
+	if _, err := c.BeginSubmit(ctx, with(&runnerv1.BeginSubmitRequest{}, tok)); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := c.Submitted(ctx, with(&runnerv1.SubmittedRequest{Confirmed: true}, tok)); err != nil {
+		t.Fatal(err)
+	}
+
+	var rm metricdata.ResourceMetrics
+	if err := reader.Collect(ctx, &rm); err != nil {
+		t.Fatal(err)
+	}
+	var steps []string
+	for _, sm := range rm.ScopeMetrics {
+		for _, m := range sm.Metrics {
+			if m.Name == "getafjob.run.step.duration" {
+				hist, ok := m.Data.(metricdata.Histogram[float64])
+				if !ok {
+					continue
+				}
+				for _, dp := range hist.DataPoints {
+					st, _ := dp.Attributes.Value(attribute.Key("step"))
+					steps = append(steps, st.AsString())
+				}
+			}
+		}
+	}
+	if !slices.Contains(steps, "extract") || !slices.Contains(steps, "submit") {
+		t.Fatalf("expected extract and submit steps in histogram, got: %v", steps)
 	}
 }

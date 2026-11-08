@@ -21,6 +21,9 @@ import (
 
 	"connectrpc.com/connect"
 	"github.com/google/uuid"
+	gotel "go.opentelemetry.io/otel"
+	"go.opentelemetry.io/otel/attribute"
+	"go.opentelemetry.io/otel/metric"
 	"google.golang.org/protobuf/types/known/durationpb"
 	"google.golang.org/protobuf/types/known/timestamppb"
 
@@ -55,17 +58,24 @@ type PortalSessionSaver interface {
 
 // Server implements the runner service.
 type Server struct {
-	Runs       *application.Runs
-	Apps       *application.Service
-	Data       Data
-	Shots      Screenshots
-	Secret     string // shared by the server's runners; empty: no runner can register
-	Logger     *slog.Logger
-	Notify     func(ctx context.Context, userID, appID uuid.UUID)
-	ATSMetrics *ats.Tracker
-	Portals    PortalSessionSaver
-	handoffs   sync.Map // map[uuid.UUID]*HandoffSession
-	runners    sync.Map // map[string]runnerSession
+	Runs         *application.Runs
+	Apps         *application.Service
+	Data         Data
+	Shots        Screenshots
+	Secret       string // shared by the server's runners; empty: no runner can register
+	Logger       *slog.Logger
+	Notify       func(ctx context.Context, userID, appID uuid.UUID)
+	ATSMetrics   *ats.Tracker
+	Portals      PortalSessionSaver
+	StepDuration metric.Float64Histogram
+	handoffs     sync.Map // map[uuid.UUID]*HandoffSession
+	runners      sync.Map // map[string]runnerSession
+	runSteps     sync.Map // map[uuid.UUID]runStepState
+}
+
+type runStepState struct {
+	at      time.Time
+	adapter string
 }
 
 type runnerIdentity struct {
@@ -237,7 +247,9 @@ func (s *Server) Lease(ctx context.Context, req *connect.Request[runnerv1.LeaseR
 	}
 	run.RunId, run.Token, run.ExpiresAt = l.RunID.String(), l.Token, timestamppb.New(l.ExpiresAt)
 	urls := append([]string{run.GetStartUrl()}, run.GetOrigins()...)
-	_ = s.Runs.SetAdapter(ctx, ref, ats.Detect("", urls...))
+	adapter := ats.Detect("", urls...)
+	_ = s.Runs.SetAdapter(ctx, ref, adapter)
+	s.runSteps.Store(ref.RunID, runStepState{at: time.Now(), adapter: adapter})
 	s.Logger.InfoContext(ctx, "run leased", "run", l.RunID, "runner", runnerID, "host", l.Host)
 	return connect.NewResponse(&runnerv1.LeaseResponse{Run: run}), nil
 }
@@ -304,6 +316,7 @@ func (s *Server) Checkpoint(ctx context.Context, req *connect.Request[runnerv1.C
 			}
 		}
 	}
+	s.recordStepDuration(ctx, ref, m.GetStep())
 	err = s.Runs.Checkpoint(ctx, ref, application.Checkpoint{Step: m.GetStep(), Page: int(m.GetPage()), URL: m.GetUrl(),
 		Data: data, Screenshot: key})
 	return connect.NewResponse(&runnerv1.CheckpointResponse{}), err
@@ -315,6 +328,7 @@ func (s *Server) Ask(ctx context.Context, req *connect.Request[runnerv1.AskReque
 	if err != nil {
 		return nil, err
 	}
+	s.runSteps.Delete(ref.RunID)
 	qs := req.Msg.GetQuestions()
 	if len(qs) == 0 || len(qs) > 50 {
 		return nil, connect.NewError(connect.CodeInvalidArgument, errors.New("between 1 and 50 questions"))
@@ -355,6 +369,7 @@ func (s *Server) Submitted(ctx context.Context, req *connect.Request[runnerv1.Su
 	if err := s.Runs.Submitted(ctx, ref, req.Msg.GetConfirmed(), effect); err != nil {
 		return nil, code(err)
 	}
+	s.finishStepDuration(ctx, ref, "submit")
 	s.recordATSOutcome(ctx, ref, ats.OutcomeSubmitted)
 	return connect.NewResponse(&runnerv1.SubmittedResponse{}), nil
 }
@@ -365,6 +380,7 @@ func (s *Server) Park(ctx context.Context, req *connect.Request[runnerv1.ParkReq
 	if err != nil {
 		return nil, err
 	}
+	s.runSteps.Delete(ref.RunID)
 	key, err := s.screenshot(ctx, ref, req.Msg.GetScreenshot())
 	if err != nil {
 		return nil, err
@@ -450,4 +466,50 @@ func (s *Server) Handoff(ctx context.Context, req *connect.Request[runnerv1.Hand
 		}
 	}
 	return connect.NewResponse(&runnerv1.HandoffResponse{Events: out}), nil
+}
+
+func (s *Server) histogram() metric.Float64Histogram {
+	if s.StepDuration != nil {
+		return s.StepDuration
+	}
+	h, err := gotel.Meter("github.com/1xxn/getafjob/internal/gateway").Float64Histogram(
+		"getafjob.run.step.duration",
+		metric.WithUnit("s"),
+		metric.WithDescription("Duration of a run step in seconds."),
+	)
+	if err != nil {
+		return nil
+	}
+	return h
+}
+
+func (s *Server) recordStepDuration(ctx context.Context, ref application.RunRef, step string) {
+	val, ok := s.runSteps.Load(ref.RunID)
+	if !ok {
+		return
+	}
+	st := val.(runStepState)
+	took := time.Since(st.at)
+	s.runSteps.Store(ref.RunID, runStepState{at: time.Now(), adapter: st.adapter})
+	if h := s.histogram(); h != nil {
+		h.Record(ctx, took.Seconds(), metric.WithAttributes(
+			attribute.String("step", step),
+			attribute.String("adapter", st.adapter),
+		))
+	}
+}
+
+func (s *Server) finishStepDuration(ctx context.Context, ref application.RunRef, step string) {
+	val, ok := s.runSteps.LoadAndDelete(ref.RunID)
+	if !ok {
+		return
+	}
+	st := val.(runStepState)
+	took := time.Since(st.at)
+	if h := s.histogram(); h != nil {
+		h.Record(ctx, took.Seconds(), metric.WithAttributes(
+			attribute.String("step", step),
+			attribute.String("adapter", st.adapter),
+		))
+	}
 }
