@@ -64,7 +64,7 @@ func (d *Documents) path(name string) (string, error) {
 }
 
 // uploadJS inspects a file field: visible inputs take files directly; a hidden one sits in a drop zone, whose
-// nearest visible ancestor (or label) gets the ID zoneID to be clicked.
+// nearest visible ancestor (or its trigger button or label) gets the ID zoneID to be clicked.
 var uploadJS = `(arg) => {
   const el = (` + findJS + `)(arg.id);
   if (!el || el.tagName !== "INPUT" || el.type !== "file") return null;
@@ -72,7 +72,14 @@ var uploadJS = `(arg) => {
     return r.width >= 1 && r.height >= 1 && cs.visibility !== "hidden" && cs.display !== "none"; };
   if (shown(el)) return { direct: true, multiple: el.multiple };
   let zone = el.id ? document.querySelector('label[for="' + CSS.escape(el.id) + '"]') : null;
-  if (!zone || !shown(zone)) { zone = el.parentElement; while (zone && !shown(zone)) zone = zone.parentElement; }
+  if (!zone || !shown(zone)) {
+    zone = el.parentElement;
+    while (zone && !shown(zone)) zone = zone.parentElement;
+    if (zone) {
+      const btn = zone.querySelector('button, [role="button"], label');
+      if (btn && shown(btn)) zone = btn;
+    }
+  }
   if (!zone) return { direct: true, multiple: el.multiple };
   zone.setAttribute("data-gaj", arg.zone);
   return { direct: false, multiple: el.multiple };
@@ -134,19 +141,23 @@ func (s *State) Upload(docs *Documents, fieldID string, names []string, wait tim
 	}
 
 	c := f.client()
+	obj, err := f.object(fieldID)
+	if err != nil {
+		return err
+	}
 	var node proto.DOMBackendNodeID
-	if info.Direct {
-		obj, err := f.object(fieldID)
-		if err != nil {
+	if !info.Direct {
+		node, err = s.chooseFiles(f, zoneID, paths, min(wait, 1500*time.Millisecond))
+		if err != nil && !errors.Is(err, ErrNoFileChooser) {
 			return err
 		}
+	}
+	if info.Direct || node == 0 {
 		if err := (proto.DOMSetFileInputFiles{Files: paths, ObjectID: obj}).Call(c); err != nil {
 			return err
 		}
-	} else if node, err = s.chooseFiles(f, zoneID, paths, wait); err != nil {
-		return err
 	}
-	return s.checkFiles(f, fieldID, node, names)
+	return s.checkFiles(f, obj, node, names)
 }
 
 // object returns the remote object of an element of the frame.
@@ -211,19 +222,13 @@ func (s *State) chooseFiles(f *Frame, zoneID string, paths []string, wait time.D
 }
 
 // checkFiles verifies that the field (or the input the chooser belonged to) holds exactly names.
-func (s *State) checkFiles(f *Frame, fieldID string, node proto.DOMBackendNodeID, names []string) error {
-	var obj proto.RuntimeRemoteObjectID
+func (s *State) checkFiles(f *Frame, obj proto.RuntimeRemoteObjectID, node proto.DOMBackendNodeID, names []string) error {
 	if node != 0 {
 		res, err := proto.DOMResolveNode{BackendNodeID: node}.Call(f.client())
 		if err != nil {
 			return err
 		}
 		obj = res.Object.ObjectID
-	} else {
-		var err error
-		if obj, err = f.object(fieldID); err != nil {
-			return err
-		}
 	}
 	res, err := proto.RuntimeCallFunctionOn{FunctionDeclaration: filesJS, ObjectID: obj, ReturnByValue: true}.Call(f.client())
 	if err != nil {

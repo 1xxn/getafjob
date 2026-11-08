@@ -39,26 +39,30 @@ func state(fields ...browser.Field) *browser.State {
 
 func TestLabels(t *testing.T) {
 	cases := map[string]string{
-		"First Name *":                     "answer#0192f3a4-5b6c-7d8e-9f01-000000000002", // the answer bank wins for the same question
-		"Vorname":                          "profile.personal.first_name",
-		"Last name":                        "profile.personal.last_name",
-		"Nachname*":                        "profile.personal.last_name",
-		"Email address":                    "profile.personal.email",
-		"E-Mail-Adresse":                   "profile.personal.email",
-		"Phone":                            "profile.personal.phone",
-		"Mobilnummer":                      "profile.personal.phone",
-		"Full name":                        "profile.personal.full_name",
-		"Postleitzahl":                     "profile.personal.postal_code",
-		"Straße und Hausnummer":            "profile.personal.street",
-		"Wohnort":                          "profile.personal.city",
-		"Location (City)":                  "profile.personal.city",
-		"LinkedIn Profile":                 "profile.personal.linkedin",
-		"Kündigungsfrist":                  "profile.work.notice_period",
-		"Earliest start date":              "profile.work.earliest_start",
-		"Gehaltsvorstellung (brutto/Jahr)": "profile.work.salary_expectation",
-		"Years of professional experience": "profile.work.years_total",
-		"Current job title":                "profile.work.current_title",
-		"How did you hear about us?":       "answer#0192f3a4-5b6c-7d8e-9f01-000000000001",
+		"First Name *":          "answer#0192f3a4-5b6c-7d8e-9f01-000000000002", // the answer bank wins for the same question
+		"Vorname":               "profile.personal.first_name",
+		"Last name":             "profile.personal.last_name",
+		"Nachname*":             "profile.personal.last_name",
+		"Email address":         "profile.personal.email",
+		"E-Mail-Adresse":        "profile.personal.email",
+		"Phone":                 "profile.personal.phone",
+		"Mobilnummer":           "profile.personal.phone",
+		"Full name":             "profile.personal.full_name",
+		"First and last name":   "profile.personal.full_name",
+		"Vor- und Nachname":     "profile.personal.full_name",
+		"Postleitzahl":          "profile.personal.postal_code",
+		"Straße und Hausnummer": "profile.personal.street",
+		"Wohnort":               "profile.personal.city",
+		"Location (City)":       "profile.personal.city",
+		"What is your current city and country of residence?":                                                            "profile.personal.city",
+		"What would be your preferred main location for your contract? We can sponsor visas for Germany for most roles.": "profile.personal.country",
+		"LinkedIn Profile":                                        "profile.personal.linkedin",
+		"Kündigungsfrist":                                         "profile.work.notice_period",
+		"Earliest start date":                                     "profile.work.earliest_start",
+		"Gehaltsvorstellung (brutto/Jahr)":                        "profile.work.salary_expectation",
+		"Years of professional experience":                        "profile.work.years_total",
+		"Current job title":                                       "profile.work.current_title",
+		"How did you hear about us?":                              "answer#0192f3a4-5b6c-7d8e-9f01-000000000001",
 		"Will you now or in the future require visa sponsorship?": "profile.work.needs_sponsorship",
 		"Do you need a work permit?":                              "profile.work.needs_sponsorship",
 		"Are you legally authorized to work in the EU?":           "profile.work.work_authorized_eu",
@@ -182,5 +186,27 @@ func TestSecurityCodeAlwaysGoesToHumanEvenWhenInAnswerBank(t *testing.T) {
 	}
 	if len(qs) != 1 || qs[0].Kind != "security_code" || qs[0].FieldID != "0-2" || qs[0].Draft != "" {
 		t.Fatalf("security code question = %+v", qs)
+	}
+}
+
+func TestRealFormQuirks(t *testing.T) {
+	p := &Planner{K: know}
+	st := state(
+		browser.Field{Kind: "file", Label: "Autofill from resume Upload your resume here"},
+		browser.Field{Kind: "combobox", Label: "Location (City)", Required: true},
+		browser.Field{Kind: "checkbox", Label: "I can be based in Germany and do not need visa support"},
+		browser.Field{Kind: "checkbox", Label: "Germany"},
+		browser.Field{Kind: "checkbox", Label: "Veteran"},
+		browser.Field{Kind: "text", Label: "Would you like to provide any additional context or details for your salary expectation?"},
+	)
+	plan, qs, err := p.Plan(context.Background(), st)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(qs) != 0 || len(plan.Values) != 1 {
+		t.Fatalf("values = %+v, questions = %+v", plan.Values, qs)
+	}
+	if got := plan.Values[0]; got.Text != "Berlin, Germany" || got.Source != "profile.personal.city" {
+		t.Fatalf("city combobox = %+v, want Berlin, Germany", got)
 	}
 }

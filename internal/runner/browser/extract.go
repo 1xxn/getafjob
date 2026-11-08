@@ -11,6 +11,7 @@ import (
 
 	"github.com/go-rod/rod"
 	"github.com/go-rod/rod/lib/proto"
+	"github.com/ysmood/gson"
 )
 
 //go:embed extract.js
@@ -105,14 +106,14 @@ type Frame struct {
 
 // iframeRef is an iframe element in its parent frame.
 type iframeRef interface {
-	// offset scrolls the iframe into view and returns where its content starts in the parent frame.
-	offset() (x, y float64, err error)
+	// offset scrolls the target point pt inside the iframe into view and returns where the iframe's content starts.
+	offset(pt point) (x, y float64, err error)
 }
 
 type rodIframe struct{ el *rod.Element }
 
-func (r rodIframe) offset() (float64, float64, error) {
-	v, err := r.el.Eval(offsetJS)
+func (r rodIframe) offset(pt point) (float64, float64, error) {
+	v, err := r.el.Eval(offsetJS, pt)
 	if err != nil {
 		return 0, 0, err
 	}
@@ -124,8 +125,13 @@ type sessionIframe struct {
 	obj proto.RuntimeRemoteObjectID
 }
 
-func (r sessionIframe) offset() (float64, float64, error) {
-	res, err := proto.RuntimeCallFunctionOn{FunctionDeclaration: offsetJS, ObjectID: r.obj, ReturnByValue: true}.Call(r.s)
+func (r sessionIframe) offset(pt point) (float64, float64, error) {
+	res, err := proto.RuntimeCallFunctionOn{
+		FunctionDeclaration: offsetJS,
+		ObjectID:            r.obj,
+		Arguments:           []*proto.RuntimeCallArgument{{Value: gson.New(pt)}},
+		ReturnByValue:       true,
+	}.Call(r.s)
 	if err != nil {
 		return 0, 0, err
 	}
