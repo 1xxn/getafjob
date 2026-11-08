@@ -17,6 +17,7 @@ import (
 	"github.com/google/uuid"
 	"golang.org/x/time/rate"
 
+	"github.com/1xxn/getafjob/internal/ai"
 	"github.com/1xxn/getafjob/internal/application"
 	"github.com/1xxn/getafjob/internal/assist"
 	"github.com/1xxn/getafjob/internal/identity"
@@ -69,6 +70,13 @@ type PortalsService interface {
 	SetDailyLimit(ctx context.Context, userID uuid.UUID, portal string, limit int) error
 }
 
+// AIService manages AI configuration, budgets, and capabilities (ADR 0012, #44).
+type AIService interface {
+	AdminEnabled() bool
+	GetSettings(ctx context.Context, userID uuid.UUID) (ai.UserSettings, error)
+	SaveSettings(ctx context.Context, userID uuid.UUID, enabled bool, customKey string, clearKey bool) error
+}
+
 // Server holds the dependencies of the UI.
 type Server struct {
 	Identity       *identity.Service
@@ -82,6 +90,7 @@ type Server struct {
 	Notify         NotificationService
 	Assist         AssistService
 	Portals        PortalsService
+	AI             AIService
 	Shots          Screenshots
 	Handoffs       HandoffHub
 	PushStore      webpush.Store

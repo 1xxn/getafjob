@@ -14,6 +14,10 @@ import (
 	"github.com/google/uuid"
 	"github.com/riverqueue/river"
 
+	"github.com/1xxn/getafjob/internal/ai"
+	aianthropic "github.com/1xxn/getafjob/internal/ai/adapters/anthropic"
+	aicrypto "github.com/1xxn/getafjob/internal/ai/adapters/crypto"
+	aistore "github.com/1xxn/getafjob/internal/ai/adapters/pgstore"
 	"github.com/1xxn/getafjob/internal/application"
 	applicationstore "github.com/1xxn/getafjob/internal/application/adapters/pgstore"
 	"github.com/1xxn/getafjob/internal/discovery"
@@ -110,6 +114,10 @@ func serve(ctx context.Context, cfg config.Config, logger *slog.Logger) error {
 	portalsStore := portalsstore.New(pool)
 	portalsCipher := portalscrypto.NewCipher(env)
 	portalsSvc := portals.NewService(portalsStore, portalsCipher, newAutonomyAdapter(apps), cfg.EasyApplyEnabled)
+	aiStore := aistore.New(pool)
+	aiCipher := aicrypto.NewCipher(env)
+	aiClient := aianthropic.NewClient()
+	aiSvc := ai.NewService(aiStore, aiCipher, aiClient, cfg.AIEnabled, cfg.AnthropicAPIKey.Reveal(), cfg.AnthropicModel, cfg.AIBudgetPerUserCents)
 	var gw *gateway.Server
 	if cfg.RunnerSecret != "" {
 		atsMetrics, err := ats.NewTracker()
@@ -131,7 +139,7 @@ func serve(ctx context.Context, cfg config.Config, logger *slog.Logger) error {
 
 	(&web.Server{Identity: ids, Logger: logger, Profile: profiles, Documents: docs, Items: items,
 		Importer: cvimport.NewImporter(docs, profiles, extractor), Jobs: matching.NewListings(matchingstore.New(pool)),
-		PushStore: webpush.NewStore(pool), VAPIDPublicKey: vapidPub, Apps: apps, Tracking: trackingSvc, Notify: notifySvc, Assist: assistSvc, Portals: portalsSvc, Shots: sealedFiles, Handoffs: gw}).Register(mux)
+		PushStore: webpush.NewStore(pool), VAPIDPublicKey: vapidPub, Apps: apps, Tracking: trackingSvc, Notify: notifySvc, Assist: assistSvc, Portals: portalsSvc, AI: aiSvc, Shots: sealedFiles, Handoffs: gw}).Register(mux)
 
 	h := httpx.Instrument(httpx.Protect(httpx.Routes(mux), maxBody, cfg.PublicURL.Scheme == "https",
 		httpx.Upload{Path: "/documents", Max: web.MaxUpload}, httpx.Upload{Path: "/setup/cv", Max: web.MaxUpload}))
