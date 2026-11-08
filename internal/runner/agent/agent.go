@@ -20,6 +20,7 @@ import (
 	runnerv1 "github.com/1xxn/getafjob/internal/gen/proto/runner/v1"
 	"github.com/1xxn/getafjob/internal/gen/proto/runner/v1/runnerv1connect"
 	"github.com/1xxn/getafjob/internal/platform/buildinfo"
+	"github.com/1xxn/getafjob/internal/runner/ats"
 	"github.com/1xxn/getafjob/internal/runner/browser"
 	"github.com/1xxn/getafjob/internal/runner/engine"
 	"github.com/1xxn/getafjob/internal/runner/executor"
@@ -117,7 +118,8 @@ func (a *Agent) RunOne(ctx context.Context, run *runnerv1.Run) error {
 	if err != nil {
 		return err
 	}
-	e := &engine.Engine{Exec: &executor.Executor{Docs: docs}, Planner: &planner.Planner{K: k}, Coord: c, Wait: a.Wait}
+	ad := ats.For("", append([]string{run.GetStartUrl()}, run.GetOrigins()...)...)
+	e := ad.NewEngine(&executor.Executor{Docs: docs}, &planner.Planner{K: k}, c, a.Wait)
 	if err := p.Context(ctx).Navigate(run.GetStartUrl()); err != nil {
 		return c.Park(ctx, "open the posting: "+err.Error(), nil)
 	}

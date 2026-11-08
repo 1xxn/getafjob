@@ -274,6 +274,15 @@
         const label = clean(own).slice(0, 300) || labelOf(el);
         fields.push({ id: tag(el), kind: role === "radio" ? "aria_radio" : "aria_checkbox", label,
           required: isRequired(el, label), value: el.getAttribute("aria-checked") === "true" ? "checked" : "" });
+      } else if (role === "group" || role === "radiogroup") {
+        const btns = Array.from(el.querySelectorAll("button[aria-pressed]")).filter(visible);
+        if (btns.length >= 2) {
+          const options = btns.map((b) => ({ id: tag(b), label: textOf(b), checked: b.getAttribute("aria-pressed") === "true" }));
+          const question = groupQuestion(btns, options.map((o) => o.label)) || labelOf(el);
+          fields.push({ id: tag(el), kind: "radio", label: question,
+            required: isRequired(el, question), options,
+            value: options.filter((o) => o.checked).map((o) => o.label).join("; ") });
+        }
       }
     }
   }
@@ -285,7 +294,7 @@
   for (const el of all) {
     const t = el.tagName;
     const role = el.getAttribute && el.getAttribute("role");
-    const isBtn = t === "BUTTON" || (t === "INPUT" && /^(submit|button)$/i.test(el.type)) || role === "button" || role === "link" || t === "A";
+    const isBtn = t === "BUTTON" || (t === "INPUT" && /^(submit|button)$/i.test(el.type)) || role === "button" || role === "tab" || role === "link" || t === "A";
     if (!isBtn || !visible(el)) continue;
     if (el.getAttribute("aria-haspopup") === "listbox" && (role === "button" || t === "BUTTON")) continue; // a select
     const text = clean(textOf(el) || el.value || el.getAttribute("aria-label") || el.title || "").slice(0, 120);

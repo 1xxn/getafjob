@@ -3,8 +3,6 @@ package app
 import (
 	"context"
 	"encoding/json"
-	"net/url"
-	"slices"
 	"strings"
 	"time"
 
@@ -15,6 +13,7 @@ import (
 	runnerv1 "github.com/1xxn/getafjob/internal/gen/proto/runner/v1"
 	"github.com/1xxn/getafjob/internal/matching"
 	"github.com/1xxn/getafjob/internal/profile"
+	"github.com/1xxn/getafjob/internal/runner/ats"
 )
 
 // jobReader reads jobs for runs.
@@ -151,33 +150,8 @@ func placeholders(p profile.Profile, job application.Job, lang string, now time.
 	}
 }
 
-// atsHosts are the hosts where an applicant tracking system shows its forms, by source kind.
-var atsHosts = map[string][]string{
-	"greenhouse":      {"boards.greenhouse.io", "job-boards.greenhouse.io", "job-boards.eu.greenhouse.io"},
-	"lever":           {"jobs.lever.co", "jobs.eu.lever.co"},
-	"ashby":           {"jobs.ashbyhq.com"},
-	"smartrecruiters": {"jobs.smartrecruiters.com"},
-	"workable":        {"apply.workable.com"},
-}
-
 // origins are the origins the run's values may go to: the posting, the application page and the ATS's own form
 // hosts.
 func origins(job application.Job) []string {
-	var out []string
-	add := func(raw string) {
-		u, err := url.Parse(raw)
-		if err != nil || u.Scheme != "https" || u.Host == "" {
-			return
-		}
-		if o := "https://" + strings.ToLower(u.Host); !slices.Contains(out, o) {
-			out = append(out, o)
-		}
-	}
-	add(job.URL)
-	add(job.Apply)
-	kind, _, _ := strings.Cut(job.Source, ":")
-	for _, h := range atsHosts[kind] {
-		add("https://" + h)
-	}
-	return out
+	return ats.Origins(job.Source, job.URL, job.Apply)
 }
