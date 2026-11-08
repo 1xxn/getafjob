@@ -184,11 +184,13 @@
   };
 
   const PLACEHOLDER_RX = /^(|-+|select.*|choose.*|please select.*|bitte (wählen|auswählen).*|auswählen.*|wählen.*|keine auswahl|\.\.\.)$/i;
+  const inCaptcha = (el) => !!(el.closest && el.closest(".g-recaptcha, .h-captcha, .cf-turnstile, .frc-captcha, [data-sitekey]"));
   const fields = [];
   const seenGroups = new Set();
   const TEXT_TYPES = new Set(["", "text", "email", "tel", "url", "number", "search", "date", "month", "week", "time", "datetime-local"]);
 
   for (const el of all) {
+    if (inCaptcha(el)) continue;
     const t = el.tagName;
     if (t === "INPUT") {
       const type = (el.getAttribute("type") || "").toLowerCase();
@@ -238,7 +240,7 @@
       const combo = role === "combobox" || el.getAttribute("aria-autocomplete") === "list" || !!el.getAttribute("aria-controls") && el.getAttribute("aria-expanded") !== null;
       fields.push({ id: tag(el), kind: combo ? "combobox" : (type === "date" ? "date" : "text"), input_type: type || "text",
         label, required: isRequired(el, label), value: el.value || (combo ? chosenValue(el) : ""), hint: describedBy(el),
-        autocomplete: el.getAttribute("autocomplete") || "", name: el.name || "",
+        autocomplete: el.getAttribute("autocomplete") || "", name: el.name || "", html_id: el.id || "",
         max_length: el.maxLength > 0 ? el.maxLength : 0, invalid: el.getAttribute("aria-invalid") === "true" });
     } else if (t === "TEXTAREA") {
       if (!visible(el) || ariaHidden(el) || shimInput(el)) continue;
@@ -292,6 +294,7 @@
   const AUTOFILL_RX = /(apply|bewerben) (with|via|mit|über) (linkedin|xing|indeed|google|seek|stepstone)|mit (linkedin|xing|indeed) bewerben|easy apply|auto-?fill|automatisch ausfüllen|(aus|mit) (dem |meinem )?lebenslauf (ausfüllen|befüllen|übernehmen|bewerben)|lebenslauf (importieren|hochladen und ausfüllen)|import (from )?(your )?(resume|cv)|(resume|cv) (import|parsing|autofill)|fill (out )?(the form )?(from|with) (your )?(resume|cv)|apply with (your )?(resume|cv)|mit lebenslauf bewerben|quick ?apply/i;
   const found = [];
   for (const el of all) {
+    if (inCaptcha(el)) continue;
     const t = el.tagName;
     const role = el.getAttribute && el.getAttribute("role");
     const isBtn = t === "BUTTON" || (t === "INPUT" && /^(submit|button)$/i.test(el.type)) || role === "button" || role === "tab" || role === "link" || t === "A";
@@ -327,9 +330,10 @@
   }
 
   // CAPTCHA signals
-  const captchaToken = Array.from(document.querySelectorAll(
-    '[name="g-recaptcha-response"], [name="h-captcha-response"], [name="cf-turnstile-response"], [name="frc-captcha-solution"]'
-  )).some((t) => typeof t.value === "string" && t.value.trim().length > 0);
+  const captchaToken = all.some(
+    (t) => t.matches && t.matches('[name="g-recaptcha-response"], [name="h-captcha-response"], [name="cf-turnstile-response"], [name="frc-captcha-solution"]') &&
+      typeof t.value === "string" && t.value.trim().length > 0
+  );
   const captcha = [];
   for (const el of all) {
     const src = (el.tagName === "IFRAME" ? el.src || "" : "").toLowerCase();

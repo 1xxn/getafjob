@@ -1,0 +1,40 @@
+<!doctype html>
+<html lang="en">
+<head><meta charset="utf-8"><title>Verify your application - Security Code</title>
+<style>.field{margin:12px 0}</style></head>
+<body>
+<!-- E-mail security code: even if the answer bank holds a previous code for the same label, the engine must
+     never auto-fill a one-time security code and must always hand off to the human. -->
+<h1>Site Reliability Engineer</h1>
+<form id="app" novalidate>
+  <div class="field"><label for="first_name">First Name *</label><input id="first_name" name="first_name" required></div>
+  <div class="field"><label for="last_name">Last Name *</label><input id="last_name" name="last_name" required></div>
+  <div class="field"><label for="email">Email *</label><input id="email" name="email" type="email" required></div>
+  <div class="field">
+    <label for="security_code">Security code sent to your email *</label>
+    <input id="security_code" name="security_code" autocomplete="one-time-code" required>
+  </div>
+  <div id="errors"></div>
+  <button type="submit">Submit application</button>
+</form>
+<script>
+  document.getElementById("app").addEventListener("submit", async (e) => {
+    e.preventDefault();
+    const f = e.target;
+    const data = {
+      first_name: f.first_name.value,
+      last_name: f.last_name.value,
+      email: f.email.value,
+      security_code: f.security_code.value,
+      form: "security_code",
+    };
+    if (!data.first_name || !data.last_name || !data.email || !data.security_code) {
+      document.getElementById("errors").innerHTML = '<div role="alert">Please enter the security code</div>';
+      return;
+    }
+    await fetch("/submit", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(data) });
+    document.body.innerHTML = "<h1>Thank you for applying!</h1><p>Your application has been received.</p>";
+  });
+</script>
+</body>
+</html>

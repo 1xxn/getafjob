@@ -4,6 +4,7 @@
 package planner
 
 import (
+	"cmp"
 	"context"
 	"fmt"
 	"slices"
@@ -62,6 +63,16 @@ func (p *Planner) Plan(ctx context.Context, st *browser.State) (executor.Plan, [
 	var qs []engine.Question
 	for _, f := range st.Fields() {
 		if f.Kind == "password" {
+			continue
+		}
+		if engine.IsSecurityCode(f) {
+			if strings.TrimSpace(f.Value) == "" {
+				qs = append(qs, engine.Question{
+					Kind:    "security_code",
+					FieldID: f.ID,
+					Label:   cmp.Or(f.Label, f.Name, "security_code"),
+				})
+			}
 			continue
 		}
 		v, ok := p.answer(f)
