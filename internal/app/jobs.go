@@ -135,6 +135,11 @@ func crawlSources(ctx context.Context, c *sources.Client, boards discovery.Board
 		if len(terms.Cities) > 0 {
 			out = append(out, sources.NewArbeitsagentur(c, terms.Queries, terms.Cities))
 		}
+		loc := "Germany"
+		if len(terms.Cities) > 0 {
+			loc = terms.Cities[0] + ", Germany"
+		}
+		out = append(out, sources.NewLinkedIn(c, terms.Queries, loc), sources.NewIndeed(c, terms.Queries, loc), sources.NewGlassdoor(c, terms.Queries, loc))
 	}
 	list, err := boards.EnabledBoards(ctx)
 	if err != nil {

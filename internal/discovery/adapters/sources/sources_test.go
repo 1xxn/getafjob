@@ -245,6 +245,31 @@ func TestSources(t *testing.T) {
 		}, func(t *testing.T, c *sources.Client) discovery.Source {
 			return board(t, c, "eightfold", "example.com", "Example Software", `{"host":"apply.careers.example.com","api":"pcsx","location":"Germany"}`)
 		}},
+		{"linkedin", map[string][]string{
+			"GET https://www.linkedin.com/jobs-guest/jobs/api/seeMoreJobPostings/search?keywords=golang&location=Germany&start=0": {"search.html"},
+			"GET https://www.linkedin.com/jobs-guest/jobs/api/jobPosting/4000000001":                                              {"detail1.html"},
+			"GET https://www.linkedin.com/jobs-guest/jobs/api/jobPosting/4000000002":                                              {"detail2.html"},
+		}, func(_ *testing.T, c *sources.Client) discovery.Source {
+			s := sources.NewLinkedIn(c, []string{"golang"}, "Germany")
+			s.MaxPages = 1
+			return s
+		}},
+		{"indeed", map[string][]string{
+			"GET https://www.indeed.com/jobs?fromage=14&l=Germany&q=golang&start=0": {"search.html"},
+			"GET https://www.indeed.com/viewjob?jk=ind1002":                         {"detail.html"},
+		}, func(_ *testing.T, c *sources.Client) discovery.Source {
+			s := sources.NewIndeed(c, []string{"golang"}, "Germany")
+			s.MaxPages = 1
+			return s
+		}},
+		{"glassdoor", map[string][]string{
+			"GET https://www.glassdoor.com/Job/jobs.htm?locKeyword=Germany&page=1&sc.keyword=golang": {"search.html"},
+			"GET https://www.glassdoor.com/job-listing/jl.htm?jl=1009000000002":                      {"detail2.html"},
+		}, func(_ *testing.T, c *sources.Client) discovery.Source {
+			s := sources.NewGlassdoor(c, []string{"golang"}, "Germany")
+			s.MaxPages = 1
+			return s
+		}},
 	}
 	for _, c := range cases {
 		t.Run(c.dir, func(t *testing.T) {

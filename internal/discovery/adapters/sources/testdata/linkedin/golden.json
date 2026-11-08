@@ -1,0 +1,31 @@
+{
+  "complete": false,
+  "postings": [
+    {
+      "Source": "linkedin",
+      "ExternalID": "4000000001",
+      "Company": "Musterwerke GmbH",
+      "Title": "Senior Backend Engineer",
+      "Location": "Berlin, Germany",
+      "URL": "https://www.linkedin.com/jobs/view/4000000001",
+      "ApplyURL": "https://jobs.musterwerke.example/apply/4000000001",
+      "Description": "We are looking for a Senior Backend Engineer to join our core services team in Berlin.\n\nStack: Go, PostgreSQL, Kubernetes.",
+      "Posted": "2026-11-01",
+      "Workplace": "",
+      "Extra": null
+    },
+    {
+      "Source": "linkedin",
+      "ExternalID": "4000000002",
+      "Company": "Nordic Data Systems",
+      "Title": "Cloud Infrastructure Lead (Remote)",
+      "Location": "Hamburg, Germany",
+      "URL": "https://www.linkedin.com/jobs/view/4000000002",
+      "ApplyURL": "",
+      "Description": "Nordic Data Systems is hiring a Cloud Infrastructure Lead. Fully remote across Europe.",
+      "Posted": "2026-11-02",
+      "Workplace": "remote",
+      "Extra": null
+    }
+  ]
+}
