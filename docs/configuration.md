@@ -28,6 +28,8 @@ an error. Unknown `GETAFJOB_*` variables are reported as a warning (typos), with
 | `GETAFJOB_BLOB_SECRET_KEY` | none | serve, worker | S3 secret key; use `_FILE` |
 | `GETAFJOB_SMTP_URL` | none | serve, worker, admin | mail server: `smtps://user:pass@host:465` or `smtp://user:pass@host:587` (STARTTLS); `smtp+insecure://host:1025` for local development only; use `_FILE` |
 | `GETAFJOB_MAIL_FROM` | `getafjob@localhost` | serve, worker, admin | sender address of all mail |
+| `GETAFJOB_VAPID_KEY` | none | serve, worker | P-256 private key for Web Push notifications, 32 bytes base64url (`admin gen-vapid-key`); use `_FILE` |
+| `GETAFJOB_VAPID_SUBJECT` | `mailto:<MAIL_FROM>` | worker | contact URI (`mailto:` or `https://`) in VAPID tokens |
 | `GETAFJOB_CRAWL_INTERVAL` | `6h` | worker | time between two crawls (30m to 168h) |
 
 `getafjob admin env` lists all variables; `getafjob admin check-config` validates the current environment without

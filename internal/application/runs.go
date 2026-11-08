@@ -116,12 +116,11 @@ func (r *Runs) Checkpoint(ctx context.Context, ref RunRef, c Checkpoint) error {
 	return r.store.AddCheckpoint(ctx, ref, c)
 }
 
-// Ask hands the run to the user and ends it (the answers start a new run).
+// Ask hands the run to the user; the run stays active during the handoff so the runner can stream the browser
+// and continue once the user answers.
 func (r *Runs) Ask(ctx context.Context, ref RunRef, questions any) error {
-	if _, err := r.apps.Fire(ctx, ref.UserID, ref.AppID, EvAsk, ActorRunner, map[string]any{"questions": questions}); err != nil {
-		return err
-	}
-	return r.store.FinishRun(ctx, ref, "asked", r.apps.now())
+	_, err := r.apps.Fire(ctx, ref.UserID, ref.AppID, EvAsk, ActorRunner, map[string]any{"questions": questions})
+	return err
 }
 
 // BeginSubmit registers the submit of the run's application.
@@ -145,7 +144,7 @@ func (r *Runs) Submitted(ctx context.Context, ref RunRef, confirmed bool, effect
 // Park stops the run for a human look.
 func (r *Runs) Park(ctx context.Context, ref RunRef, reason, screenshot string) error {
 	if _, err := r.apps.Fire(ctx, ref.UserID, ref.AppID, EvPark, ActorRunner,
-		map[string]any{"reason": reason, "screenshot": screenshot}); err != nil {
+		map[string]any{"reason": reason, "screenshot": screenshot}); err != nil && !errors.Is(err, ErrTransition) {
 		return err
 	}
 	return r.store.FinishRun(ctx, ref, "parked", r.apps.now())

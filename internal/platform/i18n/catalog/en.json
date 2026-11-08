@@ -314,5 +314,13 @@
   "texts.name": "Name",
   "texts.placeholders": "Placeholders: {list}",
   "texts.text": "Reusable texts for cover letters and free-text fields. getafjob fills placeholders from your profile and the job, and never sends a text with an empty placeholder.",
-  "texts.title": "Text blocks"
+  "texts.title": "Text blocks",
+  "handoff.title": "Remote browser",
+  "handoff.connecting": "Connecting to remote browser...",
+  "handoff.continue": "Continue",
+  "handoff.park": "Park",
+  "handoff.push": "Enable push notifications",
+  "handoff.questions": "Questions for this application",
+  "handoff.questions_hint": "Answers are saved to your answer bank for future applications.",
+  "handoff.save_continue": "Save and continue"
 }

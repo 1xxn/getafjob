@@ -300,6 +300,8 @@
   }
   .description { white-space: pre-line; max-inline-size: var(--measure); }
   .pager { display: flex; gap: var(--space-4); margin-block-start: var(--space-6); }
+  .screencast { max-inline-size: 100%; block-size: auto; border: 1px solid var(--line); display: block; background: #000; }
+  .actions { display: flex; flex-wrap: wrap; gap: var(--space-3); margin-block-start: var(--space-3); }
 }
 
 @layer components {

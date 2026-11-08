@@ -16,10 +16,12 @@ import (
 	"github.com/a-h/templ"
 	"golang.org/x/time/rate"
 
+	"github.com/1xxn/getafjob/internal/application"
 	"github.com/1xxn/getafjob/internal/identity"
 	"github.com/1xxn/getafjob/internal/matching"
 	"github.com/1xxn/getafjob/internal/platform/httpx"
 	"github.com/1xxn/getafjob/internal/platform/i18n"
+	"github.com/1xxn/getafjob/internal/platform/webpush"
 	"github.com/1xxn/getafjob/internal/profile"
 	"github.com/1xxn/getafjob/internal/profile/cvimport"
 	"github.com/1xxn/getafjob/internal/web/views"
@@ -32,14 +34,18 @@ var staticFiles embed.FS
 
 // Server holds the dependencies of the UI.
 type Server struct {
-	Identity  *identity.Service
-	Profile   *profile.Service
-	Documents *profile.Documents
-	Items     *profile.Items
-	Importer  *cvimport.Importer // nil: no CV import
-	Jobs      *matching.Listings
-	Logger    *slog.Logger
-	limiter   *limiter
+	Identity       *identity.Service
+	Profile        *profile.Service
+	Documents      *profile.Documents
+	Items          *profile.Items
+	Importer       *cvimport.Importer // nil: no CV import
+	Jobs           *matching.Listings
+	Apps           *application.Service
+	Handoffs       HandoffHub
+	PushStore      webpush.Store
+	VAPIDPublicKey string
+	Logger         *slog.Logger
+	limiter        *limiter
 }
 
 // Register adds all UI routes to mux.
@@ -48,6 +54,10 @@ func (s *Server) Register(mux *http.ServeMux) {
 	sub, _ := fs.Sub(staticFiles, "static")
 	static := http.StripPrefix("/static/", http.FileServerFS(sub))
 	mux.Handle("GET /static/", cacheFor(time.Hour, static))
+	mux.Handle("GET /sw.js", cacheFor(time.Hour, http.HandlerFunc(s.serviceWorker)))
+	mux.Handle("GET /push/key", http.HandlerFunc(s.vapidPublicKey))
+	mux.Handle("POST /push/subscribe", s.limited(s.page(s.pushSubscribe)))
+	mux.Handle("DELETE /push/subscribe", s.limited(s.page(s.pushUnsubscribe)))
 	mux.Handle("GET /speculation-rules", cacheFor(time.Hour, http.HandlerFunc(speculationRules)))
 
 	mux.Handle("GET /{$}", s.page(s.home))
@@ -60,6 +70,10 @@ func (s *Server) Register(mux *http.ServeMux) {
 	mux.Handle("POST /logout", s.page(s.logout))
 	mux.Handle("GET /jobs", s.page(s.jobsPage))
 	mux.Handle("GET /jobs/{id}", s.page(s.jobPage))
+	mux.Handle("GET /applications/{id}", s.page(s.applicationPage))
+	mux.Handle("GET /applications/{id}/screen", s.page(s.screenWebSocket))
+	mux.Handle("POST /applications/{id}/answer", s.page(s.applicationAnswer))
+	mux.Handle("POST /applications/{id}/park", s.page(s.applicationPark))
 	mux.Handle("GET /profile", s.page(s.profilePage))
 	mux.Handle("POST /profile", s.page(s.profileSave))
 	mux.Handle("GET /preferences", s.page(s.preferencesPage))

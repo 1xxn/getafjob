@@ -1,0 +1,65 @@
+package views
+
+import "strconv"
+
+// HandoffQuestion is one question asked during a run.
+type HandoffQuestion struct {
+	Kind     string
+	Question string
+	Draft    string
+}
+
+// HandoffData fills the remote browser and handoff page.
+type HandoffData struct {
+	Name      string
+	AppID     string
+	JobTitle  string
+	Company   string
+	Questions []HandoffQuestion
+}
+
+templ HandoffPage(d HandoffData) {
+	@Layout(Page{Title: T(ctx, "handoff.title"), UserName: d.Name, Handoff: true}) {
+		@Section(d.Company + " · " + d.JobTitle) {
+			<p><a href="/jobs">{ T(ctx, "jobs.back") }</a></p>
+			<p class="muted" id="screen-status">{ T(ctx, "handoff.connecting") }</p>
+
+			<div class="remote-browser-box">
+				<canvas
+					id="screencast"
+					class="screencast"
+					data-app={ d.AppID }
+					width="1280"
+					height="800"
+					tabindex="0"
+				></canvas>
+				<div class="actions">
+					<button type="button" id="btn-resume">{ T(ctx, "handoff.continue") }</button>
+					<form method="post" action={ templ.SafeURL("/applications/" + d.AppID + "/park") }>
+						<button type="submit" id="btn-park" class="secondary">{ T(ctx, "handoff.park") }</button>
+					</form>
+					<button type="button" id="btn-push" class="secondary">{ T(ctx, "handoff.push") }</button>
+				</div>
+			</div>
+
+			if len(d.Questions) > 0 {
+				<div class="form-section stack">
+					<h2>{ T(ctx, "handoff.questions") }</h2>
+					<p class="muted">{ T(ctx, "handoff.questions_hint") }</p>
+					<form method="post" action={ templ.SafeURL("/applications/" + d.AppID + "/answer") } class="stack">
+						for i, q := range d.Questions {
+							<div class="field">
+								<label for={ "q-" + strconv.Itoa(i) }>{ q.Question }</label>
+								<input type="hidden" name="question" value={ q.Question }/>
+								<textarea id={ "q-" + strconv.Itoa(i) } name="answer" rows="3">{ q.Draft }</textarea>
+							</div>
+						}
+						<div class="actions">
+							<button type="submit">{ T(ctx, "handoff.save_continue") }</button>
+						</div>
+					</form>
+				</div>
+			}
+		}
+	}
+}

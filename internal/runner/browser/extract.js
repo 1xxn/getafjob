@@ -318,6 +318,9 @@
   }
 
   // CAPTCHA signals
+  const captchaToken = Array.from(document.querySelectorAll(
+    '[name="g-recaptcha-response"], [name="h-captcha-response"], [name="cf-turnstile-response"], [name="frc-captcha-solution"]'
+  )).some((t) => typeof t.value === "string" && t.value.trim().length > 0);
   const captcha = [];
   for (const el of all) {
     const src = (el.tagName === "IFRAME" ? el.src || "" : "").toLowerCase();
@@ -344,6 +347,7 @@
     buttons,
     errors,
     captcha,
+    captcha_token: captchaToken,
     headings,
     text: (document.body ? document.body.innerText : "").slice(0, frameIndex === 0 ? 6000 : 1500),
   };

@@ -14,6 +14,7 @@ import (
 	"time"
 
 	"connectrpc.com/connect"
+	"github.com/go-rod/rod"
 	"github.com/go-rod/rod/lib/proto"
 
 	runnerv1 "github.com/1xxn/getafjob/internal/gen/proto/runner/v1"
@@ -27,12 +28,13 @@ import (
 
 // Agent leases and runs applications.
 type Agent struct {
-	Client  runnerv1connect.RunnerServiceClient
-	Secret  string
-	Browser browser.Options
-	Logger  *slog.Logger
-	Poll    time.Duration // between leases when there is nothing to do; 0: 15 s
-	Wait    time.Duration // per click; 0: the engine's default
+	Client      runnerv1connect.RunnerServiceClient
+	Secret      string
+	Browser     browser.Options
+	Logger      *slog.Logger
+	Poll        time.Duration // between leases when there is nothing to do; 0: 15 s
+	Wait        time.Duration // per click; 0: the engine's default
+	HandoffHold time.Duration // how long a handoff keeps the browser open; 0: 15 min
 }
 
 func auth[T any](msg *T, token string) *connect.Request[T] {
@@ -125,17 +127,118 @@ func (a *Agent) RunOne(ctx context.Context, run *runnerv1.Run) error {
 		shot, _ := p.Screenshot(false, nil)
 		return c.Park(ctx, "find the form: "+err.Error(), shot)
 	}
-	err = e.Run(ctx, form)
-	switch {
-	case err == nil, errors.Is(err, engine.ErrAsked), errors.Is(err, engine.ErrParked):
-		return nil
-	case c.submitting:
-		// The submit was registered and the click may have gone out: no report; the server turns the run into
-		// submit_unknown, which is reconciled and never retried.
-		return err
-	default:
-		shot, _ := form.Screenshot(false, nil)
-		return errors.Join(err, c.Park(ctx, "run: "+err.Error(), shot))
+	for {
+		err = e.Run(ctx, form)
+		switch {
+		case errors.Is(err, engine.ErrAsked):
+			ans, ok, herr := a.handoff(ctx, form, c, run)
+			if herr != nil {
+				return herr
+			}
+			if !ok {
+				return nil
+			}
+			for _, an := range ans {
+				k.Answers = append(k.Answers, planner.Answer{ID: an.GetId(), Question: an.GetQuestion(), Answer: an.GetAnswer()})
+			}
+			e.Planner = &planner.Planner{K: k}
+		case err == nil, errors.Is(err, engine.ErrParked):
+			return nil
+		case c.submitting:
+			// The submit was registered and the click may have gone out: no report; the server turns the run into
+			// submit_unknown, which is reconciled and never retried.
+			return err
+		default:
+			shot, _ := form.Screenshot(false, nil)
+			return errors.Join(err, c.Park(ctx, "run: "+err.Error(), shot))
+		}
+	}
+}
+
+// handoff holds the browser session for the user (default 15 min), streams screencast frames to the gateway,
+// and dispatches user input back to Chromium without ever logging or storing the input.
+func (a *Agent) handoff(ctx context.Context, p *rod.Page, c *coordinator, run *runnerv1.Run) ([]*runnerv1.Answer, bool, error) {
+	hold := a.HandoffHold
+	if hold <= 0 {
+		hold = 15 * time.Minute
+	}
+	hctx, cancel := context.WithTimeout(ctx, hold)
+	defer cancel()
+
+	tok := run.GetToken()
+	if _, err := a.Client.Handoff(hctx, auth(&runnerv1.HandoffRequest{}, tok)); err != nil {
+		if connect.CodeOf(err) == connect.CodeUnimplemented {
+			return nil, false, nil
+		}
+		return nil, false, err
+	}
+	defer func() {
+		_, _ = a.Client.Handoff(context.WithoutCancel(ctx), auth(&runnerv1.HandoffRequest{Done: true}, tok))
+	}()
+
+	quality := 70
+	if err := (proto.PageStartScreencast{
+		Format:  proto.PageStartScreencastFormatJpeg,
+		Quality: &quality,
+	}).Call(p); err != nil {
+		return nil, false, err
+	}
+	defer func() { _ = (proto.PageStopScreencast{}).Call(p) }()
+
+	sctx, stopScreencast := context.WithCancel(hctx)
+	waitEvents := p.Context(sctx).EachEvent(func(e *proto.PageScreencastFrame) {
+		_, _ = a.Client.Handoff(sctx, auth(&runnerv1.HandoffRequest{Frame: e.Data}, tok))
+		_ = (proto.PageScreencastFrameAck{SessionID: e.SessionID}).Call(p)
+	})
+	eventsDone := make(chan struct{})
+	go func() {
+		waitEvents()
+		close(eventsDone)
+	}()
+	defer func() {
+		stopScreencast()
+		<-eventsDone
+	}()
+
+	for {
+		res, err := a.Client.Handoff(hctx, auth(&runnerv1.HandoffRequest{Wait: true}, tok))
+		if err != nil {
+			if connect.CodeOf(err) == connect.CodeUnimplemented {
+				return nil, false, nil
+			}
+			if hctx.Err() != nil {
+				shot, _ := p.Screenshot(false, nil)
+				return nil, false, c.Park(ctx, "handoff window closed", shot)
+			}
+			return nil, false, err
+		}
+		for _, ev := range res.Msg.GetEvents() {
+			switch {
+			case ev.GetResume():
+				return ev.GetAnswers(), true, nil
+			case ev.GetPark():
+				shot, _ := p.Screenshot(false, nil)
+				return nil, false, c.Park(ctx, "parked by user during handoff", shot)
+			case ev.GetMouse() != nil:
+				m := ev.GetMouse()
+				_ = (proto.InputDispatchMouseEvent{
+					Type:       proto.InputDispatchMouseEventType(m.GetType()),
+					X:          m.GetX(),
+					Y:          m.GetY(),
+					Button:     proto.InputMouseButton(m.GetButton()),
+					ClickCount: int(m.GetClickCount()),
+				}).Call(p)
+			case ev.GetKey() != nil:
+				k := ev.GetKey()
+				_ = (proto.InputDispatchKeyEvent{
+					Type:                  proto.InputDispatchKeyEventType(k.GetType()),
+					Text:                  k.GetText(),
+					Key:                   k.GetKey(),
+					Code:                  k.GetCode(),
+					WindowsVirtualKeyCode: int(k.GetWindowsVirtualKeyCode()),
+				}).Call(p)
+			}
+		}
 	}
 }
 

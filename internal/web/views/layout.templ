@@ -18,6 +18,9 @@ templ Layout(p Page) {
 			if p.Passkeys {
 				<script type="module" src="/static/js/passkey.js" nonce={ templ.GetNonce(ctx) }></script>
 			}
+			if p.Handoff {
+				<script type="module" src="/static/js/handoff.js" nonce={ templ.GetNonce(ctx) }></script>
+			}
 		</head>
 		<body>
 			<a class="skip" href="#main">{ T(ctx, "nav.skip") }</a>

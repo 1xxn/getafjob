@@ -1,0 +1,313 @@
+package web
+
+import (
+	"context"
+	"encoding/json"
+	"errors"
+	"net/http"
+	"strings"
+
+	"github.com/coder/websocket"
+	"github.com/google/uuid"
+
+	"github.com/1xxn/getafjob/internal/application"
+	"github.com/1xxn/getafjob/internal/gateway"
+	runnerv1 "github.com/1xxn/getafjob/internal/gen/proto/runner/v1"
+	"github.com/1xxn/getafjob/internal/identity"
+	"github.com/1xxn/getafjob/internal/profile"
+	"github.com/1xxn/getafjob/internal/web/views"
+)
+
+// HandoffHub accesses active runner handoff sessions.
+type HandoffHub interface {
+	SessionFor(appID uuid.UUID) (*gateway.HandoffSession, bool)
+}
+
+type screenInputMsg struct {
+	Type                  string  `json:"type"`
+	Action                string  `json:"action"`
+	X                     float64 `json:"x"`
+	Y                     float64 `json:"y"`
+	Button                string  `json:"button"`
+	ClickCount            int32   `json:"clickCount"`
+	Text                  string  `json:"text"`
+	Key                   string  `json:"key"`
+	Code                  string  `json:"code"`
+	WindowsVirtualKeyCode int32   `json:"windowsVirtualKeyCode"`
+}
+
+// screenWebSocket upgrades the connection to WebSocket and streams the live screencast frames to the user
+// while dispatching mouse and keyboard input back to the runner. Input is never logged or stored.
+func (s *Server) screenWebSocket(w http.ResponseWriter, r *http.Request, u *identity.User) {
+	if u == nil {
+		http.Error(w, "unauthorized", http.StatusUnauthorized)
+		return
+	}
+	appID, err := uuid.Parse(r.PathValue("id"))
+	if err != nil {
+		http.Error(w, "invalid application id", http.StatusBadRequest)
+		return
+	}
+
+	if s.Apps != nil {
+		if _, err := s.Apps.Get(r.Context(), u.ID, appID); err != nil {
+			if errors.Is(err, application.ErrNotFound) {
+				http.NotFound(w, r)
+				return
+			}
+			http.Error(w, "internal error", http.StatusInternalServerError)
+			return
+		}
+	}
+
+	if s.Handoffs == nil {
+		http.Error(w, "handoffs unavailable", http.StatusServiceUnavailable)
+		return
+	}
+	sess, ok := s.Handoffs.SessionFor(appID)
+	if !ok {
+		http.Error(w, "no active browser session", http.StatusNotFound)
+		return
+	}
+
+	ws, err := websocket.Accept(w, r, &websocket.AcceptOptions{
+		Subprotocols: []string{"getafjob-screencast"},
+	})
+	if err != nil {
+		return
+	}
+	defer func() { _ = ws.Close(websocket.StatusNormalClosure, "") }()
+
+	ctx, cancel := context.WithCancel(r.Context())
+	defer cancel()
+
+	// Forward screencast frames to the client
+	go func() {
+		if last := sess.LastFrame(); len(last) > 0 {
+			if err := ws.Write(ctx, websocket.MessageBinary, last); err != nil {
+				return
+			}
+		}
+		for {
+			select {
+			case <-ctx.Done():
+				return
+			case <-sess.Done:
+				_ = ws.Close(websocket.StatusNormalClosure, "session ended")
+				return
+			case frame, ok := <-sess.Frames:
+				if !ok {
+					return
+				}
+				if err := ws.Write(ctx, websocket.MessageBinary, frame); err != nil {
+					return
+				}
+			}
+		}
+	}()
+
+	// Receive input from the client and forward to the runner (never logged)
+	for {
+		typ, data, err := ws.Read(ctx)
+		if err != nil {
+			return
+		}
+		if typ != websocket.MessageText {
+			continue
+		}
+		var in screenInputMsg
+		if err := json.Unmarshal(data, &in); err != nil {
+			continue
+		}
+		switch in.Type {
+		case "resume":
+			if s.Apps != nil {
+				_, _ = s.Apps.Fire(ctx, u.ID, appID, application.EvAnswer, application.ActorUser, nil)
+			}
+			select {
+			case sess.Input <- &runnerv1.HandoffEvent{Msg: &runnerv1.HandoffEvent_Resume{Resume: true}}:
+			default:
+			}
+		case "park":
+			if s.Apps != nil {
+				_, _ = s.Apps.Fire(ctx, u.ID, appID, application.EvPark, application.ActorUser, map[string]any{"reason": "parked by user"})
+			}
+			select {
+			case sess.Input <- &runnerv1.HandoffEvent{Msg: &runnerv1.HandoffEvent_Park{Park: true}}:
+			default:
+			}
+		case "mouse":
+			select {
+			case sess.Input <- &runnerv1.HandoffEvent{
+				Msg: &runnerv1.HandoffEvent_Mouse{
+					Mouse: &runnerv1.InputMouseEvent{
+						Type:       in.Action,
+						X:          in.X,
+						Y:          in.Y,
+						Button:     in.Button,
+						ClickCount: in.ClickCount,
+					},
+				},
+			}:
+			default:
+			}
+		case "key":
+			select {
+			case sess.Input <- &runnerv1.HandoffEvent{
+				Msg: &runnerv1.HandoffEvent_Key{
+					Key: &runnerv1.InputKeyEvent{
+						Type:                  in.Action,
+						Text:                  in.Text,
+						Key:                   in.Key,
+						Code:                  in.Code,
+						WindowsVirtualKeyCode: in.WindowsVirtualKeyCode,
+					},
+				},
+			}:
+			default:
+			}
+		}
+	}
+}
+
+// applicationAnswer saves answers provided during a handoff to the answer bank and resumes the application.
+func (s *Server) applicationAnswer(w http.ResponseWriter, r *http.Request, u *identity.User) {
+	if u == nil {
+		http.Redirect(w, r, "/login", http.StatusSeeOther)
+		return
+	}
+	appID, err := uuid.Parse(r.PathValue("id"))
+	if err != nil {
+		s.notFound(w, r, u)
+		return
+	}
+
+	if err := r.ParseForm(); err != nil {
+		s.failed(w, r, u, err)
+		return
+	}
+
+	questions := r.Form["question"]
+	answers := r.Form["answer"]
+	var saved []*runnerv1.Answer
+	for i := range questions {
+		q := strings.TrimSpace(questions[i])
+		if i >= len(answers) || q == "" {
+			continue
+		}
+		a := strings.TrimSpace(answers[i])
+		if a == "" {
+			continue
+		}
+		id := uuid.New()
+		if s.Items != nil {
+			if savedID, err := s.Items.SaveAnswer(r.Context(), u.ID, profile.Answer{Question: q, Answer: a}); err == nil {
+				id = savedID
+			}
+		}
+		saved = append(saved, &runnerv1.Answer{Id: id.String(), Question: q, Answer: a})
+	}
+
+	var sess *gateway.HandoffSession
+	if s.Handoffs != nil {
+		sess, _ = s.Handoffs.SessionFor(appID)
+	}
+
+	if s.Apps != nil {
+		if sess != nil {
+			_, _ = s.Apps.Fire(r.Context(), u.ID, appID, application.EvAnswer, application.ActorUser, nil)
+		} else {
+			// No live browser session (e.g. after a restart or hold timeout): park if still waiting and requeue.
+			_, _ = s.Apps.Fire(r.Context(), u.ID, appID, application.EvPark, application.ActorUser, map[string]any{"reason": "answered without active session"})
+			_, _ = s.Apps.Fire(r.Context(), u.ID, appID, application.EvRequeue, application.ActorUser, nil)
+		}
+	}
+
+	if sess != nil {
+		select {
+		case sess.Input <- &runnerv1.HandoffEvent{
+			Msg:     &runnerv1.HandoffEvent_Resume{Resume: true},
+			Answers: saved,
+		}:
+		default:
+		}
+	}
+
+	http.Redirect(w, r, "/jobs", http.StatusSeeOther)
+}
+
+func (s *Server) applicationPage(w http.ResponseWriter, r *http.Request, u *identity.User) {
+	if u == nil {
+		http.Redirect(w, r, "/login", http.StatusSeeOther)
+		return
+	}
+	appID, err := uuid.Parse(r.PathValue("id"))
+	if err != nil {
+		s.notFound(w, r, u)
+		return
+	}
+	var title, company string
+	var qs []views.HandoffQuestion
+	if s.Apps != nil {
+		app, err := s.Apps.Get(r.Context(), u.ID, appID)
+		if err != nil {
+			if errors.Is(err, application.ErrNotFound) {
+				s.notFound(w, r, u)
+				return
+			}
+			s.failed(w, r, u, err)
+			return
+		}
+		if s.Jobs != nil {
+			if j, err := s.Jobs.Detail(r.Context(), u.ID, app.JobID); err == nil {
+				title = j.Title
+				company = j.Company
+			}
+		}
+		if app.State == application.NeedsInput || app.State == application.Parked {
+			if asked, err := s.Apps.Questions(r.Context(), u.ID, appID); err == nil {
+				for _, q := range asked {
+					if q.Kind != "captcha" && q.Label != "" {
+						qs = append(qs, views.HandoffQuestion{Kind: q.Kind, Question: q.Label, Draft: q.Draft})
+					}
+				}
+			}
+		}
+	}
+	d := views.HandoffData{
+		Name:      u.DisplayName,
+		AppID:     appID.String(),
+		JobTitle:  title,
+		Company:   company,
+		Questions: qs,
+	}
+	s.render(w, r, http.StatusOK, views.HandoffPage(d))
+}
+
+// applicationPark parks the application from the UI.
+func (s *Server) applicationPark(w http.ResponseWriter, r *http.Request, u *identity.User) {
+	if u == nil {
+		http.Redirect(w, r, "/login", http.StatusSeeOther)
+		return
+	}
+	appID, err := uuid.Parse(r.PathValue("id"))
+	if err != nil {
+		s.notFound(w, r, u)
+		return
+	}
+
+	if s.Apps != nil {
+		_, _ = s.Apps.Fire(r.Context(), u.ID, appID, application.EvPark, application.ActorUser, map[string]any{"reason": "parked by user"})
+	}
+
+	if s.Handoffs != nil {
+		if sess, ok := s.Handoffs.SessionFor(appID); ok {
+			select {
+			case sess.Input <- &runnerv1.HandoffEvent{Msg: &runnerv1.HandoffEvent_Park{Park: true}}:
+			default:
+			}
+		}
+	}
+
+	http.Redirect(w, r, "/jobs", http.StatusSeeOther)
+}

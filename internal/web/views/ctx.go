@@ -44,4 +44,6 @@ type Page struct {
 	UserName string // empty: signed out
 	// Passkeys loads the passkey script (pages with passkey buttons).
 	Passkeys bool
+	// Handoff loads the remote browser screencast script.
+	Handoff bool
 }

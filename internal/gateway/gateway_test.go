@@ -167,3 +167,44 @@ func TestGateway(t *testing.T) {
 		t.Fatalf("state = %s", state)
 	}
 }
+
+func TestGatewayAskQuestionsSurviveRestartAndStreamHandoff(t *testing.T) {
+	pool, apps, c, _ := setup(t)
+	ctx := t.Context()
+	reg, err := c.Register(ctx, with(&runnerv1.RegisterRequest{Version: "test"}, secret))
+	if err != nil {
+		t.Fatal(err)
+	}
+	u := queue(t, pool, apps)
+	l, err := c.Lease(ctx, with(&runnerv1.LeaseRequest{RunnerId: reg.Msg.GetRunnerId()}, secret))
+	if err != nil || l.Msg.GetRun() == nil {
+		t.Fatalf("lease: %v", err)
+	}
+	tok := l.Msg.GetRun().GetToken()
+
+	if _, err := c.Ask(ctx, with(&runnerv1.AskRequest{Questions: []*runnerv1.Question{
+		{Kind: "field", Label: "Earliest start date?", Draft: "2027-01-01"},
+	}}, tok)); err != nil {
+		t.Fatalf("ask: %v", err)
+	}
+
+	var appID uuid.UUID
+	_ = db.InUserTx(ctx, pool, u, func(tx pgx.Tx) error {
+		return tx.QueryRow(ctx, "SELECT id FROM applications").Scan(&appID)
+	})
+
+	// Fresh service on the same pool simulates a server restart: questions are loaded from application_events.
+	restarted := application.NewService(pgstore.New(pool))
+	qs, err := restarted.Questions(ctx, u, appID)
+	if err != nil || len(qs) != 1 || qs[0].Label != "Earliest start date?" || qs[0].Draft != "2027-01-01" {
+		t.Fatalf("questions after restart = %+v, %v", qs, err)
+	}
+
+	// Handoff stays authorized while in needs_input.
+	if _, err := c.Handoff(ctx, with(&runnerv1.HandoffRequest{Frame: []byte{0xff, 0xd8, 0xff, 0xd9}}, tok)); err != nil {
+		t.Fatalf("handoff frame: %v", err)
+	}
+	if _, err := c.Handoff(ctx, with(&runnerv1.HandoffRequest{Done: true}, tok)); err != nil {
+		t.Fatalf("handoff done: %v", err)
+	}
+}

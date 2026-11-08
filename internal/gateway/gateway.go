@@ -16,6 +16,7 @@ import (
 	"net/http"
 	"slices"
 	"strings"
+	"sync"
 	"time"
 
 	"connectrpc.com/connect"
@@ -48,12 +49,44 @@ type Screenshots interface {
 
 // Server implements the runner service.
 type Server struct {
-	Runs   *application.Runs
-	Apps   *application.Service
-	Data   Data
-	Shots  Screenshots
-	Secret string // shared by the server's runners; empty: no runner can register
-	Logger *slog.Logger
+	Runs     *application.Runs
+	Apps     *application.Service
+	Data     Data
+	Shots    Screenshots
+	Secret   string // shared by the server's runners; empty: no runner can register
+	Logger   *slog.Logger
+	Notify   func(ctx context.Context, userID, appID uuid.UUID)
+	handoffs sync.Map // map[uuid.UUID]*HandoffSession
+}
+
+// HandoffSession coordinates a live remote browser screencast between a runner and the web UI.
+type HandoffSession struct {
+	Frames chan []byte
+	Input  chan *runnerv1.HandoffEvent
+	Done   chan struct{}
+	once   sync.Once
+	mu     sync.Mutex
+	last   []byte
+}
+
+func (h *HandoffSession) closeDone() {
+	h.once.Do(func() { close(h.Done) })
+}
+
+// LastFrame returns the most recent screencast frame of the session, if any.
+func (h *HandoffSession) LastFrame() []byte {
+	h.mu.Lock()
+	defer h.mu.Unlock()
+	return h.last
+}
+
+// SessionFor returns the active handoff session of an application, if any.
+func (s *Server) SessionFor(appID uuid.UUID) (*HandoffSession, bool) {
+	v, ok := s.handoffs.Load(appID)
+	if !ok {
+		return nil, false
+	}
+	return v.(*HandoffSession), true
 }
 
 var _ runnerv1connect.RunnerServiceHandler = (*Server)(nil)
@@ -221,7 +254,13 @@ func (s *Server) Ask(ctx context.Context, req *connect.Request[runnerv1.AskReque
 	for i, q := range qs {
 		out[i] = map[string]string{"kind": clip(q.GetKind(), 20), "label": clip(q.GetLabel(), 300), "draft": clip(q.GetDraft(), 5000)}
 	}
-	return connect.NewResponse(&runnerv1.AskResponse{}), code(s.Runs.Ask(ctx, ref, out))
+	if err := s.Runs.Ask(ctx, ref, out); err != nil {
+		return nil, code(err)
+	}
+	if s.Notify != nil {
+		s.Notify(ctx, ref.UserID, ref.AppID)
+	}
+	return connect.NewResponse(&runnerv1.AskResponse{}), nil
 }
 
 // BeginSubmit registers the submit.
@@ -264,4 +303,58 @@ func clip(s string, n int) string {
 		return s[:n]
 	}
 	return s
+}
+
+// Handoff exchanges live screencast frames and user input during an interactive handoff.
+func (s *Server) Handoff(ctx context.Context, req *connect.Request[runnerv1.HandoffRequest]) (*connect.Response[runnerv1.HandoffResponse], error) {
+	ref, err := s.run(ctx, req.Header())
+	if err != nil {
+		return nil, err
+	}
+	if req.Msg.GetDone() {
+		if v, ok := s.handoffs.LoadAndDelete(ref.AppID); ok {
+			v.(*HandoffSession).closeDone()
+		}
+		return connect.NewResponse(&runnerv1.HandoffResponse{}), nil
+	}
+	v, _ := s.handoffs.LoadOrStore(ref.AppID, &HandoffSession{
+		Frames: make(chan []byte, 4),
+		Input:  make(chan *runnerv1.HandoffEvent, 50),
+		Done:   make(chan struct{}),
+	})
+	sess := v.(*HandoffSession)
+
+	if f := req.Msg.GetFrame(); len(f) > 0 && len(f) <= maxScreenshot {
+		sess.mu.Lock()
+		sess.last = f
+		sess.mu.Unlock()
+		select {
+		case sess.Frames <- f:
+		default:
+		}
+	}
+
+	var out []*runnerv1.HandoffEvent
+	drain := func() {
+		for {
+			select {
+			case ev := <-sess.Input:
+				out = append(out, ev)
+			default:
+				return
+			}
+		}
+	}
+	drain()
+	if len(out) == 0 && req.Msg.GetWait() {
+		select {
+		case <-ctx.Done():
+			return nil, ctx.Err()
+		case <-time.After(3 * time.Second):
+		case ev := <-sess.Input:
+			out = append(out, ev)
+			drain()
+		}
+	}
+	return connect.NewResponse(&runnerv1.HandoffResponse{Events: out}), nil
 }

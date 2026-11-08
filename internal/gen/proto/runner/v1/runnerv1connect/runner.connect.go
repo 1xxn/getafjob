@@ -56,6 +56,8 @@ const (
 	RunnerServiceSubmittedProcedure = "/runner.v1.RunnerService/Submitted"
 	// RunnerServiceParkProcedure is the fully-qualified name of the RunnerService's Park RPC.
 	RunnerServiceParkProcedure = "/runner.v1.RunnerService/Park"
+	// RunnerServiceHandoffProcedure is the fully-qualified name of the RunnerService's Handoff RPC.
+	RunnerServiceHandoffProcedure = "/runner.v1.RunnerService/Handoff"
 )
 
 // RunnerServiceClient is a client for the runner.v1.RunnerService service.
@@ -78,6 +80,8 @@ type RunnerServiceClient interface {
 	Submitted(context.Context, *connect.Request[v1.SubmittedRequest]) (*connect.Response[v1.SubmittedResponse], error)
 	// Park stops the run for a human look.
 	Park(context.Context, *connect.Request[v1.ParkRequest]) (*connect.Response[v1.ParkResponse], error)
+	// Handoff exchanges screencast frames and user input during a handoff (#31).
+	Handoff(context.Context, *connect.Request[v1.HandoffRequest]) (*connect.Response[v1.HandoffResponse], error)
 }
 
 // NewRunnerServiceClient constructs a client for the runner.v1.RunnerService service. By default,
@@ -145,6 +149,12 @@ func NewRunnerServiceClient(httpClient connect.HTTPClient, baseURL string, opts 
 			connect.WithSchema(runnerServiceMethods.ByName("Park")),
 			connect.WithClientOptions(opts...),
 		),
+		handoff: connect.NewClient[v1.HandoffRequest, v1.HandoffResponse](
+			httpClient,
+			baseURL+RunnerServiceHandoffProcedure,
+			connect.WithSchema(runnerServiceMethods.ByName("Handoff")),
+			connect.WithClientOptions(opts...),
+		),
 	}
 }
 
@@ -159,6 +169,7 @@ type runnerServiceClient struct {
 	beginSubmit   *connect.Client[v1.BeginSubmitRequest, v1.BeginSubmitResponse]
 	submitted     *connect.Client[v1.SubmittedRequest, v1.SubmittedResponse]
 	park          *connect.Client[v1.ParkRequest, v1.ParkResponse]
+	handoff       *connect.Client[v1.HandoffRequest, v1.HandoffResponse]
 }
 
 // Register calls runner.v1.RunnerService.Register.
@@ -206,6 +217,11 @@ func (c *runnerServiceClient) Park(ctx context.Context, req *connect.Request[v1.
 	return c.park.CallUnary(ctx, req)
 }
 
+// Handoff calls runner.v1.RunnerService.Handoff.
+func (c *runnerServiceClient) Handoff(ctx context.Context, req *connect.Request[v1.HandoffRequest]) (*connect.Response[v1.HandoffResponse], error) {
+	return c.handoff.CallUnary(ctx, req)
+}
+
 // RunnerServiceHandler is an implementation of the runner.v1.RunnerService service.
 type RunnerServiceHandler interface {
 	// Register announces a runner and its capabilities and returns its ID.
@@ -226,6 +242,8 @@ type RunnerServiceHandler interface {
 	Submitted(context.Context, *connect.Request[v1.SubmittedRequest]) (*connect.Response[v1.SubmittedResponse], error)
 	// Park stops the run for a human look.
 	Park(context.Context, *connect.Request[v1.ParkRequest]) (*connect.Response[v1.ParkResponse], error)
+	// Handoff exchanges screencast frames and user input during a handoff (#31).
+	Handoff(context.Context, *connect.Request[v1.HandoffRequest]) (*connect.Response[v1.HandoffResponse], error)
 }
 
 // NewRunnerServiceHandler builds an HTTP handler from the service implementation. It returns the
@@ -289,6 +307,12 @@ func NewRunnerServiceHandler(svc RunnerServiceHandler, opts ...connect.HandlerOp
 		connect.WithSchema(runnerServiceMethods.ByName("Park")),
 		connect.WithHandlerOptions(opts...),
 	)
+	runnerServiceHandoffHandler := connect.NewUnaryHandler(
+		RunnerServiceHandoffProcedure,
+		svc.Handoff,
+		connect.WithSchema(runnerServiceMethods.ByName("Handoff")),
+		connect.WithHandlerOptions(opts...),
+	)
 	return "/runner.v1.RunnerService/", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch r.URL.Path {
 		case RunnerServiceRegisterProcedure:
@@ -309,6 +333,8 @@ func NewRunnerServiceHandler(svc RunnerServiceHandler, opts ...connect.HandlerOp
 			runnerServiceSubmittedHandler.ServeHTTP(w, r)
 		case RunnerServiceParkProcedure:
 			runnerServiceParkHandler.ServeHTTP(w, r)
+		case RunnerServiceHandoffProcedure:
+			runnerServiceHandoffHandler.ServeHTTP(w, r)
 		default:
 			http.NotFound(w, r)
 		}
@@ -352,4 +378,8 @@ func (UnimplementedRunnerServiceHandler) Submitted(context.Context, *connect.Req
 
 func (UnimplementedRunnerServiceHandler) Park(context.Context, *connect.Request[v1.ParkRequest]) (*connect.Response[v1.ParkResponse], error) {
 	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("runner.v1.RunnerService.Park is not implemented"))
+}
+
+func (UnimplementedRunnerServiceHandler) Handoff(context.Context, *connect.Request[v1.HandoffRequest]) (*connect.Response[v1.HandoffResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("runner.v1.RunnerService.Handoff is not implemented"))
 }

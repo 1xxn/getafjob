@@ -30,10 +30,25 @@ const token = "run-token-0123456789abcdef0123456789abcdef0123"
 // gateway is a fake gateway that records the run's calls.
 type gateway struct {
 	runnerv1connect.UnimplementedRunnerServiceHandler
-	mu    sync.Mutex
-	calls []string
-	asked []*runnerv1.Question
-	shots int
+	mu      sync.Mutex
+	calls   []string
+	asked   []*runnerv1.Question
+	shots   int
+	handoff func(*runnerv1.HandoffRequest) (*runnerv1.HandoffResponse, error)
+}
+
+func (g *gateway) Handoff(ctx context.Context, r *connect.Request[runnerv1.HandoffRequest]) (*connect.Response[runnerv1.HandoffResponse], error) {
+	if err := check(r.Header()); err != nil {
+		return nil, err
+	}
+	if g.handoff == nil {
+		return g.UnimplementedRunnerServiceHandler.Handoff(ctx, r)
+	}
+	res, err := g.handoff(r.Msg)
+	if err != nil {
+		return nil, err
+	}
+	return connect.NewResponse(res), nil
 }
 
 func (g *gateway) log(s string) { g.mu.Lock(); g.calls = append(g.calls, s); g.mu.Unlock() }
@@ -173,5 +188,25 @@ func TestRunAsksForUnknownFields(t *testing.T) {
 	}
 	if len(g.asked) != 1 || slices.Contains(g.calls, "begin_submit") || len(subs()) != 0 {
 		t.Fatalf("asked %v, calls %v", g.asked, g.calls)
+	}
+}
+
+func TestRunHandoffResumesWithAnswerAndSubmits(t *testing.T) {
+	g, a, site, subs := setup(t)
+	g.handoff = func(req *runnerv1.HandoffRequest) (*runnerv1.HandoffResponse, error) {
+		if !req.GetWait() {
+			return &runnerv1.HandoffResponse{}, nil
+		}
+		return &runnerv1.HandoffResponse{Events: []*runnerv1.HandoffEvent{{
+			Msg: &runnerv1.HandoffEvent_Resume{Resume: true},
+			Answers: []*runnerv1.Answer{{Id: "0192f3a4-5b6c-7d8e-9f01-000000000003",
+				Question: "Ich willige in die Verarbeitung meiner Daten gemäß Datenschutzerklärung ein*", Answer: "Ja"}},
+		}}}, nil
+	}
+	if err := a.RunOne(t.Context(), run(site)); err != nil {
+		t.Fatalf("run: %v (calls %v)", err, g.calls)
+	}
+	if len(g.asked) != 1 || len(subs()) != 1 || !slices.Contains(g.calls, "submitted:confirmed") {
+		t.Fatalf("asked %v, subs %v, calls %v", g.asked, subs(), g.calls)
 	}
 }

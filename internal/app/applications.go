@@ -2,12 +2,17 @@ package app
 
 import (
 	"context"
+	"crypto/ecdsa"
 	"log/slog"
 	"time"
 
+	"github.com/google/uuid"
+	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/riverqueue/river"
 
 	"github.com/1xxn/getafjob/internal/application"
+	"github.com/1xxn/getafjob/internal/platform/config"
+	"github.com/1xxn/getafjob/internal/platform/webpush"
 )
 
 // RecoverArgs turns applications stuck in submitting into submit_unknown.
@@ -51,11 +56,44 @@ func (w *handoffWorker) Work(ctx context.Context, _ *river.Job[HandoffArgs]) err
 	return err
 }
 
-// logNotifier records handoff notices in the log until Web Push and mail deliver them (#31); the event row
-// already shows them in the UI.
-type logNotifier struct{ logger *slog.Logger }
+type pushNotifier struct{ push *webpush.Notifier }
 
-func (n logNotifier) HandoffClosing(ctx context.Context, r application.Ref, until time.Time) error {
-	n.logger.InfoContext(ctx, "handoff window closing", "application", r.ID, "until", until)
-	return nil
+func (n pushNotifier) HandoffClosing(ctx context.Context, r application.Ref, _ time.Time) error {
+	return n.push.Notify(ctx, r.UserID, webpush.NoticePayload{
+		Title: "getafjob",
+		Body:  "Your turn: an application needs your attention before the window closes.",
+		URL:   "/applications/" + r.ID.String(),
+	})
+}
+
+func (n pushNotifier) YourTurn(ctx context.Context, userID, appID uuid.UUID) {
+	if err := n.push.Notify(ctx, userID, webpush.NoticePayload{
+		Title: "getafjob",
+		Body:  "Your turn: an application needs your input.",
+		URL:   "/applications/" + appID.String(),
+	}); err != nil && n.push.Logger != nil {
+		n.push.Logger.WarnContext(ctx, "handoff push failed", "application", appID, "err", err)
+	}
+}
+
+func newPushNotifier(pool *pgxpool.Pool, cfg config.Config, logger *slog.Logger) (pushNotifier, string) {
+	var priv *ecdsa.PrivateKey
+	var pub string
+	if cfg.VAPIDKey != "" {
+		if k, err := webpush.ParsePrivateKey(cfg.VAPIDKey.Reveal()); err == nil {
+			priv = k
+			pub = webpush.PublicKeyString(k)
+		} else {
+			logger.Warn("invalid GETAFJOB_VAPID_KEY", "err", err)
+		}
+	}
+	var client *webpush.Client
+	if priv != nil {
+		subject := cfg.VAPIDSubject
+		if subject == "" {
+			subject = "mailto:" + cfg.MailFrom
+		}
+		client = &webpush.Client{VAPIDKey: priv, Subject: subject}
+	}
+	return pushNotifier{push: &webpush.Notifier{Store: webpush.NewStore(pool), Client: client, Logger: logger}}, pub
 }

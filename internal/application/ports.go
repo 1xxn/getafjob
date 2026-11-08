@@ -61,11 +61,20 @@ type Ref struct {
 	ID, UserID uuid.UUID
 }
 
+// Question is an open question or checkpoint asked during a run.
+type Question struct {
+	Kind  string `json:"kind"`
+	Label string `json:"label"`
+	Draft string `json:"draft,omitempty"`
+}
+
 // Store persists applications per user (row-level security).
 type Store interface {
 	// Create returns the application of the user for the job, creating it in state if there is none.
 	Create(ctx context.Context, userID uuid.UUID, jobID int64, state State, at time.Time) (uuid.UUID, error)
 	Get(ctx context.Context, userID, id uuid.UUID) (App, error)
+	// Questions returns the questions of the last ask event of an application.
+	Questions(ctx context.Context, userID, id uuid.UUID) ([]Question, error)
 	// Apply writes a change if the application is still at app.Version; ErrConflict otherwise.
 	Apply(ctx context.Context, userID uuid.UUID, app App, c Change) error
 	// Candidate collects what the guards need for a job of the user.
