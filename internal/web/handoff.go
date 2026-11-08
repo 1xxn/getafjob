@@ -336,7 +336,7 @@ func (s *Server) applicationPage(w http.ResponseWriter, r *http.Request, u *iden
 					d.Suggestion = &views.SuggestionData{
 						ID:             sg.ID.String(),
 						Category:       string(sg.Category),
-						SuggestedState: string(sg.SuggestedState),
+						SuggestedState: sg.SuggestedState,
 						Reasons:        sg.Reasons,
 						From:           sg.MessageFrom,
 						Subject:        sg.MessageSubject,
