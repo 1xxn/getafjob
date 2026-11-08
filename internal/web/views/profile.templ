@@ -132,8 +132,26 @@ templ PreferencesPage(name string, f Form) {
 					<input id="f-mailbox_password" name="mailbox_password" type="password" maxlength="254" autocomplete="new-password"/>
 					<p class="hint">{ T(ctx, "profile.hint.mailbox_password") }</p>
 				</div>
+				<h2>{ T(ctx, "profile.notify.title") }</h2>
+				<p class="muted">{ T(ctx, "profile.notify.hint") }</p>
+				@Check("notify_email_enabled", T(ctx, "profile.field.notify_email_enabled"), f.Checks["notify_email_enabled"])
+				@Field(input(ctx, f, "notify_email_address", "email", "", 254))
+				@Check("notify_webpush_enabled", T(ctx, "profile.field.notify_webpush_enabled"), f.Checks["notify_webpush_enabled"])
+				@Check("notify_ntfy_enabled", T(ctx, "profile.field.notify_ntfy_enabled"), f.Checks["notify_ntfy_enabled"])
+				@Field(input(ctx, f, "notify_ntfy_url", "url", "", 254))
+				@Field(input(ctx, f, "notify_ntfy_topic", "text", "", 254))
+				<div class="field">
+					<label for="f-notify_ntfy_token">{ T(ctx, "profile.field.notify_ntfy_token") }</label>
+					<input id="f-notify_ntfy_token" name="notify_ntfy_token" type="password" maxlength="254" value={ f.Values["notify_ntfy_token"] } autocomplete="off"/>
+				</div>
+				@Check("notify_daily_summary_enabled", T(ctx, "profile.field.notify_daily_summary_enabled"), f.Checks["notify_daily_summary_enabled"])
+				@Field(input(ctx, f, "notify_daily_summary_time", "text", "", 5))
+				@Check("notify_quiet_hours_enabled", T(ctx, "profile.field.notify_quiet_hours_enabled"), f.Checks["notify_quiet_hours_enabled"])
+				@Field(input(ctx, f, "notify_quiet_hours_start", "text", "", 5))
+				@Field(input(ctx, f, "notify_quiet_hours_end", "text", "", 5))
 				@StickyBar() {
 					<button type="submit" class="primary">{ T(ctx, "profile.save") }</button>
+					<button type="submit" formaction="/preferences/notify/test" class="secondary">{ T(ctx, "profile.notify.test") }</button>
 				}
 			</form>
 		}

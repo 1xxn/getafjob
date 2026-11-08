@@ -20,6 +20,7 @@ import (
 	"github.com/1xxn/getafjob/internal/application"
 	"github.com/1xxn/getafjob/internal/identity"
 	"github.com/1xxn/getafjob/internal/matching"
+	"github.com/1xxn/getafjob/internal/notify"
 	"github.com/1xxn/getafjob/internal/platform/httpx"
 	"github.com/1xxn/getafjob/internal/platform/i18n"
 	"github.com/1xxn/getafjob/internal/platform/webpush"
@@ -43,6 +44,13 @@ type TrackingService interface {
 	DismissSuggestion(ctx context.Context, userID, suggestionID uuid.UUID) error
 }
 
+// NotificationService manages user notification settings and test alerts.
+type NotificationService interface {
+	GetPreferences(ctx context.Context, userID uuid.UUID) (notify.Preferences, error)
+	SavePreferences(ctx context.Context, prefs notify.Preferences) error
+	SendTestNotification(ctx context.Context, userID uuid.UUID) error
+}
+
 // Server holds the dependencies of the UI.
 type Server struct {
 	Identity       *identity.Service
@@ -53,6 +61,7 @@ type Server struct {
 	Jobs           *matching.Listings
 	Apps           *application.Service
 	Tracking       TrackingService
+	Notify         NotificationService
 	Shots          Screenshots
 	Handoffs       HandoffHub
 	PushStore      webpush.Store
@@ -96,6 +105,7 @@ func (s *Server) Register(mux *http.ServeMux) {
 	mux.Handle("POST /profile", s.page(s.profileSave))
 	mux.Handle("GET /preferences", s.page(s.preferencesPage))
 	mux.Handle("POST /preferences", s.page(s.preferencesSave))
+	mux.Handle("POST /preferences/notify/test", s.page(s.notifyTest))
 	mux.Handle("GET /documents", s.page(s.documentsPage))
 	mux.Handle("POST /documents", s.page(s.documentUpload))
 	mux.Handle("GET /documents/{id}", s.page(s.documentDownload))

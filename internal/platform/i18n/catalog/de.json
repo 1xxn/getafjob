@@ -383,5 +383,21 @@
   "profile.hint.mailbox_password": "Leer lassen, um das bestehende Passwort beizubehalten",
   "handoff.suggestion.title": "Status-Vorschlag aus eingegangener E-Mail",
   "handoff.suggestion.accept": "Vorschlag übernehmen",
-  "handoff.suggestion.dismiss": "Verwerfen"
+  "handoff.suggestion.dismiss": "Verwerfen",
+  "profile.notify.title": "Benachrichtigungen & Kanäle",
+  "profile.notify.hint": "Erhalte sofortige Benachrichtigungen bei Hand-offs (CAPTCHAs, Fragen) und tägliche Zusammenfassungen über Web Push, E-Mail und ntfy.",
+  "profile.field.notify_email_enabled": "E-Mail-Benachrichtigungen aktivieren",
+  "profile.field.notify_email_address": "Benachrichtigungs-E-Mail (leer lassen für Account-Adresse)",
+  "profile.field.notify_webpush_enabled": "Web-Push-Benachrichtigungen aktivieren",
+  "profile.field.notify_ntfy_enabled": "ntfy-Benachrichtigungen aktivieren",
+  "profile.field.notify_ntfy_url": "ntfy-Server-URL",
+  "profile.field.notify_ntfy_topic": "ntfy-Topic",
+  "profile.field.notify_ntfy_token": "ntfy-Zugriffstoken (optional)",
+  "profile.field.notify_daily_summary_enabled": "Tägliche Bewerbungszusammenfassung senden",
+  "profile.field.notify_daily_summary_time": "Zustellzeit der Zusammenfassung (HH:MM UTC)",
+  "profile.field.notify_quiet_hours_enabled": "Ruhezeiten aktivieren (dringende Alarme werden dennoch zugestellt)",
+  "profile.field.notify_quiet_hours_start": "Beginn der Ruhezeit (HH:MM)",
+  "profile.field.notify_quiet_hours_end": "Ende der Ruhezeit (HH:MM)",
+  "profile.notify.test": "Test-Benachrichtigung senden",
+  "profile.notify.tested": "Test-Benachrichtigung gesendet."
 }

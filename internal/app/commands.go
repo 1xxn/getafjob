@@ -29,6 +29,7 @@ Commands:
   gen-vapid-key  print a fresh VAPID P-256 key pair for web push notifications
   invite         create a one-time invitation link (admin invite -email … [-role admin] [-send])
   inbox          queue inbox check now (the worker runs it)
+  notify         queue daily summary notification (admin notify summary)
   plan           queue planning now (the worker runs it)
   sign-out       end all sessions of one account (admin sign-out -email …)
   rotate-master-key  re-wrap all data keys with GETAFJOB_MASTER_KEY (the previous key in GETAFJOB_MASTER_KEY_OLD)
@@ -73,6 +74,8 @@ func admin(ctx context.Context, args []string, env Env) int {
 		return adminPlan(ctx, args[1:], env)
 	case "inbox":
 		return adminInbox(ctx, args[1:], env)
+	case "notify":
+		return adminNotifySummary(ctx, args[1:], env)
 	case "gen-secret":
 		b := make([]byte, 32)
 		_, _ = rand.Read(b) // crypto/rand.Read never returns an error (it crashes instead)

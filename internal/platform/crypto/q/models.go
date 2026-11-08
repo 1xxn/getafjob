@@ -165,6 +165,25 @@ type Match struct {
 	ComputedAt time.Time
 }
 
+type NotifyPreference struct {
+	UserID              uuid.UUID
+	EmailEnabled        bool
+	EmailAddress        string
+	WebpushEnabled      bool
+	NtfyEnabled         bool
+	NtfyUrl             string
+	NtfyTopic           string
+	NtfyToken           string
+	DailySummaryEnabled bool
+	DailySummaryTime    string
+	LastSummaryAt       *time.Time
+	QuietHoursEnabled   bool
+	QuietHoursStart     string
+	QuietHoursEnd       string
+	CreatedAt           time.Time
+	UpdatedAt           time.Time
+}
+
 type Passkey struct {
 	ID         []byte
 	UserID     uuid.UUID
