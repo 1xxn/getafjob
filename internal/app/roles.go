@@ -116,7 +116,7 @@ func serve(ctx context.Context, cfg config.Config, logger *slog.Logger) error {
 
 	tstore := trackingstore.New(pool)
 	tcipher := trackingcrypto.NewCipher(env)
-	trackingSvc := tracking.NewService(tstore, trackingimap.NewClient(), tcipher, apps)
+	trackingSvc := tracking.NewService(tstore, trackingimap.NewClient(), tcipher, newAppTransitionAdapter(apps))
 
 	(&web.Server{Identity: ids, Logger: logger, Profile: profiles, Documents: docs, Items: profile.NewItems(pstore, env),
 		Importer: cvimport.NewImporter(docs, profiles, extractor), Jobs: matching.NewListings(matchingstore.New(pool)),
@@ -191,7 +191,7 @@ func worker(ctx context.Context, cfg config.Config, logger *slog.Logger) error {
 	river.AddWorker(workers, &planWorker{svc: apps, logger: logger})
 	tstore := trackingstore.New(pool)
 	tcipher := trackingcrypto.NewCipher(env)
-	trackingSvc := tracking.NewService(tstore, trackingimap.NewClient(), tcipher, apps)
+	trackingSvc := tracking.NewService(tstore, trackingimap.NewClient(), tcipher, newAppTransitionAdapter(apps))
 	river.AddWorker(workers, &inboxWorker{svc: trackingSvc, logger: logger})
 	jobs, err := queue.NewWorker(pool, queue.Options{Workers: workers, Periodic: periodicJobs(cfg), Logger: logger})
 	if err != nil {

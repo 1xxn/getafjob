@@ -11,8 +11,6 @@ import (
 	"time"
 
 	"github.com/google/uuid"
-
-	"github.com/1xxn/getafjob/internal/application"
 )
 
 // Category classifies an incoming email message.
@@ -33,18 +31,25 @@ const (
 	SuggestionDismissed = "dismissed"
 )
 
+// Target application states.
+const (
+	StateConfirmed = "confirmed"
+	StateRejected  = "rejected"
+	StateInterview = "interview"
+)
+
 // ErrInvalidSuggestion reports an invalid or already processed suggestion.
 var ErrInvalidSuggestion = errors.New("invalid or already processed suggestion")
 
 // SuggestedState maps a category to the corresponding target application state.
-func SuggestedState(cat Category) (application.State, bool) {
+func SuggestedState(cat Category) (string, bool) {
 	switch cat {
 	case CategoryReceived:
-		return application.Confirmed, true
+		return StateConfirmed, true
 	case CategoryRejection:
-		return application.Rejected, true
+		return StateRejected, true
 	case CategoryInvitation:
-		return application.Interview, true
+		return StateInterview, true
 	default:
 		return "", false
 	}
@@ -66,7 +71,7 @@ type ApplicationSummary struct {
 	ID           uuid.UUID
 	UserID       uuid.UUID
 	JobID        int64
-	CurrentState application.State
+	CurrentState string
 	Company      string
 	Title        string
 	MatchKey     string
@@ -84,7 +89,7 @@ type StatusSuggestion struct {
 	MessageSubject string
 	MessageDate    time.Time
 	Category       Category
-	SuggestedState application.State
+	SuggestedState string
 	Reasons        []string
 	Status         string
 	CreatedAt      time.Time
@@ -93,7 +98,7 @@ type StatusSuggestion struct {
 	// View/display fields
 	Company      string
 	JobTitle     string
-	CurrentState application.State
+	CurrentState string
 }
 
 // Classify classifies an incoming email using heuristic rules in English and German.

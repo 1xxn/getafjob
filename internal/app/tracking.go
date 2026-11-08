@@ -10,11 +10,38 @@ import (
 	"github.com/riverqueue/river"
 	"github.com/riverqueue/river/rivertype"
 
+	"github.com/1xxn/getafjob/internal/application"
 	"github.com/1xxn/getafjob/internal/platform/config"
 	"github.com/1xxn/getafjob/internal/platform/db"
 	"github.com/1xxn/getafjob/internal/platform/queue"
 	"github.com/1xxn/getafjob/internal/tracking"
 )
+
+type appTransitionAdapter struct {
+	apps *application.Service
+}
+
+func (a *appTransitionAdapter) Transition(ctx context.Context, userID, appID uuid.UUID, state string, detail map[string]any) error {
+	var ev application.Event
+	switch application.State(state) {
+	case application.Confirmed:
+		ev = application.EvConfirm
+	case application.Rejected:
+		ev = application.EvReject
+	case application.Interview:
+		ev = application.EvInterview
+	default:
+		return fmt.Errorf("unsupported suggestion state transition: %s", state)
+	}
+
+	_, err := a.apps.Fire(ctx, userID, appID, ev, application.ActorUser, detail)
+	return err
+}
+
+// newAppTransitionAdapter adapts application.Service to tracking.ApplicationUpdater.
+func newAppTransitionAdapter(apps *application.Service) tracking.ApplicationUpdater {
+	return &appTransitionAdapter{apps: apps}
+}
 
 // InboxArgs triggers an inbox check for a single user or all enabled mailboxes.
 type InboxArgs struct {

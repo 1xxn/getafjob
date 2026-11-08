@@ -8,26 +8,19 @@ import (
 	"time"
 
 	"github.com/google/uuid"
-
-	"github.com/1xxn/getafjob/internal/application"
 )
-
-// AppService executes state transitions for applications.
-type AppService interface {
-	Fire(ctx context.Context, userID, appID uuid.UUID, ev application.Event, actor application.Actor, detail map[string]any) (application.State, error)
-}
 
 // Service orchestrates inbox tracking, mailbox configuration, and status suggestions.
 type Service struct {
 	store  Store
 	client MailboxClient
 	cipher PasswordCipher
-	apps   AppService
+	apps   ApplicationUpdater
 	now    func() time.Time
 }
 
 // NewService returns a new tracking service.
-func NewService(store Store, client MailboxClient, cipher PasswordCipher, apps AppService) *Service {
+func NewService(store Store, client MailboxClient, cipher PasswordCipher, apps ApplicationUpdater) *Service {
 	return &Service{
 		store:  store,
 		client: client,
@@ -235,24 +228,14 @@ func (s *Service) AcceptSuggestion(ctx context.Context, userID, suggestionID uui
 		return ErrInvalidSuggestion
 	}
 
-	var ev application.Event
-	switch sug.SuggestedState {
-	case application.Confirmed:
-		ev = application.EvConfirm
-	case application.Rejected:
-		ev = application.EvReject
-	case application.Interview:
-		ev = application.EvInterview
-	default:
-		return fmt.Errorf("%w: unknown suggested state %s", ErrInvalidSuggestion, sug.SuggestedState)
-	}
-
-	if _, err := s.apps.Fire(ctx, userID, sug.ApplicationID, ev, application.ActorUser, map[string]any{
-		"via":        "mail_suggestion",
-		"message_id": sug.MessageID,
-		"from":       sug.MessageFrom,
-	}); err != nil {
-		return fmt.Errorf("transitioning application: %w", err)
+	if s.apps != nil {
+		if err := s.apps.Transition(ctx, userID, sug.ApplicationID, sug.SuggestedState, map[string]any{
+			"via":        "mail_suggestion",
+			"message_id": sug.MessageID,
+			"from":       sug.MessageFrom,
+		}); err != nil {
+			return fmt.Errorf("transitioning application: %w", err)
+		}
 	}
 
 	return s.store.SetSuggestionStatus(ctx, userID, suggestionID, SuggestionAccepted)
