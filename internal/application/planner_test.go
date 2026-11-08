@@ -142,6 +142,14 @@ func (f *fakePlannerStore) SaveSettings(_ context.Context, userID uuid.UUID, st 
 	return nil
 }
 
+func (f *fakePlannerStore) SaveHomeRunnerToken(context.Context, uuid.UUID, []byte, time.Time) error {
+	return nil
+}
+
+func (f *fakePlannerStore) UserByHomeRunnerToken(context.Context, []byte) (uuid.UUID, error) {
+	return uuid.Nil, application.ErrNotFound
+}
+
 func (f *fakePlannerStore) RuleInput(context.Context, uuid.UUID, application.App, uuid.UUID, time.Time) (application.RuleInput, error) {
 	return application.RuleInput{}, nil
 }

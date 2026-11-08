@@ -66,11 +66,13 @@ type AuditEvent struct {
 }
 
 type AutonomySetting struct {
-	UserID     uuid.UUID
-	Level      string
-	MinScore   int16
-	DailyLimit int16
-	UpdatedAt  time.Time
+	UserID              uuid.UUID
+	Level               string
+	MinScore            int16
+	DailyLimit          int16
+	UpdatedAt           time.Time
+	RunnerChoice        string
+	HomeRunnerTokenHash []byte
 }
 
 type Board struct {

@@ -20,6 +20,7 @@ import (
 	discoverystore "github.com/1xxn/getafjob/internal/discovery/adapters/pgstore"
 	"github.com/1xxn/getafjob/internal/discovery/adapters/sources"
 	"github.com/1xxn/getafjob/internal/gateway"
+	runnerv1 "github.com/1xxn/getafjob/internal/gen/proto/runner/v1"
 	"github.com/1xxn/getafjob/internal/gen/proto/runner/v1/runnerv1connect"
 	"github.com/1xxn/getafjob/internal/identity"
 	"github.com/1xxn/getafjob/internal/identity/adapters/pgstore"
@@ -232,8 +233,12 @@ func runner(ctx context.Context, cfg config.Config, logger *slog.Logger) error {
 	// The gateway sits on the internal network; everything else the runner loads goes through the egress proxy.
 	client := runnerv1connect.NewRunnerServiceClient(&http.Client{Timeout: 2 * time.Minute}, strings.TrimSuffix(cfg.GatewayURL.String(), "/"),
 		connect.WithReadMaxBytes(gateway.MaxMessage), connect.WithSendMaxBytes(gateway.MaxMessage))
+	kind := runnerv1.RunnerKind_RUNNER_KIND_SERVER
+	if cfg.RunnerKind == "home" {
+		kind = runnerv1.RunnerKind_RUNNER_KIND_HOME
+	}
 	a := &agent.Agent{Client: client, Secret: cfg.RunnerSecret.Reveal(), Logger: logger,
-		Browser: browser.Options{Bin: cfg.BrowserBin, Proxy: cfg.EgressProxy}}
+		Kind: kind, Browser: browser.Options{Bin: cfg.BrowserBin, Proxy: cfg.EgressProxy}}
 	ctx, stop := context.WithCancel(ctx)
 	defer stop()
 	done := make(chan error, 1)

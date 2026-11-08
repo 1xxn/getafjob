@@ -61,7 +61,7 @@ func TestAutonomySettingsAndApprovals(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	lease, ok, err := runs.Lease(ctx, "runner-1")
+	lease, ok, err := runs.Lease(ctx, "runner-1", application.RunnerServer, nil)
 	if err != nil || !ok {
 		t.Fatalf("Lease() = %v, %v", ok, err)
 	}
@@ -124,4 +124,111 @@ func TestAutonomySettingsAndApprovals(t *testing.T) {
 		t.Fatalf("Approvals() = %+v, want empty after approval", approvals)
 	}
 	_ = toState
+}
+
+func TestRunnerChoiceAndHomeRunnerTokens(t *testing.T) {
+	ctx := context.Background()
+	pool, st, svc, now := setup(t)
+	runs := application.NewRuns(svc, st)
+
+	alice := user(t, pool, "alice@example.org")
+	bob := user(t, pool, "bob@example.org")
+	carol := user(t, pool, "carol@example.org")
+
+	// Set choices
+	if err := svc.SaveSettings(ctx, alice, application.Settings{
+		Level:        application.LevelApprove,
+		MinScore:     70,
+		DailyLimit:   5,
+		RunnerChoice: application.RunnerServer,
+	}); err != nil {
+		t.Fatal(err)
+	}
+
+	if err := svc.SaveSettings(ctx, bob, application.Settings{
+		Level:        application.LevelApprove,
+		MinScore:     70,
+		DailyLimit:   5,
+		RunnerChoice: application.RunnerHomeRunner,
+	}); err != nil {
+		t.Fatal(err)
+	}
+
+	if err := svc.SaveSettings(ctx, carol, application.Settings{
+		Level:        application.LevelApprove,
+		MinScore:     70,
+		DailyLimit:   5,
+		RunnerChoice: application.RunnerExtension,
+	}); err != nil {
+		t.Fatal(err)
+	}
+
+	// Home runner token generation & lookup for Bob
+	bobToken, err := svc.GenerateHomeRunnerToken(ctx, bob)
+	if err != nil || bobToken == "" {
+		t.Fatalf("GenerateHomeRunnerToken() err = %v, token = %q", err, bobToken)
+	}
+	bobHash := application.HashHomeRunnerToken(bobToken)
+	foundUser, err := st.UserByHomeRunnerToken(ctx, bobHash)
+	if err != nil || foundUser != bob {
+		t.Fatalf("UserByHomeRunnerToken() = %v, err = %v, want %v", foundUser, err, bob)
+	}
+
+	// Queue applications
+	jAlice := job(t, pool, "test", "Acme", "match-alice")
+	aAlice, _ := svc.Create(ctx, alice, jAlice)
+	_, _, _ = svc.Queue(ctx, alice, jAlice)
+
+	*now = now.Add(time.Second)
+	jBob := job(t, pool, "test", "Beispiel", "match-bob")
+	aBob, _ := svc.Create(ctx, bob, jBob)
+	_, _, _ = svc.Queue(ctx, bob, jBob)
+
+	*now = now.Add(time.Second)
+	jCarol := job(t, pool, "test", "Muster", "match-carol")
+	aCarol, _ := svc.Create(ctx, carol, jCarol)
+	_, _, _ = svc.Queue(ctx, carol, jCarol)
+
+	// 1. Server runner leases: must lease Alice's job only
+	leaseServer, ok, err := runs.Lease(ctx, "srv-1", application.RunnerServer, nil)
+	if err != nil || !ok || leaseServer.AppID != aAlice {
+		t.Fatalf("server runner lease: %+v, ok=%v, err=%v, want AppID=%v", leaseServer, ok, err, aAlice)
+	}
+
+	// Second server runner lease finds nothing
+	if _, ok, err := runs.Lease(ctx, "srv-2", application.RunnerServer, nil); ok || err != nil {
+		t.Fatalf("server runner second lease found unexpected run: ok=%v, err=%v", ok, err)
+	}
+
+	// 2. Bob's home runner leases: must lease Bob's job only
+	leaseBob, ok, err := runs.Lease(ctx, "home-bob", application.RunnerHomeRunner, &bob)
+	if err != nil || !ok || leaseBob.AppID != aBob {
+		t.Fatalf("bob home runner lease: %+v, ok=%v, err=%v, want AppID=%v", leaseBob, ok, err, aBob)
+	}
+
+	// Bob's home runner second lease finds nothing
+	if _, ok, err := runs.Lease(ctx, "home-bob", application.RunnerHomeRunner, &bob); ok || err != nil {
+		t.Fatalf("bob home runner second lease found unexpected run: ok=%v, err=%v", ok, err)
+	}
+
+	// 3. Carol's home runner (she chose extension, so home runner has nothing)
+	if _, ok, err := runs.Lease(ctx, "home-carol", application.RunnerHomeRunner, &carol); ok || err != nil {
+		t.Fatalf("carol home runner found run but choice is extension: ok=%v, err=%v", ok, err)
+	}
+
+	// Carol switches to server
+	if err := svc.SaveSettings(ctx, carol, application.Settings{
+		Level:        application.LevelApprove,
+		MinScore:     70,
+		DailyLimit:   5,
+		RunnerChoice: application.RunnerServer,
+	}); err != nil {
+		t.Fatal(err)
+	}
+
+	// Now server runner can lease Carol's job
+	leaseCarol, ok, err := runs.Lease(ctx, "srv-3", application.RunnerServer, nil)
+	if err != nil || !ok || leaseCarol.AppID != aCarol {
+		t.Fatalf("carol switched to server: lease=%+v, ok=%v, err=%v, want AppID=%v", leaseCarol, ok, err, aCarol)
+	}
 }

@@ -33,9 +33,10 @@ type Agent struct {
 	Secret      string
 	Browser     browser.Options
 	Logger      *slog.Logger
-	Poll        time.Duration // between leases when there is nothing to do; 0: 15 s
-	Wait        time.Duration // per click; 0: the engine's default
-	HandoffHold time.Duration // how long a handoff keeps the browser open; 0: 15 min
+	Kind        runnerv1.RunnerKind // server or home runner
+	Poll        time.Duration       // between leases when there is nothing to do; 0: 15 s
+	Wait        time.Duration       // per click; 0: the engine's default
+	HandoffHold time.Duration       // how long a handoff keeps the browser open; 0: 15 min
 }
 
 func auth[T any](msg *T, token string) *connect.Request[T] {
@@ -50,10 +51,14 @@ func (a *Agent) Run(ctx context.Context) error {
 	if poll == 0 {
 		poll = 15 * time.Second
 	}
+	kind := a.Kind
+	if kind == runnerv1.RunnerKind_RUNNER_KIND_UNSPECIFIED {
+		kind = runnerv1.RunnerKind_RUNNER_KIND_SERVER
+	}
 	var id string
 	for id == "" { // the gateway may start after the runner
 		reg, err := a.Client.Register(ctx, auth(&runnerv1.RegisterRequest{Version: buildinfo.Version,
-			Kind: runnerv1.RunnerKind_RUNNER_KIND_SERVER, MaxParallel: 1}, a.Secret))
+			Kind: kind, MaxParallel: 1}, a.Secret))
 		if err == nil {
 			id = reg.Msg.GetRunnerId()
 			break

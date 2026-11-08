@@ -1,6 +1,9 @@
 package application
 
 import (
+	"crypto/rand"
+	"crypto/sha256"
+	"encoding/hex"
 	"errors"
 	"fmt"
 	"regexp"
@@ -23,15 +26,26 @@ const (
 	LevelAutonomous Level = "autonomous"
 )
 
+// RunnerChoice is where a user wants their applications to be executed (ADR 0007, #40).
+type RunnerChoice string
+
+// Runner choices.
+const (
+	RunnerServer     RunnerChoice = "server"
+	RunnerHomeRunner RunnerChoice = "home_runner"
+	RunnerExtension  RunnerChoice = "extension"
+)
+
 // Settings are a user's autonomy settings.
 type Settings struct {
-	Level      Level
-	MinScore   int // the match score an application needs for the green rule
-	DailyLimit int // submits per 24 hours the green rule allows
+	Level        Level
+	MinScore     int          // the match score an application needs for the green rule
+	DailyLimit   int          // submits per 24 hours the green rule allows
+	RunnerChoice RunnerChoice // server, home_runner, or extension
 }
 
 // DefaultSettings apply until the user saves their own.
-var DefaultSettings = Settings{Level: LevelApprove, MinScore: 80, DailyLimit: 5}
+var DefaultSettings = Settings{Level: LevelApprove, MinScore: 80, DailyLimit: 5, RunnerChoice: RunnerServer}
 
 // Limits of the settings.
 const (
@@ -50,8 +64,27 @@ func (s Settings) Validate() error {
 		return fmt.Errorf("%w: min score out of range", ErrInvalidSettings)
 	case s.DailyLimit < 0 || s.DailyLimit > MaxDailyLimit:
 		return fmt.Errorf("%w: daily limit out of range", ErrInvalidSettings)
+	case s.RunnerChoice != "" && s.RunnerChoice != RunnerServer && s.RunnerChoice != RunnerHomeRunner && s.RunnerChoice != RunnerExtension:
+		return fmt.Errorf("%w: unknown runner choice", ErrInvalidSettings)
 	}
 	return nil
+}
+
+// NewHomeRunnerToken generates a random home runner token and its SHA-256 hash.
+func NewHomeRunnerToken() (plain string, hash []byte, err error) {
+	b := make([]byte, 24)
+	if _, err := rand.Read(b); err != nil {
+		return "", nil, err
+	}
+	plain = "gaj_hr_" + hex.EncodeToString(b)
+	h := sha256.Sum256([]byte(plain))
+	return plain, h[:], nil
+}
+
+// HashHomeRunnerToken hashes a plain home runner token for database lookup.
+func HashHomeRunnerToken(plain string) []byte {
+	h := sha256.Sum256([]byte(plain))
+	return h[:]
 }
 
 // AutoQueue reports whether matching jobs may be queued on the user's behalf (the planner, #36).

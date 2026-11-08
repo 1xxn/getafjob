@@ -208,3 +208,66 @@ func TestGatewayAskQuestionsSurviveRestartAndStreamHandoff(t *testing.T) {
 		t.Fatalf("handoff done: %v", err)
 	}
 }
+
+func TestGatewayHomeRunnerAuthenticationAndLeasing(t *testing.T) {
+	pool, apps, c, _ := setup(t)
+	ctx := t.Context()
+
+	u := queue(t, pool, apps)
+	if err := apps.SaveSettings(ctx, u, application.Settings{
+		Level:        application.LevelAutonomous,
+		RunnerChoice: application.RunnerHomeRunner,
+		DailyLimit:   10,
+		MinScore:     0,
+	}); err != nil {
+		t.Fatal(err)
+	}
+
+	token, err := apps.GenerateHomeRunnerToken(ctx, u)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Invalid home runner token is rejected.
+	if _, err := c.Register(ctx, with(&runnerv1.RegisterRequest{
+		Version: "test",
+		Kind:    runnerv1.RunnerKind_RUNNER_KIND_HOME,
+	}, "invalid-token-1234567890")); codeOf(err) != connect.CodeUnauthenticated {
+		t.Fatalf("register with bad token: %v", err)
+	}
+
+	// Register home runner with valid token.
+	hreg, err := c.Register(ctx, with(&runnerv1.RegisterRequest{
+		Version: "test",
+		Kind:    runnerv1.RunnerKind_RUNNER_KIND_HOME,
+	}, token))
+	if err != nil || hreg.Msg.GetRunnerId() == "" {
+		t.Fatalf("register home runner: %v", err)
+	}
+	hrunnerID := hreg.Msg.GetRunnerId()
+
+	// Register server runner with shared secret.
+	sreg, err := c.Register(ctx, with(&runnerv1.RegisterRequest{
+		Version: "test",
+		Kind:    runnerv1.RunnerKind_RUNNER_KIND_SERVER,
+	}, secret))
+	if err != nil || sreg.Msg.GetRunnerId() == "" {
+		t.Fatalf("register server runner: %v", err)
+	}
+	srunnerID := sreg.Msg.GetRunnerId()
+
+	// Server runner must NOT receive the application because runner_choice is home_runner.
+	sl, err := c.Lease(ctx, with(&runnerv1.LeaseRequest{RunnerId: srunnerID}, secret))
+	if err != nil || sl.Msg.GetRun() != nil {
+		t.Fatalf("server runner leased home runner job: %v, %+v", err, sl.Msg.GetRun())
+	}
+
+	// Home runner receives the user's application.
+	hl, err := c.Lease(ctx, with(&runnerv1.LeaseRequest{RunnerId: hrunnerID}, token))
+	if err != nil || hl.Msg.GetRun() == nil {
+		t.Fatalf("home runner lease: %v", err)
+	}
+	if hl.Msg.GetRun().GetProfile()["personal.first_name"] != "Max" {
+		t.Fatalf("unexpected profile: %+v", hl.Msg.GetRun().GetProfile())
+	}
+}

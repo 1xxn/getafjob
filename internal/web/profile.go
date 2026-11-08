@@ -142,6 +142,10 @@ func preferencesForm(p profile.Preferences, a application.Settings, mb tracking.
 	if level == "" {
 		level = string(application.LevelApprove)
 	}
+	runnerChoice := string(a.RunnerChoice)
+	if runnerChoice == "" {
+		runnerChoice = string(application.RunnerServer)
+	}
 	portStr := ""
 	if mb.Port > 0 {
 		portStr = strconv.Itoa(mb.Port)
@@ -168,6 +172,7 @@ func preferencesForm(p profile.Preferences, a application.Settings, mb tracking.
 			"remote_regions": joinLines(p.RemoteRegions), "min_salary": salary, "cover_letter_lang": p.CoverLetterLang,
 			"diversity":                 p.Diversity,
 			"autonomy_level":            level,
+			"runner_choice":             runnerChoice,
 			"min_score":                 strconv.Itoa(a.MinScore),
 			"daily_limit":               strconv.Itoa(a.DailyLimit),
 			"mailbox_host":              mb.Host,
@@ -232,6 +237,9 @@ func (s *Server) preferencesPage(w http.ResponseWriter, r *http.Request, u *iden
 	if code := r.URL.Query().Get("assist_code"); code != "" {
 		f.Notice = views.T(r.Context(), "profile.assist.code", "code", code)
 	}
+	if tok := r.URL.Query().Get("runner_token"); tok != "" {
+		f.Notice = views.T(r.Context(), "profile.home_runner.token_notice", "token", tok)
+	}
 	s.render(w, r, http.StatusOK, views.PreferencesPage(u.DisplayName, f))
 }
 
@@ -265,6 +273,20 @@ func (s *Server) preferencesSave(w http.ResponseWriter, r *http.Request, u *iden
 	default:
 		errLevel = true
 	}
+	runnerChoice := application.RunnerServer
+	var errRunnerChoice bool
+	switch strings.TrimSpace(r.PostFormValue("runner_choice")) {
+	case "":
+		runnerChoice = application.RunnerServer
+	case string(application.RunnerServer):
+		runnerChoice = application.RunnerServer
+	case string(application.RunnerHomeRunner):
+		runnerChoice = application.RunnerHomeRunner
+	case string(application.RunnerExtension):
+		runnerChoice = application.RunnerExtension
+	default:
+		errRunnerChoice = true
+	}
 	minScore := application.DefaultSettings.MinScore
 	var errScore error
 	if v := strings.TrimSpace(r.PostFormValue("min_score")); v != "" {
@@ -286,11 +308,12 @@ func (s *Server) preferencesSave(w http.ResponseWriter, r *http.Request, u *iden
 		}
 	}
 	autoSettings := application.Settings{
-		Level:      autoLevel,
-		MinScore:   minScore,
-		DailyLimit: dailyLimit,
+		Level:        autoLevel,
+		RunnerChoice: runnerChoice,
+		MinScore:     minScore,
+		DailyLimit:   dailyLimit,
 	}
-	autoErr := errLevel || errScore != nil || errLimit != nil || autoSettings.Validate() != nil
+	autoErr := errLevel || errRunnerChoice || errScore != nil || errLimit != nil || autoSettings.Validate() != nil
 
 	np := notify.DefaultPreferences(u.ID, u.Email)
 	if s.Notify != nil {
@@ -332,6 +355,7 @@ func (s *Server) preferencesSave(w http.ResponseWriter, r *http.Request, u *iden
 		f.Values["min_salary"] = r.PostFormValue("min_salary")
 		f.Values["min_score"] = r.PostFormValue("min_score")
 		f.Values["daily_limit"] = r.PostFormValue("daily_limit")
+		f.Values["runner_choice"] = r.PostFormValue("runner_choice")
 		f.Errors = make(map[string]string)
 		if salaryErr {
 			f.Errors["min_salary"] = views.T(r.Context(), "profile.error.invalid")
@@ -339,6 +363,9 @@ func (s *Server) preferencesSave(w http.ResponseWriter, r *http.Request, u *iden
 		if autoErr {
 			if errLevel {
 				f.Errors["autonomy_level"] = views.T(r.Context(), "profile.error.invalid")
+			}
+			if errRunnerChoice {
+				f.Errors["runner_choice"] = views.T(r.Context(), "profile.error.invalid")
 			}
 			if errScore != nil || minScore < 0 || minScore > 100 {
 				f.Errors["min_score"] = views.T(r.Context(), "profile.error.invalid")
@@ -427,6 +454,23 @@ func (s *Server) assistPair(w http.ResponseWriter, r *http.Request, u *identity.
 			return
 		}
 		http.Redirect(w, r, "/preferences?assist_code="+url.QueryEscape(code), http.StatusSeeOther)
+		return
+	}
+	http.Redirect(w, r, "/preferences", http.StatusSeeOther)
+}
+
+func (s *Server) runnerToken(w http.ResponseWriter, r *http.Request, u *identity.User) {
+	if u == nil {
+		http.Redirect(w, r, "/login", http.StatusSeeOther)
+		return
+	}
+	if s.Apps != nil {
+		tok, err := s.Apps.GenerateHomeRunnerToken(r.Context(), u.ID)
+		if err != nil {
+			s.failed(w, r, u, err)
+			return
+		}
+		http.Redirect(w, r, "/preferences?runner_token="+url.QueryEscape(tok), http.StatusSeeOther)
 		return
 	}
 	http.Redirect(w, r, "/preferences", http.StatusSeeOther)

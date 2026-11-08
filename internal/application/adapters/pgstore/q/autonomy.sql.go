@@ -137,19 +137,25 @@ func (q *Queries) AskApproval(ctx context.Context, arg AskApprovalParams) error 
 }
 
 const getSettings = `-- name: GetSettings :one
-SELECT level, min_score, daily_limit FROM autonomy_settings WHERE user_id = $1
+SELECT level, min_score, daily_limit, runner_choice FROM autonomy_settings WHERE user_id = $1
 `
 
 type GetSettingsRow struct {
-	Level      string
-	MinScore   int16
-	DailyLimit int16
+	Level        string
+	MinScore     int16
+	DailyLimit   int16
+	RunnerChoice string
 }
 
 func (q *Queries) GetSettings(ctx context.Context, userID uuid.UUID) (GetSettingsRow, error) {
 	row := q.db.QueryRow(ctx, getSettings, userID)
 	var i GetSettingsRow
-	err := row.Scan(&i.Level, &i.MinScore, &i.DailyLimit)
+	err := row.Scan(
+		&i.Level,
+		&i.MinScore,
+		&i.DailyLimit,
+		&i.RunnerChoice,
+	)
 	return i, err
 }
 
@@ -220,18 +226,34 @@ func (q *Queries) RunCheckpoints(ctx context.Context, arg RunCheckpointsParams) 
 	return items, nil
 }
 
+const saveHomeRunnerToken = `-- name: SaveHomeRunnerToken :exec
+UPDATE autonomy_settings SET home_runner_token_hash = $2, updated_at = $3 WHERE user_id = $1
+`
+
+type SaveHomeRunnerTokenParams struct {
+	UserID              uuid.UUID
+	HomeRunnerTokenHash []byte
+	UpdatedAt           time.Time
+}
+
+func (q *Queries) SaveHomeRunnerToken(ctx context.Context, arg SaveHomeRunnerTokenParams) error {
+	_, err := q.db.Exec(ctx, saveHomeRunnerToken, arg.UserID, arg.HomeRunnerTokenHash, arg.UpdatedAt)
+	return err
+}
+
 const saveSettings = `-- name: SaveSettings :exec
-INSERT INTO autonomy_settings (user_id, level, min_score, daily_limit, updated_at) VALUES ($1, $2, $3, $4, $5)
+INSERT INTO autonomy_settings (user_id, level, min_score, daily_limit, runner_choice, updated_at) VALUES ($1, $2, $3, $4, $5, $6)
 ON CONFLICT (user_id) DO UPDATE SET level = EXCLUDED.level, min_score = EXCLUDED.min_score,
-  daily_limit = EXCLUDED.daily_limit, updated_at = EXCLUDED.updated_at
+  daily_limit = EXCLUDED.daily_limit, runner_choice = EXCLUDED.runner_choice, updated_at = EXCLUDED.updated_at
 `
 
 type SaveSettingsParams struct {
-	UserID     uuid.UUID
-	Level      string
-	MinScore   int16
-	DailyLimit int16
-	UpdatedAt  time.Time
+	UserID       uuid.UUID
+	Level        string
+	MinScore     int16
+	DailyLimit   int16
+	RunnerChoice string
+	UpdatedAt    time.Time
 }
 
 func (q *Queries) SaveSettings(ctx context.Context, arg SaveSettingsParams) error {
@@ -240,6 +262,7 @@ func (q *Queries) SaveSettings(ctx context.Context, arg SaveSettingsParams) erro
 		arg.Level,
 		arg.MinScore,
 		arg.DailyLimit,
+		arg.RunnerChoice,
 		arg.UpdatedAt,
 	)
 	return err
@@ -274,4 +297,15 @@ func (q *Queries) SubmitsSince(ctx context.Context, arg SubmitsSinceParams) (int
 	var count int64
 	err := row.Scan(&count)
 	return count, err
+}
+
+const userByHomeRunnerToken = `-- name: UserByHomeRunnerToken :one
+SELECT user_id FROM autonomy_settings WHERE home_runner_token_hash = $1
+`
+
+func (q *Queries) UserByHomeRunnerToken(ctx context.Context, homeRunnerTokenHash []byte) (uuid.UUID, error) {
+	row := q.db.QueryRow(ctx, userByHomeRunnerToken, homeRunnerTokenHash)
+	var user_id uuid.UUID
+	err := row.Scan(&user_id)
+	return user_id, err
 }

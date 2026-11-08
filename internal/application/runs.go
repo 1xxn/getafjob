@@ -49,12 +49,13 @@ type Checkpoint struct {
 // RunStore persists runs (row-level security; leasing in the system role).
 type RunStore interface {
 	// LeaseNext leases the oldest queued application that passes the per-host limits.
-	LeaseNext(ctx context.Context, runnerID string, tokenHash []byte, now, expires, gapStart time.Time) (Lease, bool, error)
+	LeaseNext(ctx context.Context, runnerID string, tokenHash []byte, runnerChoice string, userID *uuid.UUID, now, expires, gapStart time.Time) (Lease, bool, error)
 	RunByToken(ctx context.Context, tokenHash []byte) (RunRef, time.Time, *time.Time, error)
 	FinishRun(ctx context.Context, r RunRef, outcome string, at time.Time) error
 	AddCheckpoint(ctx context.Context, r RunRef, c Checkpoint) error
 	// SetAdapter records the ATS adapter of a run.
 	SetAdapter(ctx context.Context, r RunRef, adapter string) error
+	UserByHomeRunnerToken(ctx context.Context, tokenHash []byte) (uuid.UUID, error)
 }
 
 func tokenHash(token string) []byte {
@@ -73,13 +74,17 @@ func NewRuns(apps *Service, store RunStore) *Runs { return &Runs{apps: apps, sto
 
 // Lease hands out the next run: the application is started (guards run first; a failing guard parks it and the
 // next one is tried). ok is false when there is nothing to do.
-func (r *Runs) Lease(ctx context.Context, runnerID string) (Lease, bool, error) {
+func (r *Runs) Lease(ctx context.Context, runnerID string, choice RunnerChoice, userID *uuid.UUID) (Lease, bool, error) {
+	runnerChoice := string(choice)
+	if runnerChoice == "" {
+		runnerChoice = string(RunnerServer)
+	}
 	for range 5 {
 		b := make([]byte, 32)
 		_, _ = rand.Read(b)
 		token := base64.RawURLEncoding.EncodeToString(b)
 		now := r.apps.now()
-		l, ok, err := r.store.LeaseNext(ctx, runnerID, tokenHash(token), now, now.Add(RunTTL), now.Add(-HostGap))
+		l, ok, err := r.store.LeaseNext(ctx, runnerID, tokenHash(token), runnerChoice, userID, now, now.Add(RunTTL), now.Add(-HostGap))
 		if err != nil || !ok {
 			return Lease{}, false, err
 		}
@@ -96,6 +101,11 @@ func (r *Runs) Lease(ctx context.Context, runnerID string) (Lease, bool, error) 
 		return l, true, nil
 	}
 	return Lease{}, false, nil
+}
+
+// UserByHomeRunnerToken finds the user of a home runner token hash.
+func (r *Runs) UserByHomeRunnerToken(ctx context.Context, tokenHash []byte) (uuid.UUID, error) {
+	return r.store.UserByHomeRunnerToken(ctx, tokenHash)
 }
 
 // Authorize returns the active run of a token.

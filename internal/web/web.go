@@ -116,6 +116,7 @@ func (s *Server) Register(mux *http.ServeMux) {
 	mux.Handle("POST /preferences", s.page(s.preferencesSave))
 	mux.Handle("POST /preferences/notify/test", s.page(s.notifyTest))
 	mux.Handle("POST /preferences/assist/pair", s.page(s.assistPair))
+	mux.Handle("POST /preferences/runner/token", s.page(s.runnerToken))
 	mux.Handle("GET /documents", s.page(s.documentsPage))
 	mux.Handle("POST /documents", s.page(s.documentUpload))
 	mux.Handle("GET /documents/{id}", s.page(s.documentDownload))

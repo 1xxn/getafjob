@@ -117,7 +117,7 @@ func TestPgstorePlannerAndPacing(t *testing.T) {
 	runs := application.NewRuns(svc, st)
 	// u1 currently has 2 queued applications (j1, j2) and 0 submits
 	// Lease j1
-	l1, ok, err := runs.Lease(ctx, "r1")
+	l1, ok, err := runs.Lease(ctx, "r1", application.RunnerServer, nil)
 	if err != nil || !ok || l1.AppID != app1 {
 		t.Fatalf("Lease(r1) = %+v, ok=%v, err=%v", l1, ok, err)
 	}
@@ -155,7 +155,7 @@ func TestPgstorePlannerAndPacing(t *testing.T) {
 	*now = now.Add(application.HostGap + time.Minute)
 
 	// Lease should now find nothing because u1's daily quota of 1 is reached!
-	if _, ok, err := runs.Lease(ctx, "r2"); ok || err != nil {
+	if _, ok, err := runs.Lease(ctx, "r2", application.RunnerServer, nil); ok || err != nil {
 		t.Fatalf("Lease when quota is exhausted: ok = %v, err = %v, want ok=false", ok, err)
 	}
 
@@ -168,7 +168,7 @@ func TestPgstorePlannerAndPacing(t *testing.T) {
 		t.Fatalf("SaveSettings: %v", err)
 	}
 
-	if l2, ok, err := runs.Lease(ctx, "r2"); !ok || err != nil {
+	if l2, ok, err := runs.Lease(ctx, "r2", application.RunnerServer, nil); !ok || err != nil {
 		t.Fatalf("Lease with daily_limit=5: ok=%v, err=%v", ok, err)
 	} else if l2.JobID != j2 {
 		t.Errorf("Lease got job %d, want j2 (%d)", l2.JobID, j2)

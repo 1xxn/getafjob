@@ -346,7 +346,7 @@ var _ application.RunStore = (*Store)(nil)
 
 // LeaseNext leases the next application in the system role: one lease at a time (advisory lock), so the
 // per-host check holds across runners.
-func (s *Store) LeaseNext(ctx context.Context, runnerID string, tokenHash []byte, now, expires, gapStart time.Time) (
+func (s *Store) LeaseNext(ctx context.Context, runnerID string, tokenHash []byte, runnerChoice string, userID *uuid.UUID, now, expires, gapStart time.Time) (
 	l application.Lease, ok bool, err error,
 ) {
 	err = db.InSystemTx(ctx, s.pool, func(tx pgx.Tx) error {
@@ -354,7 +354,7 @@ func (s *Store) LeaseNext(ctx context.Context, runnerID string, tokenHash []byte
 		if err := qs.LockLeases(ctx); err != nil {
 			return err
 		}
-		c, err := qs.LeaseCandidate(ctx, q.LeaseCandidateParams{Now: now, GapStart: gapStart})
+		c, err := qs.LeaseCandidate(ctx, q.LeaseCandidateParams{Now: now, GapStart: gapStart, RunnerChoice: runnerChoice, UserID: userID})
 		if errors.Is(err, pgx.ErrNoRows) {
 			return nil
 		}
@@ -430,10 +430,15 @@ func (s *Store) Settings(ctx context.Context, userID uuid.UUID) (st application.
 		if err != nil {
 			return err
 		}
+		choice := application.RunnerChoice(r.RunnerChoice)
+		if choice == "" {
+			choice = application.RunnerServer
+		}
 		st = application.Settings{
-			Level:      application.Level(r.Level),
-			MinScore:   int(r.MinScore),
-			DailyLimit: int(r.DailyLimit),
+			Level:        application.Level(r.Level),
+			MinScore:     int(r.MinScore),
+			DailyLimit:   int(r.DailyLimit),
+			RunnerChoice: choice,
 		}
 		return nil
 	})
@@ -451,17 +456,45 @@ func (s *Store) SaveSettings(ctx context.Context, userID uuid.UUID, st applicati
 	if st.DailyLimit < 0 || st.DailyLimit > 50 {
 		return fmt.Errorf("%w: daily_limit out of range", application.ErrInvalidSettings)
 	}
+	choice := string(st.RunnerChoice)
+	if choice == "" {
+		choice = string(application.RunnerServer)
+	}
 	minScore := int16(st.MinScore)
 	dailyLimit := int16(st.DailyLimit)
 	return s.user(ctx, userID, func(qs *q.Queries) error {
 		return qs.SaveSettings(ctx, q.SaveSettingsParams{
-			UserID:     userID,
-			Level:      string(st.Level),
-			MinScore:   minScore,
-			DailyLimit: dailyLimit,
-			UpdatedAt:  at,
+			UserID:       userID,
+			Level:        string(st.Level),
+			MinScore:     minScore,
+			DailyLimit:   dailyLimit,
+			RunnerChoice: choice,
+			UpdatedAt:    at,
 		})
 	})
+}
+
+// SaveHomeRunnerToken stores the home runner token hash for the user.
+func (s *Store) SaveHomeRunnerToken(ctx context.Context, userID uuid.UUID, hash []byte, at time.Time) error {
+	return s.user(ctx, userID, func(qs *q.Queries) error {
+		return qs.SaveHomeRunnerToken(ctx, q.SaveHomeRunnerTokenParams{UserID: userID, HomeRunnerTokenHash: hash, UpdatedAt: at})
+	})
+}
+
+// UserByHomeRunnerToken finds the user ID associated with a home runner token hash (system role).
+func (s *Store) UserByHomeRunnerToken(ctx context.Context, hash []byte) (userID uuid.UUID, err error) {
+	err = db.InSystemTx(ctx, s.pool, func(tx pgx.Tx) error {
+		id, err := q.New(tx).UserByHomeRunnerToken(ctx, hash)
+		if errors.Is(err, pgx.ErrNoRows) {
+			return application.ErrNotFound
+		}
+		if err != nil {
+			return err
+		}
+		userID = id
+		return nil
+	})
+	return userID, err
 }
 
 // RuleInput collects what the rule needs before the submit of a run.

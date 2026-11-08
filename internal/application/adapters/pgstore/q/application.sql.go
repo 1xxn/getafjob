@@ -518,14 +518,18 @@ WHERE a.state = 'queued'
     WHERE sa.user_id = a.user_id
       AND sa.started_at >= $1::timestamptz - interval '24 hours'
   ) < coalesce(s.daily_limit, 5)
+  AND coalesce(s.runner_choice, 'server') = $3::text
+  AND ($4::uuid IS NULL OR a.user_id = $4::uuid)
 ORDER BY a.updated_at, a.id
 LIMIT 1
 FOR UPDATE OF a SKIP LOCKED
 `
 
 type LeaseCandidateParams struct {
-	Now      time.Time
-	GapStart time.Time
+	Now          time.Time
+	GapStart     time.Time
+	RunnerChoice string
+	UserID       *uuid.UUID
 }
 
 type LeaseCandidateRow struct {
@@ -536,9 +540,14 @@ type LeaseCandidateRow struct {
 }
 
 // System role: the oldest queued application whose host has no active run and no lease within the gap,
-// whose user has free daily quota, and that has no unfinished run itself.
+// whose user has free daily quota, that has no unfinished run itself, and that matches the runner's choice.
 func (q *Queries) LeaseCandidate(ctx context.Context, arg LeaseCandidateParams) (LeaseCandidateRow, error) {
-	row := q.db.QueryRow(ctx, leaseCandidate, arg.Now, arg.GapStart)
+	row := q.db.QueryRow(ctx, leaseCandidate,
+		arg.Now,
+		arg.GapStart,
+		arg.RunnerChoice,
+		arg.UserID,
+	)
 	var i LeaseCandidateRow
 	err := row.Scan(
 		&i.ID,

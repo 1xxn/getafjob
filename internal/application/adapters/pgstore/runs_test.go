@@ -45,7 +45,7 @@ func TestLeaseHonorsHostLimits(t *testing.T) {
 	ctx := t.Context()
 	runs := application.NewRuns(svc, st)
 	max := user(t, pool, "max@example.org")
-	if _, ok, err := runs.Lease(ctx, "r1"); ok || err != nil {
+	if _, ok, err := runs.Lease(ctx, "r1", application.RunnerServer, nil); ok || err != nil {
 		t.Fatalf("empty queue: %v, %v", ok, err)
 	}
 	a1 := queued(t, svc, max, jobAt(t, pool, "https://boards.greenhouse.io/acme/jobs/1", "Acme", "acme|1"))
@@ -54,15 +54,15 @@ func TestLeaseHonorsHostLimits(t *testing.T) {
 	*now = now.Add(time.Second)
 	a3 := queued(t, svc, max, jobAt(t, pool, "https://jobs.lever.co/muster/3", "Muster", "muster|3"))
 
-	l1, ok, err := runs.Lease(ctx, "r1")
+	l1, ok, err := runs.Lease(ctx, "r1", application.RunnerServer, nil)
 	if err != nil || !ok || l1.AppID != a1 || l1.Host != "boards.greenhouse.io" || len(l1.Token) < 40 {
 		t.Fatalf("first lease: %+v, %v, %v", l1, ok, err)
 	}
-	l2, ok, _ := runs.Lease(ctx, "r2")
+	l2, ok, _ := runs.Lease(ctx, "r2", application.RunnerServer, nil)
 	if !ok || l2.AppID != a3 {
 		t.Fatalf("second lease skips the busy host: %+v", l2)
 	}
-	if _, ok, _ := runs.Lease(ctx, "r3"); ok {
+	if _, ok, _ := runs.Lease(ctx, "r3", application.RunnerServer, nil); ok {
 		t.Fatal("third lease on a busy host")
 	}
 	ref, err := runs.Authorize(ctx, l1.Token)
@@ -75,11 +75,11 @@ func TestLeaseHonorsHostLimits(t *testing.T) {
 	if _, err := runs.Authorize(ctx, l1.Token); !errors.Is(err, application.ErrNoRun) {
 		t.Fatalf("finished run still authorized: %v", err)
 	}
-	if _, ok, _ := runs.Lease(ctx, "r3"); ok {
+	if _, ok, _ := runs.Lease(ctx, "r3", application.RunnerServer, nil); ok {
 		t.Fatal("lease within the host gap")
 	}
 	*now = now.Add(application.HostGap + time.Second)
-	if l, ok, _ := runs.Lease(ctx, "r3"); !ok || l.AppID != a2 {
+	if l, ok, _ := runs.Lease(ctx, "r3", application.RunnerServer, nil); !ok || l.AppID != a2 {
 		t.Fatalf("after the gap: %+v, %v", l, ok)
 	}
 	*now = now.Add(application.RunTTL)
@@ -108,7 +108,7 @@ func TestConcurrentLeasesRespectTheHost(t *testing.T) {
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
-			if _, ok, err := runs.Lease(ctx, "r"); ok && err == nil {
+			if _, ok, err := runs.Lease(ctx, "r", application.RunnerServer, nil); ok && err == nil {
 				mu.Lock()
 				n++
 				mu.Unlock()
@@ -135,7 +135,7 @@ func TestRunFlowAndGuardAtLease(t *testing.T) {
 		t.Fatal(err)
 	}
 	good := queued(t, svc, max, jobAt(t, pool, "https://b.example.org/2", "Muster", "muster|go"))
-	l, ok, err := runs.Lease(ctx, "r1")
+	l, ok, err := runs.Lease(ctx, "r1", application.RunnerServer, nil)
 	if err != nil || !ok || l.AppID != good {
 		t.Fatalf("lease after a failing guard: %+v, %v, %v", l, ok, err)
 	}

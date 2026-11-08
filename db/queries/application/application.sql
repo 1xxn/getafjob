@@ -55,7 +55,7 @@ UPDATE applications SET handoff_warned = true WHERE id = $1 AND user_id = $2 AND
 
 -- name: LeaseCandidate :one
 -- System role: the oldest queued application whose host has no active run and no lease within the gap,
--- whose user has free daily quota, and that has no unfinished run itself.
+-- whose user has free daily quota, that has no unfinished run itself, and that matches the runner's choice.
 SELECT a.id, a.user_id, a.job_id,
   lower(coalesce(substring(coalesce(nullif(j.apply_url, ''), j.url) from '^[a-zA-Z]+://([^/:?#]+)'), ''))::text AS host
 FROM applications a
@@ -71,6 +71,8 @@ WHERE a.state = 'queued'
     WHERE sa.user_id = a.user_id
       AND sa.started_at >= sqlc.arg(now)::timestamptz - interval '24 hours'
   ) < coalesce(s.daily_limit, 5)
+  AND coalesce(s.runner_choice, 'server') = sqlc.arg(runner_choice)::text
+  AND (sqlc.narg(user_id)::uuid IS NULL OR a.user_id = sqlc.narg(user_id)::uuid)
 ORDER BY a.updated_at, a.id
 LIMIT 1
 FOR UPDATE OF a SKIP LOCKED;
