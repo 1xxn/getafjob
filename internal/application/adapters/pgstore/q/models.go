@@ -252,6 +252,39 @@ type SubmitAttempt struct {
 	Outcome       *string
 }
 
+type TrackingMailbox struct {
+	UserID            uuid.UUID
+	Host              string
+	Port              int32
+	Tls               bool
+	Username          string
+	EncryptedPassword []byte
+	Enabled           bool
+	LastUid           int64
+	UidValidity       int64
+	LastCheckedAt     *time.Time
+	LastError         *string
+	CreatedAt         time.Time
+	UpdatedAt         time.Time
+}
+
+type TrackingSuggestion struct {
+	ID             uuid.UUID
+	UserID         uuid.UUID
+	ApplicationID  uuid.UUID
+	MessageUid     int64
+	MessageID      *string
+	MessageFrom    string
+	MessageSubject string
+	MessageDate    time.Time
+	Category       string
+	SuggestedState string
+	Reasons        []byte
+	Status         string
+	CreatedAt      time.Time
+	UpdatedAt      time.Time
+}
+
 type User struct {
 	ID          uuid.UUID
 	Email       string

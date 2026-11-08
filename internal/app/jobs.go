@@ -211,5 +211,7 @@ func periodicJobs(cfg config.Config) []*river.PeriodicJob {
 			func() (river.JobArgs, *river.InsertOpts) { return HandoffArgs{}, nil }, start),
 		river.NewPeriodicJob(river.PeriodicInterval(15*time.Minute),
 			func() (river.JobArgs, *river.InsertOpts) { return PlanArgs{}, nil }, start),
+		river.NewPeriodicJob(river.PeriodicInterval(15*time.Minute),
+			func() (river.JobArgs, *river.InsertOpts) { return InboxArgs{}, nil }, start),
 	}
 }

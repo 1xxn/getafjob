@@ -14,6 +14,7 @@ import (
 	"time"
 
 	"github.com/a-h/templ"
+	"github.com/google/uuid"
 	"golang.org/x/time/rate"
 
 	"github.com/1xxn/getafjob/internal/application"
@@ -24,6 +25,7 @@ import (
 	"github.com/1xxn/getafjob/internal/platform/webpush"
 	"github.com/1xxn/getafjob/internal/profile"
 	"github.com/1xxn/getafjob/internal/profile/cvimport"
+	"github.com/1xxn/getafjob/internal/tracking"
 	"github.com/1xxn/getafjob/internal/web/views"
 )
 
@@ -31,6 +33,15 @@ import (
 
 //go:embed static
 var staticFiles embed.FS
+
+// TrackingService manages user mailbox settings and status suggestions.
+type TrackingService interface {
+	GetMailbox(ctx context.Context, userID uuid.UUID) (tracking.MailboxAccount, error)
+	SaveMailbox(ctx context.Context, userID uuid.UUID, host string, port int, tls bool, username, password string, enabled bool) error
+	SuggestionsForApplication(ctx context.Context, userID, appID uuid.UUID) ([]tracking.StatusSuggestion, error)
+	AcceptSuggestion(ctx context.Context, userID, suggestionID uuid.UUID) error
+	DismissSuggestion(ctx context.Context, userID, suggestionID uuid.UUID) error
+}
 
 // Server holds the dependencies of the UI.
 type Server struct {
@@ -41,6 +52,7 @@ type Server struct {
 	Importer       *cvimport.Importer // nil: no CV import
 	Jobs           *matching.Listings
 	Apps           *application.Service
+	Tracking       TrackingService
 	Shots          Screenshots
 	Handoffs       HandoffHub
 	PushStore      webpush.Store
@@ -78,6 +90,8 @@ func (s *Server) Register(mux *http.ServeMux) {
 	mux.Handle("GET /applications/{id}/screen", s.page(s.screenWebSocket))
 	mux.Handle("POST /applications/{id}/answer", s.page(s.applicationAnswer))
 	mux.Handle("POST /applications/{id}/park", s.page(s.applicationPark))
+	mux.Handle("POST /applications/{id}/suggestions/{sugId}/accept", s.page(s.suggestionAccept))
+	mux.Handle("POST /applications/{id}/suggestions/{sugId}/dismiss", s.page(s.suggestionDismiss))
 	mux.Handle("GET /profile", s.page(s.profilePage))
 	mux.Handle("POST /profile", s.page(s.profileSave))
 	mux.Handle("GET /preferences", s.page(s.preferencesPage))

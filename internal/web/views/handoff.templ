@@ -34,6 +34,16 @@ type TimelineRow struct {
 	ScreenshotURL string
 }
 
+// SuggestionData holds a status suggestion for the application view.
+type SuggestionData struct {
+	ID             string
+	Category       string
+	SuggestedState string
+	Reasons        []string
+	From           string
+	Subject        string
+}
+
 // HandoffData fills the application evidence and remote browser page.
 type HandoffData struct {
 	Name                string
@@ -45,6 +55,7 @@ type HandoffData struct {
 	Status              string
 	ApprovalAsked       bool
 	ApprovalReasons     []string
+	Suggestion          *SuggestionData
 	Questions           []HandoffQuestion
 	Fields              []EvidenceFieldRow
 	BeforeSubmitURL     string
@@ -88,6 +99,26 @@ templ HandoffPage(d HandoffData) {
 					<button type="button" id="btn-push" class="secondary">{ T(ctx, "handoff.push") }</button>
 				</div>
 			</div>
+
+			if d.Suggestion != nil {
+				<div class="form-section stack notice notice-info">
+					<h2>{ T(ctx, "handoff.suggestion.title") }</h2>
+					<p>{ d.Company } · <strong>{ d.Suggestion.SuggestedState }</strong> ({ d.Suggestion.From })</p>
+					<ul class="reasons">
+						for _, r := range d.Suggestion.Reasons {
+							<li>{ r }</li>
+						}
+					</ul>
+					<div class="actions">
+						<form method="post" action={ templ.SafeURL("/applications/" + d.AppID + "/suggestions/" + d.Suggestion.ID + "/accept") }>
+							<button type="submit" class="primary">{ T(ctx, "handoff.suggestion.accept") }</button>
+						</form>
+						<form method="post" action={ templ.SafeURL("/applications/" + d.AppID + "/suggestions/" + d.Suggestion.ID + "/dismiss") }>
+							<button type="submit" class="secondary">{ T(ctx, "handoff.suggestion.dismiss") }</button>
+						</form>
+					</div>
+				</div>
+			}
 
 			if d.ApprovalAsked {
 				<div class="form-section stack">

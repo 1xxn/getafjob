@@ -372,5 +372,16 @@
   "rule.reason.open_question": "Required field or question unanswered",
   "rule.reason.provenance": "Form field value has no valid provenance",
   "rule.reason.quota": "Daily submit quota reached",
-  "rule.reason.score": "Match score is below threshold"
+  "rule.reason.score": "Match score is below threshold",
+  "profile.mailbox.title": "Inbox Tracking (IMAP)",
+  "profile.mailbox.hint": "Track application status automatically via read-only IMAP with an app password. Security codes are strictly ignored and never read.",
+  "profile.field.mailbox_host": "IMAP Server",
+  "profile.field.mailbox_port": "Port",
+  "profile.field.mailbox_username": "Username / E-Mail",
+  "profile.field.mailbox_password": "App Password",
+  "profile.field.mailbox_enabled": "Enable inbox tracking",
+  "profile.hint.mailbox_password": "Leave empty to keep existing password",
+  "handoff.suggestion.title": "Status suggestion from incoming email",
+  "handoff.suggestion.accept": "Accept suggestion",
+  "handoff.suggestion.dismiss": "Dismiss"
 }

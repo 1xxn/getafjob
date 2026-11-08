@@ -9,6 +9,7 @@ import (
 	"github.com/1xxn/getafjob/internal/application"
 	"github.com/1xxn/getafjob/internal/identity"
 	"github.com/1xxn/getafjob/internal/profile"
+	"github.com/1xxn/getafjob/internal/tracking"
 	"github.com/1xxn/getafjob/internal/web/views"
 )
 
@@ -130,7 +131,7 @@ func (s *Server) profileSave(w http.ResponseWriter, r *http.Request, u *identity
 	}
 }
 
-func preferencesForm(p profile.Preferences, a application.Settings) views.Form {
+func preferencesForm(p profile.Preferences, a application.Settings, mb tracking.MailboxAccount) views.Form {
 	salary := ""
 	if p.MinSalary > 0 {
 		salary = strconv.Itoa(p.MinSalary)
@@ -139,16 +140,27 @@ func preferencesForm(p profile.Preferences, a application.Settings) views.Form {
 	if level == "" {
 		level = string(application.LevelApprove)
 	}
+	portStr := ""
+	if mb.Port > 0 {
+		portStr = strconv.Itoa(mb.Port)
+	}
 	return views.Form{
 		Values: map[string]string{
 			"titles": joinLines(p.Titles), "exclude_titles": joinLines(p.ExcludeTitles), "locations": joinLines(p.Locations),
 			"remote_regions": joinLines(p.RemoteRegions), "min_salary": salary, "cover_letter_lang": p.CoverLetterLang,
-			"diversity":      p.Diversity,
-			"autonomy_level": level,
-			"min_score":      strconv.Itoa(a.MinScore),
-			"daily_limit":    strconv.Itoa(a.DailyLimit),
+			"diversity":        p.Diversity,
+			"autonomy_level":   level,
+			"min_score":        strconv.Itoa(a.MinScore),
+			"daily_limit":      strconv.Itoa(a.DailyLimit),
+			"mailbox_host":     mb.Host,
+			"mailbox_port":     portStr,
+			"mailbox_username": mb.Username,
 		},
-		Checks: map[string]bool{"remote": p.Remote, "talent_pool": p.TalentPool},
+		Checks: map[string]bool{
+			"remote":          p.Remote,
+			"talent_pool":     p.TalentPool,
+			"mailbox_enabled": mb.Enabled,
+		},
 	}
 }
 
@@ -168,7 +180,13 @@ func (s *Server) preferencesPage(w http.ResponseWriter, r *http.Request, u *iden
 			auto = st
 		}
 	}
-	f := preferencesForm(snap.Preferences, auto)
+	var mb tracking.MailboxAccount
+	if s.Tracking != nil {
+		if m, err := s.Tracking.GetMailbox(r.Context(), u.ID); err == nil {
+			mb = m
+		}
+	}
+	f := preferencesForm(snap.Preferences, auto, mb)
 	if r.URL.Query().Get("saved") == "1" {
 		f.Notice = views.T(r.Context(), "profile.saved")
 	}
@@ -233,7 +251,13 @@ func (s *Server) preferencesSave(w http.ResponseWriter, r *http.Request, u *iden
 	autoErr := errLevel || errScore != nil || errLimit != nil || autoSettings.Validate() != nil
 
 	if salaryErr || autoErr {
-		f := preferencesForm(p, autoSettings)
+		var mb tracking.MailboxAccount
+		if s.Tracking != nil {
+			if m, err := s.Tracking.GetMailbox(r.Context(), u.ID); err == nil {
+				mb = m
+			}
+		}
+		f := preferencesForm(p, autoSettings, mb)
 		f.Values["min_salary"] = r.PostFormValue("min_salary")
 		f.Values["min_score"] = r.PostFormValue("min_score")
 		f.Values["daily_limit"] = r.PostFormValue("daily_limit")
@@ -259,7 +283,13 @@ func (s *Server) preferencesSave(w http.ResponseWriter, r *http.Request, u *iden
 
 	if err := s.Profile.SavePreferences(r.Context(), u.ID, p); err != nil {
 		if errors.Is(err, profile.ErrInvalid) {
-			f := preferencesForm(p, autoSettings)
+			var mb tracking.MailboxAccount
+			if s.Tracking != nil {
+				if m, err := s.Tracking.GetMailbox(r.Context(), u.ID); err == nil {
+					mb = m
+				}
+			}
+			f := preferencesForm(p, autoSettings, mb)
 			f.Errors, f.Notice, f.Failed = fieldErrors(r, err), views.T(r.Context(), "profile.invalid"), true
 			s.render(w, r, http.StatusUnprocessableEntity, views.PreferencesPage(u.DisplayName, f))
 			return
@@ -271,6 +301,24 @@ func (s *Server) preferencesSave(w http.ResponseWriter, r *http.Request, u *iden
 		if err := s.Apps.SaveSettings(r.Context(), u.ID, autoSettings); err != nil {
 			s.failed(w, r, u, err)
 			return
+		}
+	}
+	if s.Tracking != nil {
+		mbHost := strings.TrimSpace(r.PostFormValue("mailbox_host"))
+		mbUser := strings.TrimSpace(r.PostFormValue("mailbox_username"))
+		mbPass := r.PostFormValue("mailbox_password")
+		mbPort := 993
+		if v := strings.TrimSpace(r.PostFormValue("mailbox_port")); v != "" {
+			if n, err := strconv.Atoi(v); err == nil && n > 0 && n <= 65535 {
+				mbPort = n
+			}
+		}
+		mbEnabled := r.PostFormValue("mailbox_enabled") == "on"
+		if mbHost != "" && mbUser != "" {
+			if err := s.Tracking.SaveMailbox(r.Context(), u.ID, mbHost, mbPort, true, mbUser, mbPass, mbEnabled); err != nil {
+				s.failed(w, r, u, err)
+				return
+			}
 		}
 	}
 	http.Redirect(w, r, "/preferences?saved=1", http.StatusSeeOther)
