@@ -180,6 +180,7 @@ func worker(ctx context.Context, cfg config.Config, logger *slog.Logger) error {
 	river.AddWorker(workers, &recoverWorker{svc: apps, logger: logger})
 	notifier, _ := newPushNotifier(pool, cfg, logger)
 	river.AddWorker(workers, &handoffWorker{svc: apps, notifier: notifier, logger: logger})
+	river.AddWorker(workers, &planWorker{svc: apps, logger: logger})
 	jobs, err := queue.NewWorker(pool, queue.Options{Workers: workers, Periodic: periodicJobs(cfg), Logger: logger})
 	if err != nil {
 		return err

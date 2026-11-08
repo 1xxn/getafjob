@@ -323,6 +323,26 @@ func (f *fakeAppStore) Approvals(context.Context, uuid.UUID) ([]application.Appr
 	return nil, nil
 }
 
+func (f *fakeAppStore) PlanUsers(context.Context) ([]uuid.UUID, error) {
+	return nil, nil
+}
+
+func (f *fakeAppStore) ActiveApplicationsCount(context.Context, uuid.UUID) (int, error) {
+	return 0, nil
+}
+
+func (f *fakeAppStore) UserLastPacedAt(context.Context, uuid.UUID) (time.Time, error) {
+	return time.Time{}, nil
+}
+
+func (f *fakeAppStore) PlannerCandidates(context.Context, uuid.UUID, int) ([]application.PlannerCandidate, error) {
+	return nil, nil
+}
+
+func (f *fakeAppStore) SubmitsSince(context.Context, uuid.UUID, time.Time) (int, error) {
+	return 0, nil
+}
+
 type fakeShots map[string][]byte
 
 func (s fakeShots) Get(_ context.Context, _ uuid.UUID, key string) ([]byte, error) {

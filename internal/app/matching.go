@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/jackc/pgx/v5"
 	"github.com/riverqueue/river"
 	"github.com/riverqueue/river/rivertype"
 
@@ -55,6 +56,9 @@ func (w *matchWorker) Work(ctx context.Context, job *river.Job[MatchArgs]) error
 	}
 	w.logger.InfoContext(ctx, "matching finished", "users", st.Users, "jobs", st.Jobs,
 		"match", st.Decisions[matching.Match], "maybe", st.Decisions[matching.Maybe], "skip", st.Decisions[matching.Skip])
+	if c, err := river.ClientFromContextSafely[pgx.Tx](ctx); err == nil {
+		_, _ = c.Insert(ctx, PlanArgs{}, nil)
+	}
 	return nil
 }
 

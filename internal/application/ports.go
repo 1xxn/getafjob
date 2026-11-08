@@ -142,6 +142,18 @@ type ScreenshotDeleter interface {
 	Delete(ctx context.Context, userID uuid.UUID, key string) error
 }
 
+// PlannerCandidate is an open job matching the user's criteria.
+type PlannerCandidate struct {
+	JobID int64
+	Score int
+}
+
+// PlanStats summarizes what a run of the planner queued.
+type PlanStats struct {
+	UsersEligible int
+	JobsPlanned   int
+}
+
 // Store persists applications per user (row-level security).
 type Store interface {
 	// Create returns the application of the user for the job, creating it in state if there is none.
@@ -178,4 +190,15 @@ type Store interface {
 	Approve(ctx context.Context, userID uuid.UUID, app App, at time.Time) error
 	// Approvals lists the applications on the user's approval list, oldest request first.
 	Approvals(ctx context.Context, userID uuid.UUID) ([]Approval, error)
+
+	// PlanUsers lists active users whose autonomy level enables auto-planning and who have daily quota > 0 (system role).
+	PlanUsers(ctx context.Context) ([]uuid.UUID, error)
+	// ActiveApplicationsCount counts applications in queued, running, or submitting for the user.
+	ActiveApplicationsCount(ctx context.Context, userID uuid.UUID) (int, error)
+	// UserLastPacedAt returns the most recent timestamp an application was queued, run leased, or submit started for pacing.
+	UserLastPacedAt(ctx context.Context, userID uuid.UUID) (time.Time, error)
+	// PlannerCandidates returns open matching jobs for the user ordered by match score descending.
+	PlannerCandidates(ctx context.Context, userID uuid.UUID, minScore int) ([]PlannerCandidate, error)
+	// SubmitsSince counts the submit attempts of the user started since at.
+	SubmitsSince(ctx context.Context, userID uuid.UUID, since time.Time) (int, error)
 }

@@ -505,11 +505,19 @@ func (q *Queries) InsertSubmitAttempt(ctx context.Context, arg InsertSubmitAttem
 const leaseCandidate = `-- name: LeaseCandidate :one
 SELECT a.id, a.user_id, a.job_id,
   lower(coalesce(substring(coalesce(nullif(j.apply_url, ''), j.url) from '^[a-zA-Z]+://([^/:?#]+)'), ''))::text AS host
-FROM applications a JOIN jobs j ON j.id = a.job_id
+FROM applications a
+JOIN jobs j ON j.id = a.job_id
+LEFT JOIN autonomy_settings s ON s.user_id = a.user_id
 WHERE a.state = 'queued'
   AND NOT EXISTS (SELECT 1 FROM runs r WHERE r.application_id = a.id AND r.finished_at IS NULL AND r.expires_at > $1::timestamptz)
   AND NOT EXISTS (SELECT 1 FROM runs r WHERE r.host = lower(coalesce(substring(coalesce(nullif(j.apply_url, ''), j.url) from '^[a-zA-Z]+://([^/:?#]+)'), ''))
     AND ((r.finished_at IS NULL AND r.expires_at > $1::timestamptz) OR r.leased_at > $2::timestamptz))
+  AND coalesce(s.daily_limit, 5) > 0
+  AND (
+    SELECT count(*) FROM submit_attempts sa
+    WHERE sa.user_id = a.user_id
+      AND sa.started_at >= $1::timestamptz - interval '24 hours'
+  ) < coalesce(s.daily_limit, 5)
 ORDER BY a.updated_at, a.id
 LIMIT 1
 FOR UPDATE OF a SKIP LOCKED
@@ -527,8 +535,8 @@ type LeaseCandidateRow struct {
 	Host   string
 }
 
-// System role: the oldest queued application whose host has no active run and no lease within the gap, and that
-// has no unfinished run itself.
+// System role: the oldest queued application whose host has no active run and no lease within the gap,
+// whose user has free daily quota, and that has no unfinished run itself.
 func (q *Queries) LeaseCandidate(ctx context.Context, arg LeaseCandidateParams) (LeaseCandidateRow, error) {
 	row := q.db.QueryRow(ctx, leaseCandidate, arg.Now, arg.GapStart)
 	var i LeaseCandidateRow
