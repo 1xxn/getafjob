@@ -1,6 +1,9 @@
 package views
 
-import "strconv"
+import (
+	"strconv"
+	"time"
+)
 
 // HandoffQuestion is one question asked during a run.
 type HandoffQuestion struct {
@@ -9,19 +12,61 @@ type HandoffQuestion struct {
 	Draft    string
 }
 
-// HandoffData fills the remote browser and handoff page.
+// EvidenceFieldRow is one filled form field on the application evidence page.
+type EvidenceFieldRow struct {
+	Page   int
+	Label  string
+	Value  string
+	Source string
+}
+
+// TimelineRow is one chronological event or checkpoint on the application evidence page.
+type TimelineRow struct {
+	At            time.Time
+	Kind          string
+	Step          string
+	FromState     string
+	ToState       string
+	Actor         string
+	Page          int
+	URL           string
+	Detail        string
+	ScreenshotURL string
+}
+
+// HandoffData fills the application evidence and remote browser page.
 type HandoffData struct {
-	Name      string
-	AppID     string
-	JobTitle  string
-	Company   string
-	Questions []HandoffQuestion
+	Name                string
+	AppID               string
+	JobID               int64
+	JobTitle            string
+	Company             string
+	State               string
+	Status              string
+	Questions           []HandoffQuestion
+	Fields              []EvidenceFieldRow
+	BeforeSubmitURL     string
+	ConfirmationShotURL string
+	ConfirmationURL     string
+	Confirmed           bool
+	Timeline            []TimelineRow
 }
 
 templ HandoffPage(d HandoffData) {
 	@Layout(Page{Title: T(ctx, "handoff.title"), UserName: d.Name, Handoff: true}) {
 		@Section(d.Company + " · " + d.JobTitle) {
-			<p><a href="/jobs">{ T(ctx, "jobs.back") }</a></p>
+			<p>
+				<a href="/jobs">{ T(ctx, "jobs.back") }</a>
+				if d.JobID > 0 {
+					· <a href={ templ.SafeURL("/jobs/" + i64(d.JobID)) }>{ T(ctx, "evidence.job_link") }</a>
+				}
+				if d.Status != "" {
+					· @StatusLabel(d.Status)
+				}
+				if d.State != "" {
+					· <span class="muted">{ d.State }</span>
+				}
+			</p>
 			<p class="muted" id="screen-status">{ T(ctx, "handoff.connecting") }</p>
 
 			<div class="remote-browser-box">
@@ -60,6 +105,104 @@ templ HandoffPage(d HandoffData) {
 					</form>
 				</div>
 			}
+
+			<div class="form-section stack">
+				<h2>{ T(ctx, "evidence.fields.title") }</h2>
+				if len(d.Fields) == 0 {
+					<p class="muted">{ T(ctx, "evidence.fields.empty") }</p>
+				} else {
+					<table class="table">
+						<thead>
+							<tr>
+								<th>{ T(ctx, "evidence.fields.field") }</th>
+								<th>{ T(ctx, "evidence.fields.value") }</th>
+								<th>{ T(ctx, "evidence.fields.source") }</th>
+							</tr>
+						</thead>
+						<tbody>
+							for _, f := range d.Fields {
+								<tr>
+									<td>
+										{ f.Label }
+										if f.Page > 1 {
+											<span class="muted"> ({ T(ctx, "evidence.fields.page", "page", f.Page) })</span>
+										}
+									</td>
+									<td>{ f.Value }</td>
+									<td><code>{ f.Source }</code></td>
+								</tr>
+							}
+						</tbody>
+					</table>
+				}
+			</div>
+
+			<div class="form-section stack">
+				<h2>{ T(ctx, "evidence.before_submit.title") }</h2>
+				if d.BeforeSubmitURL != "" {
+					<img src={ d.BeforeSubmitURL } alt={ T(ctx, "evidence.before_submit.title") } class="screencast" loading="lazy"/>
+				} else {
+					<p class="muted">{ T(ctx, "evidence.before_submit.empty") }</p>
+				}
+			</div>
+
+			<div class="form-section stack">
+				<h2>{ T(ctx, "evidence.confirmation.title") }</h2>
+				if d.Confirmed {
+					<p>{ T(ctx, "evidence.confirmation.confirmed") }</p>
+				} else {
+					<p class="muted">{ T(ctx, "evidence.confirmation.unconfirmed") }</p>
+				}
+				if d.ConfirmationURL != "" {
+					<p><a href={ templ.SafeURL(d.ConfirmationURL) } rel="noopener noreferrer external">{ d.ConfirmationURL }</a></p>
+				}
+				if d.ConfirmationShotURL != "" {
+					<img src={ d.ConfirmationShotURL } alt={ T(ctx, "evidence.confirmation.title") } class="screencast" loading="lazy"/>
+				}
+			</div>
+
+			<div class="form-section stack">
+				<h2>{ T(ctx, "evidence.timeline.title") }</h2>
+				<p class="muted">{ T(ctx, "evidence.retention_hint") }</p>
+				if len(d.Timeline) == 0 {
+					<p class="muted">{ T(ctx, "evidence.timeline.empty") }</p>
+				} else {
+					<table class="table">
+						<thead>
+							<tr>
+								<th>{ T(ctx, "evidence.timeline.when") }</th>
+								<th>{ T(ctx, "evidence.timeline.step") }</th>
+								<th>{ T(ctx, "evidence.timeline.detail") }</th>
+							</tr>
+						</thead>
+						<tbody>
+							for _, t := range d.Timeline {
+								<tr>
+									<td>{ When(ctx, t.At) }</td>
+									<td>
+										<strong>{ t.Step }</strong>
+										if t.Kind == "event" && t.ToState != "" {
+											<span class="muted"> ({ t.FromState } -&gt; { t.ToState })</span>
+										}
+										if t.Page > 0 {
+											<span class="muted"> · { T(ctx, "evidence.fields.page", "page", t.Page) }</span>
+										}
+									</td>
+									<td>
+										{ or(t.Detail, t.URL) }
+										if t.ScreenshotURL != "" {
+											if t.Detail != "" || t.URL != "" {
+												<span> · </span>
+											}
+											<a href={ templ.SafeURL(t.ScreenshotURL) }>{ T(ctx, "evidence.timeline.screenshot") }</a>
+										}
+									</td>
+								</tr>
+							}
+						</tbody>
+					</table>
+				}
+			</div>
 		}
 	}
 }

@@ -235,16 +235,18 @@ func (e *Engine) submit(ctx context.Context, p *rod.Page, page int, st *browser.
 		return ErrParked
 	}
 	confirmed := false
+	var after *browser.State
 	deadline := e.clock().Add(e.wait())
 	for !confirmed && e.clock().Before(deadline) {
-		if after, err := browser.Extract(p); err == nil {
-			confirmed = confirmation(after)
+		if stAfter, err := browser.Extract(p); err == nil {
+			after = stAfter
+			confirmed = confirmation(stAfter)
 		}
 		if !confirmed {
 			time.Sleep(250 * time.Millisecond)
 		}
 	}
-	_ = e.checkpoint(ctx, p, page, StepVerify, nil, nil, &eff, dialogs)
+	_ = e.checkpoint(ctx, p, page, StepVerify, after, nil, &eff, dialogs)
 	return e.Coord.Submitted(ctx, confirmed, eff)
 }
 

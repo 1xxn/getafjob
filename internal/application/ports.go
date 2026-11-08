@@ -68,6 +68,55 @@ type Question struct {
 	Draft string `json:"draft,omitempty"`
 }
 
+// ScreenshotRetention is how long encrypted run screenshots are kept in the blob store.
+const ScreenshotRetention = 90 * 24 * time.Hour
+
+// EvidenceField is a form field filled during an application run, with its value and provenance source.
+type EvidenceField struct {
+	Page   int
+	ID     string
+	Label  string
+	Value  string
+	Source string
+}
+
+// TimelineEntry is a chronological state transition event or run checkpoint of an application.
+type TimelineEntry struct {
+	At           time.Time
+	Kind         string // "event" or "checkpoint"
+	Step         string // event name or checkpoint step
+	FromState    State
+	ToState      State
+	Actor        Actor
+	Page         int
+	URL          string
+	Detail       string
+	CheckpointID int64 // > 0 when this entry is a checkpoint with a stored screenshot
+}
+
+// Evidence is the audit record of an application: every filled field with its value and source, the screenshot
+// before submitting, the confirmation page, and the chronological timeline.
+type Evidence struct {
+	Fields                   []EvidenceField
+	BeforeSubmitCheckpointID int64
+	ConfirmationCheckpointID int64
+	ConfirmationURL          string
+	Confirmed                bool
+	Timeline                 []TimelineEntry
+}
+
+// ExpiredScreenshot names a checkpoint screenshot older than ScreenshotRetention.
+type ExpiredScreenshot struct {
+	CheckpointID int64
+	UserID       uuid.UUID
+	Key          string
+}
+
+// ScreenshotDeleter deletes a sealed screenshot blob of a user.
+type ScreenshotDeleter interface {
+	Delete(ctx context.Context, userID uuid.UUID, key string) error
+}
+
 // Store persists applications per user (row-level security).
 type Store interface {
 	// Create returns the application of the user for the job, creating it in state if there is none.
@@ -75,6 +124,10 @@ type Store interface {
 	Get(ctx context.Context, userID, id uuid.UUID) (App, error)
 	// Questions returns the questions of the last ask event of an application.
 	Questions(ctx context.Context, userID, id uuid.UUID) ([]Question, error)
+	// Evidence returns the filled fields, screenshots, confirmation page, and timeline of an application.
+	Evidence(ctx context.Context, userID, id uuid.UUID) (Evidence, error)
+	// CheckpointScreenshot returns the blob key of a checkpoint screenshot belonging to an application of the user.
+	CheckpointScreenshot(ctx context.Context, userID, appID uuid.UUID, checkpointID int64) (string, error)
 	// Apply writes a change if the application is still at app.Version; ErrConflict otherwise.
 	Apply(ctx context.Context, userID uuid.UUID, app App, c Change) error
 	// Candidate collects what the guards need for a job of the user.
@@ -85,4 +138,8 @@ type Store interface {
 	HandoffsDue(ctx context.Context, before time.Time) ([]Handoff, error)
 	// MarkWarned records the notice once; false when it was recorded before or the application moved on.
 	MarkWarned(ctx context.Context, r Ref, at time.Time) (bool, error)
+	// ExpiredScreenshots lists checkpoint screenshots older than before (system role).
+	ExpiredScreenshots(ctx context.Context, before time.Time) ([]ExpiredScreenshot, error)
+	// ClearScreenshot clears the screenshot blob reference on a checkpoint after its blob was deleted.
+	ClearScreenshot(ctx context.Context, userID uuid.UUID, checkpointID int64) error
 }

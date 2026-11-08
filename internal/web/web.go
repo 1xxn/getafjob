@@ -41,6 +41,7 @@ type Server struct {
 	Importer       *cvimport.Importer // nil: no CV import
 	Jobs           *matching.Listings
 	Apps           *application.Service
+	Shots          Screenshots
 	Handoffs       HandoffHub
 	PushStore      webpush.Store
 	VAPIDPublicKey string
@@ -71,6 +72,7 @@ func (s *Server) Register(mux *http.ServeMux) {
 	mux.Handle("GET /jobs", s.page(s.jobsPage))
 	mux.Handle("GET /jobs/{id}", s.page(s.jobPage))
 	mux.Handle("GET /applications/{id}", s.page(s.applicationPage))
+	mux.Handle("GET /applications/{id}/screenshots/{checkpoint}", s.page(s.applicationScreenshot))
 	mux.Handle("GET /applications/{id}/screen", s.page(s.screenWebSocket))
 	mux.Handle("POST /applications/{id}/answer", s.page(s.applicationAnswer))
 	mux.Handle("POST /applications/{id}/park", s.page(s.applicationPark))

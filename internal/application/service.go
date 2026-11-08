@@ -53,6 +53,41 @@ func (s *Service) Questions(ctx context.Context, userID, id uuid.UUID) ([]Questi
 	return s.store.Questions(ctx, userID, id)
 }
 
+// Evidence returns the audit evidence of an application.
+func (s *Service) Evidence(ctx context.Context, userID, id uuid.UUID) (Evidence, error) {
+	return s.store.Evidence(ctx, userID, id)
+}
+
+// CheckpointScreenshot returns the blob key of a checkpoint screenshot of an application.
+func (s *Service) CheckpointScreenshot(ctx context.Context, userID, appID uuid.UUID, checkpointID int64) (string, error) {
+	return s.store.CheckpointScreenshot(ctx, userID, appID, checkpointID)
+}
+
+// PurgeExpiredScreenshots deletes run screenshots older than ScreenshotRetention from the blob store and clears
+// their checkpoint references.
+func (s *Service) PurgeExpiredScreenshots(ctx context.Context, blobs ScreenshotDeleter) (int, error) {
+	expired, err := s.store.ExpiredScreenshots(ctx, s.now().Add(-ScreenshotRetention))
+	if err != nil {
+		return 0, err
+	}
+	purged := 0
+	var errs []error
+	for _, sc := range expired {
+		if blobs != nil {
+			if err := blobs.Delete(ctx, sc.UserID, sc.Key); err != nil {
+				errs = append(errs, err)
+				continue
+			}
+		}
+		if err := s.store.ClearScreenshot(ctx, sc.UserID, sc.CheckpointID); err != nil {
+			errs = append(errs, err)
+			continue
+		}
+		purged++
+	}
+	return purged, errors.Join(errs...)
+}
+
 // Create returns the user's application for a job, creating it as matched.
 func (s *Service) Create(ctx context.Context, userID uuid.UUID, jobID int64) (uuid.UUID, error) {
 	return s.store.Create(ctx, userID, jobID, Matched, s.now())

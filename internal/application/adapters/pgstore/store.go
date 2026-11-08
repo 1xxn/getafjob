@@ -4,9 +4,11 @@ package pgstore
 //go:generate go tool sqlc generate -f ../../../../sqlc.yaml
 
 import (
+	"cmp"
 	"context"
 	"encoding/json"
 	"errors"
+	"slices"
 	"time"
 
 	"github.com/google/uuid"
@@ -179,6 +181,141 @@ func (s *Store) MarkWarned(ctx context.Context, r application.Ref, at time.Time)
 			Detail: []byte("{}"), At: at})
 	})
 	return ok, err
+}
+
+// Evidence assembles the filled fields, screenshots, confirmation page, and timeline of an application.
+func (s *Store) Evidence(ctx context.Context, userID, id uuid.UUID) (ev application.Evidence, err error) {
+	err = s.user(ctx, userID, func(qs *q.Queries) error {
+		evs, err := qs.Events(ctx, q.EventsParams{ApplicationID: id, UserID: userID})
+		if err != nil {
+			return err
+		}
+		cps, err := qs.ApplicationCheckpoints(ctx, q.ApplicationCheckpointsParams{ApplicationID: id, UserID: userID})
+		if err != nil {
+			return err
+		}
+		sawSubmit := false
+		for _, c := range cps {
+			var d struct {
+				Filled []struct {
+					ID     string `json:"id"`
+					Label  string `json:"label"`
+					Shown  string `json:"shown"`
+					Source string `json:"source"`
+				} `json:"filled"`
+			}
+			_ = json.Unmarshal(c.Data, &d)
+			for _, f := range d.Filled {
+				ef := application.EvidenceField{
+					Page:   int(c.Page),
+					ID:     f.ID,
+					Label:  cmp.Or(f.Label, f.ID),
+					Value:  f.Shown,
+					Source: f.Source,
+				}
+				idx := slices.IndexFunc(ev.Fields, func(existing application.EvidenceField) bool {
+					return existing.Page == ef.Page && ef.ID != "" && existing.ID == ef.ID
+				})
+				if idx >= 0 {
+					ev.Fields[idx] = ef
+				} else {
+					ev.Fields = append(ev.Fields, ef)
+				}
+			}
+			if c.Step == "submit" {
+				sawSubmit = true
+				if c.Screenshot != "" {
+					ev.BeforeSubmitCheckpointID = c.ID
+				}
+			}
+			if c.Step == "verify" && sawSubmit {
+				if c.Screenshot != "" {
+					ev.ConfirmationCheckpointID = c.ID
+				}
+				if c.Url != "" {
+					ev.ConfirmationURL = c.Url
+				}
+			}
+			var shotID int64
+			if c.Screenshot != "" {
+				shotID = c.ID
+			}
+			ev.Timeline = append(ev.Timeline, application.TimelineEntry{
+				At:           c.At,
+				Kind:         "checkpoint",
+				Step:         c.Step,
+				Page:         int(c.Page),
+				URL:          c.Url,
+				CheckpointID: shotID,
+			})
+		}
+		for _, e := range evs {
+			if e.Event == string(application.EvConfirm) || e.Event == string(application.EvReconciled) ||
+				e.ToState == string(application.Confirmed) {
+				ev.Confirmed = true
+			}
+			var d struct {
+				Reason string `json:"reason"`
+				Guard  string `json:"guard"`
+				Via    string `json:"via"`
+			}
+			_ = json.Unmarshal(e.Detail, &d)
+			ev.Timeline = append(ev.Timeline, application.TimelineEntry{
+				At:        e.At,
+				Kind:      "event",
+				Step:      e.Event,
+				FromState: application.State(e.FromState),
+				ToState:   application.State(e.ToState),
+				Actor:     application.Actor(e.Actor),
+				Detail:    cmp.Or(d.Reason, d.Guard, d.Via),
+			})
+		}
+		slices.SortStableFunc(ev.Timeline, func(a, b application.TimelineEntry) int {
+			return a.At.Compare(b.At)
+		})
+		return nil
+	})
+	return ev, err
+}
+
+// CheckpointScreenshot returns the blob key of a checkpoint screenshot belonging to an application of the user.
+func (s *Store) CheckpointScreenshot(ctx context.Context, userID, appID uuid.UUID, checkpointID int64) (key string, err error) {
+	err = s.user(ctx, userID, func(qs *q.Queries) error {
+		shot, err := qs.CheckpointScreenshot(ctx, q.CheckpointScreenshotParams{
+			ApplicationID: appID,
+			ID:            checkpointID,
+			UserID:        userID,
+		})
+		if errors.Is(err, pgx.ErrNoRows) || (err == nil && shot == "") {
+			return application.ErrNotFound
+		}
+		key = shot
+		return err
+	})
+	return key, err
+}
+
+// ExpiredScreenshots lists checkpoint screenshots older than before (system role).
+func (s *Store) ExpiredScreenshots(ctx context.Context, before time.Time) (out []application.ExpiredScreenshot, err error) {
+	err = db.InSystemTx(ctx, s.pool, func(tx pgx.Tx) error {
+		rows, err := q.New(tx).ExpiredCheckpointScreenshots(ctx, before)
+		for _, r := range rows {
+			out = append(out, application.ExpiredScreenshot{
+				CheckpointID: r.ID,
+				UserID:       r.UserID,
+				Key:          r.Screenshot,
+			})
+		}
+		return err
+	})
+	return out, err
+}
+
+// ClearScreenshot clears the screenshot blob reference on a checkpoint after its blob was deleted.
+func (s *Store) ClearScreenshot(ctx context.Context, userID uuid.UUID, checkpointID int64) error {
+	return s.user(ctx, userID, func(qs *q.Queries) error {
+		return qs.ClearCheckpointScreenshot(ctx, q.ClearCheckpointScreenshotParams{ID: checkpointID, UserID: userID})
+	})
 }
 
 var _ application.RunStore = (*Store)(nil)

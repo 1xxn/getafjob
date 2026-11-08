@@ -256,3 +256,118 @@ func TestHandoffWindow(t *testing.T) {
 		t.Fatalf("answered = %s", a.State)
 	}
 }
+
+type deletedShots struct {
+	keys []string
+}
+
+func (d *deletedShots) Delete(_ context.Context, _ uuid.UUID, key string) error {
+	d.keys = append(d.keys, key)
+	return nil
+}
+
+func TestEvidenceAndScreenshotRetention(t *testing.T) {
+	pool, st, svc, now := setup(t)
+	ctx := t.Context()
+	max := user(t, pool, "max@example.org")
+	other := user(t, pool, "erika@example.org")
+	runs := application.NewRuns(svc, st)
+
+	appID, err := svc.Create(ctx, max, job(t, pool, "greenhouse:acme", "Acme GmbH", "acme|go"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := svc.Fire(ctx, max, appID, application.EvQueue, application.ActorWorker, nil); err != nil {
+		t.Fatal(err)
+	}
+	lease, ok, err := runs.Lease(ctx, "runner-1")
+	if err != nil || !ok {
+		t.Fatalf("lease: %v, %v", ok, err)
+	}
+	ref := application.RunRef{RunID: lease.RunID, AppID: lease.AppID, UserID: lease.UserID}
+
+	*now = now.Add(time.Minute)
+	if err := runs.Checkpoint(ctx, ref, application.Checkpoint{
+		Step:       "execute",
+		Page:       1,
+		URL:        "https://jobs.example.org/apply",
+		Data:       []byte(`{"filled":[{"id":"f-1","label":"First name","shown":"Max","source":"profile:personal.first_name"},{"id":"f-2","label":"Email","shown":"max@example.org","source":"profile:personal.email"}]}`),
+		Screenshot: "runs/1/execute.png",
+	}); err != nil {
+		t.Fatal(err)
+	}
+
+	*now = now.Add(time.Minute)
+	if err := runs.Checkpoint(ctx, ref, application.Checkpoint{
+		Step:       "submit",
+		Page:       1,
+		URL:        "https://jobs.example.org/apply",
+		Data:       []byte(`{}`),
+		Screenshot: "runs/1/submit.png",
+	}); err != nil {
+		t.Fatal(err)
+	}
+	if err := runs.BeginSubmit(ctx, ref); err != nil {
+		t.Fatal(err)
+	}
+
+	*now = now.Add(time.Minute)
+	if err := runs.Checkpoint(ctx, ref, application.Checkpoint{
+		Step:       "verify",
+		Page:       1,
+		URL:        "https://jobs.example.org/apply/thank-you",
+		Data:       []byte(`{}`),
+		Screenshot: "runs/1/confirm.png",
+	}); err != nil {
+		t.Fatal(err)
+	}
+	if err := runs.Submitted(ctx, ref, true, map[string]any{"navigation": true}); err != nil {
+		t.Fatal(err)
+	}
+
+	ev, err := svc.Evidence(ctx, max, appID)
+	if err != nil {
+		t.Fatalf("evidence: %v", err)
+	}
+	if len(ev.Fields) != 2 || ev.Fields[0].Label != "First name" || ev.Fields[0].Value != "Max" ||
+		ev.Fields[0].Source != "profile:personal.first_name" {
+		t.Fatalf("fields = %+v", ev.Fields)
+	}
+	if ev.BeforeSubmitCheckpointID <= 0 || ev.ConfirmationCheckpointID <= 0 {
+		t.Fatalf("checkpoint IDs = before:%d confirm:%d", ev.BeforeSubmitCheckpointID, ev.ConfirmationCheckpointID)
+	}
+	if !ev.Confirmed || ev.ConfirmationURL != "https://jobs.example.org/apply/thank-you" {
+		t.Fatalf("confirmation = %v, %q", ev.Confirmed, ev.ConfirmationURL)
+	}
+	if len(ev.Timeline) < 6 {
+		t.Fatalf("timeline len = %d", len(ev.Timeline))
+	}
+
+	// Owner can read the screenshot key; another user cannot.
+	key, err := svc.CheckpointScreenshot(ctx, max, appID, ev.BeforeSubmitCheckpointID)
+	if err != nil || key != "runs/1/submit.png" {
+		t.Fatalf("before-submit screenshot = %q, %v", key, err)
+	}
+	if _, err := svc.CheckpointScreenshot(ctx, other, appID, ev.BeforeSubmitCheckpointID); !errors.Is(err, application.ErrNotFound) {
+		t.Fatalf("other user screenshot = %v", err)
+	}
+
+	// Before 90 days, nothing expires.
+	del := &deletedShots{}
+	*now = now.Add(89 * 24 * time.Hour)
+	if n, err := svc.PurgeExpiredScreenshots(ctx, del); err != nil || n != 0 {
+		t.Fatalf("purge at 89d = %d, %v", n, err)
+	}
+
+	// After 90 days, all 3 screenshots are purged from the blob store and cleared on their checkpoints.
+	*now = now.Add(2 * 24 * time.Hour)
+	if n, err := svc.PurgeExpiredScreenshots(ctx, del); err != nil || n != 3 {
+		t.Fatalf("purge at 91d = %d, %v", n, err)
+	}
+	if len(del.keys) != 3 {
+		t.Fatalf("deleted keys = %v", del.keys)
+	}
+	if _, err := svc.CheckpointScreenshot(ctx, max, appID, ev.BeforeSubmitCheckpointID); !errors.Is(err, application.ErrNotFound) {
+		t.Fatalf("purged screenshot should be ErrNotFound, got %v", err)
+	}
+}

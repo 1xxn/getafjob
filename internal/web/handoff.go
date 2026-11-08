@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"net/http"
+	"strconv"
 	"strings"
 
 	"github.com/coder/websocket"
@@ -14,6 +15,7 @@ import (
 	"github.com/1xxn/getafjob/internal/gateway"
 	runnerv1 "github.com/1xxn/getafjob/internal/gen/proto/runner/v1"
 	"github.com/1xxn/getafjob/internal/identity"
+	"github.com/1xxn/getafjob/internal/platform/blob"
 	"github.com/1xxn/getafjob/internal/profile"
 	"github.com/1xxn/getafjob/internal/web/views"
 )
@@ -21,6 +23,11 @@ import (
 // HandoffHub accesses active runner handoff sessions.
 type HandoffHub interface {
 	SessionFor(appID uuid.UUID) (*gateway.HandoffSession, bool)
+}
+
+// Screenshots reads sealed run screenshots per user.
+type Screenshots interface {
+	Get(ctx context.Context, userID uuid.UUID, key string) ([]byte, error)
 }
 
 type screenInputMsg struct {
@@ -246,8 +253,10 @@ func (s *Server) applicationPage(w http.ResponseWriter, r *http.Request, u *iden
 		s.notFound(w, r, u)
 		return
 	}
-	var title, company string
-	var qs []views.HandoffQuestion
+	d := views.HandoffData{
+		Name:  u.DisplayName,
+		AppID: appID.String(),
+	}
 	if s.Apps != nil {
 		app, err := s.Apps.Get(r.Context(), u.ID, appID)
 		if err != nil {
@@ -258,30 +267,116 @@ func (s *Server) applicationPage(w http.ResponseWriter, r *http.Request, u *iden
 			s.failed(w, r, u, err)
 			return
 		}
+		d.JobID = app.JobID
+		d.State = string(app.State)
+		d.Status = appStatus(app.State)
 		if s.Jobs != nil {
 			if j, err := s.Jobs.Detail(r.Context(), u.ID, app.JobID); err == nil {
-				title = j.Title
-				company = j.Company
+				d.JobTitle = j.Title
+				d.Company = j.Company
 			}
 		}
 		if app.State == application.NeedsInput || app.State == application.Parked {
 			if asked, err := s.Apps.Questions(r.Context(), u.ID, appID); err == nil {
 				for _, q := range asked {
 					if q.Kind != "captcha" && q.Label != "" {
-						qs = append(qs, views.HandoffQuestion{Kind: q.Kind, Question: q.Label, Draft: q.Draft})
+						d.Questions = append(d.Questions, views.HandoffQuestion{Kind: q.Kind, Question: q.Label, Draft: q.Draft})
 					}
 				}
 			}
 		}
-	}
-	d := views.HandoffData{
-		Name:      u.DisplayName,
-		AppID:     appID.String(),
-		JobTitle:  title,
-		Company:   company,
-		Questions: qs,
+		if ev, err := s.Apps.Evidence(r.Context(), u.ID, appID); err == nil {
+			for _, f := range ev.Fields {
+				d.Fields = append(d.Fields, views.EvidenceFieldRow{
+					Page:   f.Page,
+					Label:  f.Label,
+					Value:  f.Value,
+					Source: f.Source,
+				})
+			}
+			if ev.BeforeSubmitCheckpointID > 0 {
+				d.BeforeSubmitURL = "/applications/" + appID.String() + "/screenshots/" + strconv.FormatInt(ev.BeforeSubmitCheckpointID, 10)
+			}
+			if ev.ConfirmationCheckpointID > 0 {
+				d.ConfirmationShotURL = "/applications/" + appID.String() + "/screenshots/" + strconv.FormatInt(ev.ConfirmationCheckpointID, 10)
+			}
+			d.ConfirmationURL = webLink(ev.ConfirmationURL)
+			d.Confirmed = ev.Confirmed || app.State == application.Confirmed
+			for _, t := range ev.Timeline {
+				var shotURL string
+				if t.CheckpointID > 0 {
+					shotURL = "/applications/" + appID.String() + "/screenshots/" + strconv.FormatInt(t.CheckpointID, 10)
+				}
+				d.Timeline = append(d.Timeline, views.TimelineRow{
+					At:            t.At,
+					Kind:          t.Kind,
+					Step:          t.Step,
+					FromState:     string(t.FromState),
+					ToState:       string(t.ToState),
+					Actor:         string(t.Actor),
+					Page:          t.Page,
+					URL:           t.URL,
+					Detail:        t.Detail,
+					ScreenshotURL: shotURL,
+				})
+			}
+		}
 	}
 	s.render(w, r, http.StatusOK, views.HandoffPage(d))
+}
+
+func appStatus(st application.State) string {
+	switch st {
+	case application.Submitted, application.Confirmed, application.Interview, application.Offer:
+		return "done"
+	case application.NeedsInput:
+		return "your_turn"
+	case application.Parked, application.Failed, application.Rejected, application.Withdrawn:
+		return "failed"
+	default:
+		return "waiting"
+	}
+}
+
+// applicationScreenshot serves a decrypted checkpoint screenshot belonging to an application of the signed-in user.
+func (s *Server) applicationScreenshot(w http.ResponseWriter, r *http.Request, u *identity.User) {
+	if u == nil {
+		http.Redirect(w, r, "/login", http.StatusSeeOther)
+		return
+	}
+	appID, err := uuid.Parse(r.PathValue("id"))
+	if err != nil {
+		s.notFound(w, r, u)
+		return
+	}
+	cpID, err := strconv.ParseInt(r.PathValue("checkpoint"), 10, 64)
+	if err != nil || cpID <= 0 || s.Apps == nil || s.Shots == nil {
+		s.notFound(w, r, u)
+		return
+	}
+	key, err := s.Apps.CheckpointScreenshot(r.Context(), u.ID, appID, cpID)
+	if err != nil {
+		if errors.Is(err, application.ErrNotFound) {
+			s.notFound(w, r, u)
+			return
+		}
+		s.failed(w, r, u, err)
+		return
+	}
+	png, err := s.Shots.Get(r.Context(), u.ID, key)
+	if err != nil {
+		if errors.Is(err, blob.ErrNotFound) {
+			s.notFound(w, r, u)
+			return
+		}
+		s.failed(w, r, u, err)
+		return
+	}
+	h := w.Header()
+	h.Set("Content-Type", "image/png")
+	h.Set("Content-Length", strconv.Itoa(len(png)))
+	h.Set("Content-Security-Policy", "sandbox; default-src 'none'")
+	_, _ = w.Write(png) //nolint:gosec // G705: PNG screenshot verified at upload, served as image/png under a sandbox CSP
 }
 
 // applicationPark parks the application from the UI.
