@@ -12,6 +12,7 @@ import (
 
 	"github.com/google/uuid"
 
+	"github.com/1xxn/getafjob/internal/ai"
 	"github.com/1xxn/getafjob/internal/application"
 	"github.com/1xxn/getafjob/internal/identity"
 	"github.com/1xxn/getafjob/internal/portals"
@@ -322,5 +323,110 @@ func TestPreferencesEasyApply(t *testing.T) {
 	}
 	if len(portalsSvc.disconnected) == 0 || portalsSvc.disconnected[0] != "linkedin" {
 		t.Fatalf("expected linkedin disconnected, got %+v", portalsSvc.disconnected)
+	}
+}
+
+type fakeAIService struct {
+	adminEnabled bool
+	settings     ai.UserSettings
+	savedEnabled bool
+	savedKey     string
+	clearedKey   bool
+}
+
+func (f *fakeAIService) AdminEnabled() bool { return f.adminEnabled }
+func (f *fakeAIService) GetSettings(context.Context, uuid.UUID) (ai.UserSettings, error) {
+	return f.settings, nil
+}
+func (f *fakeAIService) SaveSettings(_ context.Context, _ uuid.UUID, enabled bool, customKey string, clearKey bool) error {
+	f.savedEnabled = enabled
+	f.savedKey = customKey
+	f.clearedKey = clearKey
+	f.settings.Enabled = enabled
+	if customKey != "" {
+		f.settings.HasCustomKey = true
+	}
+	if clearKey {
+		f.settings.HasCustomKey = false
+	}
+	return nil
+}
+
+func TestPreferencesAI(t *testing.T) {
+	max := uuid.MustParse("0192f3a4-5b6c-7d8e-9f01-23456789abcd")
+	u := &identity.User{ID: max, DisplayName: "Max Mustermann", Email: "max@example.org"}
+
+	profStore := &fakeProfileStore{}
+	profSvc := profile.NewService(profStore, nil)
+
+	st := &fakeAutonomyStore{
+		settings: application.Settings{
+			Level:      application.LevelApprove,
+			MinScore:   80,
+			DailyLimit: 5,
+		},
+	}
+	aiSvc := &fakeAIService{
+		adminEnabled: true,
+		settings: ai.UserSettings{
+			Enabled:      false,
+			HasCustomKey: false,
+			SpentCents:   120,
+			BudgetCents:  500,
+		},
+	}
+
+	srv := &Server{
+		Profile: profSvc,
+		Apps:    application.NewService(st),
+		AI:      aiSvc,
+		Logger:  slog.Default(),
+	}
+
+	// 1. GET /preferences includes AI section and budget
+	rec := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodGet, "/preferences", nil)
+	srv.preferencesPage(rec, req, u)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("preferencesPage status = %d, want 200", rec.Code)
+	}
+	body := rec.Body.String()
+	if !strings.Contains(body, `name="ai_enabled"`) || !strings.Contains(body, `name="ai_custom_api_key"`) {
+		t.Fatalf("preferencesPage missing AI inputs:\n%s", body)
+	}
+	if !strings.Contains(body, "1.20") || !strings.Contains(body, "5.00") {
+		t.Fatalf("preferencesPage missing budget values:\n%s", body)
+	}
+
+	// 2. POST /preferences enables AI and sets custom API key
+	form := url.Values{
+		"ai_enabled":        {"on"},
+		"ai_custom_api_key": {"sk-ant-test-key-1234"},
+	}
+	rec = httptest.NewRecorder()
+	req = httptest.NewRequest(http.MethodPost, "/preferences", strings.NewReader(form.Encode()))
+	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	srv.preferencesSave(rec, req, u)
+	if rec.Code != http.StatusSeeOther {
+		t.Fatalf("preferencesSave status = %d, want 303, body: %s", rec.Code, rec.Body.String())
+	}
+	if !aiSvc.savedEnabled || aiSvc.savedKey != "sk-ant-test-key-1234" {
+		t.Fatalf("AI settings not saved as expected: enabled=%v, key=%s", aiSvc.savedEnabled, aiSvc.savedKey)
+	}
+
+	// 3. POST /preferences with clear custom key
+	form = url.Values{
+		"ai_enabled":          {"on"},
+		"ai_clear_custom_key": {"on"},
+	}
+	rec = httptest.NewRecorder()
+	req = httptest.NewRequest(http.MethodPost, "/preferences", strings.NewReader(form.Encode()))
+	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	srv.preferencesSave(rec, req, u)
+	if rec.Code != http.StatusSeeOther {
+		t.Fatalf("preferencesSave clear key status = %d, want 303", rec.Code)
+	}
+	if !aiSvc.clearedKey {
+		t.Fatalf("expected clearedKey = true")
 	}
 }

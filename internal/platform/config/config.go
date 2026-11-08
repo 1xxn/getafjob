@@ -16,6 +16,7 @@ import (
 	"net/url"
 	"os"
 	"slices"
+	"strconv"
 	"strings"
 	"time"
 )
@@ -78,6 +79,14 @@ type Config struct {
 	CrawlInterval time.Duration
 	// EasyApplyEnabled is an operator switch enabling the Easy Apply module (#43). Default: false.
 	EasyApplyEnabled bool
+	// AIEnabled is an operator switch enabling the optional AI module (#44). Default: false.
+	AIEnabled bool
+	// AnthropicAPIKey is the operator's Anthropic API key. Empty: users must supply their own key.
+	AnthropicAPIKey Secret
+	// AnthropicModel is the default Anthropic model for AI operations. Default: claude-3-5-haiku-20241022.
+	AnthropicModel string
+	// AIBudgetPerUserCents is the budget cap per user in USD cents when using the operator key. Default: 500 (5 USD).
+	AIBudgetPerUserCents int
 
 	// Unknown lists GETAFJOB_* variables that are set but read by nobody (typos); names only, never values.
 	Unknown []string
@@ -133,6 +142,17 @@ var specs = []spec{
 	{"VAPID_SUBJECT", "", setVAPIDSubject},
 	{"CRAWL_INTERVAL", "6h", setCrawlInterval},
 	{"EASY_APPLY_ENABLED", "false", func(c *Config, v string) error { return setBool(&c.EasyApplyEnabled, v) }},
+	{"AI_ENABLED", "false", func(c *Config, v string) error { return setBool(&c.AIEnabled, v) }},
+	{"ANTHROPIC_API_KEY", "", func(c *Config, v string) error { c.AnthropicAPIKey = Secret(v); return nil }},
+	{"ANTHROPIC_MODEL", "claude-3-5-haiku-20241022", func(c *Config, v string) error { c.AnthropicModel = strings.TrimSpace(v); return nil }},
+	{"AI_BUDGET_PER_USER_CENTS", "500", func(c *Config, v string) error {
+		n, err := strconv.Atoi(v)
+		if err != nil || n < 0 {
+			return errors.New("must be a positive integer")
+		}
+		c.AIBudgetPerUserCents = n
+		return nil
+	}},
 }
 
 // Names returns all known variable names (with prefix), e.g. for the docs.

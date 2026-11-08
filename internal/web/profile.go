@@ -2,12 +2,14 @@ package web
 
 import (
 	"errors"
+	"fmt"
 	"net/http"
 	"net/url"
 	"strconv"
 	"strings"
 	"time"
 
+	"github.com/1xxn/getafjob/internal/ai"
 	"github.com/1xxn/getafjob/internal/application"
 	"github.com/1xxn/getafjob/internal/identity"
 	"github.com/1xxn/getafjob/internal/notify"
@@ -135,7 +137,7 @@ func (s *Server) profileSave(w http.ResponseWriter, r *http.Request, u *identity
 	}
 }
 
-func preferencesForm(p profile.Preferences, a application.Settings, mb tracking.MailboxAccount, np notify.Preferences, accounts []portals.AccountView, easyApplyAdmin bool) views.Form {
+func preferencesForm(p profile.Preferences, a application.Settings, mb tracking.MailboxAccount, np notify.Preferences, accounts []portals.AccountView, easyApplyAdmin bool, aiSettings ai.UserSettings, aiAdmin bool) views.Form {
 	salary := ""
 	if p.MinSalary > 0 {
 		salary = strconv.Itoa(p.MinSalary)
@@ -168,6 +170,10 @@ func preferencesForm(p profile.Preferences, a application.Settings, mb tracking.
 	if ntfyURL == "" {
 		ntfyURL = "https://ntfy.sh"
 	}
+	placeholder := "sk-ant-api03-..."
+	if aiSettings.HasCustomKey {
+		placeholder = "••••••••••••••••"
+	}
 	vals := map[string]string{
 		"titles": joinLines(p.Titles), "exclude_titles": joinLines(p.ExcludeTitles), "locations": joinLines(p.Locations),
 		"remote_regions": joinLines(p.RemoteRegions), "min_salary": salary, "cover_letter_lang": p.CoverLetterLang,
@@ -181,6 +187,10 @@ func preferencesForm(p profile.Preferences, a application.Settings, mb tracking.
 		"portal_status_indeed":      "disconnected",
 		"portal_limit_linkedin":     "5",
 		"portal_limit_indeed":       "5",
+		"ai_admin_enabled":          strconv.FormatBool(aiAdmin),
+		"ai_spent":                  fmt.Sprintf("%.2f", float64(aiSettings.SpentCents)/100.0),
+		"ai_budget":                 fmt.Sprintf("%.2f", float64(aiSettings.BudgetCents)/100.0),
+		"ai_key_placeholder":        placeholder,
 		"mailbox_host":              mb.Host,
 		"mailbox_port":              portStr,
 		"mailbox_username":          mb.Username,
@@ -206,6 +216,8 @@ func preferencesForm(p profile.Preferences, a application.Settings, mb tracking.
 			"talent_pool":                  p.TalentPool,
 			"easy_apply_enabled":           a.EasyApplyEnabled,
 			"easy_apply_terms_accepted":    a.EasyApplyTermsAcceptedAt != nil,
+			"ai_enabled":                   aiSettings.Enabled,
+			"ai_has_custom_key":            aiSettings.HasCustomKey,
 			"mailbox_enabled":              mb.Enabled,
 			"notify_email_enabled":         np.EmailEnabled,
 			"notify_webpush_enabled":       np.WebPushEnabled,
@@ -252,7 +264,15 @@ func (s *Server) preferencesPage(w http.ResponseWriter, r *http.Request, u *iden
 			portalAccounts = accs
 		}
 	}
-	f := preferencesForm(snap.Preferences, auto, mb, np, portalAccounts, easyApplyAdmin)
+	var aiSettings ai.UserSettings
+	aiAdmin := false
+	if s.AI != nil {
+		aiAdmin = s.AI.AdminEnabled()
+		if st, err := s.AI.GetSettings(r.Context(), u.ID); err == nil {
+			aiSettings = st
+		}
+	}
+	f := preferencesForm(snap.Preferences, auto, mb, np, portalAccounts, easyApplyAdmin, aiSettings, aiAdmin)
 	if r.URL.Query().Get("saved") == "1" {
 		f.Notice = views.T(r.Context(), "profile.saved")
 	}
@@ -413,13 +433,22 @@ func (s *Server) preferencesSave(w http.ResponseWriter, r *http.Request, u *iden
 				portalAccounts = accs
 			}
 		}
-		f := preferencesForm(p, autoSettings, mb, np, portalAccounts, easyApplyAdmin)
+		var aiSettings ai.UserSettings
+		aiAdmin := false
+		if s.AI != nil {
+			aiAdmin = s.AI.AdminEnabled()
+			if st, err := s.AI.GetSettings(r.Context(), u.ID); err == nil {
+				aiSettings = st
+			}
+		}
+		f := preferencesForm(p, autoSettings, mb, np, portalAccounts, easyApplyAdmin, aiSettings, aiAdmin)
 		f.Values["min_salary"] = r.PostFormValue("min_salary")
 		f.Values["min_score"] = r.PostFormValue("min_score")
 		f.Values["daily_limit"] = r.PostFormValue("daily_limit")
 		f.Values["runner_choice"] = r.PostFormValue("runner_choice")
 		f.Checks["easy_apply_enabled"] = easyApplyEnabled
 		f.Checks["easy_apply_terms_accepted"] = termsAccepted
+		f.Checks["ai_enabled"] = r.PostFormValue("ai_enabled") == "on"
 		f.Errors = make(map[string]string)
 		if salaryErr {
 			f.Errors["min_salary"] = views.T(r.Context(), "profile.error.invalid")
@@ -462,7 +491,15 @@ func (s *Server) preferencesSave(w http.ResponseWriter, r *http.Request, u *iden
 					portalAccounts = accs
 				}
 			}
-			f := preferencesForm(p, autoSettings, mb, np, portalAccounts, easyApplyAdmin)
+			var aiSettings ai.UserSettings
+			aiAdmin := false
+			if s.AI != nil {
+				aiAdmin = s.AI.AdminEnabled()
+				if st, err := s.AI.GetSettings(r.Context(), u.ID); err == nil {
+					aiSettings = st
+				}
+			}
+			f := preferencesForm(p, autoSettings, mb, np, portalAccounts, easyApplyAdmin, aiSettings, aiAdmin)
 			f.Errors, f.Notice, f.Failed = fieldErrors(r, err), views.T(r.Context(), "profile.invalid"), true
 			s.render(w, r, http.StatusUnprocessableEntity, views.PreferencesPage(u.DisplayName, f))
 			return
@@ -508,6 +545,12 @@ func (s *Server) preferencesSave(w http.ResponseWriter, r *http.Request, u *iden
 			s.failed(w, r, u, err)
 			return
 		}
+	}
+	if s.AI != nil {
+		aiEnabled := r.PostFormValue("ai_enabled") == "on"
+		aiCustomKey := strings.TrimSpace(r.PostFormValue("ai_custom_api_key"))
+		aiClearKey := r.PostFormValue("ai_clear_custom_key") == "on"
+		_ = s.AI.SaveSettings(r.Context(), u.ID, aiEnabled, aiCustomKey, aiClearKey)
 	}
 	http.Redirect(w, r, "/preferences?saved=1", http.StatusSeeOther)
 }

@@ -163,6 +163,22 @@ templ PreferencesPage(name string, f Form) {
 						</div>
 					}
 				}
+				<h2>{ T(ctx, "profile.ai.title") }</h2>
+				<p class="muted">{ T(ctx, "profile.ai.hint") }</p>
+				if f.Values["ai_admin_enabled"] != "true" {
+					<p class="hint warning">{ T(ctx, "profile.ai.disabled_by_admin") }</p>
+				} else {
+					@Check("ai_enabled", T(ctx, "profile.field.ai_enabled"), f.Checks["ai_enabled"])
+					<p class="hint">{ T(ctx, "profile.ai.budget_notice", "spent", f.Values["ai_spent"], "budget", f.Values["ai_budget"]) }</p>
+					<div class="field">
+						<label for="f-ai_custom_api_key">{ T(ctx, "profile.field.ai_custom_api_key") }</label>
+						<input id="f-ai_custom_api_key" name="ai_custom_api_key" type="password" maxlength="254" autocomplete="off" placeholder={ f.Values["ai_key_placeholder"] }/>
+						<p class="hint">{ T(ctx, "profile.ai.key_hint") }</p>
+					</div>
+					if f.Checks["ai_has_custom_key"] {
+						@Check("ai_clear_custom_key", T(ctx, "profile.field.ai_clear_custom_key"), false)
+					}
+				}
 				<h2>{ T(ctx, "profile.mailbox.title") }</h2>
 				<p class="muted">{ T(ctx, "profile.mailbox.hint") }</p>
 				@Check("mailbox_enabled", T(ctx, "profile.field.mailbox_enabled"), f.Checks["mailbox_enabled"])
