@@ -179,15 +179,16 @@ func (s *Service) GetSettings(ctx context.Context, userID uuid.UUID) (UserSettin
 // SaveSettings updates the user's AI opt-in and optional custom Anthropic key.
 func (s *Service) SaveSettings(ctx context.Context, userID uuid.UUID, enabled bool, customKey string, clearKey bool) error {
 	var encKey []byte
-	if clearKey {
+	switch {
+	case clearKey:
 		encKey = nil
-	} else if customKey != "" && s.cipher != nil {
+	case customKey != "" && s.cipher != nil:
 		sealed, err := s.cipher.SealKey(ctx, userID, customKey)
 		if err != nil {
 			return err
 		}
 		encKey = sealed
-	} else {
+	default:
 		// Keep existing key if not changed or cleared
 		_, existingEnc, err := s.store.GetSettings(ctx, userID)
 		if err == nil {

@@ -146,7 +146,7 @@ func (c *Client) call(ctx context.Context, apiKey string, req apiRequest) (*apiR
 
 	var res apiResponse
 	if err := json.Unmarshal(respBody, &res); err != nil {
-		return nil, fmt.Errorf("%w: %v", ai.ErrInvalidSchema, err)
+		return nil, fmt.Errorf("%w: %w", ai.ErrInvalidSchema, err)
 	}
 	return &res, nil
 }
@@ -209,7 +209,7 @@ func (c *Client) CompletePlan(ctx context.Context, apiKey, model string, req ai.
 
 	var plan ai.PlanResult
 	if err := json.Unmarshal(rawInput, &plan); err != nil {
-		return ai.PlanResult{}, apiResp.Usage.InputTokens, apiResp.Usage.OutputTokens, fmt.Errorf("%w: %v", ai.ErrInvalidSchema, err)
+		return ai.PlanResult{}, apiResp.Usage.InputTokens, apiResp.Usage.OutputTokens, fmt.Errorf("%w: %w", ai.ErrInvalidSchema, err)
 	}
 	return plan, apiResp.Usage.InputTokens, apiResp.Usage.OutputTokens, nil
 }
@@ -254,7 +254,7 @@ func (c *Client) CompleteDraft(ctx context.Context, apiKey, model string, req ai
 
 	var draft ai.DraftResult
 	if err := json.Unmarshal(rawInput, &draft); err != nil {
-		return ai.DraftResult{}, apiResp.Usage.InputTokens, apiResp.Usage.OutputTokens, fmt.Errorf("%w: %v", ai.ErrInvalidSchema, err)
+		return ai.DraftResult{}, apiResp.Usage.InputTokens, apiResp.Usage.OutputTokens, fmt.Errorf("%w: %w", ai.ErrInvalidSchema, err)
 	}
 	draft.FieldID = req.Field.ID
 	draft.RequiresApproval = true
@@ -312,7 +312,7 @@ func (c *Client) CompleteExtract(ctx context.Context, apiKey, model string, req 
 
 	var ext ai.ExtractResult
 	if err := json.Unmarshal(rawInput, &ext); err != nil {
-		return ai.ExtractResult{}, apiResp.Usage.InputTokens, apiResp.Usage.OutputTokens, fmt.Errorf("%w: %v", ai.ErrInvalidSchema, err)
+		return ai.ExtractResult{}, apiResp.Usage.InputTokens, apiResp.Usage.OutputTokens, fmt.Errorf("%w: %w", ai.ErrInvalidSchema, err)
 	}
 	return ext, apiResp.Usage.InputTokens, apiResp.Usage.OutputTokens, nil
 }
@@ -365,7 +365,7 @@ func (c *Client) CompleteClassify(ctx context.Context, apiKey, model string, req
 
 	var cls ai.ClassifyResult
 	if err := json.Unmarshal(rawInput, &cls); err != nil {
-		return ai.ClassifyResult{}, apiResp.Usage.InputTokens, apiResp.Usage.OutputTokens, fmt.Errorf("%w: %v", ai.ErrInvalidSchema, err)
+		return ai.ClassifyResult{}, apiResp.Usage.InputTokens, apiResp.Usage.OutputTokens, fmt.Errorf("%w: %w", ai.ErrInvalidSchema, err)
 	}
 	if cls.Category == "" {
 		return ai.ClassifyResult{}, apiResp.Usage.InputTokens, apiResp.Usage.OutputTokens, errors.New("empty category returned")
