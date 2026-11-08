@@ -18,6 +18,7 @@ import (
 	"golang.org/x/time/rate"
 
 	"github.com/1xxn/getafjob/internal/application"
+	"github.com/1xxn/getafjob/internal/assist"
 	"github.com/1xxn/getafjob/internal/identity"
 	"github.com/1xxn/getafjob/internal/matching"
 	"github.com/1xxn/getafjob/internal/notify"
@@ -51,6 +52,13 @@ type NotificationService interface {
 	SendTestNotification(ctx context.Context, userID uuid.UUID) error
 }
 
+// AssistService manages extension pairing and tokens.
+type AssistService interface {
+	GeneratePairingCode(ctx context.Context, userID uuid.UUID) (string, error)
+	ListExtensionTokens(ctx context.Context, userID uuid.UUID) ([]assist.Token, error)
+	RevokeExtensionToken(ctx context.Context, id, userID uuid.UUID) error
+}
+
 // Server holds the dependencies of the UI.
 type Server struct {
 	Identity       *identity.Service
@@ -62,6 +70,7 @@ type Server struct {
 	Apps           *application.Service
 	Tracking       TrackingService
 	Notify         NotificationService
+	Assist         AssistService
 	Shots          Screenshots
 	Handoffs       HandoffHub
 	PushStore      webpush.Store
@@ -106,6 +115,7 @@ func (s *Server) Register(mux *http.ServeMux) {
 	mux.Handle("GET /preferences", s.page(s.preferencesPage))
 	mux.Handle("POST /preferences", s.page(s.preferencesSave))
 	mux.Handle("POST /preferences/notify/test", s.page(s.notifyTest))
+	mux.Handle("POST /preferences/assist/pair", s.page(s.assistPair))
 	mux.Handle("GET /documents", s.page(s.documentsPage))
 	mux.Handle("POST /documents", s.page(s.documentUpload))
 	mux.Handle("GET /documents/{id}", s.page(s.documentDownload))

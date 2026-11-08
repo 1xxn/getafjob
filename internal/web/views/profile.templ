@@ -149,6 +149,9 @@ templ PreferencesPage(name string, f Form) {
 				@Check("notify_quiet_hours_enabled", T(ctx, "profile.field.notify_quiet_hours_enabled"), f.Checks["notify_quiet_hours_enabled"])
 				@Field(input(ctx, f, "notify_quiet_hours_start", "text", "", 5))
 				@Field(input(ctx, f, "notify_quiet_hours_end", "text", "", 5))
+				<h2>{ T(ctx, "profile.assist.title") }</h2>
+				<p class="muted">{ T(ctx, "profile.assist.hint") }</p>
+				<button type="submit" formaction="/preferences/assist/pair" class="secondary">{ T(ctx, "profile.assist.generate_code") }</button>
 				@StickyBar() {
 					<button type="submit" class="primary">{ T(ctx, "profile.save") }</button>
 					<button type="submit" formaction="/preferences/notify/test" class="secondary">{ T(ctx, "profile.notify.test") }</button>

@@ -71,7 +71,6 @@ func serve(ctx context.Context, cfg config.Config, logger *slog.Logger) error {
 
 	mux := http.NewServeMux()
 	health.Register(mux)
-	apiv1.Mount(mux)
 	ring, err := crypto.NewKeyring(cfg.MasterKey, cfg.MasterKeyOld)
 	if err != nil {
 		return fmt.Errorf("GETAFJOB_MASTER_KEY: %w", err)
@@ -118,10 +117,13 @@ func serve(ctx context.Context, cfg config.Config, logger *slog.Logger) error {
 	tstore := trackingstore.New(pool)
 	tcipher := trackingcrypto.NewCipher(env)
 	trackingSvc := tracking.NewService(tstore, trackingimap.NewClient(), tcipher, newAppTransitionAdapter(apps))
+	items := profile.NewItems(pstore, env)
+	assistSvc := newAssistService(pool, profiles, items, docs, apps, logger)
+	apiv1.Mount(mux, assistSvc)
 
-	(&web.Server{Identity: ids, Logger: logger, Profile: profiles, Documents: docs, Items: profile.NewItems(pstore, env),
+	(&web.Server{Identity: ids, Logger: logger, Profile: profiles, Documents: docs, Items: items,
 		Importer: cvimport.NewImporter(docs, profiles, extractor), Jobs: matching.NewListings(matchingstore.New(pool)),
-		PushStore: webpush.NewStore(pool), VAPIDPublicKey: vapidPub, Apps: apps, Tracking: trackingSvc, Notify: notifySvc, Shots: sealedFiles, Handoffs: gw}).Register(mux)
+		PushStore: webpush.NewStore(pool), VAPIDPublicKey: vapidPub, Apps: apps, Tracking: trackingSvc, Notify: notifySvc, Assist: assistSvc, Shots: sealedFiles, Handoffs: gw}).Register(mux)
 
 	h := httpx.Instrument(httpx.Protect(httpx.Routes(mux), maxBody, cfg.PublicURL.Scheme == "https",
 		httpx.Upload{Path: "/documents", Max: web.MaxUpload}, httpx.Upload{Path: "/setup/cv", Max: web.MaxUpload}))

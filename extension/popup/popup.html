@@ -1,0 +1,50 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>getafjob Assist</title>
+  <link rel="stylesheet" href="popup.css">
+</head>
+<body>
+  <div class="header">
+    <div class="logo">
+      <span class="icon">💼</span>
+      <span class="title">getafjob Assist</span>
+    </div>
+    <div id="status-badge" class="badge disconnected">Disconnected</div>
+  </div>
+
+  <div id="unpaired-view" class="view">
+    <p class="desc">Pair this extension with your getafjob instance using a pairing code from <strong>Preferences</strong>.</p>
+    <form id="pair-form">
+      <div class="field">
+        <label for="server-url">Server URL</label>
+        <input id="server-url" type="url" required value="http://localhost:8080" placeholder="https://getafjob.example.com">
+      </div>
+      <div class="field">
+        <label for="pair-code">Pairing Code</label>
+        <input id="pair-code" type="text" required placeholder="GAJ-XXXX" maxlength="16" autocomplete="off" autocorrect="off" autocapitalize="characters">
+      </div>
+      <div id="pair-error" class="error-msg" hidden></div>
+      <button id="pair-btn" type="submit" class="btn primary">Connect Extension</button>
+    </form>
+  </div>
+
+  <div id="paired-view" class="view" hidden>
+    <div class="user-info">
+      <span class="label">Connected as</span>
+      <span id="user-name" class="value">User</span>
+      <span id="connected-server" class="server-url"></span>
+    </div>
+
+    <div class="actions">
+      <button id="inspect-btn" class="btn primary">Inspect Active Form</button>
+      <button id="dashboard-btn" class="btn secondary">Open getafjob</button>
+      <button id="unpair-btn" class="btn danger">Disconnect</button>
+    </div>
+  </div>
+
+  <script src="popup.js"></script>
+</body>
+</html>

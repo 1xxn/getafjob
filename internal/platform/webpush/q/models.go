@@ -38,6 +38,24 @@ type ApplicationEvent struct {
 	At            time.Time
 }
 
+type AssistPairing struct {
+	ID        uuid.UUID
+	UserID    uuid.UUID
+	CodeHash  []byte
+	CreatedAt time.Time
+	ExpiresAt time.Time
+}
+
+type AssistToken struct {
+	ID         uuid.UUID
+	UserID     uuid.UUID
+	TokenHash  []byte
+	ClientName string
+	CreatedAt  time.Time
+	ExpiresAt  time.Time
+	LastUsedAt *time.Time
+}
+
 type AuditEvent struct {
 	ID        int64
 	UserID    *uuid.UUID

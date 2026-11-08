@@ -11,7 +11,29 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"time"
+
+	"github.com/oapi-codegen/runtime"
+	openapi_types "github.com/oapi-codegen/runtime/types"
 )
+
+// Defines values for ApprovalDecisionRequestDecision.
+const (
+	Approve ApprovalDecisionRequestDecision = "approve"
+	Reject  ApprovalDecisionRequestDecision = "reject"
+)
+
+// Valid indicates whether the value is a known member of the ApprovalDecisionRequestDecision enum.
+func (e ApprovalDecisionRequestDecision) Valid() bool {
+	switch e {
+	case Approve:
+		return true
+	case Reject:
+		return true
+	default:
+		return false
+	}
+}
 
 // Defines values for MetaApi.
 const (
@@ -28,6 +50,92 @@ func (e MetaApi) Valid() bool {
 	}
 }
 
+// AnswerItem defines model for AnswerItem.
+type AnswerItem struct {
+	Answer   string `json:"answer"`
+	Id       string `json:"id"`
+	Question string `json:"question"`
+}
+
+// ApprovalDecisionRequest defines model for ApprovalDecisionRequest.
+type ApprovalDecisionRequest struct {
+	Decision ApprovalDecisionRequestDecision `json:"decision"`
+}
+
+// ApprovalDecisionRequestDecision defines model for ApprovalDecisionRequest.Decision.
+type ApprovalDecisionRequestDecision string
+
+// ApprovalDecisionResponse defines model for ApprovalDecisionResponse.
+type ApprovalDecisionResponse struct {
+	Id     openapi_types.UUID `json:"id"`
+	Status string             `json:"status"`
+}
+
+// ApprovalItem defines model for ApprovalItem.
+type ApprovalItem struct {
+	Company   string             `json:"company"`
+	CreatedAt time.Time          `json:"created_at"`
+	Id        openapi_types.UUID `json:"id"`
+	Score     int                `json:"score"`
+	Title     string             `json:"title"`
+	Url       string             `json:"url"`
+}
+
+// ApprovalsList defines model for ApprovalsList.
+type ApprovalsList struct {
+	Items []ApprovalItem `json:"items"`
+}
+
+// AssistProfile defines model for AssistProfile.
+type AssistProfile struct {
+	Answers   []AnswerItem   `json:"answers"`
+	Documents []DocumentItem `json:"documents"`
+
+	// Facts Key-value facts (e.g. personal.first_name, work.notice_period)
+	Facts      map[string]string `json:"facts"`
+	TextBlocks []TextBlockItem   `json:"text_blocks"`
+}
+
+// DocumentItem defines model for DocumentItem.
+type DocumentItem struct {
+	Id   string `json:"id"`
+	Kind string `json:"kind"`
+	Name string `json:"name"`
+}
+
+// FieldMatch defines model for FieldMatch.
+type FieldMatch struct {
+	Confidence float32 `json:"confidence"`
+	FieldId    string  `json:"field_id"`
+	Provenance string  `json:"provenance"`
+	Source     string  `json:"source"`
+	Value      string  `json:"value"`
+}
+
+// FormField defines model for FormField.
+type FormField struct {
+	Id       string  `json:"id"`
+	Label    *string `json:"label,omitempty"`
+	Name     string  `json:"name"`
+	Required bool    `json:"required"`
+	Selector *string `json:"selector,omitempty"`
+	Type     string  `json:"type"`
+}
+
+// InspectRequest defines model for InspectRequest.
+type InspectRequest struct {
+	Fields []FormField `json:"fields"`
+	Title  string      `json:"title"`
+	Url    string      `json:"url"`
+}
+
+// InspectResponse defines model for InspectResponse.
+type InspectResponse struct {
+	Matches          []FieldMatch `json:"matches"`
+	MissingRequired  []string     `json:"missing_required"`
+	RequiresApproval bool         `json:"requires_approval"`
+}
+
 // Meta defines model for Meta.
 type Meta struct {
 	// Api API level
@@ -40,6 +148,25 @@ type Meta struct {
 // MetaApi API level
 type MetaApi string
 
+// PairRequest defines model for PairRequest.
+type PairRequest struct {
+	// ClientName Descriptive name of the browser / extension client
+	ClientName string `json:"client_name"`
+
+	// Code One-time pairing code generated in the getafjob web UI
+	Code string `json:"code"`
+}
+
+// PairResponse defines model for PairResponse.
+type PairResponse struct {
+	ExpiresAt time.Time `json:"expires_at"`
+
+	// Token Bearer token for subsequent extension API calls
+	Token    string             `json:"token"`
+	UserId   openapi_types.UUID `json:"user_id"`
+	UserName string             `json:"user_name"`
+}
+
 // Problem defines model for Problem.
 type Problem struct {
 	// Code Stable error code, e.g. api.not_found; the client translates it.
@@ -50,8 +177,61 @@ type Problem struct {
 	Status int                     `json:"status"`
 }
 
+// SubmitRequest defines model for SubmitRequest.
+type SubmitRequest struct {
+	Approved     bool    `json:"approved"`
+	Company      string  `json:"company"`
+	FieldsFilled int     `json:"fields_filled"`
+	Notes        *string `json:"notes,omitempty"`
+	Title        string  `json:"title"`
+	Url          string  `json:"url"`
+}
+
+// SubmitResponse defines model for SubmitResponse.
+type SubmitResponse struct {
+	ApplicationId openapi_types.UUID `json:"application_id"`
+	Status        string             `json:"status"`
+}
+
+// TextBlockItem defines model for TextBlockItem.
+type TextBlockItem struct {
+	Body string `json:"body"`
+	Id   string `json:"id"`
+	Name string `json:"name"`
+}
+
+// PostAssistApprovalDecideJSONRequestBody defines body for PostAssistApprovalDecide for application/json ContentType.
+type PostAssistApprovalDecideJSONRequestBody = ApprovalDecisionRequest
+
+// PostAssistInspectJSONRequestBody defines body for PostAssistInspect for application/json ContentType.
+type PostAssistInspectJSONRequestBody = InspectRequest
+
+// PostAssistPairJSONRequestBody defines body for PostAssistPair for application/json ContentType.
+type PostAssistPairJSONRequestBody = PairRequest
+
+// PostAssistSubmitJSONRequestBody defines body for PostAssistSubmit for application/json ContentType.
+type PostAssistSubmitJSONRequestBody = SubmitRequest
+
 // ServerInterface represents all server handlers.
 type ServerInterface interface {
+	// GetAssistApprovals List pending application approvals for the user
+	// (GET /assist/approvals)
+	GetAssistApprovals(w http.ResponseWriter, r *http.Request)
+	// PostAssistApprovalDecide Approve or reject an application submission
+	// (POST /assist/approvals/{id}/decide)
+	PostAssistApprovalDecide(w http.ResponseWriter, r *http.Request, id openapi_types.UUID)
+	// PostAssistInspect Inspect page form fields and return matched values and suggested answers
+	// (POST /assist/inspect)
+	PostAssistInspect(w http.ResponseWriter, r *http.Request)
+	// PostAssistPair Pair an extension using a one-time pairing code
+	// (POST /assist/pair)
+	PostAssistPair(w http.ResponseWriter, r *http.Request)
+	// GetAssistProfile Get user profile facts, answers, text blocks, and documents for autofill
+	// (GET /assist/profile)
+	GetAssistProfile(w http.ResponseWriter, r *http.Request)
+	// PostAssistSubmit Record an application submitted via the extension
+	// (POST /assist/submit)
+	PostAssistSubmit(w http.ResponseWriter, r *http.Request)
 	// GetMeta Server version and API level
 	// (GET /meta)
 	GetMeta(w http.ResponseWriter, r *http.Request)
@@ -65,6 +245,102 @@ type ServerInterfaceWrapper struct {
 }
 
 type MiddlewareFunc func(http.Handler) http.Handler
+
+// GetAssistApprovals operation middleware
+func (siw *ServerInterfaceWrapper) GetAssistApprovals(w http.ResponseWriter, r *http.Request) {
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.GetAssistApprovals(w, r)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// PostAssistApprovalDecide operation middleware
+func (siw *ServerInterfaceWrapper) PostAssistApprovalDecide(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "id" -------------
+	var id openapi_types.UUID
+
+	err = runtime.BindStyledParameterWithOptions("simple", "id", r.PathValue("id"), &id, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "uuid", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "id", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.PostAssistApprovalDecide(w, r, id)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// PostAssistInspect operation middleware
+func (siw *ServerInterfaceWrapper) PostAssistInspect(w http.ResponseWriter, r *http.Request) {
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.PostAssistInspect(w, r)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// PostAssistPair operation middleware
+func (siw *ServerInterfaceWrapper) PostAssistPair(w http.ResponseWriter, r *http.Request) {
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.PostAssistPair(w, r)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// GetAssistProfile operation middleware
+func (siw *ServerInterfaceWrapper) GetAssistProfile(w http.ResponseWriter, r *http.Request) {
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.GetAssistProfile(w, r)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// PostAssistSubmit operation middleware
+func (siw *ServerInterfaceWrapper) PostAssistSubmit(w http.ResponseWriter, r *http.Request) {
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.PostAssistSubmit(w, r)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
 
 // GetMeta operation middleware
 func (siw *ServerInterfaceWrapper) GetMeta(w http.ResponseWriter, r *http.Request) {
@@ -201,11 +477,250 @@ func HandlerWithOptions(si ServerInterface, options StdHTTPServerOptions) http.H
 	}
 
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/meta", wrapper.GetMeta)
+	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/assist/pair", wrapper.PostAssistPair)
+	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/assist/profile", wrapper.GetAssistProfile)
+	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/assist/inspect", wrapper.PostAssistInspect)
+	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/assist/submit", wrapper.PostAssistSubmit)
+	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/assist/approvals", wrapper.GetAssistApprovals)
+	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/assist/approvals/{id}/decide", wrapper.PostAssistApprovalDecide)
 
 	return m
 }
 
 type ProblemApplicationProblemPlusJSONResponse Problem
+
+type GetAssistApprovalsRequestObject struct {
+}
+
+type GetAssistApprovalsResponseObject interface {
+	VisitGetAssistApprovalsResponse(w http.ResponseWriter) error
+}
+
+type GetAssistApprovals200JSONResponse ApprovalsList
+
+func (response GetAssistApprovals200JSONResponse) VisitGetAssistApprovalsResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetAssistApprovalsdefaultApplicationProblemPlusJSONResponse struct {
+	Body       Problem
+	StatusCode int
+}
+
+func (response GetAssistApprovalsdefaultApplicationProblemPlusJSONResponse) VisitGetAssistApprovalsResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(response.StatusCode)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type PostAssistApprovalDecideRequestObject struct {
+	Id   openapi_types.UUID `json:"id"`
+	Body *PostAssistApprovalDecideJSONRequestBody
+}
+
+type PostAssistApprovalDecideResponseObject interface {
+	VisitPostAssistApprovalDecideResponse(w http.ResponseWriter) error
+}
+
+type PostAssistApprovalDecide200JSONResponse ApprovalDecisionResponse
+
+func (response PostAssistApprovalDecide200JSONResponse) VisitPostAssistApprovalDecideResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type PostAssistApprovalDecidedefaultApplicationProblemPlusJSONResponse struct {
+	Body       Problem
+	StatusCode int
+}
+
+func (response PostAssistApprovalDecidedefaultApplicationProblemPlusJSONResponse) VisitPostAssistApprovalDecideResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(response.StatusCode)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type PostAssistInspectRequestObject struct {
+	Body *PostAssistInspectJSONRequestBody
+}
+
+type PostAssistInspectResponseObject interface {
+	VisitPostAssistInspectResponse(w http.ResponseWriter) error
+}
+
+type PostAssistInspect200JSONResponse InspectResponse
+
+func (response PostAssistInspect200JSONResponse) VisitPostAssistInspectResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type PostAssistInspectdefaultApplicationProblemPlusJSONResponse struct {
+	Body       Problem
+	StatusCode int
+}
+
+func (response PostAssistInspectdefaultApplicationProblemPlusJSONResponse) VisitPostAssistInspectResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(response.StatusCode)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type PostAssistPairRequestObject struct {
+	Body *PostAssistPairJSONRequestBody
+}
+
+type PostAssistPairResponseObject interface {
+	VisitPostAssistPairResponse(w http.ResponseWriter) error
+}
+
+type PostAssistPair200JSONResponse PairResponse
+
+func (response PostAssistPair200JSONResponse) VisitPostAssistPairResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type PostAssistPairdefaultApplicationProblemPlusJSONResponse struct {
+	Body       Problem
+	StatusCode int
+}
+
+func (response PostAssistPairdefaultApplicationProblemPlusJSONResponse) VisitPostAssistPairResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(response.StatusCode)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetAssistProfileRequestObject struct {
+}
+
+type GetAssistProfileResponseObject interface {
+	VisitGetAssistProfileResponse(w http.ResponseWriter) error
+}
+
+type GetAssistProfile200JSONResponse AssistProfile
+
+func (response GetAssistProfile200JSONResponse) VisitGetAssistProfileResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetAssistProfiledefaultApplicationProblemPlusJSONResponse struct {
+	Body       Problem
+	StatusCode int
+}
+
+func (response GetAssistProfiledefaultApplicationProblemPlusJSONResponse) VisitGetAssistProfileResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(response.StatusCode)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type PostAssistSubmitRequestObject struct {
+	Body *PostAssistSubmitJSONRequestBody
+}
+
+type PostAssistSubmitResponseObject interface {
+	VisitPostAssistSubmitResponse(w http.ResponseWriter) error
+}
+
+type PostAssistSubmit200JSONResponse SubmitResponse
+
+func (response PostAssistSubmit200JSONResponse) VisitPostAssistSubmitResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type PostAssistSubmitdefaultApplicationProblemPlusJSONResponse struct {
+	Body       Problem
+	StatusCode int
+}
+
+func (response PostAssistSubmitdefaultApplicationProblemPlusJSONResponse) VisitPostAssistSubmitResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(response.StatusCode)
+	_, err := buf.WriteTo(w)
+	return err
+}
 
 type GetMetaRequestObject struct {
 }
@@ -247,6 +762,24 @@ func (response GetMetadefaultApplicationProblemPlusJSONResponse) VisitGetMetaRes
 
 // StrictServerInterface represents all server handlers.
 type StrictServerInterface interface {
+	// GetAssistApprovals List pending application approvals for the user
+	// (GET /assist/approvals)
+	GetAssistApprovals(ctx context.Context, request GetAssistApprovalsRequestObject) (GetAssistApprovalsResponseObject, error)
+	// PostAssistApprovalDecide Approve or reject an application submission
+	// (POST /assist/approvals/{id}/decide)
+	PostAssistApprovalDecide(ctx context.Context, request PostAssistApprovalDecideRequestObject) (PostAssistApprovalDecideResponseObject, error)
+	// PostAssistInspect Inspect page form fields and return matched values and suggested answers
+	// (POST /assist/inspect)
+	PostAssistInspect(ctx context.Context, request PostAssistInspectRequestObject) (PostAssistInspectResponseObject, error)
+	// PostAssistPair Pair an extension using a one-time pairing code
+	// (POST /assist/pair)
+	PostAssistPair(ctx context.Context, request PostAssistPairRequestObject) (PostAssistPairResponseObject, error)
+	// GetAssistProfile Get user profile facts, answers, text blocks, and documents for autofill
+	// (GET /assist/profile)
+	GetAssistProfile(ctx context.Context, request GetAssistProfileRequestObject) (GetAssistProfileResponseObject, error)
+	// PostAssistSubmit Record an application submitted via the extension
+	// (POST /assist/submit)
+	PostAssistSubmit(ctx context.Context, request PostAssistSubmitRequestObject) (PostAssistSubmitResponseObject, error)
 	// GetMeta Server version and API level
 	// (GET /meta)
 	GetMeta(ctx context.Context, request GetMetaRequestObject) (GetMetaResponseObject, error)
@@ -289,6 +822,180 @@ type strictHandler struct {
 	ssi         StrictServerInterface
 	middlewares []StrictMiddlewareFunc
 	options     StrictHTTPServerOptions
+}
+
+// GetAssistApprovals operation middleware
+func (sh *strictHandler) GetAssistApprovals(w http.ResponseWriter, r *http.Request) {
+	var request GetAssistApprovalsRequestObject
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.GetAssistApprovals(ctx, request.(GetAssistApprovalsRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "GetAssistApprovals")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(GetAssistApprovalsResponseObject); ok {
+		if err := validResponse.VisitGetAssistApprovalsResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// PostAssistApprovalDecide operation middleware
+func (sh *strictHandler) PostAssistApprovalDecide(w http.ResponseWriter, r *http.Request, id openapi_types.UUID) {
+	var request PostAssistApprovalDecideRequestObject
+
+	request.Id = id
+
+	var body PostAssistApprovalDecideJSONRequestBody
+	if err := runtime.BindJSONBody(r, &body); err != nil {
+		sh.options.RequestErrorHandlerFunc(w, r, fmt.Errorf("can't decode JSON body: %w", err))
+		return
+	}
+	request.Body = &body
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.PostAssistApprovalDecide(ctx, request.(PostAssistApprovalDecideRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "PostAssistApprovalDecide")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(PostAssistApprovalDecideResponseObject); ok {
+		if err := validResponse.VisitPostAssistApprovalDecideResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// PostAssistInspect operation middleware
+func (sh *strictHandler) PostAssistInspect(w http.ResponseWriter, r *http.Request) {
+	var request PostAssistInspectRequestObject
+
+	var body PostAssistInspectJSONRequestBody
+	if err := runtime.BindJSONBody(r, &body); err != nil {
+		sh.options.RequestErrorHandlerFunc(w, r, fmt.Errorf("can't decode JSON body: %w", err))
+		return
+	}
+	request.Body = &body
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.PostAssistInspect(ctx, request.(PostAssistInspectRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "PostAssistInspect")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(PostAssistInspectResponseObject); ok {
+		if err := validResponse.VisitPostAssistInspectResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// PostAssistPair operation middleware
+func (sh *strictHandler) PostAssistPair(w http.ResponseWriter, r *http.Request) {
+	var request PostAssistPairRequestObject
+
+	var body PostAssistPairJSONRequestBody
+	if err := runtime.BindJSONBody(r, &body); err != nil {
+		sh.options.RequestErrorHandlerFunc(w, r, fmt.Errorf("can't decode JSON body: %w", err))
+		return
+	}
+	request.Body = &body
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.PostAssistPair(ctx, request.(PostAssistPairRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "PostAssistPair")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(PostAssistPairResponseObject); ok {
+		if err := validResponse.VisitPostAssistPairResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// GetAssistProfile operation middleware
+func (sh *strictHandler) GetAssistProfile(w http.ResponseWriter, r *http.Request) {
+	var request GetAssistProfileRequestObject
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.GetAssistProfile(ctx, request.(GetAssistProfileRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "GetAssistProfile")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(GetAssistProfileResponseObject); ok {
+		if err := validResponse.VisitGetAssistProfileResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// PostAssistSubmit operation middleware
+func (sh *strictHandler) PostAssistSubmit(w http.ResponseWriter, r *http.Request) {
+	var request PostAssistSubmitRequestObject
+
+	var body PostAssistSubmitJSONRequestBody
+	if err := runtime.BindJSONBody(r, &body); err != nil {
+		sh.options.RequestErrorHandlerFunc(w, r, fmt.Errorf("can't decode JSON body: %w", err))
+		return
+	}
+	request.Body = &body
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.PostAssistSubmit(ctx, request.(PostAssistSubmitRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "PostAssistSubmit")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(PostAssistSubmitResponseObject); ok {
+		if err := validResponse.VisitPostAssistSubmitResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
 }
 
 // GetMeta operation middleware
