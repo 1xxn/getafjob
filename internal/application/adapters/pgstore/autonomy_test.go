@@ -28,9 +28,10 @@ func TestAutonomySettingsAndApprovals(t *testing.T) {
 
 	// 2. Save settings
 	newSettings := application.Settings{
-		Level:      application.LevelAutonomous,
-		MinScore:   90,
-		DailyLimit: 10,
+		Level:        application.LevelAutonomous,
+		MinScore:     90,
+		DailyLimit:   10,
+		RunnerChoice: application.RunnerServer,
 	}
 	if err := svc.SaveSettings(ctx, max, newSettings); err != nil {
 		t.Fatalf("SaveSettings() err = %v", err)
@@ -45,9 +46,10 @@ func TestAutonomySettingsAndApprovals(t *testing.T) {
 
 	// 3. Application that needs approval because level is 'approve'
 	if err := svc.SaveSettings(ctx, max, application.Settings{
-		Level:      application.LevelApprove,
-		MinScore:   70,
-		DailyLimit: 5,
+		Level:        application.LevelApprove,
+		MinScore:     70,
+		DailyLimit:   5,
+		RunnerChoice: application.RunnerServer,
 	}); err != nil {
 		t.Fatal(err)
 	}
@@ -175,17 +177,17 @@ func TestRunnerChoiceAndHomeRunnerTokens(t *testing.T) {
 	}
 
 	// Queue applications
-	jAlice := job(t, pool, "test", "Acme", "match-alice")
+	jAlice := jobAt(t, pool, "https://alice.example.org/1", "Acme", "match-alice")
 	aAlice, _ := svc.Create(ctx, alice, jAlice)
 	_, _, _ = svc.Queue(ctx, alice, jAlice)
 
 	*now = now.Add(time.Second)
-	jBob := job(t, pool, "test", "Beispiel", "match-bob")
+	jBob := jobAt(t, pool, "https://bob.example.org/1", "Beispiel", "match-bob")
 	aBob, _ := svc.Create(ctx, bob, jBob)
 	_, _, _ = svc.Queue(ctx, bob, jBob)
 
 	*now = now.Add(time.Second)
-	jCarol := job(t, pool, "test", "Muster", "match-carol")
+	jCarol := jobAt(t, pool, "https://carol.example.org/1", "Muster", "match-carol")
 	aCarol, _ := svc.Create(ctx, carol, jCarol)
 	_, _, _ = svc.Queue(ctx, carol, jCarol)
 
