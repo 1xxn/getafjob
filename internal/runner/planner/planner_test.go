@@ -160,3 +160,27 @@ func TestPrecheck(t *testing.T) {
 		t.Fatal("precheck changed the caller's fields")
 	}
 }
+
+func TestSecurityCodeAlwaysGoesToHumanEvenWhenInAnswerBank(t *testing.T) {
+	k := know
+	k.Answers = append([]Answer{{
+		ID:       "0192f3a4-5b6c-7d8e-9f01-000000000088",
+		Question: "Security code sent to your email *",
+		Answer:   "12345678",
+	}}, k.Answers...)
+	p := &Planner{K: k, Drafter: drafter{}}
+	st := state(
+		browser.Field{ID: "0-1", Kind: "text", Label: "First Name", Required: true},
+		browser.Field{ID: "0-2", Kind: "text", Label: "Security code sent to your email *", Name: "security_code", Required: true},
+	)
+	plan, qs, err := p.Plan(context.Background(), st)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(plan.Values) != 1 || plan.Values[0].FieldID != "0-1" {
+		t.Fatalf("plan values = %+v", plan.Values)
+	}
+	if len(qs) != 1 || qs[0].Kind != "security_code" || qs[0].FieldID != "0-2" || qs[0].Draft != "" {
+		t.Fatalf("security code question = %+v", qs)
+	}
+}

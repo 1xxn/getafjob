@@ -48,3 +48,35 @@ func TestConfirmation(t *testing.T) {
 		}
 	}
 }
+
+func TestCaptchaRequiresToken(t *testing.T) {
+	unsolved := &browser.State{Frames: []*browser.Frame{{
+		Captcha:      []browser.Captcha{{Cls: "cf-turnstile", Visible: true, Challenge: true}},
+		CaptchaToken: false,
+	}}}
+	if qs := captcha(unsolved); len(qs) != 1 || qs[0].Kind != "captcha" || qs[0].Label != "cf-turnstile" {
+		t.Fatalf("unsolved captcha = %+v", qs)
+	}
+	solved := &browser.State{Frames: []*browser.Frame{{
+		Captcha:      []browser.Captcha{{Cls: "cf-turnstile", Visible: true, Challenge: true}},
+		CaptchaToken: true,
+	}}}
+	if qs := captcha(solved); len(qs) != 0 {
+		t.Fatalf("solved captcha still asked: %+v", qs)
+	}
+}
+
+func TestSecurityCodeDetection(t *testing.T) {
+	st := &browser.State{Frames: []*browser.Frame{{Fields: []browser.Field{
+		{ID: "0-1", Kind: "text", Label: "First Name *", Value: "Max"},
+		{ID: "0-2", Kind: "text", Label: "Security code sent to your email *", Name: "security_code"},
+	}}}}
+	qs := securityCode(st)
+	if len(qs) != 1 || qs[0].Kind != "security_code" || qs[0].FieldID != "0-2" {
+		t.Fatalf("securityCode = %+v", qs)
+	}
+	st.Frames[0].Fields[1].Value = "A1B2C3D4"
+	if qs := securityCode(st); len(qs) != 0 {
+		t.Fatalf("filled security code still asked: %+v", qs)
+	}
+}

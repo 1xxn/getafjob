@@ -1,0 +1,41 @@
+<!doctype html>
+<html lang="en">
+<head><meta charset="utf-8"><title>Apply - Turnstile Challenge</title>
+<style>
+  .field{margin:12px 0}
+  .cf-turnstile{width:300px;height:65px;border:1px solid #ccc;display:flex;align-items:center;padding:0 12px}
+</style></head>
+<body>
+<!-- Cloudflare Turnstile fixture (dummy test sitekey 1x00000000000000000000AA): a visual checkbox inside the
+     widget does NOT count as solved unless cf-turnstile-response holds a non-empty token. -->
+<h1>Platform Engineer</h1>
+<form id="app" novalidate>
+  <div class="field"><label for="first_name">First Name *</label><input id="first_name" name="first_name" required></div>
+  <div class="field"><label for="last_name">Last Name *</label><input id="last_name" name="last_name" required></div>
+  <div class="field"><label for="email">Email *</label><input id="email" name="email" type="email" required></div>
+  <div class="cf-turnstile" data-sitekey="1x00000000000000000000AA">
+    <label><input type="checkbox" id="cf-check"> Verify you are human</label>
+    <input type="hidden" id="cf-token" name="cf-turnstile-response" value="">
+  </div>
+  <div id="errors"></div>
+  <button type="submit">Submit application</button>
+</form>
+<script>
+  document.getElementById("app").addEventListener("submit", async (e) => {
+    e.preventDefault();
+    const f = e.target;
+    const token = document.getElementById("cf-token").value;
+    if (!token) {
+      document.getElementById("errors").innerHTML = '<div role="alert">Please complete the Turnstile check</div>';
+      return;
+    }
+    await fetch("/submit", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ first_name: f.first_name.value, last_name: f.last_name.value, email: f.email.value, turnstile: token }),
+    });
+    document.body.innerHTML = "<h1>Thank you for applying!</h1>";
+  });
+</script>
+</body>
+</html>

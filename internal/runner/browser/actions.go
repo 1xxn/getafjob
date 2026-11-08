@@ -275,6 +275,9 @@ func (s *State) clickOnce(id string, watched []*Frame, newTargets func() []strin
 // Submit clicks a submit button. Without any effect it tries once more; if that changes nothing either it
 // returns a NoEffectError with a screenshot, and the caller parks the application.
 func (s *State) Submit(id string, wait time.Duration) (Effect, error) {
+	if f, err := s.FrameOf(id); err == nil {
+		_, _ = f.run(`() => { if (document.activeElement && document.activeElement.blur) document.activeElement.blur(); }`, nil)
+	}
 	for range 2 {
 		e, err := s.Click(id, wait)
 		if err != nil || e.Any() {

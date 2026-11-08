@@ -4,6 +4,7 @@
 package engine
 
 import (
+	"cmp"
 	"context"
 	"errors"
 	"fmt"
@@ -124,6 +125,9 @@ func (e *Engine) Run(ctx context.Context, p *rod.Page) error {
 			return err
 		}
 		if qs := captcha(st); len(qs) > 0 {
+			return e.ask(ctx, qs)
+		}
+		if qs := securityCode(st); len(qs) > 0 {
 			return e.ask(ctx, qs)
 		}
 		plan, qs, err := e.Planner.Plan(ctx, st)
@@ -262,12 +266,37 @@ func captcha(st *browser.State) []Question {
 			return nil
 		}
 	}
-	var qs []Question
 	for _, f := range st.Frames {
 		for _, c := range f.Captcha {
 			if c.Visible || c.Challenge {
-				qs = append(qs, Question{Kind: "captcha", Label: c.Src})
+				return []Question{{Kind: "captcha", Label: cmp.Or(c.Src, c.Cls, "captcha")}}
 			}
+		}
+	}
+	return nil
+}
+
+var securityCodeRx = regexp.MustCompile(`(?i)security[_ -]?code|verification[_ -]?code|confirmation[_ -]?code|` +
+	`sicherheitscode|best[aä]tigungscode|verifizierungscode|einmalcode|\botp\b|one[- ]time[- ]?(password|code)|passcode`)
+
+// IsSecurityCode reports whether f is a one-time e-mail or SMS verification code field, which must always go to
+// the human and is never answered from the answer bank or profile rules.
+func IsSecurityCode(f browser.Field) bool {
+	if strings.EqualFold(strings.TrimSpace(f.Autocomplete), "one-time-code") {
+		return true
+	}
+	return securityCodeRx.MatchString(f.Label + " " + f.Name + " " + f.HTMLID + " " + f.Hint)
+}
+
+func securityCode(st *browser.State) []Question {
+	var qs []Question
+	for _, f := range st.Fields() {
+		if IsSecurityCode(f) && strings.TrimSpace(f.Value) == "" {
+			qs = append(qs, Question{
+				Kind:    "security_code",
+				FieldID: f.ID,
+				Label:   cmp.Or(f.Label, f.Name, "security_code"),
+			})
 		}
 	}
 	return qs
