@@ -38,10 +38,12 @@ const (
 
 // Settings are a user's autonomy settings.
 type Settings struct {
-	Level        Level
-	MinScore     int          // the match score an application needs for the green rule
-	DailyLimit   int          // submits per 24 hours the green rule allows
-	RunnerChoice RunnerChoice // server, home_runner, or extension
+	Level                    Level
+	MinScore                 int          // the match score an application needs for the green rule
+	DailyLimit               int          // submits per 24 hours the green rule allows
+	RunnerChoice             RunnerChoice // server, home_runner, or extension
+	EasyApplyEnabled         bool         // opt-in to Easy Apply for portals (#43)
+	EasyApplyTermsAcceptedAt *time.Time   // when the user accepted terms of use and ban risk
 }
 
 // DefaultSettings apply until the user saves their own.
@@ -66,6 +68,8 @@ func (s Settings) Validate() error {
 		return fmt.Errorf("%w: daily limit out of range", ErrInvalidSettings)
 	case s.RunnerChoice != "" && s.RunnerChoice != RunnerServer && s.RunnerChoice != RunnerHomeRunner && s.RunnerChoice != RunnerExtension:
 		return fmt.Errorf("%w: unknown runner choice", ErrInvalidSettings)
+	case s.EasyApplyEnabled && s.EasyApplyTermsAcceptedAt == nil:
+		return fmt.Errorf("%w: easy apply requires accepting terms and ban risk", ErrInvalidSettings)
 	}
 	return nil
 }

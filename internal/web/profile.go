@@ -6,10 +6,12 @@ import (
 	"net/url"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/1xxn/getafjob/internal/application"
 	"github.com/1xxn/getafjob/internal/identity"
 	"github.com/1xxn/getafjob/internal/notify"
+	"github.com/1xxn/getafjob/internal/portals"
 	"github.com/1xxn/getafjob/internal/profile"
 	"github.com/1xxn/getafjob/internal/tracking"
 	"github.com/1xxn/getafjob/internal/web/views"
@@ -133,7 +135,7 @@ func (s *Server) profileSave(w http.ResponseWriter, r *http.Request, u *identity
 	}
 }
 
-func preferencesForm(p profile.Preferences, a application.Settings, mb tracking.MailboxAccount, np notify.Preferences) views.Form {
+func preferencesForm(p profile.Preferences, a application.Settings, mb tracking.MailboxAccount, np notify.Preferences, accounts []portals.AccountView, easyApplyAdmin bool) views.Form {
 	salary := ""
 	if p.MinSalary > 0 {
 		salary = strconv.Itoa(p.MinSalary)
@@ -166,29 +168,44 @@ func preferencesForm(p profile.Preferences, a application.Settings, mb tracking.
 	if ntfyURL == "" {
 		ntfyURL = "https://ntfy.sh"
 	}
+	vals := map[string]string{
+		"titles": joinLines(p.Titles), "exclude_titles": joinLines(p.ExcludeTitles), "locations": joinLines(p.Locations),
+		"remote_regions": joinLines(p.RemoteRegions), "min_salary": salary, "cover_letter_lang": p.CoverLetterLang,
+		"diversity":                 p.Diversity,
+		"autonomy_level":            level,
+		"runner_choice":             runnerChoice,
+		"min_score":                 strconv.Itoa(a.MinScore),
+		"daily_limit":               strconv.Itoa(a.DailyLimit),
+		"easy_apply_admin_enabled":  strconv.FormatBool(easyApplyAdmin),
+		"portal_status_linkedin":    "disconnected",
+		"portal_status_indeed":      "disconnected",
+		"portal_limit_linkedin":     "5",
+		"portal_limit_indeed":       "5",
+		"mailbox_host":              mb.Host,
+		"mailbox_port":              portStr,
+		"mailbox_username":          mb.Username,
+		"notify_email_address":      np.EmailAddress,
+		"notify_ntfy_url":           ntfyURL,
+		"notify_ntfy_topic":         np.NtfyTopic,
+		"notify_ntfy_token":         np.NtfyToken,
+		"notify_daily_summary_time": summaryTime,
+		"notify_quiet_hours_start":  quietStart,
+		"notify_quiet_hours_end":    quietEnd,
+	}
+	for _, acc := range accounts {
+		vals["portal_status_"+acc.Portal] = acc.Status
+		if acc.DailyLimit > 0 {
+			vals["portal_limit_"+acc.Portal] = strconv.Itoa(acc.DailyLimit)
+		}
+		vals["portal_submits_"+acc.Portal] = strconv.Itoa(acc.SubmitsToday)
+	}
 	return views.Form{
-		Values: map[string]string{
-			"titles": joinLines(p.Titles), "exclude_titles": joinLines(p.ExcludeTitles), "locations": joinLines(p.Locations),
-			"remote_regions": joinLines(p.RemoteRegions), "min_salary": salary, "cover_letter_lang": p.CoverLetterLang,
-			"diversity":                 p.Diversity,
-			"autonomy_level":            level,
-			"runner_choice":             runnerChoice,
-			"min_score":                 strconv.Itoa(a.MinScore),
-			"daily_limit":               strconv.Itoa(a.DailyLimit),
-			"mailbox_host":              mb.Host,
-			"mailbox_port":              portStr,
-			"mailbox_username":          mb.Username,
-			"notify_email_address":      np.EmailAddress,
-			"notify_ntfy_url":           ntfyURL,
-			"notify_ntfy_topic":         np.NtfyTopic,
-			"notify_ntfy_token":         np.NtfyToken,
-			"notify_daily_summary_time": summaryTime,
-			"notify_quiet_hours_start":  quietStart,
-			"notify_quiet_hours_end":    quietEnd,
-		},
+		Values: vals,
 		Checks: map[string]bool{
 			"remote":                       p.Remote,
 			"talent_pool":                  p.TalentPool,
+			"easy_apply_enabled":           a.EasyApplyEnabled,
+			"easy_apply_terms_accepted":    a.EasyApplyTermsAcceptedAt != nil,
 			"mailbox_enabled":              mb.Enabled,
 			"notify_email_enabled":         np.EmailEnabled,
 			"notify_webpush_enabled":       np.WebPushEnabled,
@@ -227,7 +244,15 @@ func (s *Server) preferencesPage(w http.ResponseWriter, r *http.Request, u *iden
 			np = p
 		}
 	}
-	f := preferencesForm(snap.Preferences, auto, mb, np)
+	var portalAccounts []portals.AccountView
+	easyApplyAdmin := false
+	if s.Portals != nil {
+		easyApplyAdmin = s.Portals.AdminEnabled()
+		if accs, err := s.Portals.ListAccounts(r.Context(), u.ID); err == nil {
+			portalAccounts = accs
+		}
+	}
+	f := preferencesForm(snap.Preferences, auto, mb, np, portalAccounts, easyApplyAdmin)
 	if r.URL.Query().Get("saved") == "1" {
 		f.Notice = views.T(r.Context(), "profile.saved")
 	}
@@ -246,6 +271,13 @@ func (s *Server) preferencesPage(w http.ResponseWriter, r *http.Request, u *iden
 func (s *Server) preferencesSave(w http.ResponseWriter, r *http.Request, u *identity.User) {
 	if u == nil {
 		http.Redirect(w, r, "/login", http.StatusSeeOther)
+		return
+	}
+	if disconnectPortal := strings.TrimSpace(r.PostFormValue("disconnect_portal")); disconnectPortal != "" {
+		if s.Portals != nil {
+			_ = s.Portals.Disconnect(r.Context(), u.ID, disconnectPortal)
+		}
+		http.Redirect(w, r, "/preferences?saved=1", http.StatusSeeOther)
 		return
 	}
 	p := profile.Preferences{
@@ -307,13 +339,35 @@ func (s *Server) preferencesSave(w http.ResponseWriter, r *http.Request, u *iden
 			dailyLimit = int(n)
 		}
 	}
-	autoSettings := application.Settings{
-		Level:        autoLevel,
-		RunnerChoice: runnerChoice,
-		MinScore:     minScore,
-		DailyLimit:   dailyLimit,
+	var autoTermsAt *time.Time
+	if s.Apps != nil {
+		if st, err := s.Apps.Settings(r.Context(), u.ID); err == nil {
+			autoTermsAt = st.EasyApplyTermsAcceptedAt
+		}
 	}
-	autoErr := errLevel || errRunnerChoice || errScore != nil || errLimit != nil || autoSettings.Validate() != nil
+	easyApplyEnabled := r.PostFormValue("easy_apply_enabled") == "on"
+	termsAccepted := r.PostFormValue("easy_apply_terms_accepted") == "on"
+	var termsAcceptedAt *time.Time
+	if autoTermsAt != nil {
+		termsAcceptedAt = autoTermsAt
+	}
+	if termsAccepted && termsAcceptedAt == nil {
+		now := time.Now()
+		termsAcceptedAt = &now
+	}
+	var errEasyApplyTerms bool
+	if easyApplyEnabled && termsAcceptedAt == nil {
+		errEasyApplyTerms = true
+	}
+	autoSettings := application.Settings{
+		Level:                    autoLevel,
+		RunnerChoice:             runnerChoice,
+		MinScore:                 minScore,
+		DailyLimit:               dailyLimit,
+		EasyApplyEnabled:         easyApplyEnabled,
+		EasyApplyTermsAcceptedAt: termsAcceptedAt,
+	}
+	autoErr := errLevel || errRunnerChoice || errScore != nil || errLimit != nil || errEasyApplyTerms || autoSettings.Validate() != nil
 
 	np := notify.DefaultPreferences(u.ID, u.Email)
 	if s.Notify != nil {
@@ -351,11 +405,21 @@ func (s *Server) preferencesSave(w http.ResponseWriter, r *http.Request, u *iden
 				mb = m
 			}
 		}
-		f := preferencesForm(p, autoSettings, mb, np)
+		var portalAccounts []portals.AccountView
+		easyApplyAdmin := false
+		if s.Portals != nil {
+			easyApplyAdmin = s.Portals.AdminEnabled()
+			if accs, err := s.Portals.ListAccounts(r.Context(), u.ID); err == nil {
+				portalAccounts = accs
+			}
+		}
+		f := preferencesForm(p, autoSettings, mb, np, portalAccounts, easyApplyAdmin)
 		f.Values["min_salary"] = r.PostFormValue("min_salary")
 		f.Values["min_score"] = r.PostFormValue("min_score")
 		f.Values["daily_limit"] = r.PostFormValue("daily_limit")
 		f.Values["runner_choice"] = r.PostFormValue("runner_choice")
+		f.Checks["easy_apply_enabled"] = easyApplyEnabled
+		f.Checks["easy_apply_terms_accepted"] = termsAccepted
 		f.Errors = make(map[string]string)
 		if salaryErr {
 			f.Errors["min_salary"] = views.T(r.Context(), "profile.error.invalid")
@@ -373,6 +437,9 @@ func (s *Server) preferencesSave(w http.ResponseWriter, r *http.Request, u *iden
 			if errLimit != nil || dailyLimit < 0 || dailyLimit > application.MaxDailyLimit {
 				f.Errors["daily_limit"] = views.T(r.Context(), "profile.error.invalid")
 			}
+			if errEasyApplyTerms {
+				f.Errors["easy_apply_terms_accepted"] = views.T(r.Context(), "profile.error.invalid")
+			}
 		}
 		f.Notice, f.Failed = views.T(r.Context(), "profile.invalid"), true
 		s.render(w, r, http.StatusUnprocessableEntity, views.PreferencesPage(u.DisplayName, f))
@@ -387,7 +454,15 @@ func (s *Server) preferencesSave(w http.ResponseWriter, r *http.Request, u *iden
 					mb = m
 				}
 			}
-			f := preferencesForm(p, autoSettings, mb, np)
+			var portalAccounts []portals.AccountView
+			easyApplyAdmin := false
+			if s.Portals != nil {
+				easyApplyAdmin = s.Portals.AdminEnabled()
+				if accs, err := s.Portals.ListAccounts(r.Context(), u.ID); err == nil {
+					portalAccounts = accs
+				}
+			}
+			f := preferencesForm(p, autoSettings, mb, np, portalAccounts, easyApplyAdmin)
 			f.Errors, f.Notice, f.Failed = fieldErrors(r, err), views.T(r.Context(), "profile.invalid"), true
 			s.render(w, r, http.StatusUnprocessableEntity, views.PreferencesPage(u.DisplayName, f))
 			return
@@ -399,6 +474,15 @@ func (s *Server) preferencesSave(w http.ResponseWriter, r *http.Request, u *iden
 		if err := s.Apps.SaveSettings(r.Context(), u.ID, autoSettings); err != nil {
 			s.failed(w, r, u, err)
 			return
+		}
+	}
+	if s.Portals != nil {
+		for _, portal := range []string{portals.PortalLinkedIn, portals.PortalIndeed} {
+			if v := strings.TrimSpace(r.PostFormValue("portal_limit_" + portal)); v != "" {
+				if lim, err := strconv.Atoi(v); err == nil && lim >= portals.MinDailyLimit && lim <= portals.MaxDailyLimit {
+					_ = s.Portals.SetDailyLimit(r.Context(), u.ID, portal, lim)
+				}
+			}
 		}
 	}
 	if s.Tracking != nil {

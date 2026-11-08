@@ -21,12 +21,19 @@ type jobReader interface {
 	Job(ctx context.Context, id int64) (application.Job, error)
 }
 
+type portalProvider interface {
+	CanApply(ctx context.Context, userID uuid.UUID, portal string) (bool, string, error)
+	GetDecryptedCookies(ctx context.Context, userID uuid.UUID, portal string) ([]byte, error)
+	RecordUsed(ctx context.Context, userID uuid.UUID, portal string) error
+}
+
 // runData assembles what a run needs from the user's profile, answers, texts and documents.
 type runData struct {
 	profiles *profile.Service
 	items    *profile.Items
 	docs     *profile.Documents
 	jobs     jobReader
+	portals  portalProvider
 	now      func() time.Time
 }
 
@@ -61,6 +68,15 @@ func (d runData) RunData(ctx context.Context, userID uuid.UUID, jobID int64) (*r
 	}
 	run := &runnerv1.Run{StartUrl: start, Origins: origins(job), Language: lang,
 		Profile: facts(snap.Profile, snap.Preferences)}
+	if p := portalOf(job, start); p != "" && d.portals != nil {
+		run.Portal = p
+		if can, _, err := d.portals.CanApply(ctx, userID, p); err == nil && can {
+			if cookies, err := d.portals.GetDecryptedCookies(ctx, userID, p); err == nil {
+				run.SessionCookiesJson = cookies
+				_ = d.portals.RecordUsed(ctx, userID, p)
+			}
+		}
+	}
 	for _, a := range answers {
 		run.Answers = append(run.Answers, &runnerv1.Answer{Id: a.ID.String(), Question: a.Question, Answer: a.Answer})
 	}
@@ -154,4 +170,15 @@ func placeholders(p profile.Profile, job application.Job, lang string, now time.
 // hosts.
 func origins(job application.Job) []string {
 	return ats.Origins(job.Source, job.URL, job.Apply)
+}
+
+func portalOf(job application.Job, start string) string {
+	s := strings.ToLower(job.Source)
+	if s == "linkedin" || strings.HasPrefix(s, "linkedin:") || strings.Contains(strings.ToLower(start), "linkedin.com") {
+		return "linkedin"
+	}
+	if s == "indeed" || strings.HasPrefix(s, "indeed:") || strings.Contains(strings.ToLower(start), "indeed.com") {
+		return "indeed"
+	}
+	return ""
 }

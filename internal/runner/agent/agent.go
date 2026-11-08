@@ -123,12 +123,50 @@ func (a *Agent) RunOne(ctx context.Context, run *runnerv1.Run) error {
 	if err != nil {
 		return err
 	}
+	if len(run.GetSessionCookiesJson()) > 0 {
+		var cookies []*proto.NetworkCookieParam
+		if err := json.Unmarshal(run.GetSessionCookiesJson(), &cookies); err == nil && len(cookies) > 0 {
+			_ = (proto.NetworkSetCookies{Cookies: cookies}).Call(p)
+		}
+	}
 	ad := ats.For("", append([]string{run.GetStartUrl()}, run.GetOrigins()...)...)
 	e := ad.NewEngine(&executor.Executor{Docs: docs}, &planner.Planner{K: k}, c, a.Wait)
 	if err := p.Context(ctx).Navigate(run.GetStartUrl()); err != nil {
 		return c.Park(ctx, "open the posting: "+err.Error(), nil)
 	}
 	_ = p.Context(ctx).WaitLoad()
+	if (ats.IsPortal(ad.Name) || run.GetPortal() != "") && p.MustInfo() != nil {
+		curURL := p.MustInfo().URL
+		html, _ := p.HTML()
+		if ats.IsSessionExpired(run.GetPortal(), curURL, html) {
+			a.Logger.WarnContext(ctx, "portal session expired, requesting handoff", "portal", run.GetPortal())
+			if err := c.Ask(ctx, []engine.Question{{
+				Kind:  "session_expired",
+				Label: fmt.Sprintf("Portal session expired for %s. Please sign in again in the remote browser.", run.GetPortal()),
+			}}); err != nil {
+				return err
+			}
+			_, ok, herr := a.handoff(ctx, p, c, run)
+			if herr != nil {
+				return herr
+			}
+			if !ok {
+				return nil
+			}
+			if res, err := (proto.NetworkGetCookies{}).Call(p); err == nil && len(res.Cookies) > 0 {
+				params := proto.CookiesToParams(res.Cookies)
+				if updatedJSON, err := json.Marshal(params); err == nil {
+					_ = c.CheckpointWithCookies(ctx, engine.Checkpoint{
+						Page: 1, Step: engine.StepPrepare, URL: p.MustInfo().URL,
+					}, updatedJSON)
+				}
+			}
+			if err := p.Context(ctx).Navigate(run.GetStartUrl()); err != nil {
+				return c.Park(ctx, "open posting after sign in: "+err.Error(), nil)
+			}
+			_ = p.Context(ctx).WaitLoad()
+		}
+	}
 	form, err := e.Prepare(ctx, p)
 	if err != nil {
 		shot, _ := p.Screenshot(false, nil)
@@ -306,6 +344,25 @@ func (c *coordinator) Checkpoint(ctx context.Context, cp engine.Checkpoint) erro
 	}
 	_, err = c.client.Checkpoint(ctx, auth(&runnerv1.CheckpointRequest{Step: string(cp.Step), Page: int32(min(cp.Page, 100)), //nolint:gosec // bounded
 		Url: cp.URL, DataJson: data, Screenshot: cp.Screenshot}, c.token))
+	return err
+}
+
+func (c *coordinator) CheckpointWithCookies(ctx context.Context, cp engine.Checkpoint, cookiesJSON []byte) error {
+	data, err := json.Marshal(cp)
+	if err != nil {
+		return err
+	}
+	if len(data) > 200<<10 {
+		data, _ = json.Marshal(map[string]any{"step": cp.Step, "page": cp.Page, "truncated": true})
+	}
+	_, err = c.client.Checkpoint(ctx, auth(&runnerv1.CheckpointRequest{
+		Step:                      string(cp.Step),
+		Page:                      int32(min(cp.Page, 100)), //nolint:gosec // bounded
+		Url:                       cp.URL,
+		DataJson:                  data,
+		Screenshot:                cp.Screenshot,
+		UpdatedSessionCookiesJson: cookiesJSON,
+	}, c.token))
 	return err
 }
 

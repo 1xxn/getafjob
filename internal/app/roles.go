@@ -33,6 +33,9 @@ import (
 	"github.com/1xxn/getafjob/internal/platform/httpx"
 	"github.com/1xxn/getafjob/internal/platform/queue"
 	"github.com/1xxn/getafjob/internal/platform/webpush"
+	"github.com/1xxn/getafjob/internal/portals"
+	portalscrypto "github.com/1xxn/getafjob/internal/portals/adapters/crypto"
+	portalsstore "github.com/1xxn/getafjob/internal/portals/adapters/pgstore"
 	"github.com/1xxn/getafjob/internal/profile"
 	profilestore "github.com/1xxn/getafjob/internal/profile/adapters/pgstore"
 	"github.com/1xxn/getafjob/internal/profile/cvimport"
@@ -104,6 +107,9 @@ func serve(ctx context.Context, cfg config.Config, logger *slog.Logger) error {
 	appNotifier := newNotifyAppNotifier(notifySvc)
 	astore := applicationstore.New(pool)
 	apps := application.NewService(astore)
+	portalsStore := portalsstore.New(pool)
+	portalsCipher := portalscrypto.NewCipher(env)
+	portalsSvc := portals.NewService(portalsStore, portalsCipher, newAutonomyAdapter(apps), cfg.EasyApplyEnabled)
 	var gw *gateway.Server
 	if cfg.RunnerSecret != "" {
 		atsMetrics, err := ats.NewTracker()
@@ -112,7 +118,8 @@ func serve(ctx context.Context, cfg config.Config, logger *slog.Logger) error {
 		}
 		gw = &gateway.Server{Runs: application.NewRuns(apps, astore), Apps: apps, Shots: sealedFiles,
 			Secret: cfg.RunnerSecret.Reveal(), Logger: logger, Notify: appNotifier.YourTurn, ATSMetrics: atsMetrics,
-			Data: runData{profiles: profiles, items: profile.NewItems(pstore, env), docs: docs, jobs: astore, now: time.Now}}
+			Portals: portalsSvc,
+			Data:    runData{profiles: profiles, items: profile.NewItems(pstore, env), docs: docs, jobs: astore, portals: portalsSvc, now: time.Now}}
 	}
 
 	tstore := trackingstore.New(pool)
@@ -124,7 +131,7 @@ func serve(ctx context.Context, cfg config.Config, logger *slog.Logger) error {
 
 	(&web.Server{Identity: ids, Logger: logger, Profile: profiles, Documents: docs, Items: items,
 		Importer: cvimport.NewImporter(docs, profiles, extractor), Jobs: matching.NewListings(matchingstore.New(pool)),
-		PushStore: webpush.NewStore(pool), VAPIDPublicKey: vapidPub, Apps: apps, Tracking: trackingSvc, Notify: notifySvc, Assist: assistSvc, Shots: sealedFiles, Handoffs: gw}).Register(mux)
+		PushStore: webpush.NewStore(pool), VAPIDPublicKey: vapidPub, Apps: apps, Tracking: trackingSvc, Notify: notifySvc, Assist: assistSvc, Portals: portalsSvc, Shots: sealedFiles, Handoffs: gw}).Register(mux)
 
 	h := httpx.Instrument(httpx.Protect(httpx.Routes(mux), maxBody, cfg.PublicURL.Scheme == "https",
 		httpx.Upload{Path: "/documents", Max: web.MaxUpload}, httpx.Upload{Path: "/setup/cv", Max: web.MaxUpload}))

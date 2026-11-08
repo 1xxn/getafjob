@@ -48,6 +48,11 @@ type Screenshots interface {
 	Put(ctx context.Context, userID uuid.UUID, key string, data []byte) error
 }
 
+// PortalSessionSaver stores updated portal session cookies captured during a run.
+type PortalSessionSaver interface {
+	SaveCookies(ctx context.Context, userID uuid.UUID, portal string, cookiesJSON []byte, dailyLimit int) error
+}
+
 // Server implements the runner service.
 type Server struct {
 	Runs       *application.Runs
@@ -58,6 +63,7 @@ type Server struct {
 	Logger     *slog.Logger
 	Notify     func(ctx context.Context, userID, appID uuid.UUID)
 	ATSMetrics *ats.Tracker
+	Portals    PortalSessionSaver
 	handoffs   sync.Map // map[uuid.UUID]*HandoffSession
 	runners    sync.Map // map[string]runnerSession
 }
@@ -290,6 +296,13 @@ func (s *Server) Checkpoint(ctx context.Context, req *connect.Request[runnerv1.C
 	key, err := s.screenshot(ctx, ref, m.GetScreenshot())
 	if err != nil {
 		return nil, err
+	}
+	if cookies := m.GetUpdatedSessionCookiesJson(); len(cookies) > 0 && s.Portals != nil && s.Apps != nil && s.Data != nil {
+		if app, err := s.Apps.Get(ctx, ref.UserID, ref.AppID); err == nil {
+			if run, err := s.Data.RunData(ctx, ref.UserID, app.JobID); err == nil && run.GetPortal() != "" {
+				_ = s.Portals.SaveCookies(ctx, ref.UserID, run.GetPortal(), cookies, 0)
+			}
+		}
 	}
 	err = s.Runs.Checkpoint(ctx, ref, application.Checkpoint{Step: m.GetStep(), Page: int(m.GetPage()), URL: m.GetUrl(),
 		Data: data, Screenshot: key})

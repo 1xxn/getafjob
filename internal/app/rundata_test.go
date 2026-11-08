@@ -62,3 +62,21 @@ func TestFormLanguageAndTexts(t *testing.T) {
 		t.Fatal("missing placeholder not reported")
 	}
 }
+
+func TestPortalOf(t *testing.T) {
+	cases := []struct {
+		job   application.Job
+		start string
+		want  string
+	}{
+		{application.Job{Source: "linkedin:search"}, "https://www.linkedin.com/jobs/view/123", "linkedin"},
+		{application.Job{Source: "indeed"}, "https://de.indeed.com/viewjob?jk=abc", "indeed"},
+		{application.Job{Source: "greenhouse:acme"}, "https://boards.greenhouse.io/acme/jobs/1", ""},
+		{application.Job{Source: "custom"}, "https://www.linkedin.com/jobs/view/456", "linkedin"},
+	}
+	for _, tc := range cases {
+		if got := portalOf(tc.job, tc.start); got != tc.want {
+			t.Errorf("portalOf(%+v, %q) = %q, want %q", tc.job, tc.start, got, tc.want)
+		}
+	}
+}
