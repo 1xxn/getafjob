@@ -31,6 +31,7 @@ import (
 	"github.com/1xxn/getafjob/internal/platform/db"
 	"github.com/1xxn/getafjob/internal/platform/httpx"
 	"github.com/1xxn/getafjob/internal/platform/queue"
+	"github.com/1xxn/getafjob/internal/platform/webpush"
 	"github.com/1xxn/getafjob/internal/profile"
 	profilestore "github.com/1xxn/getafjob/internal/profile/adapters/pgstore"
 	"github.com/1xxn/getafjob/internal/profile/cvimport"
@@ -94,8 +95,19 @@ func serve(ctx context.Context, cfg config.Config, logger *slog.Logger) error {
 	if err != nil {
 		return err
 	}
+	notifier, vapidPub := newPushNotifier(pool, cfg, logger)
+	astore := applicationstore.New(pool)
+	apps := application.NewService(astore)
+	var gw *gateway.Server
+	if cfg.RunnerSecret != "" {
+		gw = &gateway.Server{Runs: application.NewRuns(apps, astore), Apps: apps, Shots: sealedFiles,
+			Secret: cfg.RunnerSecret.Reveal(), Logger: logger, Notify: notifier.YourTurn,
+			Data: runData{profiles: profiles, items: profile.NewItems(pstore, env), docs: docs, jobs: astore, now: time.Now}}
+	}
+
 	(&web.Server{Identity: ids, Logger: logger, Profile: profiles, Documents: docs, Items: profile.NewItems(pstore, env),
-		Importer: cvimport.NewImporter(docs, profiles, extractor), Jobs: matching.NewListings(matchingstore.New(pool))}).Register(mux)
+		Importer: cvimport.NewImporter(docs, profiles, extractor), Jobs: matching.NewListings(matchingstore.New(pool)),
+		PushStore: webpush.NewStore(pool), VAPIDPublicKey: vapidPub, Apps: apps, Handoffs: gw}).Register(mux)
 
 	h := httpx.Instrument(httpx.Protect(httpx.Routes(mux), maxBody, cfg.PublicURL.Scheme == "https",
 		httpx.Upload{Path: "/documents", Max: web.MaxUpload}, httpx.Upload{Path: "/setup/cv", Max: web.MaxUpload}))
@@ -104,15 +116,10 @@ func serve(ctx context.Context, cfg config.Config, logger *slog.Logger) error {
 	ctx, stop := context.WithCancel(ctx)
 	defer stop()
 	gatewayDone := make(chan error, 1)
-	if cfg.RunnerSecret == "" {
+	if gw == nil {
 		logger.Info("runner gateway off: GETAFJOB_RUNNER_SECRET is not set")
 		close(gatewayDone)
 	} else {
-		astore := applicationstore.New(pool)
-		apps := application.NewService(astore)
-		gw := &gateway.Server{Runs: application.NewRuns(apps, astore), Apps: apps, Shots: sealedFiles,
-			Secret: cfg.RunnerSecret.Reveal(), Logger: logger,
-			Data: runData{profiles: profiles, items: profile.NewItems(pstore, env), docs: docs, jobs: astore, now: time.Now}}
 		gmux := http.NewServeMux()
 		gmux.Handle(gw.Handler())
 		go func() {
@@ -156,7 +163,8 @@ func worker(ctx context.Context, cfg config.Config, logger *slog.Logger) error {
 	river.AddWorker(workers, &cleanupWorker{ids: identity.NewService(pgstore.New(pool), nil, cfg.PublicURL)})
 	apps := application.NewService(applicationstore.New(pool))
 	river.AddWorker(workers, &recoverWorker{svc: apps, logger: logger})
-	river.AddWorker(workers, &handoffWorker{svc: apps, notifier: logNotifier{logger}, logger: logger})
+	notifier, _ := newPushNotifier(pool, cfg, logger)
+	river.AddWorker(workers, &handoffWorker{svc: apps, notifier: notifier, logger: logger})
 	jobs, err := queue.NewWorker(pool, queue.Options{Workers: workers, Periodic: periodicJobs(cfg), Logger: logger})
 	if err != nil {
 		return err

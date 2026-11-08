@@ -66,6 +66,10 @@ type Config struct {
 	SMTPURL Secret
 	// MailFrom is the sender address of all mail.
 	MailFrom string
+	// VAPIDKey is the P-256 private key for Web Push notifications (32 bytes, base64url).
+	VAPIDKey Secret
+	// VAPIDSubject is the contact address in VAPID tokens (mailto: or https://).
+	VAPIDSubject string
 	// ShutdownTimeout bounds the graceful shutdown.
 	ShutdownTimeout time.Duration
 	// CrawlInterval is the time between two crawls (worker).
@@ -120,6 +124,8 @@ var specs = []spec{
 	{"SHUTDOWN_TIMEOUT", "20s", setShutdownTimeout},
 	{"SMTP_URL", "", func(c *Config, v string) error { c.SMTPURL = Secret(v); return nil }},
 	{"MAIL_FROM", "getafjob@localhost", setMailFrom},
+	{"VAPID_KEY", "", func(c *Config, v string) error { return setKey(&c.VAPIDKey, v) }},
+	{"VAPID_SUBJECT", "", setVAPIDSubject},
 	{"CRAWL_INTERVAL", "6h", setCrawlInterval},
 }
 
@@ -300,6 +306,17 @@ func setCrawlInterval(c *Config, v string) error {
 	return nil
 }
 
+func setVAPIDSubject(c *Config, v string) error {
+	if v == "" {
+		return nil
+	}
+	if !strings.HasPrefix(v, "mailto:") && !strings.HasPrefix(v, "https://") {
+		return errors.New("must be a mailto: or https:// URL")
+	}
+	c.VAPIDSubject = v
+	return nil
+}
+
 // LogValue logs harmless fields only.
 func (c Config) LogValue() slog.Value {
 	return slog.GroupValue(
@@ -313,6 +330,7 @@ func (c Config) LogValue() slog.Value {
 		slog.Bool("egress_proxy_set", c.EgressProxy != nil),
 		slog.String("otel_endpoint", urlString(c.OTelEndpoint)),
 		slog.Bool("smtp_configured", c.SMTPURL != ""),
+		slog.Bool("vapid_configured", c.VAPIDKey != ""),
 		slog.Bool("master_key_set", c.MasterKey != ""),
 		slog.Bool("old_master_key_set", c.MasterKeyOld != ""),
 		slog.String("blob_store", blobScheme(c.BlobURL)),

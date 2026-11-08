@@ -48,6 +48,11 @@ func (s *Service) Get(ctx context.Context, userID, id uuid.UUID) (App, error) {
 	return s.store.Get(ctx, userID, id)
 }
 
+// Questions returns the questions of the last ask event of an application.
+func (s *Service) Questions(ctx context.Context, userID, id uuid.UUID) ([]Question, error) {
+	return s.store.Questions(ctx, userID, id)
+}
+
 // Create returns the user's application for a job, creating it as matched.
 func (s *Service) Create(ctx context.Context, userID uuid.UUID, jobID int64) (uuid.UUID, error) {
 	return s.store.Create(ctx, userID, jobID, Matched, s.now())

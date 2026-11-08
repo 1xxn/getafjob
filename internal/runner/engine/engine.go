@@ -248,6 +248,11 @@ func confirmation(st *browser.State) bool {
 }
 
 func captcha(st *browser.State) []Question {
+	for _, f := range st.Frames {
+		if f.CaptchaToken {
+			return nil
+		}
+	}
 	var qs []Question
 	for _, f := range st.Frames {
 		for _, c := range f.Captcha {

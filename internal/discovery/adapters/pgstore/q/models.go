@@ -179,6 +179,15 @@ type ProfileItem struct {
 	UpdatedAt time.Time
 }
 
+type PushSubscription struct {
+	ID        uuid.UUID
+	UserID    uuid.UUID
+	Endpoint  string
+	P256dh    string
+	Auth      string
+	CreatedAt time.Time
+}
+
 type Recovery struct {
 	UserID      uuid.UUID
 	RequestedAt time.Time

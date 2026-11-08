@@ -13,6 +13,7 @@ import (
 	"time"
 
 	"github.com/1xxn/getafjob/internal/platform/config"
+	"github.com/1xxn/getafjob/internal/platform/webpush"
 )
 
 const adminUsage = `Usage:
@@ -25,6 +26,7 @@ Commands:
   demo           invented users, profiles and jobs for development (admin demo [-jobs 2000] [-seed 1])
   env            list all configuration variables
   gen-secret     print 32 random bytes (base64url) for passwords and keys
+  gen-vapid-key  print a fresh VAPID P-256 key pair for web push notifications
   invite         create a one-time invitation link (admin invite -email … [-role admin] [-send])
   sign-out       end all sessions of one account (admin sign-out -email …)
   rotate-master-key  re-wrap all data keys with GETAFJOB_MASTER_KEY (the previous key in GETAFJOB_MASTER_KEY_OLD)
@@ -69,6 +71,14 @@ func admin(ctx context.Context, args []string, env Env) int {
 		b := make([]byte, 32)
 		_, _ = rand.Read(b) // crypto/rand.Read never returns an error (it crashes instead)
 		_, _ = fmt.Fprintln(env.Stdout, base64.RawURLEncoding.EncodeToString(b))
+		return ExitOK
+	case "gen-vapid-key":
+		keys, err := webpush.GenerateKeys()
+		if err != nil {
+			_, _ = fmt.Fprintf(env.Stderr, "generate vapid key: %v\n", err)
+			return ExitError
+		}
+		_, _ = fmt.Fprintf(env.Stdout, "GETAFJOB_VAPID_KEY=%s\n# Public key (for browsers):\n# %s\n", keys.Private, keys.Public)
 		return ExitOK
 	case "help", "-h", "--help":
 		_, _ = fmt.Fprint(env.Stdout, adminUsage)

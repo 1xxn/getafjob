@@ -55,6 +55,31 @@ func (s *Store) Get(ctx context.Context, userID, id uuid.UUID) (a application.Ap
 	return a, err
 }
 
+// Questions returns the questions from the latest ask event of the application.
+func (s *Store) Questions(ctx context.Context, userID, id uuid.UUID) (out []application.Question, err error) {
+	err = s.user(ctx, userID, func(qs *q.Queries) error {
+		evs, err := qs.Events(ctx, q.EventsParams{ApplicationID: id, UserID: userID})
+		if err != nil {
+			return err
+		}
+		for i := len(evs) - 1; i >= 0; i-- {
+			if evs[i].Event != string(application.EvAsk) {
+				continue
+			}
+			var d struct {
+				Questions []application.Question `json:"questions"`
+			}
+			if err := json.Unmarshal(evs[i].Detail, &d); err != nil {
+				return err
+			}
+			out = d.Questions
+			return nil
+		}
+		return nil
+	})
+	return out, err
+}
+
 // Apply writes state, event and submit register in one transaction.
 func (s *Store) Apply(ctx context.Context, userID uuid.UUID, a application.App, c application.Change) error {
 	detail := []byte("{}")

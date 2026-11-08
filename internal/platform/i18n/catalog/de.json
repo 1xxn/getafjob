@@ -314,5 +314,13 @@
   "texts.name": "Name",
   "texts.placeholders": "Platzhalter: {list}",
   "texts.text": "Wiederverwendbare Texte für Anschreiben und Freitextfelder. getafjob füllt Platzhalter aus deinem Profil und der Stelle und verschickt nie einen Text mit leerem Platzhalter.",
-  "texts.title": "Textbausteine"
+  "texts.title": "Textbausteine",
+  "handoff.title": "Remote-Browser",
+  "handoff.connecting": "Verbinde mit dem Remote-Browser...",
+  "handoff.continue": "Weiter",
+  "handoff.park": "Parken",
+  "handoff.push": "Push-Benachrichtigungen aktivieren",
+  "handoff.questions": "Fragen zu dieser Bewerbung",
+  "handoff.questions_hint": "Antworten werden für künftige Bewerbungen in deiner Antwortbank gespeichert.",
+  "handoff.save_continue": "Speichern und weiter"
 }

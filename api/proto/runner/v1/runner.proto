@@ -32,6 +32,8 @@ service RunnerService {
   rpc Submitted(SubmittedRequest) returns (SubmittedResponse) {}
   // Park stops the run for a human look.
   rpc Park(ParkRequest) returns (ParkResponse) {}
+  // Handoff exchanges screencast frames and user input during a handoff (#31).
+  rpc Handoff(HandoffRequest) returns (HandoffResponse) {}
 }
 
 // RunnerKind tells where a runner lives.
@@ -169,3 +171,43 @@ message ParkRequest {
 }
 
 message ParkResponse {}
+
+message HandoffRequest {
+  // A JPEG frame of the active browser screencast.
+  bytes frame = 1;
+  // Wait for user input when no event is queued yet.
+  bool wait = 2;
+  // Done closes the handoff session.
+  bool done = 3;
+}
+
+message HandoffResponse {
+  repeated HandoffEvent events = 1;
+}
+
+message HandoffEvent {
+  oneof msg {
+    InputMouseEvent mouse = 1;
+    InputKeyEvent key = 2;
+    bool resume = 3;
+    bool park = 4;
+  }
+  repeated Answer answers = 5;
+}
+
+message InputMouseEvent {
+  string type = 1;
+  double x = 2;
+  double y = 3;
+  string button = 4;
+  int32 click_count = 5;
+}
+
+message InputKeyEvent {
+  string type = 1;
+  string text = 2;
+  string key = 3;
+  string code = 4;
+  int32 windows_virtual_key_code = 5;
+}
+

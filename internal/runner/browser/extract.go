@@ -86,15 +86,16 @@ type Captcha struct {
 
 // Frame is the extraction result of one frame.
 type Frame struct {
-	Index    int       `json:"-"`
-	URL      string    `json:"url"`
-	Title    string    `json:"title"`
-	Fields   []Field   `json:"fields"`
-	Buttons  []Button  `json:"buttons"`
-	Errors   []string  `json:"errors"`
-	Captcha  []Captcha `json:"captcha"`
-	Headings []string  `json:"headings"`
-	Text     string    `json:"text"`
+	Index        int       `json:"-"`
+	URL          string    `json:"url"`
+	Title        string    `json:"title"`
+	Fields       []Field   `json:"fields"`
+	Buttons      []Button  `json:"buttons"`
+	Errors       []string  `json:"errors"`
+	Captcha      []Captcha `json:"captcha"`
+	CaptchaToken bool      `json:"captcha_token,omitempty"`
+	Headings     []string  `json:"headings"`
+	Text         string    `json:"text"`
 
 	page   *rod.Page // in-process frame of a rod page
 	sess   *session  // frame reached over a CDP session (out-of-process iframes and the frames inside them)

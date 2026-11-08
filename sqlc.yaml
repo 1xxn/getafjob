@@ -81,3 +81,13 @@ sql:
         sql_package: pgx/v5
         emit_pointers_for_null_types: true
         emit_empty_slices: true
+  - engine: postgresql
+    schema: db/migrations
+    queries: db/queries/webpush
+    gen:
+      go:
+        package: q
+        out: internal/platform/webpush/q
+        sql_package: pgx/v5
+        emit_pointers_for_null_types: true
+        emit_empty_slices: true
