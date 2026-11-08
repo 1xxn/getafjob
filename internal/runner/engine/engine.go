@@ -166,7 +166,8 @@ func (e *Engine) Run(ctx context.Context, p *rod.Page) error {
 }
 
 // formButton picks the button that continues the form the plan filled: a submit button inside that form. A
-// button of the same name elsewhere (page headers) never counts.
+// button of the same name elsewhere (page headers) never counts. When the page has no <form> around its fields
+// (e.g. Ashby or Workday), non-cookie, non-autofill buttons on the page are eligible.
 func formButton(st *browser.State, plan executor.Plan) (browser.Button, bool, error) {
 	form := ""
 	for _, v := range plan.Values {
@@ -175,9 +176,17 @@ func formButton(st *browser.State, plan executor.Plan) (browser.Button, bool, er
 			break
 		}
 	}
+	if form == "" {
+		for _, f := range st.Fields() {
+			if f.Form != "" {
+				form = f.Form
+				break
+			}
+		}
+	}
 	var candidates []browser.Button
 	for _, b := range st.Buttons() {
-		if b.Disabled || b.Form == "" || (form != "" && b.Form != form) {
+		if b.Disabled || b.Cookie || b.Autofill || (form != "" && b.Form != form) {
 			continue
 		}
 		if b.Kind == "submit" || (b.Kind == "button" && (finalRx.MatchString(b.Text) || nextRx.MatchString(b.Text))) {

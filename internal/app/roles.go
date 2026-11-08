@@ -36,6 +36,7 @@ import (
 	profilestore "github.com/1xxn/getafjob/internal/profile/adapters/pgstore"
 	"github.com/1xxn/getafjob/internal/profile/cvimport"
 	"github.com/1xxn/getafjob/internal/runner/agent"
+	"github.com/1xxn/getafjob/internal/runner/ats"
 	"github.com/1xxn/getafjob/internal/runner/browser"
 	"github.com/1xxn/getafjob/internal/web"
 	"github.com/1xxn/getafjob/internal/web/apiv1"
@@ -100,8 +101,12 @@ func serve(ctx context.Context, cfg config.Config, logger *slog.Logger) error {
 	apps := application.NewService(astore)
 	var gw *gateway.Server
 	if cfg.RunnerSecret != "" {
+		atsMetrics, err := ats.NewTracker()
+		if err != nil {
+			return err
+		}
 		gw = &gateway.Server{Runs: application.NewRuns(apps, astore), Apps: apps, Shots: sealedFiles,
-			Secret: cfg.RunnerSecret.Reveal(), Logger: logger, Notify: notifier.YourTurn,
+			Secret: cfg.RunnerSecret.Reveal(), Logger: logger, Notify: notifier.YourTurn, ATSMetrics: atsMetrics,
 			Data: runData{profiles: profiles, items: profile.NewItems(pstore, env), docs: docs, jobs: astore, now: time.Now}}
 	}
 

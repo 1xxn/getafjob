@@ -27,6 +27,7 @@ import (
 	"github.com/1xxn/getafjob/internal/application"
 	runnerv1 "github.com/1xxn/getafjob/internal/gen/proto/runner/v1"
 	"github.com/1xxn/getafjob/internal/gen/proto/runner/v1/runnerv1connect"
+	"github.com/1xxn/getafjob/internal/runner/ats"
 )
 
 // Limits of run calls.
@@ -49,14 +50,15 @@ type Screenshots interface {
 
 // Server implements the runner service.
 type Server struct {
-	Runs     *application.Runs
-	Apps     *application.Service
-	Data     Data
-	Shots    Screenshots
-	Secret   string // shared by the server's runners; empty: no runner can register
-	Logger   *slog.Logger
-	Notify   func(ctx context.Context, userID, appID uuid.UUID)
-	handoffs sync.Map // map[uuid.UUID]*HandoffSession
+	Runs       *application.Runs
+	Apps       *application.Service
+	Data       Data
+	Shots      Screenshots
+	Secret     string // shared by the server's runners; empty: no runner can register
+	Logger     *slog.Logger
+	Notify     func(ctx context.Context, userID, appID uuid.UUID)
+	ATSMetrics *ats.Tracker
+	handoffs   sync.Map // map[uuid.UUID]*HandoffSession
 }
 
 // HandoffSession coordinates a live remote browser screencast between a runner and the web UI.
@@ -257,6 +259,7 @@ func (s *Server) Ask(ctx context.Context, req *connect.Request[runnerv1.AskReque
 	if err := s.Runs.Ask(ctx, ref, out); err != nil {
 		return nil, code(err)
 	}
+	s.recordATSOutcome(ctx, ref, ats.OutcomeAsked)
 	if s.Notify != nil {
 		s.Notify(ctx, ref.UserID, ref.AppID)
 	}
@@ -282,7 +285,11 @@ func (s *Server) Submitted(ctx context.Context, req *connect.Request[runnerv1.Su
 	if e := req.Msg.GetEffectJson(); len(e) > 0 && len(e) <= maxData && json.Valid(e) {
 		effect = json.RawMessage(e)
 	}
-	return connect.NewResponse(&runnerv1.SubmittedResponse{}), code(s.Runs.Submitted(ctx, ref, req.Msg.GetConfirmed(), effect))
+	if err := s.Runs.Submitted(ctx, ref, req.Msg.GetConfirmed(), effect); err != nil {
+		return nil, code(err)
+	}
+	s.recordATSOutcome(ctx, ref, ats.OutcomeSubmitted)
+	return connect.NewResponse(&runnerv1.SubmittedResponse{}), nil
 }
 
 // Park stops the run.
@@ -295,7 +302,26 @@ func (s *Server) Park(ctx context.Context, req *connect.Request[runnerv1.ParkReq
 	if err != nil {
 		return nil, err
 	}
-	return connect.NewResponse(&runnerv1.ParkResponse{}), code(s.Runs.Park(ctx, ref, clip(req.Msg.GetReason(), 1000), key))
+	if err := s.Runs.Park(ctx, ref, clip(req.Msg.GetReason(), 1000), key); err != nil {
+		return nil, code(err)
+	}
+	s.recordATSOutcome(ctx, ref, ats.OutcomeParked)
+	return connect.NewResponse(&runnerv1.ParkResponse{}), nil
+}
+
+func (s *Server) recordATSOutcome(ctx context.Context, ref application.RunRef, outcome ats.Outcome) {
+	if s.ATSMetrics == nil {
+		return
+	}
+	var urls []string
+	if s.Apps != nil && s.Data != nil {
+		if app, err := s.Apps.Get(ctx, ref.UserID, ref.AppID); err == nil {
+			if run, err := s.Data.RunData(ctx, ref.UserID, app.JobID); err == nil {
+				urls = append([]string{run.GetStartUrl()}, run.GetOrigins()...)
+			}
+		}
+	}
+	s.ATSMetrics.Record(ctx, ats.Detect("", urls...), outcome)
 }
 
 func clip(s string, n int) string {
