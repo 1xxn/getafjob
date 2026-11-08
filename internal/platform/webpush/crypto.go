@@ -148,6 +148,9 @@ func Encrypt(plaintext []byte, receiverP256dh, receiverAuth string) ([]byte, err
 func encryptWithKeys(plaintext []byte, recPubKey *ecdh.PublicKey, recPubBytes []byte,
 	senderPriv *ecdh.PrivateKey, senderPubBytes, authSecret, salt []byte,
 ) ([]byte, error) {
+	if len(plaintext) > recordSize-17 {
+		return nil, errors.New("web push payload exceeds single record size")
+	}
 	// ECDH shared secret
 	sharedSecret, err := senderPriv.ECDH(recPubKey)
 	if err != nil {
