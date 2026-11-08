@@ -22,7 +22,7 @@ require (
 	github.com/a-h/templ v0.3.1100
 	github.com/coder/websocket v1.8.15
 	github.com/evanw/esbuild v0.28.2
-	github.com/fxamacker/cbor/v2 v2.9.4
+	github.com/fxamacker/cbor/v2 v2.10.0
 	github.com/go-rod/rod v0.116.2
 	github.com/go-webauthn/webauthn v0.18.2
 	github.com/google/uuid v1.6.0
@@ -48,7 +48,7 @@ require (
 	golang.org/x/net v0.62.0
 	golang.org/x/text v0.43.0
 	golang.org/x/time v0.16.0
-	google.golang.org/protobuf v1.36.12
+	google.golang.org/protobuf v1.36.13-0.20261016172727-e9ee2a76ab8e
 )
 
 require (
@@ -123,8 +123,8 @@ require (
 	github.com/bgentry/go-netrc v0.0.0-20140422174119-9fd32a8b3d3d // indirect
 	github.com/bmatcuk/doublestar/v4 v4.10.2 // indirect
 	github.com/briandowns/spinner v1.23.2 // indirect
-	github.com/bufbuild/buf v1.74.0 // indirect
-	github.com/bufbuild/protocompile v0.14.2-0.20261013160345-b79bfe2f85df // indirect
+	github.com/bufbuild/buf v1.75.0 // indirect
+	github.com/bufbuild/protocompile v0.14.2-0.20261020145055-56248e843b50 // indirect
 	github.com/bufbuild/protoplugin v0.0.0-20260414125817-25d1d281b46b // indirect
 	github.com/cenkalti/backoff/v4 v4.3.0 // indirect
 	github.com/cenkalti/backoff/v5 v5.0.3 // indirect
