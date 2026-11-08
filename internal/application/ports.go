@@ -183,6 +183,10 @@ type Store interface {
 	// Settings returns the user's autonomy settings, DefaultSettings if they saved none.
 	Settings(ctx context.Context, userID uuid.UUID) (Settings, error)
 	SaveSettings(ctx context.Context, userID uuid.UUID, st Settings, at time.Time) error
+	// SaveHomeRunnerToken records a home runner token hash for the user.
+	SaveHomeRunnerToken(ctx context.Context, userID uuid.UUID, hash []byte, at time.Time) error
+	// UserByHomeRunnerToken looks up the user an active home runner token belongs to (system role).
+	UserByHomeRunnerToken(ctx context.Context, hash []byte) (uuid.UUID, error)
 	// RuleInput collects what the rule needs before the submit of a run: settings, match score, guard inputs,
 	// the run's filled fields and final page, the user's recent submits and the maturity of the run's adapter.
 	RuleInput(ctx context.Context, userID uuid.UUID, app App, runID uuid.UUID, now time.Time) (RuleInput, error)

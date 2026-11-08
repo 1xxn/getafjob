@@ -30,11 +30,27 @@ func TestAutonomySettings(t *testing.T) {
 		{Level: LevelAutonomous, MinScore: 101, DailyLimit: 5},
 		{Level: LevelAutonomous, MinScore: 80, DailyLimit: -1},
 		{Level: LevelAutonomous, MinScore: 80, DailyLimit: 51},
+		{Level: LevelAutonomous, MinScore: 80, DailyLimit: 5, RunnerChoice: "invalid"},
 	}
 	for _, b := range bad {
 		if err := b.Validate(); err == nil {
 			t.Errorf("validate(%+v) = nil, want error", b)
 		}
+	}
+
+	for _, c := range []RunnerChoice{RunnerServer, RunnerHomeRunner, RunnerExtension} {
+		s := Settings{Level: LevelApprove, MinScore: 80, DailyLimit: 5, RunnerChoice: c}
+		if err := s.Validate(); err != nil {
+			t.Errorf("validate(%+v) = %v, want nil", s, err)
+		}
+	}
+
+	plain, hash, err := NewHomeRunnerToken()
+	if err != nil || plain == "" || len(hash) != 32 {
+		t.Fatalf("NewHomeRunnerToken() = (%q, %v, %v)", plain, hash, err)
+	}
+	if !slices.Equal(HashHomeRunnerToken(plain), hash) {
+		t.Fatalf("HashHomeRunnerToken mismatch")
 	}
 }
 

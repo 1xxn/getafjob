@@ -36,6 +36,8 @@ type Config struct {
 	GatewayAddr string
 	// RunnerSecret authenticates the server's runners at the gateway; empty: the gateway stays off.
 	RunnerSecret Secret
+	// RunnerKind is "server" (default) or "home" for a home runner.
+	RunnerKind string
 	// GatewayURL is where a runner reaches the gateway (http://serve:8090). Empty: the runner only self-tests.
 	GatewayURL *url.URL
 	// PublicURL is the public address behind Caddy (links in mails, WebAuthn origin, cookies).
@@ -106,6 +108,7 @@ var specs = []spec{
 	{"HEALTH_ADDR", ":8081", func(c *Config, v string) error { return setAddr(&c.HealthAddr, v) }},
 	{"GATEWAY_ADDR", ":8090", func(c *Config, v string) error { return setAddr(&c.GatewayAddr, v) }},
 	{"RUNNER_SECRET", "", setRunnerSecret},
+	{"RUNNER_KIND", "server", setRunnerKind},
 	{"GATEWAY_URL", "", setGatewayURL},
 	{"PUBLIC_URL", "https://localhost:8443", setPublicURL},
 	{"DATABASE_URL", "", setDatabaseURL},
@@ -212,6 +215,19 @@ func setRunnerSecret(c *Config, v string) error {
 		return errors.New("must be at least 32 characters (getafjob admin gen-secret)")
 	}
 	c.RunnerSecret = Secret(v)
+	return nil
+}
+
+func setRunnerKind(c *Config, v string) error {
+	v = strings.ToLower(strings.TrimSpace(v))
+	if v != "" && v != "server" && v != "home" && v != "home_runner" {
+		return fmt.Errorf("GETAFJOB_RUNNER_KIND: unknown runner kind %q (must be server or home)", v)
+	}
+	if v == "home" || v == "home_runner" {
+		c.RunnerKind = "home"
+	} else {
+		c.RunnerKind = "server"
+	}
 	return nil
 }
 
@@ -325,6 +341,7 @@ func (c Config) LogValue() slog.Value {
 		slog.String("public_url", urlString(c.PublicURL)),
 		slog.Bool("database_configured", c.DatabaseURL != ""),
 		slog.Bool("runner_secret_set", c.RunnerSecret != ""),
+		slog.String("runner_kind", c.RunnerKind),
 		slog.String("log_level", c.LogLevel.String()),
 		slog.String("log_format", c.LogFormat),
 		slog.Bool("egress_proxy_set", c.EgressProxy != nil),

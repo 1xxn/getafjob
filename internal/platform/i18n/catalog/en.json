@@ -403,5 +403,14 @@
   "profile.assist.title": "Browser Extension (Assist)",
   "profile.assist.hint": "Pair the getafjob Assist browser extension to autofill job applications with your explicit approval and trusted human clicks.",
   "profile.assist.generate_code": "Generate Extension Pairing Code",
-  "profile.assist.code": "Your extension pairing code is: {code} (valid for 10 minutes)"
+  "profile.assist.code": "Your extension pairing code is: {code} (valid for 10 minutes)",
+  "profile.field.runner_choice": "Execution environment",
+  "profile.hint.runner_choice": "Select where applications are submitted: server, your dedicated home runner, or the browser extension.",
+  "profile.runner.server": "Server (default)",
+  "profile.runner.home_runner": "Home Runner (outbound connection from your machine)",
+  "profile.runner.extension": "Browser Extension (manual review via Assist)",
+  "profile.home_runner.title": "Home Runner",
+  "profile.home_runner.hint": "Run applications from your residential IP using the getafjob binary. Outbound connection only; requires your home runner token.",
+  "profile.home_runner.generate_token": "Generate Home Runner Token",
+  "profile.home_runner.token_notice": "Your home runner token is: {token} (Keep this secret; pass via GETAFJOB_GATEWAY_TOKEN)"
 }

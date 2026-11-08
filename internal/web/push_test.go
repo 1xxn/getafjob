@@ -311,6 +311,14 @@ func (f *fakeAppStore) SaveSettings(context.Context, uuid.UUID, application.Sett
 	return nil
 }
 
+func (f *fakeAppStore) SaveHomeRunnerToken(context.Context, uuid.UUID, []byte, time.Time) error {
+	return nil
+}
+
+func (f *fakeAppStore) UserByHomeRunnerToken(context.Context, []byte) (uuid.UUID, error) {
+	return uuid.Nil, nil
+}
+
 func (f *fakeAppStore) RuleInput(context.Context, uuid.UUID, application.App, uuid.UUID, time.Time) (application.RuleInput, error) {
 	return application.RuleInput{}, nil
 }

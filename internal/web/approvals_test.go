@@ -22,6 +22,12 @@ type fakeAutonomyStore struct {
 	settings  application.Settings
 	approvals []application.Approval
 	approved  uuid.UUID
+	tokenHash []byte
+}
+
+func (f *fakeAutonomyStore) SaveHomeRunnerToken(_ context.Context, _ uuid.UUID, hash []byte, _ time.Time) error {
+	f.tokenHash = hash
+	return nil
 }
 
 func (f *fakeAutonomyStore) Settings(context.Context, uuid.UUID) (application.Settings, error) {
@@ -154,14 +160,18 @@ func TestPreferencesAutonomySettings(t *testing.T) {
 		t.Fatalf("preferencesPage status = %d, want 200", rec.Code)
 	}
 	body := rec.Body.String()
-	if !strings.Contains(body, `name="autonomy_level"`) || !strings.Contains(body, `name="min_score"`) {
+	if !strings.Contains(body, `name="autonomy_level"`) || !strings.Contains(body, `name="min_score"`) || !strings.Contains(body, `name="runner_choice"`) {
 		t.Fatalf("preferencesPage missing autonomy inputs:\n%s", body)
+	}
+	if !strings.Contains(body, `/preferences/runner/token`) {
+		t.Fatalf("preferencesPage missing runner token action:\n%s", body)
 	}
 
 	// 2. POST /preferences saves autonomy values
 	form := url.Values{
 		"titles":         {"DevOps Engineer"},
 		"autonomy_level": {"autonomous"},
+		"runner_choice":  {"home_runner"},
 		"min_score":      {"85"},
 		"daily_limit":    {"10"},
 	}
@@ -172,7 +182,22 @@ func TestPreferencesAutonomySettings(t *testing.T) {
 	if rec.Code != http.StatusSeeOther {
 		t.Fatalf("preferencesSave status = %d, want 303, body: %s", rec.Code, rec.Body.String())
 	}
-	if st.settings.Level != application.LevelAutonomous || st.settings.MinScore != 85 || st.settings.DailyLimit != 10 {
-		t.Fatalf("st.settings = %+v, want autonomous / 85 / 10", st.settings)
+	if st.settings.Level != application.LevelAutonomous || st.settings.RunnerChoice != application.RunnerHomeRunner || st.settings.MinScore != 85 || st.settings.DailyLimit != 10 {
+		t.Fatalf("st.settings = %+v, want autonomous / home_runner / 85 / 10", st.settings)
+	}
+
+	// 3. POST /preferences/runner/token generates a token
+	rec = httptest.NewRecorder()
+	req = httptest.NewRequest(http.MethodPost, "/preferences/runner/token", nil)
+	srv.runnerToken(rec, req, u)
+	if rec.Code != http.StatusSeeOther {
+		t.Fatalf("runnerToken status = %d, want 303", rec.Code)
+	}
+	loc := rec.Header().Get("Location")
+	if !strings.HasPrefix(loc, "/preferences?runner_token=") {
+		t.Fatalf("runnerToken redirect = %q, want /preferences?runner_token=...", loc)
+	}
+	if len(st.tokenHash) != 32 {
+		t.Fatalf("expected 32-byte token hash, got %d bytes", len(st.tokenHash))
 	}
 }

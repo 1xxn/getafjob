@@ -280,7 +280,7 @@ func TestEvidenceAndScreenshotRetention(t *testing.T) {
 	if _, err := svc.Fire(ctx, max, appID, application.EvQueue, application.ActorWorker, nil); err != nil {
 		t.Fatal(err)
 	}
-	lease, ok, err := runs.Lease(ctx, "runner-1")
+	lease, ok, err := runs.Lease(ctx, "runner-1", application.RunnerServer, nil)
 	if err != nil || !ok {
 		t.Fatalf("lease: %v, %v", ok, err)
 	}

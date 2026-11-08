@@ -403,5 +403,14 @@
   "profile.assist.title": "Browser-Erweiterung (Assist)",
   "profile.assist.hint": "Koppeln Sie die getafjob Assist Browser-Erweiterung, um Bewerbungsformulare mit Ihrer Freigabe und vertrauenswürdigen Klicks auszufüllen.",
   "profile.assist.generate_code": "Koppelcode für Erweiterung erzeugen",
-  "profile.assist.code": "Ihr Koppelcode für die Erweiterung lautet: {code} (gültig für 10 Minuten)"
+  "profile.assist.code": "Ihr Koppelcode für die Erweiterung lautet: {code} (gültig für 10 Minuten)",
+  "profile.field.runner_choice": "Ausführungsumgebung",
+  "profile.hint.runner_choice": "Wählen Sie, wo Bewerbungen übermittelt werden: auf dem Server, über Ihren Home Runner oder über die Browser-Erweiterung.",
+  "profile.runner.server": "Server (Standard)",
+  "profile.runner.home_runner": "Home Runner (ausgehende Verbindung von Ihrem Gerät)",
+  "profile.runner.extension": "Browser-Erweiterung (manuelle Prüfung via Assist)",
+  "profile.home_runner.title": "Home Runner",
+  "profile.home_runner.hint": "Führen Sie Bewerbungen über Ihre private IP mit der getafjob-Binary aus. Nur ausgehende Verbindungen; erfordert Ihr Home-Runner-Token.",
+  "profile.home_runner.generate_token": "Home-Runner-Token erzeugen",
+  "profile.home_runner.token_notice": "Ihr Home-Runner-Token lautet: {token} (Geheim halten; via GETAFJOB_GATEWAY_TOKEN übergeben)"
 }

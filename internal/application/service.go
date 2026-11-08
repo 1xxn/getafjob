@@ -187,6 +187,19 @@ func (s *Service) SaveSettings(ctx context.Context, userID uuid.UUID, st Setting
 	return s.store.SaveSettings(ctx, userID, st, s.now())
 }
 
+// GenerateHomeRunnerToken creates and records a new home runner token for the user, returning the plaintext token.
+func (s *Service) GenerateHomeRunnerToken(ctx context.Context, userID uuid.UUID) (string, error) {
+	plain, hash, err := NewHomeRunnerToken()
+	if err != nil {
+		return "", err
+	}
+	now := s.now()
+	if err := s.store.SaveHomeRunnerToken(ctx, userID, hash, now); err != nil {
+		return "", err
+	}
+	return plain, nil
+}
+
 // Queue queues the user's application for a job, creating it if needed: a new application is queued, a parked or
 // failed one is queued again. Anything else (already queued, in a run, sent or skipped) stays as it is.
 func (s *Service) Queue(ctx context.Context, userID uuid.UUID, jobID int64) (uuid.UUID, State, error) {

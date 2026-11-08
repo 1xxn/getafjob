@@ -59,6 +59,18 @@ type Server struct {
 	Notify     func(ctx context.Context, userID, appID uuid.UUID)
 	ATSMetrics *ats.Tracker
 	handoffs   sync.Map // map[uuid.UUID]*HandoffSession
+	runners    sync.Map // map[string]runnerSession
+}
+
+type runnerIdentity struct {
+	kind   runnerv1.RunnerKind
+	userID uuid.UUID
+}
+
+type runnerSession struct {
+	runnerID string
+	kind     runnerv1.RunnerKind
+	userID   uuid.UUID
 }
 
 // HandoffSession coordinates a live remote browser screencast between a runner and the web UI.
@@ -106,13 +118,25 @@ func bearer(h http.Header) string {
 	return ""
 }
 
-// runner checks the runner secret (constant time).
-func (s *Server) runner(h http.Header) error {
-	got, want := sha256.Sum256([]byte(bearer(h))), sha256.Sum256([]byte(s.Secret))
-	if s.Secret == "" || subtle.ConstantTimeCompare(got[:], want[:]) != 1 {
-		return connect.NewError(connect.CodeUnauthenticated, errors.New("runner not authenticated"))
+// runner checks the runner secret (constant time) or a user's home runner token.
+func (s *Server) runner(ctx context.Context, h http.Header) (runnerIdentity, error) {
+	tok := bearer(h)
+	if tok == "" {
+		return runnerIdentity{}, connect.NewError(connect.CodeUnauthenticated, errors.New("missing token"))
 	}
-	return nil
+	if s.Secret != "" {
+		got, want := sha256.Sum256([]byte(tok)), sha256.Sum256([]byte(s.Secret))
+		if subtle.ConstantTimeCompare(got[:], want[:]) == 1 {
+			return runnerIdentity{kind: runnerv1.RunnerKind_RUNNER_KIND_SERVER}, nil
+		}
+	}
+	if s.Runs != nil {
+		hash := sha256.Sum256([]byte(tok))
+		if userID, err := s.Runs.UserByHomeRunnerToken(ctx, hash[:]); err == nil && userID != uuid.Nil {
+			return runnerIdentity{kind: runnerv1.RunnerKind_RUNNER_KIND_HOME, userID: userID}, nil
+		}
+	}
+	return runnerIdentity{}, connect.NewError(connect.CodeUnauthenticated, errors.New("runner not authenticated"))
 }
 
 // run returns the run of the call's token.
@@ -140,19 +164,30 @@ func code(err error) error {
 }
 
 // Register announces a runner; the ID only names it in logs and leases.
-func (s *Server) Register(_ context.Context, req *connect.Request[runnerv1.RegisterRequest]) (*connect.Response[runnerv1.RegisterResponse], error) {
-	if err := s.runner(req.Header()); err != nil {
+func (s *Server) Register(ctx context.Context, req *connect.Request[runnerv1.RegisterRequest]) (*connect.Response[runnerv1.RegisterResponse], error) {
+	ident, err := s.runner(ctx, req.Header())
+	if err != nil {
 		return nil, err
+	}
+	kind := ident.kind
+	if req.Msg.GetKind() == runnerv1.RunnerKind_RUNNER_KIND_HOME {
+		kind = runnerv1.RunnerKind_RUNNER_KIND_HOME
 	}
 	b := make([]byte, 8)
 	_, _ = rand.Read(b)
-	return connect.NewResponse(&runnerv1.RegisterResponse{RunnerId: "runner-" + hex.EncodeToString(b),
+	runnerID := "runner-" + hex.EncodeToString(b)
+	s.runners.Store(runnerID, runnerSession{
+		runnerID: runnerID,
+		kind:     kind,
+		userID:   ident.userID,
+	})
+	return connect.NewResponse(&runnerv1.RegisterResponse{RunnerId: runnerID,
 		HeartbeatInterval: durationpb.New(30 * time.Second)}), nil
 }
 
 // Heartbeat keeps a runner registered.
-func (s *Server) Heartbeat(_ context.Context, req *connect.Request[runnerv1.HeartbeatRequest]) (*connect.Response[runnerv1.HeartbeatResponse], error) {
-	if err := s.runner(req.Header()); err != nil {
+func (s *Server) Heartbeat(ctx context.Context, req *connect.Request[runnerv1.HeartbeatRequest]) (*connect.Response[runnerv1.HeartbeatResponse], error) {
+	if _, err := s.runner(ctx, req.Header()); err != nil {
 		return nil, err
 	}
 	return connect.NewResponse(&runnerv1.HeartbeatResponse{}), nil
@@ -160,14 +195,31 @@ func (s *Server) Heartbeat(_ context.Context, req *connect.Request[runnerv1.Hear
 
 // Lease hands out the next run.
 func (s *Server) Lease(ctx context.Context, req *connect.Request[runnerv1.LeaseRequest]) (*connect.Response[runnerv1.LeaseResponse], error) {
-	if err := s.runner(req.Header()); err != nil {
+	ident, err := s.runner(ctx, req.Header())
+	if err != nil {
 		return nil, err
 	}
 	runnerID := req.Msg.GetRunnerId()
 	if runnerID == "" || len(runnerID) > 100 {
 		return nil, connect.NewError(connect.CodeInvalidArgument, errors.New("runner id"))
 	}
-	l, ok, err := s.Runs.Lease(ctx, runnerID)
+	choice := application.RunnerServer
+	var userPtr *uuid.UUID
+	if v, ok := s.runners.Load(runnerID); ok {
+		sess := v.(runnerSession)
+		if sess.kind == runnerv1.RunnerKind_RUNNER_KIND_HOME {
+			choice = application.RunnerHomeRunner
+			if sess.userID != uuid.Nil {
+				userPtr = &sess.userID
+			}
+		}
+	} else if ident.kind == runnerv1.RunnerKind_RUNNER_KIND_HOME {
+		choice = application.RunnerHomeRunner
+		if ident.userID != uuid.Nil {
+			userPtr = &ident.userID
+		}
+	}
+	l, ok, err := s.Runs.Lease(ctx, runnerID, choice, userPtr)
 	if err != nil || !ok {
 		return connect.NewResponse(&runnerv1.LeaseResponse{}), err
 	}
