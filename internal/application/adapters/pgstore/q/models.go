@@ -12,15 +12,18 @@ import (
 )
 
 type Application struct {
-	ID            uuid.UUID
-	UserID        uuid.UUID
-	JobID         int64
-	State         string
-	Version       int64
-	CreatedAt     time.Time
-	UpdatedAt     time.Time
-	HandoffUntil  *time.Time
-	HandoffWarned bool
+	ID              uuid.UUID
+	UserID          uuid.UUID
+	JobID           int64
+	State           string
+	Version         int64
+	CreatedAt       time.Time
+	UpdatedAt       time.Time
+	HandoffUntil    *time.Time
+	HandoffWarned   bool
+	ApprovalAskedAt *time.Time
+	ApprovalReasons []string
+	ApprovedAt      *time.Time
 }
 
 type ApplicationEvent struct {
@@ -42,6 +45,14 @@ type AuditEvent struct {
 	Code      string
 	Params    []byte
 	CreatedAt time.Time
+}
+
+type AutonomySetting struct {
+	UserID     uuid.UUID
+	Level      string
+	MinScore   int16
+	DailyLimit int16
+	UpdatedAt  time.Time
 }
 
 type Board struct {
@@ -206,6 +217,7 @@ type Run struct {
 	ExpiresAt     time.Time
 	FinishedAt    *time.Time
 	Outcome       *string
+	Adapter       string
 }
 
 type RunCheckpoint struct {

@@ -303,6 +303,26 @@ func (f *fakeAppStore) ClearScreenshot(context.Context, uuid.UUID, int64) error 
 	return nil
 }
 
+func (f *fakeAppStore) Settings(context.Context, uuid.UUID) (application.Settings, error) {
+	return application.DefaultSettings, nil
+}
+
+func (f *fakeAppStore) SaveSettings(context.Context, uuid.UUID, application.Settings, time.Time) error {
+	return nil
+}
+
+func (f *fakeAppStore) RuleInput(context.Context, uuid.UUID, application.App, uuid.UUID, time.Time) (application.RuleInput, error) {
+	return application.RuleInput{}, nil
+}
+
+func (f *fakeAppStore) Approve(context.Context, uuid.UUID, application.App, time.Time) error {
+	return nil
+}
+
+func (f *fakeAppStore) Approvals(context.Context, uuid.UUID) ([]application.Approval, error) {
+	return nil, nil
+}
+
 type fakeShots map[string][]byte
 
 func (s fakeShots) Get(_ context.Context, _ uuid.UUID, key string) ([]byte, error) {

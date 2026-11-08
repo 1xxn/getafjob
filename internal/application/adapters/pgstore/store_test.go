@@ -307,6 +307,9 @@ func TestEvidenceAndScreenshotRetention(t *testing.T) {
 	}); err != nil {
 		t.Fatal(err)
 	}
+	if _, err := svc.Approve(ctx, max, appID); err != nil {
+		t.Fatal(err)
+	}
 	if err := runs.BeginSubmit(ctx, ref); err != nil {
 		t.Fatal(err)
 	}

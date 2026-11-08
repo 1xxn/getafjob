@@ -270,6 +270,12 @@ func (s *Server) applicationPage(w http.ResponseWriter, r *http.Request, u *iden
 		d.JobID = app.JobID
 		d.State = string(app.State)
 		d.Status = appStatus(app.State)
+		if app.AwaitingApproval() {
+			d.ApprovalAsked = true
+			for _, re := range app.ApprovalReasons {
+				d.ApprovalReasons = append(d.ApprovalReasons, views.T(r.Context(), "rule.reason."+string(re)))
+			}
+		}
 		if s.Jobs != nil {
 			if j, err := s.Jobs.Detail(r.Context(), u.ID, app.JobID); err == nil {
 				d.JobTitle = j.Title

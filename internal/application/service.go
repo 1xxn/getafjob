@@ -117,19 +117,25 @@ func (s *Service) Fire(ctx context.Context, userID, id uuid.UUID, ev Event, acto
 func (s *Service) apply(ctx context.Context, userID, id uuid.UUID, ev Event, actor Actor, detail map[string]any,
 	submit bool,
 ) (State, error) {
+	return s.applyChange(ctx, userID, id, Change{Event: ev, Actor: actor, Detail: detail, BeginSubmit: submit})
+}
+
+// applyChange fills in the states, time, outcome and handoff window of c and writes it.
+func (s *Service) applyChange(ctx context.Context, userID, id uuid.UUID, c Change) (State, error) {
 	app, err := s.store.Get(ctx, userID, id)
 	if err != nil {
 		return "", err
 	}
-	to, err := Next(app.State, ev)
+	to, err := Next(app.State, c.Event)
 	if err != nil {
 		return app.State, err
 	}
-	c := Change{Event: ev, From: app.State, To: to, Actor: actor, Detail: detail, At: s.now(), BeginSubmit: submit,
-		Outcome: outcome(app.State, ev)}
-	if ev == EvAsk {
+	c.From, c.To, c.At, c.Outcome = app.State, to, s.now(), outcome(app.State, c.Event)
+	if c.Event == EvAsk {
 		until := c.At.Add(HandoffWindow)
 		c.HandoffUntil = &until
+	} else {
+		c.Approval = nil
 	}
 	if err := s.store.Apply(ctx, userID, app, c); err != nil {
 		return app.State, err
@@ -162,9 +168,74 @@ func (s *Service) Start(ctx context.Context, userID, id uuid.UUID, actor Actor) 
 
 // BeginSubmit writes the submit attempt and the state submitting in one transaction, before the click. A second
 // call for the same application fails with ErrAlreadySubmitted or ErrTransition; the click must not happen then.
+// Runs reach it only through Runs.BeginSubmit, which checks the guards and the autonomy rule first.
 func (s *Service) BeginSubmit(ctx context.Context, userID, id uuid.UUID) error {
 	_, err := s.apply(ctx, userID, id, EvBeginSubmit, ActorRunner, nil, true)
 	return err
+}
+
+// Settings returns the user's autonomy settings.
+func (s *Service) Settings(ctx context.Context, userID uuid.UUID) (Settings, error) {
+	return s.store.Settings(ctx, userID)
+}
+
+// SaveSettings validates and stores the user's autonomy settings.
+func (s *Service) SaveSettings(ctx context.Context, userID uuid.UUID, st Settings) error {
+	if err := st.Validate(); err != nil {
+		return err
+	}
+	return s.store.SaveSettings(ctx, userID, st, s.now())
+}
+
+// Queue queues the user's application for a job, creating it if needed: a new application is queued, a parked or
+// failed one is queued again. Anything else (already queued, in a run, sent or skipped) stays as it is.
+func (s *Service) Queue(ctx context.Context, userID uuid.UUID, jobID int64) (uuid.UUID, State, error) {
+	id, err := s.Create(ctx, userID, jobID)
+	if err != nil {
+		return id, "", err
+	}
+	app, err := s.store.Get(ctx, userID, id)
+	if err != nil {
+		return id, "", err
+	}
+	switch app.State {
+	case Matched:
+		st, err := s.apply(ctx, userID, id, EvQueue, ActorUser, nil, false)
+		return id, st, err
+	case Parked, Failed:
+		st, err := s.apply(ctx, userID, id, EvRequeue, ActorUser, nil, false)
+		return id, st, err
+	default:
+		return id, app.State, nil
+	}
+}
+
+// Approvals lists the user's approval list.
+func (s *Service) Approvals(ctx context.Context, userID uuid.UUID) ([]Approval, error) {
+	return s.store.Approvals(ctx, userID)
+}
+
+// Approve records the user's approval of the submit. A parked or failed application is queued again so that the
+// next run submits it; a waiting one (needs_input) stays for the caller to resume the run or queue it again.
+func (s *Service) Approve(ctx context.Context, userID, id uuid.UUID) (State, error) {
+	app, err := s.store.Get(ctx, userID, id)
+	if err != nil {
+		return "", err
+	}
+	if !app.State.Approvable() {
+		return app.State, fmt.Errorf("%w: approve on %s", ErrTransition, app.State)
+	}
+	if err := s.store.Approve(ctx, userID, app, s.now()); err != nil {
+		return app.State, err
+	}
+	switch app.State {
+	case Parked, Failed:
+		return s.apply(ctx, userID, id, EvRequeue, ActorUser, map[string]any{"via": "approval"}, false)
+	case Matched:
+		return s.apply(ctx, userID, id, EvQueue, ActorUser, map[string]any{"via": "approval"}, false)
+	default:
+		return app.State, nil
+	}
 }
 
 // RecoverCrashed turns applications stuck in submitting into submit_unknown; they are reconciled through the

@@ -6,6 +6,7 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/1xxn/getafjob/internal/application"
 	"github.com/1xxn/getafjob/internal/identity"
 	"github.com/1xxn/getafjob/internal/profile"
 	"github.com/1xxn/getafjob/internal/web/views"
@@ -129,16 +130,23 @@ func (s *Server) profileSave(w http.ResponseWriter, r *http.Request, u *identity
 	}
 }
 
-func preferencesForm(p profile.Preferences) views.Form {
+func preferencesForm(p profile.Preferences, a application.Settings) views.Form {
 	salary := ""
 	if p.MinSalary > 0 {
 		salary = strconv.Itoa(p.MinSalary)
+	}
+	level := string(a.Level)
+	if level == "" {
+		level = string(application.LevelApprove)
 	}
 	return views.Form{
 		Values: map[string]string{
 			"titles": joinLines(p.Titles), "exclude_titles": joinLines(p.ExcludeTitles), "locations": joinLines(p.Locations),
 			"remote_regions": joinLines(p.RemoteRegions), "min_salary": salary, "cover_letter_lang": p.CoverLetterLang,
-			"diversity": p.Diversity,
+			"diversity":      p.Diversity,
+			"autonomy_level": level,
+			"min_score":      strconv.Itoa(a.MinScore),
+			"daily_limit":    strconv.Itoa(a.DailyLimit),
 		},
 		Checks: map[string]bool{"remote": p.Remote, "talent_pool": p.TalentPool},
 	}
@@ -154,7 +162,13 @@ func (s *Server) preferencesPage(w http.ResponseWriter, r *http.Request, u *iden
 		s.failed(w, r, u, err)
 		return
 	}
-	f := preferencesForm(snap.Preferences)
+	auto := application.DefaultSettings
+	if s.Apps != nil {
+		if st, err := s.Apps.Settings(r.Context(), u.ID); err == nil {
+			auto = st
+		}
+	}
+	f := preferencesForm(snap.Preferences, auto)
 	if r.URL.Query().Get("saved") == "1" {
 		f.Notice = views.T(r.Context(), "profile.saved")
 	}
@@ -177,21 +191,64 @@ func (s *Server) preferencesSave(w http.ResponseWriter, r *http.Request, u *iden
 		n, err := strconv.Atoi(v)
 		p.MinSalary, salaryErr = n, err != nil
 	}
-	var err error
-	if salaryErr {
-		err = &profile.ValidationError{Fields: []profile.FieldError{{Field: "min_salary", Code: "profile.error.invalid"}}}
-	} else {
-		err = s.Profile.SavePreferences(r.Context(), u.ID, p)
+	autoLevel := application.Level(strings.TrimSpace(r.PostFormValue("autonomy_level")))
+	if autoLevel == "" {
+		autoLevel = application.LevelApprove
 	}
-	switch {
-	case err == nil:
-		http.Redirect(w, r, "/preferences?saved=1", http.StatusSeeOther)
-	case errors.Is(err, profile.ErrInvalid):
-		f := preferencesForm(p)
+	minScore := application.DefaultSettings.MinScore
+	var errScore error
+	if v := strings.TrimSpace(r.PostFormValue("min_score")); v != "" {
+		minScore, errScore = strconv.Atoi(v)
+	}
+	dailyLimit := application.DefaultSettings.DailyLimit
+	var errLimit error
+	if v := strings.TrimSpace(r.PostFormValue("daily_limit")); v != "" {
+		dailyLimit, errLimit = strconv.Atoi(v)
+	}
+	autoSettings := application.Settings{
+		Level:      autoLevel,
+		MinScore:   minScore,
+		DailyLimit: dailyLimit,
+	}
+	autoErr := errScore != nil || errLimit != nil || autoSettings.Validate() != nil
+
+	if salaryErr || autoErr {
+		f := preferencesForm(p, autoSettings)
 		f.Values["min_salary"] = r.PostFormValue("min_salary")
-		f.Errors, f.Notice, f.Failed = fieldErrors(r, err), views.T(r.Context(), "profile.invalid"), true
+		f.Values["min_score"] = r.PostFormValue("min_score")
+		f.Values["daily_limit"] = r.PostFormValue("daily_limit")
+		f.Errors = make(map[string]string)
+		if salaryErr {
+			f.Errors["min_salary"] = views.T(r.Context(), "profile.error.invalid")
+		}
+		if autoErr {
+			if errScore != nil || minScore < 0 || minScore > 100 {
+				f.Errors["min_score"] = views.T(r.Context(), "profile.error.invalid")
+			}
+			if errLimit != nil || dailyLimit < 0 || dailyLimit > application.MaxDailyLimit {
+				f.Errors["daily_limit"] = views.T(r.Context(), "profile.error.invalid")
+			}
+		}
+		f.Notice, f.Failed = views.T(r.Context(), "profile.invalid"), true
 		s.render(w, r, http.StatusUnprocessableEntity, views.PreferencesPage(u.DisplayName, f))
-	default:
-		s.failed(w, r, u, err)
+		return
 	}
+
+	if err := s.Profile.SavePreferences(r.Context(), u.ID, p); err != nil {
+		if errors.Is(err, profile.ErrInvalid) {
+			f := preferencesForm(p, autoSettings)
+			f.Errors, f.Notice, f.Failed = fieldErrors(r, err), views.T(r.Context(), "profile.invalid"), true
+			s.render(w, r, http.StatusUnprocessableEntity, views.PreferencesPage(u.DisplayName, f))
+			return
+		}
+		s.failed(w, r, u, err)
+		return
+	}
+	if s.Apps != nil {
+		if err := s.Apps.SaveSettings(r.Context(), u.ID, autoSettings); err != nil {
+			s.failed(w, r, u, err)
+			return
+		}
+	}
+	http.Redirect(w, r, "/preferences?saved=1", http.StatusSeeOther)
 }
