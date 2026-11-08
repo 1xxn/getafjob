@@ -121,6 +121,17 @@ templ PreferencesPage(name string, f Form) {
 				</div>
 				@Field(input(ctx, f, "min_score", "number", "", 3))
 				@Field(input(ctx, f, "daily_limit", "number", "", 3))
+				<h2>{ T(ctx, "profile.mailbox.title") }</h2>
+				<p class="muted">{ T(ctx, "profile.mailbox.hint") }</p>
+				@Check("mailbox_enabled", T(ctx, "profile.field.mailbox_enabled"), f.Checks["mailbox_enabled"])
+				@Field(input(ctx, f, "mailbox_host", "text", "", 254))
+				@Field(input(ctx, f, "mailbox_port", "number", "", 5))
+				@Field(input(ctx, f, "mailbox_username", "text", "", 254))
+				<div class="field">
+					<label for="f-mailbox_password">{ T(ctx, "profile.field.mailbox_password") }</label>
+					<input id="f-mailbox_password" name="mailbox_password" type="password" maxlength="254" autocomplete="new-password"/>
+					<p class="hint">{ T(ctx, "profile.hint.mailbox_password") }</p>
+				</div>
 				@StickyBar() {
 					<button type="submit" class="primary">{ T(ctx, "profile.save") }</button>
 				}

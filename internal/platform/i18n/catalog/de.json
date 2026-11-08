@@ -372,5 +372,16 @@
   "rule.reason.open_question": "Pflichtfeld oder Frage unbeantwortet",
   "rule.reason.provenance": "Formularfeld ohne gültigen Herkunftsnachweis",
   "rule.reason.quota": "Tageslimit für Bewerbungen erreicht",
-  "rule.reason.score": "Match-Score liegt unter dem Schwellenwert"
+  "rule.reason.score": "Match-Score liegt unter dem Schwellenwert",
+  "profile.mailbox.title": "E-Mail-Postfach (IMAP)",
+  "profile.mailbox.hint": "Bewerbungsstatus automatisch per lesendem IMAP-Zugriff mit App-Passwort nachverfolgen. Sicherheitscodes werden strikt ignoriert und niemals ausgelesen.",
+  "profile.field.mailbox_host": "IMAP-Server",
+  "profile.field.mailbox_port": "Port",
+  "profile.field.mailbox_username": "Benutzername / E-Mail",
+  "profile.field.mailbox_password": "App-Passwort",
+  "profile.field.mailbox_enabled": "E-Mail-Tracking aktivieren",
+  "profile.hint.mailbox_password": "Leer lassen, um das bestehende Passwort beizubehalten",
+  "handoff.suggestion.title": "Status-Vorschlag aus eingegangener E-Mail",
+  "handoff.suggestion.accept": "Vorschlag übernehmen",
+  "handoff.suggestion.dismiss": "Verwerfen"
 }

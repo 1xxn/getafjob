@@ -17,6 +17,7 @@ import (
 	"github.com/1xxn/getafjob/internal/identity"
 	"github.com/1xxn/getafjob/internal/platform/blob"
 	"github.com/1xxn/getafjob/internal/profile"
+	"github.com/1xxn/getafjob/internal/tracking"
 	"github.com/1xxn/getafjob/internal/web/views"
 )
 
@@ -328,7 +329,68 @@ func (s *Server) applicationPage(w http.ResponseWriter, r *http.Request, u *iden
 			}
 		}
 	}
+	if s.Tracking != nil {
+		if sugs, err := s.Tracking.SuggestionsForApplication(r.Context(), u.ID, appID); err == nil {
+			for _, sg := range sugs {
+				if sg.Status == tracking.SuggestionPending {
+					d.Suggestion = &views.SuggestionData{
+						ID:             sg.ID.String(),
+						Category:       string(sg.Category),
+						SuggestedState: string(sg.SuggestedState),
+						Reasons:        sg.Reasons,
+						From:           sg.MessageFrom,
+						Subject:        sg.MessageSubject,
+					}
+					break
+				}
+			}
+		}
+	}
 	s.render(w, r, http.StatusOK, views.HandoffPage(d))
+}
+
+func (s *Server) suggestionAccept(w http.ResponseWriter, r *http.Request, u *identity.User) {
+	if u == nil {
+		http.Redirect(w, r, "/login", http.StatusSeeOther)
+		return
+	}
+	appID, err := uuid.Parse(r.PathValue("id"))
+	if err != nil {
+		s.notFound(w, r, u)
+		return
+	}
+	sugID, err := uuid.Parse(r.PathValue("sugId"))
+	if err != nil || s.Tracking == nil {
+		s.notFound(w, r, u)
+		return
+	}
+	if err := s.Tracking.AcceptSuggestion(r.Context(), u.ID, sugID); err != nil {
+		s.failed(w, r, u, err)
+		return
+	}
+	http.Redirect(w, r, "/applications/"+appID.String(), http.StatusSeeOther) //nolint:gosec // G710: appID is a parsed UUID
+}
+
+func (s *Server) suggestionDismiss(w http.ResponseWriter, r *http.Request, u *identity.User) {
+	if u == nil {
+		http.Redirect(w, r, "/login", http.StatusSeeOther)
+		return
+	}
+	appID, err := uuid.Parse(r.PathValue("id"))
+	if err != nil {
+		s.notFound(w, r, u)
+		return
+	}
+	sugID, err := uuid.Parse(r.PathValue("sugId"))
+	if err != nil || s.Tracking == nil {
+		s.notFound(w, r, u)
+		return
+	}
+	if err := s.Tracking.DismissSuggestion(r.Context(), u.ID, sugID); err != nil {
+		s.failed(w, r, u, err)
+		return
+	}
+	http.Redirect(w, r, "/applications/"+appID.String(), http.StatusSeeOther) //nolint:gosec // G710: appID is a parsed UUID
 }
 
 func appStatus(st application.State) string {

@@ -38,6 +38,10 @@ import (
 	"github.com/1xxn/getafjob/internal/runner/agent"
 	"github.com/1xxn/getafjob/internal/runner/ats"
 	"github.com/1xxn/getafjob/internal/runner/browser"
+	"github.com/1xxn/getafjob/internal/tracking"
+	trackingcrypto "github.com/1xxn/getafjob/internal/tracking/adapters/crypto"
+	trackingimap "github.com/1xxn/getafjob/internal/tracking/adapters/imap"
+	trackingstore "github.com/1xxn/getafjob/internal/tracking/adapters/pgstore"
 	"github.com/1xxn/getafjob/internal/web"
 	"github.com/1xxn/getafjob/internal/web/apiv1"
 )
@@ -110,9 +114,13 @@ func serve(ctx context.Context, cfg config.Config, logger *slog.Logger) error {
 			Data: runData{profiles: profiles, items: profile.NewItems(pstore, env), docs: docs, jobs: astore, now: time.Now}}
 	}
 
+	tstore := trackingstore.New(pool)
+	tcipher := trackingcrypto.NewCipher(env)
+	trackingSvc := tracking.NewService(tstore, trackingimap.NewClient(), tcipher, apps)
+
 	(&web.Server{Identity: ids, Logger: logger, Profile: profiles, Documents: docs, Items: profile.NewItems(pstore, env),
 		Importer: cvimport.NewImporter(docs, profiles, extractor), Jobs: matching.NewListings(matchingstore.New(pool)),
-		PushStore: webpush.NewStore(pool), VAPIDPublicKey: vapidPub, Apps: apps, Shots: sealedFiles, Handoffs: gw}).Register(mux)
+		PushStore: webpush.NewStore(pool), VAPIDPublicKey: vapidPub, Apps: apps, Tracking: trackingSvc, Shots: sealedFiles, Handoffs: gw}).Register(mux)
 
 	h := httpx.Instrument(httpx.Protect(httpx.Routes(mux), maxBody, cfg.PublicURL.Scheme == "https",
 		httpx.Upload{Path: "/documents", Max: web.MaxUpload}, httpx.Upload{Path: "/setup/cv", Max: web.MaxUpload}))
@@ -181,6 +189,10 @@ func worker(ctx context.Context, cfg config.Config, logger *slog.Logger) error {
 	notifier, _ := newPushNotifier(pool, cfg, logger)
 	river.AddWorker(workers, &handoffWorker{svc: apps, notifier: notifier, logger: logger})
 	river.AddWorker(workers, &planWorker{svc: apps, logger: logger})
+	tstore := trackingstore.New(pool)
+	tcipher := trackingcrypto.NewCipher(env)
+	trackingSvc := tracking.NewService(tstore, trackingimap.NewClient(), tcipher, apps)
+	river.AddWorker(workers, &inboxWorker{svc: trackingSvc, logger: logger})
 	jobs, err := queue.NewWorker(pool, queue.Options{Workers: workers, Periodic: periodicJobs(cfg), Logger: logger})
 	if err != nil {
 		return err
