@@ -1,0 +1,31 @@
+{
+  "complete": false,
+  "postings": [
+    {
+      "Source": "indeed",
+      "ExternalID": "ind1001",
+      "Company": "Hanseatic Software AG",
+      "Title": "Go Backend Engineer",
+      "Location": "Bremen, Germany",
+      "URL": "https://www.indeed.com/viewjob?jk=ind1001",
+      "ApplyURL": "",
+      "Description": "Full description for Go Backend Engineer at Hanseatic Software AG in Bremen.",
+      "Posted": "2026-11-01",
+      "Workplace": "",
+      "Extra": null
+    },
+    {
+      "Source": "indeed",
+      "ExternalID": "ind1002",
+      "Company": "Alpen Cloud Labs",
+      "Title": "Platform Architect (Hybrid)",
+      "Location": "Munich, Germany",
+      "URL": "https://www.indeed.com/viewjob?jk=ind1002",
+      "ApplyURL": "",
+      "Description": "Detailed job description retrieved from Indeed.",
+      "Posted": "2026-11-02",
+      "Workplace": "hybrid",
+      "Extra": null
+    }
+  ]
+}

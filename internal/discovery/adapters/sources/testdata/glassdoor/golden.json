@@ -1,0 +1,31 @@
+{
+  "complete": false,
+  "postings": [
+    {
+      "Source": "glassdoor",
+      "ExternalID": "1009000000001",
+      "Company": "Cologne Metrics GmbH",
+      "Title": "Distributed Systems Engineer",
+      "Location": "Cologne, Germany",
+      "URL": "https://www.glassdoor.com/job-listing/jl.htm?jl=1009000000001",
+      "ApplyURL": "",
+      "Description": "High-throughput distributed systems in Go and Linux.",
+      "Posted": "2026-11-01",
+      "Workplace": "remote",
+      "Extra": null
+    },
+    {
+      "Source": "glassdoor",
+      "ExternalID": "1009000000002",
+      "Company": "Rhine Security AG",
+      "Title": "Site Reliability Engineer",
+      "Location": "Bonn, Germany",
+      "URL": "https://www.glassdoor.com/job-listing/jl.htm?jl=1009000000002",
+      "ApplyURL": "",
+      "Description": "Rhine Security AG is hiring for SRE roles on-site in Bonn.",
+      "Posted": "2026-11-02",
+      "Workplace": "onsite",
+      "Extra": null
+    }
+  ]
+}

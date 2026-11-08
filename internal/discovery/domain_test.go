@@ -31,7 +31,7 @@ func TestKeys(t *testing.T) {
 	if Fold("  Ärztin   in   München ") != "arztin in munchen" {
 		t.Errorf("Fold = %q", Fold("  Ärztin   in   München "))
 	}
-	if !IsAggregator("arbeitsagentur") || !IsAggregator("portal:linkedin") || IsAggregator("greenhouse:acme") {
+	if !IsAggregator("arbeitsagentur") || !IsAggregator("portal:linkedin") || !IsAggregator("linkedin") || !IsAggregator("indeed") || !IsAggregator("glassdoor") || IsAggregator("greenhouse:acme") {
 		t.Error("IsAggregator")
 	}
 }
