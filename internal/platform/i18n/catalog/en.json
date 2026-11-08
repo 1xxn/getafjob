@@ -399,5 +399,9 @@
   "profile.field.notify_quiet_hours_start": "Quiet hours start (HH:MM)",
   "profile.field.notify_quiet_hours_end": "Quiet hours end (HH:MM)",
   "profile.notify.test": "Send Test Notification",
-  "profile.notify.tested": "Test notification sent."
+  "profile.notify.tested": "Test notification sent.",
+  "profile.assist.title": "Browser Extension (Assist)",
+  "profile.assist.hint": "Pair the getafjob Assist browser extension to autofill job applications with your explicit approval and trusted human clicks.",
+  "profile.assist.generate_code": "Generate Extension Pairing Code",
+  "profile.assist.code": "Your extension pairing code is: {code} (valid for 10 minutes)"
 }

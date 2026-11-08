@@ -399,5 +399,9 @@
   "profile.field.notify_quiet_hours_start": "Beginn der Ruhezeit (HH:MM)",
   "profile.field.notify_quiet_hours_end": "Ende der Ruhezeit (HH:MM)",
   "profile.notify.test": "Test-Benachrichtigung senden",
-  "profile.notify.tested": "Test-Benachrichtigung gesendet."
+  "profile.notify.tested": "Test-Benachrichtigung gesendet.",
+  "profile.assist.title": "Browser-Erweiterung (Assist)",
+  "profile.assist.hint": "Koppeln Sie die getafjob Assist Browser-Erweiterung, um Bewerbungsformulare mit Ihrer Freigabe und vertrauenswürdigen Klicks auszufüllen.",
+  "profile.assist.generate_code": "Koppelcode für Erweiterung erzeugen",
+  "profile.assist.code": "Ihr Koppelcode für die Erweiterung lautet: {code} (gültig für 10 Minuten)"
 }

@@ -27,7 +27,140 @@ paths:
                 $ref: "#/components/schemas/Meta"
         default:
           $ref: "#/components/responses/Problem"
+
+  /assist/pair:
+    post:
+      operationId: postAssistPair
+      summary: Pair an extension using a one-time pairing code
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/PairRequest"
+      responses:
+        "200":
+          description: Successful pairing returning a bearer token
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PairResponse"
+        default:
+          $ref: "#/components/responses/Problem"
+
+  /assist/profile:
+    get:
+      operationId: getAssistProfile
+      summary: Get user profile facts, answers, text blocks, and documents for autofill
+      security:
+        - BearerAuth: []
+      responses:
+        "200":
+          description: Assist profile facts
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AssistProfile"
+        default:
+          $ref: "#/components/responses/Problem"
+
+  /assist/inspect:
+    post:
+      operationId: postAssistInspect
+      summary: Inspect page form fields and return matched values and suggested answers
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/InspectRequest"
+      responses:
+        "200":
+          description: Form inspection result with matched values and provenance
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/InspectResponse"
+        default:
+          $ref: "#/components/responses/Problem"
+
+  /assist/submit:
+    post:
+      operationId: postAssistSubmit
+      summary: Record an application submitted via the extension
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SubmitRequest"
+      responses:
+        "200":
+          description: Recorded application result
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SubmitResponse"
+        default:
+          $ref: "#/components/responses/Problem"
+
+  /assist/approvals:
+    get:
+      operationId: getAssistApprovals
+      summary: List pending application approvals for the user
+      security:
+        - BearerAuth: []
+      responses:
+        "200":
+          description: Pending application approvals
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApprovalsList"
+        default:
+          $ref: "#/components/responses/Problem"
+
+  /assist/approvals/{id}/decide:
+    post:
+      operationId: postAssistApprovalDecide
+      summary: Approve or reject an application submission
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ApprovalDecisionRequest"
+      responses:
+        "200":
+          description: Decision outcome
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApprovalDecisionResponse"
+        default:
+          $ref: "#/components/responses/Problem"
+
 components:
+  securitySchemes:
+    BearerAuth:
+      type: http
+      scheme: bearer
+      description: Bearer token obtained via /assist/pair or session cookie
+
   responses:
     Problem:
       description: Error in RFC 9457 form with a stable code for translation
@@ -35,6 +168,7 @@ components:
         application/problem+json:
           schema:
             $ref: "#/components/schemas/Problem"
+
   schemas:
     Meta:
       type: object
@@ -49,6 +183,7 @@ components:
           type: string
           description: API level
           enum: [v1]
+
     Problem:
       type: object
       additionalProperties: false
@@ -66,3 +201,238 @@ components:
           type: object
           description: Parameters for the translated message (scalar values).
           additionalProperties: true
+
+    PairRequest:
+      type: object
+      additionalProperties: false
+      required: [code, client_name]
+      properties:
+        code:
+          type: string
+          minLength: 4
+          maxLength: 64
+          description: One-time pairing code generated in the getafjob web UI
+        client_name:
+          type: string
+          minLength: 1
+          maxLength: 128
+          description: Descriptive name of the browser / extension client
+
+    PairResponse:
+      type: object
+      additionalProperties: false
+      required: [token, user_id, user_name, expires_at]
+      properties:
+        token:
+          type: string
+          description: Bearer token for subsequent extension API calls
+        user_id:
+          type: string
+          format: uuid
+        user_name:
+          type: string
+        expires_at:
+          type: string
+          format: date-time
+
+    AssistProfile:
+      type: object
+      additionalProperties: false
+      required: [facts, answers, text_blocks, documents]
+      properties:
+        facts:
+          type: object
+          description: Key-value facts (e.g. personal.first_name, work.notice_period)
+          additionalProperties:
+            type: string
+        answers:
+          type: array
+          items:
+            $ref: "#/components/schemas/AnswerItem"
+        text_blocks:
+          type: array
+          items:
+            $ref: "#/components/schemas/TextBlockItem"
+        documents:
+          type: array
+          items:
+            $ref: "#/components/schemas/DocumentItem"
+
+    AnswerItem:
+      type: object
+      additionalProperties: false
+      required: [id, question, answer]
+      properties:
+        id:
+          type: string
+        question:
+          type: string
+        answer:
+          type: string
+
+    TextBlockItem:
+      type: object
+      additionalProperties: false
+      required: [id, name, body]
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+        body:
+          type: string
+
+    DocumentItem:
+      type: object
+      additionalProperties: false
+      required: [id, name, kind]
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+        kind:
+          type: string
+
+    FormField:
+      type: object
+      additionalProperties: false
+      required: [id, name, type, required]
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+        label:
+          type: string
+        type:
+          type: string
+        required:
+          type: boolean
+        selector:
+          type: string
+
+    InspectRequest:
+      type: object
+      additionalProperties: false
+      required: [url, title, fields]
+      properties:
+        url:
+          type: string
+        title:
+          type: string
+        fields:
+          type: array
+          items:
+            $ref: "#/components/schemas/FormField"
+
+    FieldMatch:
+      type: object
+      additionalProperties: false
+      required: [field_id, value, provenance, confidence, source]
+      properties:
+        field_id:
+          type: string
+        value:
+          type: string
+        provenance:
+          type: string
+        confidence:
+          type: number
+        source:
+          type: string
+
+    InspectResponse:
+      type: object
+      additionalProperties: false
+      required: [matches, missing_required, requires_approval]
+      properties:
+        matches:
+          type: array
+          items:
+            $ref: "#/components/schemas/FieldMatch"
+        missing_required:
+          type: array
+          items:
+            type: string
+        requires_approval:
+          type: boolean
+
+    SubmitRequest:
+      type: object
+      additionalProperties: false
+      required: [url, company, title, fields_filled, approved]
+      properties:
+        url:
+          type: string
+        company:
+          type: string
+        title:
+          type: string
+        fields_filled:
+          type: integer
+        approved:
+          type: boolean
+        notes:
+          type: string
+
+    SubmitResponse:
+      type: object
+      additionalProperties: false
+      required: [application_id, status]
+      properties:
+        application_id:
+          type: string
+          format: uuid
+        status:
+          type: string
+
+    ApprovalsList:
+      type: object
+      additionalProperties: false
+      required: [items]
+      properties:
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/ApprovalItem"
+
+    ApprovalItem:
+      type: object
+      additionalProperties: false
+      required: [id, company, title, url, score, created_at]
+      properties:
+        id:
+          type: string
+          format: uuid
+        company:
+          type: string
+        title:
+          type: string
+        url:
+          type: string
+        score:
+          type: integer
+        created_at:
+          type: string
+          format: date-time
+
+    ApprovalDecisionRequest:
+      type: object
+      additionalProperties: false
+      required: [decision]
+      properties:
+        decision:
+          type: string
+          enum: [approve, reject]
+
+    ApprovalDecisionResponse:
+      type: object
+      additionalProperties: false
+      required: [id, status]
+      properties:
+        id:
+          type: string
+          format: uuid
+        status:
+          type: string

@@ -3,6 +3,7 @@ package web
 import (
 	"errors"
 	"net/http"
+	"net/url"
 	"strconv"
 	"strings"
 
@@ -228,6 +229,9 @@ func (s *Server) preferencesPage(w http.ResponseWriter, r *http.Request, u *iden
 	if r.URL.Query().Get("tested") == "1" {
 		f.Notice = views.T(r.Context(), "profile.notify.tested")
 	}
+	if code := r.URL.Query().Get("assist_code"); code != "" {
+		f.Notice = views.T(r.Context(), "profile.assist.code", "code", code)
+	}
 	s.render(w, r, http.StatusOK, views.PreferencesPage(u.DisplayName, f))
 }
 
@@ -409,4 +413,21 @@ func (s *Server) notifyTest(w http.ResponseWriter, r *http.Request, u *identity.
 		}
 	}
 	http.Redirect(w, r, "/preferences?tested=1", http.StatusSeeOther)
+}
+
+func (s *Server) assistPair(w http.ResponseWriter, r *http.Request, u *identity.User) {
+	if u == nil {
+		http.Redirect(w, r, "/login", http.StatusSeeOther)
+		return
+	}
+	if s.Assist != nil {
+		code, err := s.Assist.GeneratePairingCode(r.Context(), u.ID)
+		if err != nil {
+			s.failed(w, r, u, err)
+			return
+		}
+		http.Redirect(w, r, "/preferences?assist_code="+url.QueryEscape(code), http.StatusSeeOther)
+		return
+	}
+	http.Redirect(w, r, "/preferences", http.StatusSeeOther)
 }
