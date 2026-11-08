@@ -66,13 +66,15 @@ type AuditEvent struct {
 }
 
 type AutonomySetting struct {
-	UserID              uuid.UUID
-	Level               string
-	MinScore            int16
-	DailyLimit          int16
-	UpdatedAt           time.Time
-	RunnerChoice        string
-	HomeRunnerTokenHash []byte
+	UserID                   uuid.UUID
+	Level                    string
+	MinScore                 int16
+	DailyLimit               int16
+	UpdatedAt                time.Time
+	RunnerChoice             string
+	HomeRunnerTokenHash      []byte
+	EasyApplyEnabled         bool
+	EasyApplyTermsAcceptedAt *time.Time
 }
 
 type Board struct {
@@ -211,6 +213,17 @@ type Passkey struct {
 	Credential []byte
 	CreatedAt  time.Time
 	LastUsedAt *time.Time
+}
+
+type PortalSession struct {
+	UserID           uuid.UUID
+	Portal           string
+	Status           string
+	EncryptedCookies []byte
+	DailyLimit       int32
+	LastUsedAt       *time.Time
+	CreatedAt        time.Time
+	UpdatedAt        time.Time
 }
 
 type Profile struct {

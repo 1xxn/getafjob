@@ -303,9 +303,11 @@
     const text = clean(textOf(el) || el.value || el.getAttribute("aria-label") || el.title || "").slice(0, 120);
     if (!text) continue;
     if (t === "A" && !ACTION_RX.test(text)) continue;
+    const isNativePortalApply = (/(linkedin|indeed)\.[a-z.]+$/i.test(window.location.hostname)) && /(easy apply|einfach bewerben|indeed bewerbung|apply now|jetzt bewerben)/i.test(text);
+    const isAutofill = !isNativePortalApply && AUTOFILL_RX.test(text);
     const btn = { id: tag(el), text, kind: t === "A" ? "link" : (el.type === "submit" || /submit/i.test(el.getAttribute("type") || "") ? "submit" : "button"),
       href: t === "A" ? (el.href || "").slice(0, 300) : "", disabled: !!el.disabled || el.getAttribute("aria-disabled") === "true",
-      form: formKey(el), autofill: AUTOFILL_RX.test(text), cookie: inCookieBanner(el),
+      form: formKey(el), autofill: isAutofill, cookie: inCookieBanner(el),
       // toggle buttons (Ashby yes/no): pressed = chosen; another click would clear the choice
       pressed: el.getAttribute("aria-pressed") === "true" };
     // Important ones first: form buttons, autofill, flow buttons; navigation last.

@@ -14,6 +14,7 @@ import (
 
 	"github.com/1xxn/getafjob/internal/application"
 	"github.com/1xxn/getafjob/internal/identity"
+	"github.com/1xxn/getafjob/internal/portals"
 	"github.com/1xxn/getafjob/internal/profile"
 )
 
@@ -199,5 +200,127 @@ func TestPreferencesAutonomySettings(t *testing.T) {
 	}
 	if len(st.tokenHash) != 32 {
 		t.Fatalf("expected 32-byte token hash, got %d bytes", len(st.tokenHash))
+	}
+}
+
+type fakePortalsService struct {
+	adminEnabled bool
+	accounts     []portals.AccountView
+	disconnected []string
+	dailyLimits  map[string]int
+}
+
+func (f *fakePortalsService) AdminEnabled() bool { return f.adminEnabled }
+func (f *fakePortalsService) ListAccounts(context.Context, uuid.UUID) ([]portals.AccountView, error) {
+	return f.accounts, nil
+}
+func (f *fakePortalsService) SaveCookies(context.Context, uuid.UUID, string, []byte, int) error {
+	return nil
+}
+func (f *fakePortalsService) Disconnect(_ context.Context, _ uuid.UUID, portal string) error {
+	f.disconnected = append(f.disconnected, portal)
+	return nil
+}
+func (f *fakePortalsService) SetDailyLimit(_ context.Context, _ uuid.UUID, portal string, limit int) error {
+	if f.dailyLimits == nil {
+		f.dailyLimits = make(map[string]int)
+	}
+	f.dailyLimits[portal] = limit
+	return nil
+}
+
+func TestPreferencesEasyApply(t *testing.T) {
+	max := uuid.MustParse("0192f3a4-5b6c-7d8e-9f01-23456789abcd")
+	u := &identity.User{ID: max, DisplayName: "Max Mustermann", Email: "max@example.org"}
+
+	profStore := &fakeProfileStore{}
+	profSvc := profile.NewService(profStore, nil)
+
+	st := &fakeAutonomyStore{
+		settings: application.Settings{
+			Level:      application.LevelApprove,
+			MinScore:   80,
+			DailyLimit: 5,
+		},
+	}
+	portalsSvc := &fakePortalsService{
+		adminEnabled: true,
+		accounts: []portals.AccountView{
+			{Portal: portals.PortalLinkedIn, Status: portals.StatusActive, DailyLimit: 5},
+			{Portal: portals.PortalIndeed, Status: portals.StatusDisconnected, DailyLimit: 5},
+		},
+	}
+
+	srv := &Server{
+		Profile: profSvc,
+		Apps:    application.NewService(st),
+		Portals: portalsSvc,
+		Logger:  slog.Default(),
+	}
+
+	// 1. GET /preferences renders Easy Apply and notice warning
+	rec := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodGet, "/preferences", nil)
+	srv.preferencesPage(rec, req, u)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("preferencesPage status = %d, want 200", rec.Code)
+	}
+	body := rec.Body.String()
+	if !strings.Contains(body, `name="easy_apply_enabled"`) || !strings.Contains(body, `name="easy_apply_terms_accepted"`) {
+		t.Fatalf("preferencesPage missing easy apply checkboxes:\n%s", body)
+	}
+	if !strings.Contains(body, "LinkedIn") || !strings.Contains(body, "Indeed") {
+		t.Fatalf("preferencesPage missing portal accounts list:\n%s", body)
+	}
+
+	// 2. POST /preferences enabling Easy Apply WITHOUT accepting terms is rejected with 422
+	form := url.Values{
+		"easy_apply_enabled": {"on"},
+		// terms not accepted
+	}
+	rec = httptest.NewRecorder()
+	req = httptest.NewRequest(http.MethodPost, "/preferences", strings.NewReader(form.Encode()))
+	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	srv.preferencesSave(rec, req, u)
+	if rec.Code != http.StatusUnprocessableEntity {
+		t.Fatalf("preferencesSave without terms status = %d, want 422", rec.Code)
+	}
+	if st.settings.EasyApplyEnabled {
+		t.Fatal("expected EasyApplyEnabled to remain false")
+	}
+
+	// 3. POST /preferences enabling Easy Apply WITH accepting terms succeeds
+	form = url.Values{
+		"easy_apply_enabled":        {"on"},
+		"easy_apply_terms_accepted": {"on"},
+		"portal_limit_linkedin":     {"7"},
+	}
+	rec = httptest.NewRecorder()
+	req = httptest.NewRequest(http.MethodPost, "/preferences", strings.NewReader(form.Encode()))
+	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	srv.preferencesSave(rec, req, u)
+	if rec.Code != http.StatusSeeOther {
+		t.Fatalf("preferencesSave with terms status = %d, want 303, body: %s", rec.Code, rec.Body.String())
+	}
+	if !st.settings.EasyApplyEnabled || st.settings.EasyApplyTermsAcceptedAt == nil {
+		t.Fatalf("st.settings EasyApplyEnabled = %v, TermsAcceptedAt = %v", st.settings.EasyApplyEnabled, st.settings.EasyApplyTermsAcceptedAt)
+	}
+	if portalsSvc.dailyLimits[portals.PortalLinkedIn] != 7 {
+		t.Fatalf("portal limit for linkedin = %d, want 7", portalsSvc.dailyLimits[portals.PortalLinkedIn])
+	}
+
+	// 4. POST /preferences with disconnect_portal disconnects account
+	form = url.Values{
+		"disconnect_portal": {"linkedin"},
+	}
+	rec = httptest.NewRecorder()
+	req = httptest.NewRequest(http.MethodPost, "/preferences", strings.NewReader(form.Encode()))
+	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	srv.preferencesSave(rec, req, u)
+	if rec.Code != http.StatusSeeOther {
+		t.Fatalf("disconnect_portal status = %d, want 303", rec.Code)
+	}
+	if len(portalsSvc.disconnected) == 0 || portalsSvc.disconnected[0] != "linkedin" {
+		t.Fatalf("expected linkedin disconnected, got %+v", portalsSvc.disconnected)
 	}
 }

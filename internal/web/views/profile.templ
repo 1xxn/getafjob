@@ -130,6 +130,39 @@ templ PreferencesPage(name string, f Form) {
 				</div>
 				@Field(input(ctx, f, "min_score", "number", "", 3))
 				@Field(input(ctx, f, "daily_limit", "number", "", 3))
+				<h2>{ T(ctx, "profile.easy_apply.title") }</h2>
+				<p class="muted">{ T(ctx, "profile.easy_apply.hint") }</p>
+				if f.Values["easy_apply_admin_enabled"] != "true" {
+					<p class="hint warning">{ T(ctx, "profile.easy_apply.disabled_by_admin") }</p>
+				} else {
+					@Check("easy_apply_enabled", T(ctx, "profile.field.easy_apply_enabled"), f.Checks["easy_apply_enabled"])
+					<div class="notice alert warning">
+						<strong>{ T(ctx, "profile.easy_apply.notice_title") }</strong>
+						<p>{ T(ctx, "profile.easy_apply.notice_text") }</p>
+					</div>
+					@Check("easy_apply_terms_accepted", T(ctx, "profile.field.easy_apply_terms_accepted"), f.Checks["easy_apply_terms_accepted"])
+					if f.Checks["easy_apply_enabled"] {
+						<h3>{ T(ctx, "profile.portals.title") }</h3>
+						<div class="portal-accounts">
+							<div class="portal-account">
+								<strong>LinkedIn</strong>:
+								<span class={ "badge badge-" + f.Values["portal_status_linkedin"] }>{ T(ctx, "profile.portal.status." + f.Values["portal_status_linkedin"]) }</span>
+								@Field(input(ctx, f, "portal_limit_linkedin", "number", "", 2))
+								if f.Values["portal_status_linkedin"] == "active" {
+									<button type="submit" name="disconnect_portal" value="linkedin" class="btn btn-secondary">{ T(ctx, "profile.portal.disconnect") }</button>
+								}
+							</div>
+							<div class="portal-account">
+								<strong>Indeed</strong>:
+								<span class={ "badge badge-" + f.Values["portal_status_indeed"] }>{ T(ctx, "profile.portal.status." + f.Values["portal_status_indeed"]) }</span>
+								@Field(input(ctx, f, "portal_limit_indeed", "number", "", 2))
+								if f.Values["portal_status_indeed"] == "active" {
+									<button type="submit" name="disconnect_portal" value="indeed" class="btn btn-secondary">{ T(ctx, "profile.portal.disconnect") }</button>
+								}
+							</div>
+						</div>
+					}
+				}
 				<h2>{ T(ctx, "profile.mailbox.title") }</h2>
 				<p class="muted">{ T(ctx, "profile.mailbox.hint") }</p>
 				@Check("mailbox_enabled", T(ctx, "profile.field.mailbox_enabled"), f.Checks["mailbox_enabled"])

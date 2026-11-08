@@ -31,6 +31,8 @@ const (
 	Taleo           = "taleo"
 	SuccessFactors  = "successfactors"
 	Teamtailor      = "teamtailor"
+	LinkedIn        = "linkedin"
+	Indeed          = "indeed"
 	Generic         = "generic"
 )
 
@@ -127,6 +129,18 @@ var adapters = []*Adapter{
 		SlugHosts: func(slug string) []string {
 			return []string{slug + ".teamtailor.com"}
 		},
+	},
+	{
+		Name:         LinkedIn,
+		Tier:         3,
+		Hosts:        []string{"www.linkedin.com", "linkedin.com"},
+		HostSuffixes: []string{".linkedin.com"},
+	},
+	{
+		Name:         Indeed,
+		Tier:         3,
+		Hosts:        []string{"www.indeed.com", "indeed.com", "de.indeed.com", "uk.indeed.com", "fr.indeed.com"},
+		HostSuffixes: []string{".indeed.com"},
 	},
 }
 

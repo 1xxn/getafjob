@@ -54,7 +54,7 @@ func (s *Server) renderSetup(w http.ResponseWriter, r *http.Request, u *identity
 				st = cfg
 			}
 		}
-		d.Form = preferencesForm(snap.Preferences, st, tracking.MailboxAccount{}, notify.Preferences{})
+		d.Form = preferencesForm(snap.Preferences, st, tracking.MailboxAccount{}, notify.Preferences{}, nil, false)
 	default:
 		d.Form = profileForm(snap)
 	}
@@ -145,7 +145,7 @@ func (s *Server) setupSave(w http.ResponseWriter, r *http.Request, u *identity.U
 				st = cfg
 			}
 		}
-		s.setupSaved(w, r, u, step, next, serr, preferencesForm(keep, st, tracking.MailboxAccount{}, notify.Preferences{}))
+		s.setupSaved(w, r, u, step, next, serr, preferencesForm(keep, st, tracking.MailboxAccount{}, notify.Preferences{}, nil, false))
 		return
 	}
 	snap, err := s.Profile.Get(r.Context(), u.ID)

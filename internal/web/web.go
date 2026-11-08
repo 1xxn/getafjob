@@ -25,6 +25,7 @@ import (
 	"github.com/1xxn/getafjob/internal/platform/httpx"
 	"github.com/1xxn/getafjob/internal/platform/i18n"
 	"github.com/1xxn/getafjob/internal/platform/webpush"
+	"github.com/1xxn/getafjob/internal/portals"
 	"github.com/1xxn/getafjob/internal/profile"
 	"github.com/1xxn/getafjob/internal/profile/cvimport"
 	"github.com/1xxn/getafjob/internal/tracking"
@@ -59,6 +60,15 @@ type AssistService interface {
 	RevokeExtensionToken(ctx context.Context, id, userID uuid.UUID) error
 }
 
+// PortalsService manages portal sessions and accounts for Easy Apply.
+type PortalsService interface {
+	AdminEnabled() bool
+	ListAccounts(ctx context.Context, userID uuid.UUID) ([]portals.AccountView, error)
+	SaveCookies(ctx context.Context, userID uuid.UUID, portal string, cookiesJSON []byte, dailyLimit int) error
+	Disconnect(ctx context.Context, userID uuid.UUID, portal string) error
+	SetDailyLimit(ctx context.Context, userID uuid.UUID, portal string, limit int) error
+}
+
 // Server holds the dependencies of the UI.
 type Server struct {
 	Identity       *identity.Service
@@ -71,6 +81,7 @@ type Server struct {
 	Tracking       TrackingService
 	Notify         NotificationService
 	Assist         AssistService
+	Portals        PortalsService
 	Shots          Screenshots
 	Handoffs       HandoffHub
 	PushStore      webpush.Store

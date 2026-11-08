@@ -49,6 +49,9 @@ func TestLoadDefaults(t *testing.T) {
 	if c.DatabaseURL != "" || c.EgressProxy != nil {
 		t.Errorf("optional values set without env")
 	}
+	if c.EasyApplyEnabled {
+		t.Errorf("EasyApplyEnabled default = true, want false")
+	}
 }
 
 func TestLoadValuesAndFiles(t *testing.T) {
@@ -59,6 +62,7 @@ func TestLoadValuesAndFiles(t *testing.T) {
 		"GETAFJOB_LOG_LEVEL":              "debug",
 		"GETAFJOB_LOG_FORMAT":             "text",
 		"GETAFJOB_EGRESS_PROXY":           "http://egress:4750",
+		"GETAFJOB_EASY_APPLY_ENABLED":     "true",
 		"GETAFJOB_SHUTDOWN_TIMEOUT":       "5s",
 		"GETAFJOB_HTTP_ADRR":              "typo",
 		"OTHER":                           "ignored",
@@ -79,6 +83,9 @@ func TestLoadValuesAndFiles(t *testing.T) {
 	}
 	if c.EgressProxy.Host != "egress:4750" {
 		t.Errorf("EgressProxy = %v", c.EgressProxy)
+	}
+	if !c.EasyApplyEnabled {
+		t.Errorf("EasyApplyEnabled = false, want true")
 	}
 	if len(c.Unknown) != 1 || c.Unknown[0] != "GETAFJOB_HTTP_ADRR" {
 		t.Errorf("Unknown = %v", c.Unknown)

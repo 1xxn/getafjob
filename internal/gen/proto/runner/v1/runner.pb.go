@@ -398,7 +398,11 @@ type Run struct {
 	Texts     []*Text           `protobuf:"bytes,9,rep,name=texts,proto3" json:"texts,omitempty"`
 	Documents []*Document       `protobuf:"bytes,10,rep,name=documents,proto3" json:"documents,omitempty"`
 	// The CV chosen for this job.
-	CvDocumentId  string `protobuf:"bytes,11,opt,name=cv_document_id,json=cvDocumentId,proto3" json:"cv_document_id,omitempty"`
+	CvDocumentId string `protobuf:"bytes,11,opt,name=cv_document_id,json=cvDocumentId,proto3" json:"cv_document_id,omitempty"`
+	// Session cookies JSON for Easy Apply runs.
+	SessionCookiesJson []byte `protobuf:"bytes,12,opt,name=session_cookies_json,json=sessionCookiesJson,proto3" json:"session_cookies_json,omitempty"`
+	// Portal name if this is an Easy Apply run (linkedin, indeed).
+	Portal        string `protobuf:"bytes,13,opt,name=portal,proto3" json:"portal,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -506,6 +510,20 @@ func (x *Run) GetDocuments() []*Document {
 func (x *Run) GetCvDocumentId() string {
 	if x != nil {
 		return x.CvDocumentId
+	}
+	return ""
+}
+
+func (x *Run) GetSessionCookiesJson() []byte {
+	if x != nil {
+		return x.SessionCookiesJson
+	}
+	return nil
+}
+
+func (x *Run) GetPortal() string {
+	if x != nil {
+		return x.Portal
 	}
 	return ""
 }
@@ -802,10 +820,12 @@ type CheckpointRequest struct {
 	Page  int32                  `protobuf:"varint,2,opt,name=page,proto3" json:"page,omitempty"`
 	Url   string                 `protobuf:"bytes,3,opt,name=url,proto3" json:"url,omitempty"`
 	// The checkpoint's page data as JSON (fields, filled values, effect, errors, dialogs).
-	DataJson      []byte `protobuf:"bytes,4,opt,name=data_json,json=dataJson,proto3" json:"data_json,omitempty"`
-	Screenshot    []byte `protobuf:"bytes,5,opt,name=screenshot,proto3" json:"screenshot,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
+	DataJson   []byte `protobuf:"bytes,4,opt,name=data_json,json=dataJson,proto3" json:"data_json,omitempty"`
+	Screenshot []byte `protobuf:"bytes,5,opt,name=screenshot,proto3" json:"screenshot,omitempty"`
+	// Fresh session cookies JSON captured after manual login during handoff.
+	UpdatedSessionCookiesJson []byte `protobuf:"bytes,6,opt,name=updated_session_cookies_json,json=updatedSessionCookiesJson,proto3" json:"updated_session_cookies_json,omitempty"`
+	unknownFields             protoimpl.UnknownFields
+	sizeCache                 protoimpl.SizeCache
 }
 
 func (x *CheckpointRequest) Reset() {
@@ -869,6 +889,13 @@ func (x *CheckpointRequest) GetDataJson() []byte {
 func (x *CheckpointRequest) GetScreenshot() []byte {
 	if x != nil {
 		return x.Screenshot
+	}
+	return nil
+}
+
+func (x *CheckpointRequest) GetUpdatedSessionCookiesJson() []byte {
+	if x != nil {
+		return x.UpdatedSessionCookiesJson
 	}
 	return nil
 }
@@ -1702,7 +1729,7 @@ const file_runner_v1_runner_proto_rawDesc = "" +
 	"\fLeaseRequest\x12\x1b\n" +
 	"\trunner_id\x18\x01 \x01(\tR\brunnerId\"1\n" +
 	"\rLeaseResponse\x12 \n" +
-	"\x03run\x18\x01 \x01(\v2\x0e.runner.v1.RunR\x03run\"\xe0\x03\n" +
+	"\x03run\x18\x01 \x01(\v2\x0e.runner.v1.RunR\x03run\"\xaa\x04\n" +
 	"\x03Run\x12\x15\n" +
 	"\x06run_id\x18\x01 \x01(\tR\x05runId\x12\x14\n" +
 	"\x05token\x18\x02 \x01(\tR\x05token\x129\n" +
@@ -1716,7 +1743,9 @@ const file_runner_v1_runner_proto_rawDesc = "" +
 	"\x05texts\x18\t \x03(\v2\x0f.runner.v1.TextR\x05texts\x121\n" +
 	"\tdocuments\x18\n" +
 	" \x03(\v2\x13.runner.v1.DocumentR\tdocuments\x12$\n" +
-	"\x0ecv_document_id\x18\v \x01(\tR\fcvDocumentId\x1a:\n" +
+	"\x0ecv_document_id\x18\v \x01(\tR\fcvDocumentId\x120\n" +
+	"\x14session_cookies_json\x18\f \x01(\fR\x12sessionCookiesJson\x12\x16\n" +
+	"\x06portal\x18\r \x01(\tR\x06portal\x1a:\n" +
 	"\fProfileEntry\x12\x10\n" +
 	"\x03key\x18\x01 \x01(\tR\x03key\x12\x14\n" +
 	"\x05value\x18\x02 \x01(\tR\x05value:\x028\x01\"L\n" +
@@ -1738,7 +1767,7 @@ const file_runner_v1_runner_proto_rawDesc = "" +
 	"\vdocument_id\x18\x01 \x01(\tR\n" +
 	"documentId\"1\n" +
 	"\x15FetchDocumentResponse\x12\x18\n" +
-	"\acontent\x18\x01 \x01(\fR\acontent\"\x8a\x01\n" +
+	"\acontent\x18\x01 \x01(\fR\acontent\"\xcb\x01\n" +
 	"\x11CheckpointRequest\x12\x12\n" +
 	"\x04step\x18\x01 \x01(\tR\x04step\x12\x12\n" +
 	"\x04page\x18\x02 \x01(\x05R\x04page\x12\x10\n" +
@@ -1746,7 +1775,8 @@ const file_runner_v1_runner_proto_rawDesc = "" +
 	"\tdata_json\x18\x04 \x01(\fR\bdataJson\x12\x1e\n" +
 	"\n" +
 	"screenshot\x18\x05 \x01(\fR\n" +
-	"screenshot\"\x14\n" +
+	"screenshot\x12?\n" +
+	"\x1cupdated_session_cookies_json\x18\x06 \x01(\fR\x19updatedSessionCookiesJson\"\x14\n" +
 	"\x12CheckpointResponse\"J\n" +
 	"\bQuestion\x12\x12\n" +
 	"\x04kind\x18\x01 \x01(\tR\x04kind\x12\x14\n" +

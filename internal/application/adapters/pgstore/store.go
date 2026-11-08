@@ -435,10 +435,12 @@ func (s *Store) Settings(ctx context.Context, userID uuid.UUID) (st application.
 			choice = application.RunnerServer
 		}
 		st = application.Settings{
-			Level:        application.Level(r.Level),
-			MinScore:     int(r.MinScore),
-			DailyLimit:   int(r.DailyLimit),
-			RunnerChoice: choice,
+			Level:                    application.Level(r.Level),
+			MinScore:                 int(r.MinScore),
+			DailyLimit:               int(r.DailyLimit),
+			RunnerChoice:             choice,
+			EasyApplyEnabled:         r.EasyApplyEnabled,
+			EasyApplyTermsAcceptedAt: r.EasyApplyTermsAcceptedAt,
 		}
 		return nil
 	})
@@ -464,12 +466,14 @@ func (s *Store) SaveSettings(ctx context.Context, userID uuid.UUID, st applicati
 	dailyLimit := int16(st.DailyLimit)
 	return s.user(ctx, userID, func(qs *q.Queries) error {
 		return qs.SaveSettings(ctx, q.SaveSettingsParams{
-			UserID:       userID,
-			Level:        string(st.Level),
-			MinScore:     minScore,
-			DailyLimit:   dailyLimit,
-			RunnerChoice: choice,
-			UpdatedAt:    at,
+			UserID:                   userID,
+			Level:                    string(st.Level),
+			MinScore:                 minScore,
+			DailyLimit:               dailyLimit,
+			RunnerChoice:             choice,
+			EasyApplyEnabled:         st.EasyApplyEnabled,
+			EasyApplyTermsAcceptedAt: st.EasyApplyTermsAcceptedAt,
+			UpdatedAt:                at,
 		})
 	})
 }

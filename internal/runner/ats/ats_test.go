@@ -17,6 +17,7 @@ func TestAllAdaptersAndTiers(t *testing.T) {
 	want := []string{
 		Greenhouse, Lever, Ashby, Workday, SmartRecruiters, Personio, Recruitee, Workable,
 		ICIMS, Taleo, SuccessFactors, Teamtailor,
+		LinkedIn, Indeed,
 		Generic,
 	}
 	if got := All(); !slices.Equal(got, want) {
@@ -30,6 +31,11 @@ func TestAllAdaptersAndTiers(t *testing.T) {
 	for _, name := range want[8:12] {
 		if a := Lookup(name); a.Tier != 2 {
 			t.Errorf("%s tier = %d, want 2", name, a.Tier)
+		}
+	}
+	for _, name := range want[12:14] {
+		if a := Lookup(name); a.Tier != 3 {
+			t.Errorf("%s tier = %d, want 3", name, a.Tier)
 		}
 	}
 	if a := Lookup(Generic); a.Tier != 0 || Lookup("unknown-ats").Name != Generic {
@@ -66,6 +72,8 @@ func TestDetectFromSourceAndURLs(t *testing.T) {
 		{"careers", []string{"https://acme.taleo.net/careersection/ex/jobdetail.ftl?job=1"}, Taleo},
 		{"careers", []string{"https://career.successfactors.eu/career?company=acme"}, SuccessFactors},
 		{"careers", []string{"https://acme.teamtailor.com/jobs/1234-go-engineer"}, Teamtailor},
+		{"linkedin", []string{"https://www.linkedin.com/jobs/view/12345"}, LinkedIn},
+		{"indeed", []string{"https://de.indeed.com/viewjob?jk=abc123"}, Indeed},
 		{"arbeitsagentur", []string{"https://www.acme.example/karriere/go"}, Generic},
 	}
 	for _, tc := range cases {

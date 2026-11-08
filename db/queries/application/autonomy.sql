@@ -1,10 +1,18 @@
 -- name: GetSettings :one
-SELECT level, min_score, daily_limit, runner_choice FROM autonomy_settings WHERE user_id = $1;
+SELECT level, min_score, daily_limit, runner_choice, easy_apply_enabled, easy_apply_terms_accepted_at
+FROM autonomy_settings WHERE user_id = $1;
 
 -- name: SaveSettings :exec
-INSERT INTO autonomy_settings (user_id, level, min_score, daily_limit, runner_choice, updated_at) VALUES ($1, $2, $3, $4, $5, $6)
-ON CONFLICT (user_id) DO UPDATE SET level = EXCLUDED.level, min_score = EXCLUDED.min_score,
-  daily_limit = EXCLUDED.daily_limit, runner_choice = EXCLUDED.runner_choice, updated_at = EXCLUDED.updated_at;
+INSERT INTO autonomy_settings (user_id, level, min_score, daily_limit, runner_choice, easy_apply_enabled, easy_apply_terms_accepted_at, updated_at)
+VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+ON CONFLICT (user_id) DO UPDATE SET
+  level = EXCLUDED.level,
+  min_score = EXCLUDED.min_score,
+  daily_limit = EXCLUDED.daily_limit,
+  runner_choice = EXCLUDED.runner_choice,
+  easy_apply_enabled = EXCLUDED.easy_apply_enabled,
+  easy_apply_terms_accepted_at = EXCLUDED.easy_apply_terms_accepted_at,
+  updated_at = EXCLUDED.updated_at;
 
 -- name: SaveHomeRunnerToken :exec
 UPDATE autonomy_settings SET home_runner_token_hash = $2, updated_at = $3 WHERE user_id = $1;

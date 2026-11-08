@@ -96,6 +96,10 @@ message Run {
   repeated Document documents = 10;
   // The CV chosen for this job.
   string cv_document_id = 11;
+  // Session cookies JSON for Easy Apply runs.
+  bytes session_cookies_json = 12;
+  // Portal name if this is an Easy Apply run (linkedin, indeed).
+  string portal = 13;
 }
 
 message Answer {
@@ -135,6 +139,8 @@ message CheckpointRequest {
   // The checkpoint's page data as JSON (fields, filled values, effect, errors, dialogs).
   bytes data_json = 4;
   bytes screenshot = 5;
+  // Fresh session cookies JSON captured after manual login during handoff.
+  bytes updated_session_cookies_json = 6;
 }
 
 message CheckpointResponse {}

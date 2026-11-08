@@ -19,7 +19,7 @@ import (
 const mod = "github.com/1xxn/getafjob/"
 
 // modules are the business modules; each owns internal/<name>/...
-var modules = []string{"identity", "discovery", "profile", "matching", "application", "tracking", "notify", "assist", "ai"}
+var modules = []string{"identity", "discovery", "profile", "matching", "application", "tracking", "notify", "assist", "portals", "ai"}
 
 type pkg struct {
 	ImportPath string

@@ -76,6 +76,8 @@ type Config struct {
 	ShutdownTimeout time.Duration
 	// CrawlInterval is the time between two crawls (worker).
 	CrawlInterval time.Duration
+	// EasyApplyEnabled is an operator switch enabling the Easy Apply module (#43). Default: false.
+	EasyApplyEnabled bool
 
 	// Unknown lists GETAFJOB_* variables that are set but read by nobody (typos); names only, never values.
 	Unknown []string
@@ -130,6 +132,7 @@ var specs = []spec{
 	{"VAPID_KEY", "", func(c *Config, v string) error { return setKey(&c.VAPIDKey, v) }},
 	{"VAPID_SUBJECT", "", setVAPIDSubject},
 	{"CRAWL_INTERVAL", "6h", setCrawlInterval},
+	{"EASY_APPLY_ENABLED", "false", func(c *Config, v string) error { return setBool(&c.EasyApplyEnabled, v) }},
 }
 
 // Names returns all known variable names (with prefix), e.g. for the docs.
@@ -403,4 +406,17 @@ func setBlobURL(c *Config, v string) error {
 func blobScheme(v string) string {
 	scheme, _, _ := strings.Cut(v, ":")
 	return scheme
+}
+
+func setBool(dst *bool, v string) error {
+	v = strings.ToLower(strings.TrimSpace(v))
+	switch v {
+	case "true", "1", "yes", "on":
+		*dst = true
+	case "false", "0", "no", "off", "":
+		*dst = false
+	default:
+		return errors.New("must be a boolean (true or false)")
+	}
+	return nil
 }

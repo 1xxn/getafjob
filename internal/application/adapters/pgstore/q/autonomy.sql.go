@@ -137,14 +137,17 @@ func (q *Queries) AskApproval(ctx context.Context, arg AskApprovalParams) error 
 }
 
 const getSettings = `-- name: GetSettings :one
-SELECT level, min_score, daily_limit, runner_choice FROM autonomy_settings WHERE user_id = $1
+SELECT level, min_score, daily_limit, runner_choice, easy_apply_enabled, easy_apply_terms_accepted_at
+FROM autonomy_settings WHERE user_id = $1
 `
 
 type GetSettingsRow struct {
-	Level        string
-	MinScore     int16
-	DailyLimit   int16
-	RunnerChoice string
+	Level                    string
+	MinScore                 int16
+	DailyLimit               int16
+	RunnerChoice             string
+	EasyApplyEnabled         bool
+	EasyApplyTermsAcceptedAt *time.Time
 }
 
 func (q *Queries) GetSettings(ctx context.Context, userID uuid.UUID) (GetSettingsRow, error) {
@@ -155,6 +158,8 @@ func (q *Queries) GetSettings(ctx context.Context, userID uuid.UUID) (GetSetting
 		&i.MinScore,
 		&i.DailyLimit,
 		&i.RunnerChoice,
+		&i.EasyApplyEnabled,
+		&i.EasyApplyTermsAcceptedAt,
 	)
 	return i, err
 }
@@ -242,18 +247,27 @@ func (q *Queries) SaveHomeRunnerToken(ctx context.Context, arg SaveHomeRunnerTok
 }
 
 const saveSettings = `-- name: SaveSettings :exec
-INSERT INTO autonomy_settings (user_id, level, min_score, daily_limit, runner_choice, updated_at) VALUES ($1, $2, $3, $4, $5, $6)
-ON CONFLICT (user_id) DO UPDATE SET level = EXCLUDED.level, min_score = EXCLUDED.min_score,
-  daily_limit = EXCLUDED.daily_limit, runner_choice = EXCLUDED.runner_choice, updated_at = EXCLUDED.updated_at
+INSERT INTO autonomy_settings (user_id, level, min_score, daily_limit, runner_choice, easy_apply_enabled, easy_apply_terms_accepted_at, updated_at)
+VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+ON CONFLICT (user_id) DO UPDATE SET
+  level = EXCLUDED.level,
+  min_score = EXCLUDED.min_score,
+  daily_limit = EXCLUDED.daily_limit,
+  runner_choice = EXCLUDED.runner_choice,
+  easy_apply_enabled = EXCLUDED.easy_apply_enabled,
+  easy_apply_terms_accepted_at = EXCLUDED.easy_apply_terms_accepted_at,
+  updated_at = EXCLUDED.updated_at
 `
 
 type SaveSettingsParams struct {
-	UserID       uuid.UUID
-	Level        string
-	MinScore     int16
-	DailyLimit   int16
-	RunnerChoice string
-	UpdatedAt    time.Time
+	UserID                   uuid.UUID
+	Level                    string
+	MinScore                 int16
+	DailyLimit               int16
+	RunnerChoice             string
+	EasyApplyEnabled         bool
+	EasyApplyTermsAcceptedAt *time.Time
+	UpdatedAt                time.Time
 }
 
 func (q *Queries) SaveSettings(ctx context.Context, arg SaveSettingsParams) error {
@@ -263,6 +277,8 @@ func (q *Queries) SaveSettings(ctx context.Context, arg SaveSettingsParams) erro
 		arg.MinScore,
 		arg.DailyLimit,
 		arg.RunnerChoice,
+		arg.EasyApplyEnabled,
+		arg.EasyApplyTermsAcceptedAt,
 		arg.UpdatedAt,
 	)
 	return err
