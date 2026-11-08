@@ -100,7 +100,8 @@ func serve(ctx context.Context, cfg config.Config, logger *slog.Logger) error {
 	if err != nil {
 		return err
 	}
-	notifier, vapidPub := newPushNotifier(pool, cfg, logger)
+	notifySvc, _, vapidPub := newNotifyService(pool, cfg, logger)
+	appNotifier := newNotifyAppNotifier(notifySvc)
 	astore := applicationstore.New(pool)
 	apps := application.NewService(astore)
 	var gw *gateway.Server
@@ -110,7 +111,7 @@ func serve(ctx context.Context, cfg config.Config, logger *slog.Logger) error {
 			return err
 		}
 		gw = &gateway.Server{Runs: application.NewRuns(apps, astore), Apps: apps, Shots: sealedFiles,
-			Secret: cfg.RunnerSecret.Reveal(), Logger: logger, Notify: notifier.YourTurn, ATSMetrics: atsMetrics,
+			Secret: cfg.RunnerSecret.Reveal(), Logger: logger, Notify: appNotifier.YourTurn, ATSMetrics: atsMetrics,
 			Data: runData{profiles: profiles, items: profile.NewItems(pstore, env), docs: docs, jobs: astore, now: time.Now}}
 	}
 
@@ -120,7 +121,7 @@ func serve(ctx context.Context, cfg config.Config, logger *slog.Logger) error {
 
 	(&web.Server{Identity: ids, Logger: logger, Profile: profiles, Documents: docs, Items: profile.NewItems(pstore, env),
 		Importer: cvimport.NewImporter(docs, profiles, extractor), Jobs: matching.NewListings(matchingstore.New(pool)),
-		PushStore: webpush.NewStore(pool), VAPIDPublicKey: vapidPub, Apps: apps, Tracking: trackingSvc, Shots: sealedFiles, Handoffs: gw}).Register(mux)
+		PushStore: webpush.NewStore(pool), VAPIDPublicKey: vapidPub, Apps: apps, Tracking: trackingSvc, Notify: notifySvc, Shots: sealedFiles, Handoffs: gw}).Register(mux)
 
 	h := httpx.Instrument(httpx.Protect(httpx.Routes(mux), maxBody, cfg.PublicURL.Scheme == "https",
 		httpx.Upload{Path: "/documents", Max: web.MaxUpload}, httpx.Upload{Path: "/setup/cv", Max: web.MaxUpload}))
@@ -186,8 +187,10 @@ func worker(ctx context.Context, cfg config.Config, logger *slog.Logger) error {
 	river.AddWorker(workers, &cleanupWorker{ids: identity.NewService(pgstore.New(pool), nil, cfg.PublicURL),
 		apps: apps, blobs: sealedFiles})
 	river.AddWorker(workers, &recoverWorker{svc: apps, logger: logger})
-	notifier, _ := newPushNotifier(pool, cfg, logger)
-	river.AddWorker(workers, &handoffWorker{svc: apps, notifier: notifier, logger: logger})
+	notifySvc, _, _ := newNotifyService(pool, cfg, logger)
+	appNotifier := newNotifyAppNotifier(notifySvc)
+	river.AddWorker(workers, &handoffWorker{svc: apps, notifier: appNotifier, logger: logger})
+	river.AddWorker(workers, &dailySummaryWorker{svc: notifySvc, logger: logger})
 	river.AddWorker(workers, &planWorker{svc: apps, logger: logger})
 	tstore := trackingstore.New(pool)
 	tcipher := trackingcrypto.NewCipher(env)

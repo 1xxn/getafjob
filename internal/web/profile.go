@@ -8,6 +8,7 @@ import (
 
 	"github.com/1xxn/getafjob/internal/application"
 	"github.com/1xxn/getafjob/internal/identity"
+	"github.com/1xxn/getafjob/internal/notify"
 	"github.com/1xxn/getafjob/internal/profile"
 	"github.com/1xxn/getafjob/internal/tracking"
 	"github.com/1xxn/getafjob/internal/web/views"
@@ -131,7 +132,7 @@ func (s *Server) profileSave(w http.ResponseWriter, r *http.Request, u *identity
 	}
 }
 
-func preferencesForm(p profile.Preferences, a application.Settings, mb tracking.MailboxAccount) views.Form {
+func preferencesForm(p profile.Preferences, a application.Settings, mb tracking.MailboxAccount, np notify.Preferences) views.Form {
 	salary := ""
 	if p.MinSalary > 0 {
 		salary = strconv.Itoa(p.MinSalary)
@@ -144,22 +145,50 @@ func preferencesForm(p profile.Preferences, a application.Settings, mb tracking.
 	if mb.Port > 0 {
 		portStr = strconv.Itoa(mb.Port)
 	}
+	summaryTime := np.DailySummaryTime
+	if summaryTime == "" {
+		summaryTime = "18:00"
+	}
+	quietStart := np.QuietHoursStart
+	if quietStart == "" {
+		quietStart = "22:00"
+	}
+	quietEnd := np.QuietHoursEnd
+	if quietEnd == "" {
+		quietEnd = "08:00"
+	}
+	ntfyURL := np.NtfyURL
+	if ntfyURL == "" {
+		ntfyURL = "https://ntfy.sh"
+	}
 	return views.Form{
 		Values: map[string]string{
 			"titles": joinLines(p.Titles), "exclude_titles": joinLines(p.ExcludeTitles), "locations": joinLines(p.Locations),
 			"remote_regions": joinLines(p.RemoteRegions), "min_salary": salary, "cover_letter_lang": p.CoverLetterLang,
-			"diversity":        p.Diversity,
-			"autonomy_level":   level,
-			"min_score":        strconv.Itoa(a.MinScore),
-			"daily_limit":      strconv.Itoa(a.DailyLimit),
-			"mailbox_host":     mb.Host,
-			"mailbox_port":     portStr,
-			"mailbox_username": mb.Username,
+			"diversity":                 p.Diversity,
+			"autonomy_level":            level,
+			"min_score":                 strconv.Itoa(a.MinScore),
+			"daily_limit":               strconv.Itoa(a.DailyLimit),
+			"mailbox_host":              mb.Host,
+			"mailbox_port":              portStr,
+			"mailbox_username":          mb.Username,
+			"notify_email_address":      np.EmailAddress,
+			"notify_ntfy_url":           ntfyURL,
+			"notify_ntfy_topic":         np.NtfyTopic,
+			"notify_ntfy_token":         np.NtfyToken,
+			"notify_daily_summary_time": summaryTime,
+			"notify_quiet_hours_start":  quietStart,
+			"notify_quiet_hours_end":    quietEnd,
 		},
 		Checks: map[string]bool{
-			"remote":          p.Remote,
-			"talent_pool":     p.TalentPool,
-			"mailbox_enabled": mb.Enabled,
+			"remote":                       p.Remote,
+			"talent_pool":                  p.TalentPool,
+			"mailbox_enabled":              mb.Enabled,
+			"notify_email_enabled":         np.EmailEnabled,
+			"notify_webpush_enabled":       np.WebPushEnabled,
+			"notify_ntfy_enabled":          np.NtfyEnabled,
+			"notify_daily_summary_enabled": np.DailySummaryEnabled,
+			"notify_quiet_hours_enabled":   np.QuietHoursEnabled,
 		},
 	}
 }
@@ -186,9 +215,18 @@ func (s *Server) preferencesPage(w http.ResponseWriter, r *http.Request, u *iden
 			mb = m
 		}
 	}
-	f := preferencesForm(snap.Preferences, auto, mb)
+	np := notify.DefaultPreferences(u.ID, u.Email)
+	if s.Notify != nil {
+		if p, err := s.Notify.GetPreferences(r.Context(), u.ID); err == nil {
+			np = p
+		}
+	}
+	f := preferencesForm(snap.Preferences, auto, mb, np)
 	if r.URL.Query().Get("saved") == "1" {
 		f.Notice = views.T(r.Context(), "profile.saved")
+	}
+	if r.URL.Query().Get("tested") == "1" {
+		f.Notice = views.T(r.Context(), "profile.notify.tested")
 	}
 	s.render(w, r, http.StatusOK, views.PreferencesPage(u.DisplayName, f))
 }
@@ -250,6 +288,35 @@ func (s *Server) preferencesSave(w http.ResponseWriter, r *http.Request, u *iden
 	}
 	autoErr := errLevel || errScore != nil || errLimit != nil || autoSettings.Validate() != nil
 
+	np := notify.DefaultPreferences(u.ID, u.Email)
+	if s.Notify != nil {
+		if cur, err := s.Notify.GetPreferences(r.Context(), u.ID); err == nil {
+			np = cur
+		}
+	}
+	np.EmailEnabled = r.PostFormValue("notify_email_enabled") == "on"
+	np.EmailAddress = strings.TrimSpace(r.PostFormValue("notify_email_address"))
+	np.WebPushEnabled = r.PostFormValue("notify_webpush_enabled") == "on"
+	np.NtfyEnabled = r.PostFormValue("notify_ntfy_enabled") == "on"
+	if urlStr := strings.TrimSpace(r.PostFormValue("notify_ntfy_url")); urlStr != "" {
+		np.NtfyURL = urlStr
+	}
+	np.NtfyTopic = strings.TrimSpace(r.PostFormValue("notify_ntfy_topic"))
+	if tok := strings.TrimSpace(r.PostFormValue("notify_ntfy_token")); tok != "" {
+		np.NtfyToken = tok
+	}
+	np.DailySummaryEnabled = r.PostFormValue("notify_daily_summary_enabled") == "on"
+	if sumTime := strings.TrimSpace(r.PostFormValue("notify_daily_summary_time")); sumTime != "" {
+		np.DailySummaryTime = sumTime
+	}
+	np.QuietHoursEnabled = r.PostFormValue("notify_quiet_hours_enabled") == "on"
+	if qStart := strings.TrimSpace(r.PostFormValue("notify_quiet_hours_start")); qStart != "" {
+		np.QuietHoursStart = qStart
+	}
+	if qEnd := strings.TrimSpace(r.PostFormValue("notify_quiet_hours_end")); qEnd != "" {
+		np.QuietHoursEnd = qEnd
+	}
+
 	if salaryErr || autoErr {
 		var mb tracking.MailboxAccount
 		if s.Tracking != nil {
@@ -257,7 +324,7 @@ func (s *Server) preferencesSave(w http.ResponseWriter, r *http.Request, u *iden
 				mb = m
 			}
 		}
-		f := preferencesForm(p, autoSettings, mb)
+		f := preferencesForm(p, autoSettings, mb, np)
 		f.Values["min_salary"] = r.PostFormValue("min_salary")
 		f.Values["min_score"] = r.PostFormValue("min_score")
 		f.Values["daily_limit"] = r.PostFormValue("daily_limit")
@@ -289,7 +356,7 @@ func (s *Server) preferencesSave(w http.ResponseWriter, r *http.Request, u *iden
 					mb = m
 				}
 			}
-			f := preferencesForm(p, autoSettings, mb)
+			f := preferencesForm(p, autoSettings, mb, np)
 			f.Errors, f.Notice, f.Failed = fieldErrors(r, err), views.T(r.Context(), "profile.invalid"), true
 			s.render(w, r, http.StatusUnprocessableEntity, views.PreferencesPage(u.DisplayName, f))
 			return
@@ -321,5 +388,25 @@ func (s *Server) preferencesSave(w http.ResponseWriter, r *http.Request, u *iden
 			}
 		}
 	}
+	if s.Notify != nil {
+		if err := s.Notify.SavePreferences(r.Context(), np); err != nil {
+			s.failed(w, r, u, err)
+			return
+		}
+	}
 	http.Redirect(w, r, "/preferences?saved=1", http.StatusSeeOther)
+}
+
+func (s *Server) notifyTest(w http.ResponseWriter, r *http.Request, u *identity.User) {
+	if u == nil {
+		http.Redirect(w, r, "/login", http.StatusSeeOther)
+		return
+	}
+	if s.Notify != nil {
+		if err := s.Notify.SendTestNotification(r.Context(), u.ID); err != nil {
+			s.failed(w, r, u, err)
+			return
+		}
+	}
+	http.Redirect(w, r, "/preferences?tested=1", http.StatusSeeOther)
 }

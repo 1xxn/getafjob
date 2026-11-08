@@ -9,6 +9,7 @@ import (
 
 	"github.com/1xxn/getafjob/internal/application"
 	"github.com/1xxn/getafjob/internal/identity"
+	"github.com/1xxn/getafjob/internal/notify"
 	"github.com/1xxn/getafjob/internal/profile"
 	"github.com/1xxn/getafjob/internal/profile/cvimport"
 	"github.com/1xxn/getafjob/internal/tracking"
@@ -53,7 +54,7 @@ func (s *Server) renderSetup(w http.ResponseWriter, r *http.Request, u *identity
 				st = cfg
 			}
 		}
-		d.Form = preferencesForm(snap.Preferences, st, tracking.MailboxAccount{})
+		d.Form = preferencesForm(snap.Preferences, st, tracking.MailboxAccount{}, notify.Preferences{})
 	default:
 		d.Form = profileForm(snap)
 	}
@@ -144,7 +145,7 @@ func (s *Server) setupSave(w http.ResponseWriter, r *http.Request, u *identity.U
 				st = cfg
 			}
 		}
-		s.setupSaved(w, r, u, step, next, serr, preferencesForm(keep, st, tracking.MailboxAccount{}))
+		s.setupSaved(w, r, u, step, next, serr, preferencesForm(keep, st, tracking.MailboxAccount{}, notify.Preferences{}))
 		return
 	}
 	snap, err := s.Profile.Get(r.Context(), u.ID)
