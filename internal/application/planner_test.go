@@ -231,7 +231,7 @@ func TestPlanner(t *testing.T) {
 	store := newFakePlannerStore()
 	store.users = []uuid.UUID{u1, u2, u3}
 
-	// u1: autonomous, daily_limit = 5. No recent submits, pacing window clear -> should plan 1 job
+	// u1: autonomous, daily_limit = 5. Both matching jobs (101, 102) should be queued immediately (#156)
 	store.settings[u1] = application.Settings{Level: application.LevelAutonomous, MinScore: 75, DailyLimit: 5}
 	store.candidates[u1] = []application.PlannerCandidate{
 		{JobID: 101, Score: 95},
@@ -244,9 +244,9 @@ func TestPlanner(t *testing.T) {
 		{JobID: 201, Score: 90},
 	}
 
-	// u3: approve level, daily_limit = 5, but last paced was 1 hour ago (< 4h48m) -> paced, skipped
+	// u3: approve level, daily_limit = 5, but submits = 5 -> quota full, skipped
 	store.settings[u3] = application.Settings{Level: application.LevelApprove, MinScore: 80, DailyLimit: 5}
-	store.lastPaced[u3] = now.Add(-1 * time.Hour)
+	store.submits[u3] = 5
 	store.candidates[u3] = []application.PlannerCandidate{
 		{JobID: 301, Score: 92},
 	}
@@ -260,11 +260,11 @@ func TestPlanner(t *testing.T) {
 	if st.UsersEligible != 3 {
 		t.Errorf("UsersEligible = %d, want 3", st.UsersEligible)
 	}
-	if st.JobsPlanned != 1 {
-		t.Errorf("JobsPlanned = %d, want 1", st.JobsPlanned)
+	if st.JobsPlanned != 2 {
+		t.Errorf("JobsPlanned = %d, want 2", st.JobsPlanned)
 	}
-	if !slices.Contains(store.queued, 101) {
-		t.Errorf("queued jobs = %v, want to contain 101", store.queued)
+	if !slices.Contains(store.queued, 101) || !slices.Contains(store.queued, 102) {
+		t.Errorf("queued jobs = %v, want to contain 101 and 102", store.queued)
 	}
 
 	// Test candidate guards: if job 101 is excluded, planner falls back to job 102

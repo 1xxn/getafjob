@@ -612,7 +612,7 @@ func (s *Server) preferencesSave(w http.ResponseWriter, r *http.Request, u *iden
 	var errLimit error
 	if v := strings.TrimSpace(r.PostFormValue("daily_limit")); v != "" {
 		n, err := strconv.ParseInt(v, 10, 16)
-		if err != nil || n < 0 || n > 50 {
+		if err != nil || n < 0 || n > int64(application.MaxDailyLimit) {
 			errLimit = errors.New("invalid daily_limit")
 		} else {
 			dailyLimit = int(n)

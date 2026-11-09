@@ -51,7 +51,7 @@ var DefaultSettings = Settings{Level: LevelApprove, MinScore: 80, DailyLimit: 5,
 
 // Limits of the settings.
 const (
-	MaxDailyLimit = 50
+	MaxDailyLimit = 500
 )
 
 // ErrInvalidSettings reports settings outside their limits.
