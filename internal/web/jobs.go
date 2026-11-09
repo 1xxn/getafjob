@@ -41,8 +41,14 @@ func (s *Server) jobsPage(w http.ResponseWriter, r *http.Request, u *identity.Us
 		decisions = decisionFilters[dec]
 	}
 
-	page, _ := strconv.Atoi(qv.Get("page"))
-	minSalary, _ := strconv.Atoi(qv.Get("min_salary"))
+	page := 1
+	if v, err := strconv.Atoi(qv.Get("page")); err == nil && v >= 1 && v <= 1000 {
+		page = v
+	}
+	minSalary := 0
+	if v, err := strconv.Atoi(qv.Get("min_salary")); err == nil && v >= 0 && v <= 10_000_000 {
+		minSalary = v
+	}
 	freshness := qv.Get("freshness")
 	var freshnessDays int
 	switch freshness {
