@@ -21,6 +21,8 @@ import (
 	"github.com/1xxn/getafjob/internal/ai"
 	"github.com/1xxn/getafjob/internal/application"
 	"github.com/1xxn/getafjob/internal/assist"
+	"github.com/1xxn/getafjob/internal/discovery"
+	"github.com/1xxn/getafjob/internal/discovery/urlimport"
 	"github.com/1xxn/getafjob/internal/identity"
 	"github.com/1xxn/getafjob/internal/matching"
 	"github.com/1xxn/getafjob/internal/notify"
@@ -84,6 +86,14 @@ type PrivacyService interface {
 	DeleteAccount(ctx context.Context, userID uuid.UUID) error
 }
 
+// DiscoveryService manages job URL ingestion, crawl triggers, status, and board additions.
+type DiscoveryService interface {
+	ImportJob(ctx context.Context, userID uuid.UUID, rawURL string) (int64, error)
+	TriggerCrawl(ctx context.Context) (queued bool, err error)
+	CrawlStatus(ctx context.Context) (urlimport.CrawlStatus, error)
+	AddBoard(ctx context.Context, rawURL string) (discovery.Board, error)
+}
+
 // Server holds the dependencies of the UI.
 type Server struct {
 	Identity       *identity.Service
@@ -93,6 +103,7 @@ type Server struct {
 	Stations       *profile.Stations
 	Importer       *cvimport.Importer // nil: no CV import
 	Jobs           *matching.Listings
+	Discovery      DiscoveryService // nil: no discovery controls
 	Apps           *application.Service
 	Tracking       TrackingService
 	Notify         NotificationService
@@ -129,6 +140,10 @@ func (s *Server) Register(mux *http.ServeMux) {
 	mux.Handle("POST /invite/{token}", s.limited(s.page(s.inviteSubmit)))
 	mux.Handle("POST /logout", s.page(s.logout))
 	mux.Handle("GET /jobs", s.page(s.jobsPage))
+	mux.Handle("POST /jobs/import", s.limited(s.page(s.importJob)))
+	mux.Handle("POST /jobs/crawl", s.limited(s.page(s.triggerCrawl)))
+	mux.Handle("GET /jobs/crawl/status", s.page(s.crawlStatus))
+	mux.Handle("POST /jobs/boards", s.limited(s.page(s.addBoard)))
 	mux.Handle("POST /jobs/blocklist", s.page(s.addBlocklist))
 	mux.Handle("POST /jobs/blocklist/delete", s.page(s.deleteBlocklist))
 	mux.Handle("GET /jobs/{id}", s.page(s.jobPage))

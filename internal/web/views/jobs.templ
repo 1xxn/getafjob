@@ -25,6 +25,13 @@ type BlocklistItemData struct {
 	CreatedAt string
 }
 
+// CrawlStatusData fills the crawl sync button and badge.
+type CrawlStatusData struct {
+	Running bool
+	Queued  bool
+	LastRun string
+}
+
 // JobsData fills the job list.
 type JobsData struct {
 	Name         string
@@ -46,6 +53,7 @@ type JobsData struct {
 	PrevURL      string
 	NextURL      string
 	Blocklist    []BlocklistItemData
+	Crawl        CrawlStatusData
 }
 
 // Reason is one translated part of a score.
@@ -101,9 +109,91 @@ templ option(value, current, label string) {
 	<option value={ value } selected?={ value == current }>{ label }</option>
 }
 
+templ CrawlStatus(c CrawlStatusData) {
+	<div
+		id="crawl-status"
+		class="crawl-status-bar"
+		if c.Running || c.Queued {
+			{ HX(ctx, "hx-get", "/jobs/crawl/status", "hx-trigger", "every 3s", "hx-swap", "outerHTML")... }
+		}
+	>
+		<div class="crawl-status-info">
+			if c.Running {
+				<span class="badge badge-running animate-pulse">{ T(ctx, "jobs.crawl_running") }</span>
+			} else if c.Queued {
+				<span class="badge badge-queued">{ T(ctx, "jobs.crawl_queued") }</span>
+			} else if c.LastRun != "" {
+				<span class="badge badge-muted">{ T(ctx, "jobs.crawl_last_run", "time", c.LastRun) }</span>
+			} else {
+				<span class="badge badge-muted">{ T(ctx, "jobs.crawl_never") }</span>
+			}
+		</div>
+		<form
+			method="post"
+			action="/jobs/crawl"
+			class="crawl-trigger-form"
+			{ HX(ctx, "hx-post", "/jobs/crawl", "hx-target", "#crawl-status", "hx-swap", "outerHTML")... }
+		>
+			<button type="submit" class="btn-sm" disabled?={ c.Running || c.Queued }>
+				{ T(ctx, "jobs.crawl_button") }
+			</button>
+		</form>
+	</div>
+}
+
+templ BoardAddSuccess(company, atsPlatform string) {
+	@Notice("success", T(ctx, "jobs.board_add_success", "company", company, "ats", atsPlatform))
+}
+
+templ BoardAddError(msg string) {
+	@Notice("error", msg)
+}
+
 templ JobsPage(d JobsData) {
 	@Layout(Page{Title: T(ctx, "jobs.title"), UserName: d.Name}) {
 		@Section(T(ctx, "jobs.title")) {
+			<div class="discovery-toolbar">
+				<div class="crawl-sync-box">
+					@CrawlStatus(d.Crawl)
+				</div>
+				<form
+					method="post"
+					action="/jobs/import"
+					class="job-import-form"
+					{ HX(ctx, "hx-post", "/jobs/import", "hx-target", "#results", "hx-swap", "outerHTML")... }
+				>
+					<input
+						type="url"
+						name="url"
+						placeholder={ T(ctx, "jobs.import_placeholder") }
+						required
+						maxlength="500"
+					/>
+					<button type="submit">{ T(ctx, "jobs.import_button") }</button>
+				</form>
+				<details class="career-site-panel">
+					<summary class="career-site-summary">{ T(ctx, "jobs.board_add_title") }</summary>
+					<div class="career-site-body">
+						<form
+							method="post"
+							action="/jobs/boards"
+							class="board-add-form"
+							{ HX(ctx, "hx-post", "/jobs/boards", "hx-target", "#board-add-result", "hx-swap", "innerHTML")... }
+						>
+							<input
+								type="url"
+								name="url"
+								placeholder={ T(ctx, "jobs.board_add_placeholder") }
+								required
+								maxlength="500"
+							/>
+							<button type="submit">{ T(ctx, "jobs.board_add_button") }</button>
+						</form>
+						<div id="board-add-result"></div>
+					</div>
+				</details>
+			</div>
+			<div id="import-result"></div>
 			<form
 				method="get"
 				action="/jobs"

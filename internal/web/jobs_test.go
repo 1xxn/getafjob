@@ -186,6 +186,114 @@ func TestJobPages(t *testing.T) {
 	}
 }
 
+func TestJobIngestionAndCrawlControls(t *testing.T) {
+	a := newApp(t)
+	session := signedIn(t, a)
+
+	// 1. Ingest job from HTTP URL
+	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.Header().Set("Content-Type", "text/html")
+		_, _ = w.Write([]byte(`<!DOCTYPE html>
+<html>
+<head>
+  <title>Distributed Systems Engineer - Acme Cloud Corp</title>
+  <script type="application/ld+json">
+  {
+    "@context": "https://schema.org/",
+    "@type": "JobPosting",
+    "title": "Distributed Systems Engineer",
+    "description": "<p>Design distributed consensus algorithms in Go.</p>",
+    "identifier": {
+      "@type": "PropertyValue",
+      "value": "acme-cloud-99"
+    },
+    "hiringOrganization": {
+      "@type": "Organization",
+      "name": "Acme Cloud Corp"
+    },
+    "jobLocation": {
+      "@type": "Place",
+      "address": {
+        "@type": "PostalAddress",
+        "addressLocality": "Berlin"
+      }
+    },
+    "baseSalary": {
+      "@type": "MonetaryAmount",
+      "currency": "EUR",
+      "value": {
+        "@type": "QuantitativeValue",
+        "minValue": 85000,
+        "maxValue": 105000,
+        "unitText": "YEAR"
+      }
+    }
+  }
+  </script>
+</head>
+<body>
+  <h1>Distributed Systems Engineer</h1>
+</body>
+</html>`))
+	}))
+	defer ts.Close()
+
+	// Import job via standard form POST
+	importRec := a.do(http.MethodPost, "/jobs/import", url.Values{"url": {ts.URL + "/jobs/99"}}, session, nil)
+	if importRec.Code != http.StatusSeeOther {
+		t.Fatalf("job import redirect code: got %d, want %d", importRec.Code, http.StatusSeeOther)
+	}
+	loc := importRec.Header().Get("Location")
+	if !strings.HasPrefix(loc, "/jobs/") {
+		t.Fatalf("job import Location = %q, want /jobs/{id}", loc)
+	}
+
+	// Verify job detail page
+	detailRec := a.do(http.MethodGet, loc, nil, session, nil)
+	if detailRec.Code != http.StatusOK {
+		t.Fatalf("job detail page: got %d, want 200", detailRec.Code)
+	}
+	detailBody := detailRec.Body.String()
+	if !strings.Contains(detailBody, "Distributed Systems Engineer") {
+		t.Errorf("detail body missing job title")
+	}
+	if !strings.Contains(detailBody, "Acme Cloud Corp") {
+		t.Errorf("detail body missing company name")
+	}
+
+	// Import job via HTMX
+	htmxImport := a.do(http.MethodPost, "/jobs/import", url.Values{"url": {ts.URL + "/jobs/99"}}, session, map[string]string{"HX-Request": "true"})
+	if htmxImport.Code != http.StatusOK || htmxImport.Header().Get("HX-Location") == "" {
+		t.Fatalf("htmx job import failed: code %d, HX-Location %q", htmxImport.Code, htmxImport.Header().Get("HX-Location"))
+	}
+
+	// 2. Trigger crawl
+	crawlRec := a.do(http.MethodPost, "/jobs/crawl", nil, session, map[string]string{"HX-Request": "true"})
+	if crawlRec.Code != http.StatusOK {
+		t.Fatalf("trigger crawl code: got %d, want 200", crawlRec.Code)
+	}
+	crawlBody := crawlRec.Body.String()
+	if !strings.Contains(crawlBody, `id="crawl-status"`) {
+		t.Errorf("trigger crawl body missing #crawl-status: %s", crawlBody)
+	}
+
+	// Crawl status polling
+	statusRec := a.do(http.MethodGet, "/jobs/crawl/status", nil, session, nil)
+	if statusRec.Code != http.StatusOK || !strings.Contains(statusRec.Body.String(), `id="crawl-status"`) {
+		t.Fatalf("crawl status polling failed: code %d, body %s", statusRec.Code, statusRec.Body.String())
+	}
+
+	// 3. Add Career Site
+	boardRec := a.do(http.MethodPost, "/jobs/boards", url.Values{"url": {"https://jobs.lever.co/syntheticcorp"}}, session, map[string]string{"HX-Request": "true"})
+	if boardRec.Code != http.StatusOK {
+		t.Fatalf("add board code: got %d, want 200", boardRec.Code)
+	}
+	boardBody := boardRec.Body.String()
+	if !strings.Contains(boardBody, "Syntheticcorp") || !strings.Contains(boardBody, "lever") {
+		t.Errorf("add board response missing company or ats: %s", boardBody)
+	}
+}
+
 var (
 	cspNonce = regexp.MustCompile(`script-src 'nonce-([A-Za-z0-9_-]+)'`)
 	tagRx    = regexp.MustCompile(`<[a-z]+\s[^>]*>`)

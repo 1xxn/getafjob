@@ -28,17 +28,20 @@ const (
 
 // Posting is one job as a source delivers it.
 type Posting struct {
-	Source      string // e.g. greenhouse:acme, arbeitsagentur
-	ExternalID  string
-	Company     string
-	Title       string
-	Location    string
-	URL         string
-	ApplyURL    string
-	Description string
-	Posted      string // YYYY-MM-DD or empty
-	Workplace   Workplace
-	Extra       map[string]string
+	Source         string // e.g. greenhouse:acme, arbeitsagentur
+	ExternalID     string
+	Company        string
+	Title          string
+	Location       string
+	URL            string
+	ApplyURL       string
+	Description    string
+	Posted         string // YYYY-MM-DD or empty
+	Workplace      Workplace
+	SalaryMin      int    `json:",omitempty"`
+	SalaryMax      int    `json:",omitempty"`
+	SalaryCurrency string `json:",omitempty"`
+	Extra          map[string]string
 	// Stub marks a posting that only names a job (sitemaps): source, ID and URL. A known open job is just seen
 	// again; a new one gets its details before it counts.
 	Stub bool `json:",omitempty"`

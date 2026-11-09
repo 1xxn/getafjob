@@ -24,6 +24,9 @@ import (
 
 	"github.com/1xxn/getafjob/internal/application"
 	applicationstore "github.com/1xxn/getafjob/internal/application/adapters/pgstore"
+	"github.com/1xxn/getafjob/internal/discovery"
+	discoverystore "github.com/1xxn/getafjob/internal/discovery/adapters/pgstore"
+	"github.com/1xxn/getafjob/internal/discovery/urlimport"
 	"github.com/1xxn/getafjob/internal/identity"
 	"github.com/1xxn/getafjob/internal/identity/adapters/pgstore"
 	"github.com/1xxn/getafjob/internal/identity/softauthn"
@@ -52,6 +55,27 @@ func (m *mailbox) Send(_ context.Context, x identity.Mail) error {
 	defer m.mu.Unlock()
 	m.last, m.n = x, m.n+1
 	return nil
+}
+
+type testMatchEvaluator struct {
+	matching matching.Store
+}
+
+func (e *testMatchEvaluator) EvaluateAndSave(ctx context.Context, userID uuid.UUID, jobID int64, p discovery.Posting, at time.Time) error {
+	m := matching.NewMatcher(matching.Criteria{Titles: []string{p.Title}})
+	posted, _ := time.Parse(time.DateOnly, p.Posted)
+	mj := matching.Job{
+		ID:          jobID,
+		Company:     p.Company,
+		Title:       p.Title,
+		Location:    p.Location,
+		Workplace:   string(p.Workplace),
+		Description: p.Description,
+		Posted:      posted,
+		FirstSeen:   at,
+	}
+	res := m.Evaluate(mj, at)
+	return e.matching.SaveMatches(ctx, userID, []matching.Result{res}, at)
 }
 
 type app struct {
@@ -96,8 +120,16 @@ func newApp(t *testing.T) *app {
 		t.Fatal(err)
 	}
 	importer := cvimport.NewImporter(docs, profiles, stations, cvimport.NewExtractorFor(exe, 20*time.Second))
+	dstore := discoverystore.New(pool)
+	mstore := matchingstore.New(pool)
+	discoverySvc := urlimport.NewService(urlimport.Options{
+		Discovery:    dstore,
+		Boards:       dstore,
+		Matcher:      &testMatchEvaluator{matching: mstore},
+		AllowPrivate: true,
+	})
 	(&web.Server{Identity: ids, Profile: profiles, Documents: docs, Items: items, Stations: stations, Importer: importer,
-		Jobs: listings, Apps: apps, Privacy: privacySvc, Logger: slog.New(slog.NewTextHandler(io.Discard, nil))}).Register(mux)
+		Jobs: listings, Discovery: discoverySvc, Apps: apps, Privacy: privacySvc, Logger: slog.New(slog.NewTextHandler(io.Discard, nil))}).Register(mux)
 	return &app{t: t, h: httpx.Protect(mux, 1<<20, true, httpx.Upload{Path: "/documents", Max: web.MaxUpload},
 		httpx.Upload{Path: "/setup/cv", Max: web.MaxUpload}), ids: ids, mail: mb, pool: pool}
 }

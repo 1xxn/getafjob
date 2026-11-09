@@ -3,12 +3,15 @@ package web
 import (
 	"context"
 	"errors"
+	"fmt"
 	"net/http"
 	"net/url"
 	"slices"
 	"strconv"
+	"strings"
 	"time"
 
+	"github.com/1xxn/getafjob/internal/discovery/urlimport"
 	"github.com/1xxn/getafjob/internal/identity"
 	"github.com/1xxn/getafjob/internal/matching"
 	"github.com/1xxn/getafjob/internal/web/views"
@@ -107,6 +110,13 @@ func (s *Server) jobsPage(w http.ResponseWriter, r *http.Request, u *identity.Us
 	}
 
 	now := time.Now()
+	var crawl views.CrawlStatusData
+	if s.Discovery != nil {
+		if st, err := s.Discovery.CrawlStatus(r.Context()); err == nil {
+			crawl = toCrawlStatusData(r.Context(), st)
+		}
+	}
+
 	d := views.JobsData{
 		Name:         u.DisplayName,
 		Query:        f.Query,
@@ -123,6 +133,7 @@ func (s *Server) jobsPage(w http.ResponseWriter, r *http.Request, u *identity.Us
 		Counts:       map[string]int{},
 		BlockedCount: l.BlockedCount,
 		Blocklist:    blData,
+		Crawl:        crawl,
 	}
 	for k, n := range l.Counts {
 		d.Counts[string(k)] = n
@@ -344,4 +355,97 @@ func webLink(s string) string {
 func partial(r *http.Request) bool {
 	return r.Header.Get("HX-Request") == "true" && r.Header.Get("HX-Request-Type") != "full" &&
 		r.Header.Get("HX-History-Restore-Request") != "true"
+}
+
+func (s *Server) importJob(w http.ResponseWriter, r *http.Request, u *identity.User) {
+	if u == nil {
+		http.Redirect(w, r, "/login", http.StatusSeeOther)
+		return
+	}
+	if s.Discovery == nil {
+		s.failed(w, r, u, errors.New("discovery service unavailable"))
+		return
+	}
+	rawURL := strings.TrimSpace(r.FormValue("url"))
+	jobID, err := s.Discovery.ImportJob(r.Context(), u.ID, rawURL)
+	if err != nil {
+		s.Logger.WarnContext(r.Context(), "job import failed", "url", rawURL, "err", err)
+		if partial(r) {
+			w.Header().Set("HX-Reswap", "innerHTML")
+			w.Header().Set("HX-Retarget", "#import-result")
+			s.render(w, r, http.StatusOK, views.Notice("error", views.T(r.Context(), "jobs.import_error")))
+			return
+		}
+		http.Redirect(w, r, "/jobs", http.StatusSeeOther)
+		return
+	}
+	detailURL := fmt.Sprintf("/jobs/%d", jobID)
+	if partial(r) {
+		w.Header().Set("HX-Location", detailURL)
+		w.WriteHeader(http.StatusOK)
+		return
+	}
+	//nolint:gosec // G710: detailURL is formatted /jobs/%d with internal ID
+	http.Redirect(w, r, detailURL, http.StatusSeeOther)
+}
+
+func (s *Server) triggerCrawl(w http.ResponseWriter, r *http.Request, u *identity.User) {
+	if u == nil {
+		http.Redirect(w, r, "/login", http.StatusSeeOther)
+		return
+	}
+	if s.Discovery == nil {
+		s.failed(w, r, u, errors.New("discovery service unavailable"))
+		return
+	}
+	_, _ = s.Discovery.TriggerCrawl(r.Context())
+	st, _ := s.Discovery.CrawlStatus(r.Context())
+	if !st.Running {
+		st.Queued = true
+	}
+	s.render(w, r, http.StatusOK, views.CrawlStatus(toCrawlStatusData(r.Context(), st)))
+}
+
+func (s *Server) crawlStatus(w http.ResponseWriter, r *http.Request, u *identity.User) {
+	if u == nil {
+		http.Redirect(w, r, "/login", http.StatusSeeOther)
+		return
+	}
+	if s.Discovery == nil {
+		s.render(w, r, http.StatusOK, views.CrawlStatus(views.CrawlStatusData{}))
+		return
+	}
+	st, _ := s.Discovery.CrawlStatus(r.Context())
+	s.render(w, r, http.StatusOK, views.CrawlStatus(toCrawlStatusData(r.Context(), st)))
+}
+
+func (s *Server) addBoard(w http.ResponseWriter, r *http.Request, u *identity.User) {
+	if u == nil {
+		http.Redirect(w, r, "/login", http.StatusSeeOther)
+		return
+	}
+	if s.Discovery == nil {
+		s.failed(w, r, u, errors.New("discovery service unavailable"))
+		return
+	}
+	rawURL := strings.TrimSpace(r.FormValue("url"))
+	b, err := s.Discovery.AddBoard(r.Context(), rawURL)
+	if err != nil {
+		s.Logger.WarnContext(r.Context(), "add board failed", "url", rawURL, "err", err)
+		s.render(w, r, http.StatusOK, views.BoardAddError(views.T(r.Context(), "jobs.board_add_error")))
+		return
+	}
+	s.render(w, r, http.StatusOK, views.BoardAddSuccess(b.Company, b.ATS))
+}
+
+func toCrawlStatusData(ctx context.Context, st urlimport.CrawlStatus) views.CrawlStatusData {
+	var lastRun string
+	if st.LastRunAt != nil && !st.LastRunAt.IsZero() {
+		lastRun = views.When(ctx, *st.LastRunAt)
+	}
+	return views.CrawlStatusData{
+		Running: st.Running,
+		Queued:  st.Queued,
+		LastRun: lastRun,
+	}
 }

@@ -24,6 +24,7 @@ import (
 	"github.com/1xxn/getafjob/internal/discovery"
 	discoverystore "github.com/1xxn/getafjob/internal/discovery/adapters/pgstore"
 	"github.com/1xxn/getafjob/internal/discovery/adapters/sources"
+	"github.com/1xxn/getafjob/internal/discovery/urlimport"
 	"github.com/1xxn/getafjob/internal/gateway"
 	runnerv1 "github.com/1xxn/getafjob/internal/gen/proto/runner/v1"
 	"github.com/1xxn/getafjob/internal/gen/proto/runner/v1/runnerv1connect"
@@ -139,11 +140,21 @@ func serve(ctx context.Context, cfg config.Config, logger *slog.Logger) error {
 	assistSvc := newAssistService(pool, profiles, items, docs, apps, logger)
 	apiv1.Mount(mux, assistSvc)
 
-	listings := matching.NewListings(matchingstore.New(pool))
+	dstore := discoverystore.New(pool)
+	mstore := matchingstore.New(pool)
+	listings := matching.NewListings(mstore)
 	privacySvc := privacy.NewService(ids, profiles, items, docs, apps, listings, env, sealedFiles)
 	stations := profile.NewStations(pstore, env)
+	crawlQueue := NewCrawlQueue(inserter, pool)
+	evaluator := NewMatchEvaluator(profileCriteria{svc: profiles, store: pstore}, mstore)
+	discoverySvc := urlimport.NewService(urlimport.Options{
+		Discovery: dstore,
+		Boards:    dstore,
+		Matcher:   evaluator,
+		Queue:     crawlQueue,
+	})
 	(&web.Server{Identity: ids, Logger: logger, Profile: profiles, Documents: docs, Items: items, Stations: stations,
-		Importer: cvimport.NewImporter(docs, profiles, stations, extractor), Jobs: listings,
+		Importer: cvimport.NewImporter(docs, profiles, stations, extractor), Jobs: listings, Discovery: discoverySvc,
 		PushStore: webpush.NewStore(pool), VAPIDPublicKey: vapidPub, Apps: apps, Tracking: trackingSvc, Notify: notifySvc, Assist: assistSvc, Portals: portalsSvc, AI: aiSvc, Privacy: privacySvc, Shots: sealedFiles, Handoffs: gw}).Register(mux)
 
 	h := httpx.Instrument(httpx.Protect(httpx.Routes(mux), maxBody, cfg.PublicURL.Scheme == "https",
