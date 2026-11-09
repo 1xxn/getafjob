@@ -2,6 +2,7 @@ package web
 
 import (
 	"errors"
+	"fmt"
 	"io"
 	"mime"
 	"net/http"
@@ -215,4 +216,124 @@ func (s *Server) documentImport(w http.ResponseWriter, r *http.Request, u *ident
 	default:
 		s.failed(w, r, u, err)
 	}
+}
+
+// documentReview renders the interactive review page for extracted career stations and profile fields.
+func (s *Server) documentReview(w http.ResponseWriter, r *http.Request, u *identity.User) {
+	if u == nil {
+		http.Redirect(w, r, "/login", http.StatusSeeOther)
+		return
+	}
+	id, ok := docID(r)
+	if !ok || s.Importer == nil {
+		s.notFound(w, r, u)
+		return
+	}
+	d, _, err := s.Documents.Read(r.Context(), u.ID, id)
+	if errors.Is(err, profile.ErrNotFound) {
+		s.notFound(w, r, u)
+		return
+	}
+	if err != nil {
+		s.failed(w, r, u, err)
+		return
+	}
+	parsed, err := s.Importer.Extract(r.Context(), u.ID, id)
+	switch {
+	case err == nil:
+		s.render(w, r, http.StatusOK, views.DocumentReviewPage(views.DocumentReviewProps{
+			UserName:    u.DisplayName,
+			DocID:       id.String(),
+			DocName:     d.Name,
+			Profile:     parsed.Profile,
+			Experiences: parsed.Experiences,
+			Educations:  parsed.Educations,
+		}))
+	case errors.Is(err, cvimport.ErrNoText):
+		s.renderDocuments(w, r, u, http.StatusUnprocessableEntity, views.T(r.Context(), "documents.import_no_text"), true)
+	case errors.Is(err, profile.ErrFileType), errors.Is(err, profile.ErrFileTooLarge):
+		s.renderDocuments(w, r, u, http.StatusUnprocessableEntity, views.T(r.Context(), "documents.import_unreadable"), true)
+	default:
+		s.failed(w, r, u, err)
+	}
+}
+
+// documentReviewSave saves confirmed career stations and merges profile details from the review page.
+func (s *Server) documentReviewSave(w http.ResponseWriter, r *http.Request, u *identity.User) {
+	if u == nil {
+		http.Redirect(w, r, "/login", http.StatusSeeOther)
+		return
+	}
+	id, ok := docID(r)
+	if !ok || s.Importer == nil || s.Stations == nil {
+		s.notFound(w, r, u)
+		return
+	}
+	_, _, err := s.Documents.Read(r.Context(), u.ID, id)
+	if errors.Is(err, profile.ErrNotFound) {
+		s.notFound(w, r, u)
+		return
+	}
+	if err != nil {
+		s.failed(w, r, u, err)
+		return
+	}
+
+	expCount, _ := strconv.Atoi(r.PostFormValue("exp_count"))
+	for i := 0; i < expCount; i++ {
+		if r.PostFormValue(fmt.Sprintf("include_exp_%d", i)) == "" {
+			continue
+		}
+		company := strings.TrimSpace(r.PostFormValue(fmt.Sprintf("exp_%d_company", i)))
+		title := strings.TrimSpace(r.PostFormValue(fmt.Sprintf("exp_%d_title", i)))
+		if company == "" && title == "" {
+			continue
+		}
+		we := profile.WorkExperience{
+			Company:            company,
+			Title:              title,
+			Location:           strings.TrimSpace(r.PostFormValue(fmt.Sprintf("exp_%d_location", i))),
+			WorkplaceType:      strings.TrimSpace(r.PostFormValue(fmt.Sprintf("exp_%d_workplace", i))),
+			StartDate:          strings.TrimSpace(r.PostFormValue(fmt.Sprintf("exp_%d_start", i))),
+			EndDate:            strings.TrimSpace(r.PostFormValue(fmt.Sprintf("exp_%d_end", i))),
+			IsCurrent:          r.PostFormValue(fmt.Sprintf("exp_%d_current", i)) != "",
+			DescriptionBullets: profile.Lines(r.PostFormValue(fmt.Sprintf("exp_%d_bullets", i))),
+		}
+		_, _ = s.Stations.SaveWorkExperience(r.Context(), u.ID, we)
+	}
+
+	eduCount, _ := strconv.Atoi(r.PostFormValue("edu_count"))
+	for i := 0; i < eduCount; i++ {
+		if r.PostFormValue(fmt.Sprintf("include_edu_%d", i)) == "" {
+			continue
+		}
+		inst := strings.TrimSpace(r.PostFormValue(fmt.Sprintf("edu_%d_institution", i)))
+		degree := strings.TrimSpace(r.PostFormValue(fmt.Sprintf("edu_%d_degree", i)))
+		if inst == "" && degree == "" {
+			continue
+		}
+		ed := profile.EducationStation{
+			Institution:  inst,
+			Degree:       degree,
+			FieldOfStudy: strings.TrimSpace(r.PostFormValue(fmt.Sprintf("edu_%d_field", i))),
+			StartDate:    strings.TrimSpace(r.PostFormValue(fmt.Sprintf("edu_%d_start", i))),
+			EndDate:      strings.TrimSpace(r.PostFormValue(fmt.Sprintf("edu_%d_end", i))),
+			IsCurrent:    r.PostFormValue(fmt.Sprintf("edu_%d_current", i)) != "",
+			Grade:        strings.TrimSpace(r.PostFormValue(fmt.Sprintf("edu_%d_grade", i))),
+		}
+		_, _ = s.Stations.SaveEducation(r.Context(), u.ID, ed)
+	}
+
+	if r.PostFormValue("include_profile") != "" {
+		parsed, err := s.Importer.Extract(r.Context(), u.ID, id)
+		if err == nil {
+			snap, err := s.Profile.Get(r.Context(), u.ID)
+			if err == nil {
+				merged := cvimport.Merge(snap.Profile, parsed.Profile)
+				_ = s.Profile.SaveProfile(r.Context(), u.ID, merged, snap.Version)
+			}
+		}
+	}
+
+	http.Redirect(w, r, "/profile?imported=1", http.StatusSeeOther)
 }

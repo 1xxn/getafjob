@@ -19,6 +19,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5/pgxpool"
 
 	"github.com/1xxn/getafjob/internal/application"
@@ -94,7 +95,7 @@ func newApp(t *testing.T) *app {
 	if err != nil {
 		t.Fatal(err)
 	}
-	importer := cvimport.NewImporter(docs, profiles, cvimport.NewExtractorFor(exe, 20*time.Second))
+	importer := cvimport.NewImporter(docs, profiles, stations, cvimport.NewExtractorFor(exe, 20*time.Second))
 	(&web.Server{Identity: ids, Profile: profiles, Documents: docs, Items: items, Stations: stations, Importer: importer,
 		Jobs: listings, Apps: apps, Privacy: privacySvc, Logger: slog.New(slog.NewTextHandler(io.Discard, nil))}).Register(mux)
 	return &app{t: t, h: httpx.Protect(mux, 1<<20, true, httpx.Upload{Path: "/documents", Max: web.MaxUpload},
@@ -887,6 +888,80 @@ func TestCVImport(t *testing.T) {
 	// A second import has nothing to add.
 	if rec := a.do(http.MethodPost, path, url.Values{}, session, nil); rec.Code != http.StatusOK || !strings.Contains(rec.Body.String(), "nothing to add") {
 		t.Errorf("second import %d", rec.Code)
+	}
+}
+
+func TestCVReviewAndImport(t *testing.T) {
+	a := newApp(t)
+	session := signedIn(t, a)
+	cv := cvDocx(t, "Max Mustermann", "10115 Berlin", "max.mustermann@example.org | +49 30 1234567",
+		"Summary", "Staff Platform Engineer with extensive Go and Kubernetes experience.",
+		"Experience", "Lead Platform Engineer at Muster Cloud GmbH | Berlin, Germany 02/2021 - present",
+		"• Built cloud developer platform",
+		"Education", "M.Sc. Computer Science, TU Berlin 2016 - 2018",
+		"Skills", "Go, Kubernetes, PostgreSQL")
+	if rec := a.upload("cv", "cv.docx", cv, session); rec.Code != http.StatusSeeOther {
+		t.Fatalf("upload %d", rec.Code)
+	}
+	page := a.do(http.MethodGet, "/documents", nil, session, nil).Body.String()
+	idx := strings.Index(page, `href="/documents/`)
+	if idx < 0 {
+		t.Fatalf("no document in page: %s", page)
+	}
+	raw := page[idx+len(`href="/documents/`):]
+	if len(raw) < 36 {
+		t.Fatalf("short raw: %s", raw)
+	}
+	docID := raw[:36]
+	if _, err := uuid.Parse(docID); err != nil {
+		t.Fatalf("invalid doc id %q: %v", docID, err)
+	}
+
+	// 1. GET /documents/{id}/review renders review page
+	rev := a.do(http.MethodGet, "/documents/"+docID+"/review", nil, session, nil)
+	if rev.Code != http.StatusOK {
+		t.Fatalf("review get %d: %s", rev.Code, rev.Body.String())
+	}
+	revBody := rev.Body.String()
+	for _, want := range []string{"Lead Platform Engineer", "Muster Cloud GmbH", "TU Berlin", "M.Sc.", "Computer Science", "Built cloud developer platform"} {
+		if !strings.Contains(revBody, want) {
+			t.Errorf("review page lacks %q", want)
+		}
+	}
+
+	// 2. POST /documents/{id}/review submits confirmed entries
+	form := url.Values{
+		"exp_count":         {"1"},
+		"include_exp_0":     {"1"},
+		"exp_0_title":       {"Lead Platform Engineer"},
+		"exp_0_company":     {"Muster Cloud GmbH"},
+		"exp_0_location":    {"Berlin, Germany"},
+		"exp_0_workplace":   {"remote"},
+		"exp_0_start":       {"2021-02"},
+		"exp_0_end":         {""},
+		"exp_0_current":     {"1"},
+		"exp_0_bullets":     {"Built cloud developer platform\nCut infrastructure cost"},
+		"edu_count":         {"1"},
+		"include_edu_0":     {"1"},
+		"edu_0_institution": {"TU Berlin"},
+		"edu_0_degree":      {"M.Sc."},
+		"edu_0_field":       {"Computer Science"},
+		"edu_0_grade":       {"1.3"},
+		"edu_0_start":       {"2016"},
+		"edu_0_end":         {"2018"},
+		"include_profile":   {"1"},
+	}
+	saveRec := a.do(http.MethodPost, "/documents/"+docID+"/review", form, session, nil)
+	if saveRec.Code != http.StatusSeeOther || saveRec.Header().Get("Location") != "/profile?imported=1" {
+		t.Fatalf("review post %d: %s", saveRec.Code, saveRec.Body.String())
+	}
+
+	// 3. GET /profile verifies profile has stations and imported details
+	profBody := a.do(http.MethodGet, "/profile?imported=1", nil, session, nil).Body.String()
+	for _, want := range []string{"Lead Platform Engineer", "Muster Cloud GmbH", "TU Berlin", "Computer Science", "Built cloud developer platform"} {
+		if !strings.Contains(profBody, want) {
+			t.Errorf("profile lacks %q", want)
+		}
 	}
 }
 

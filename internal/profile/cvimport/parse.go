@@ -287,6 +287,200 @@ func cut(s string, n int) string {
 	return s
 }
 
+// ExtractedStations contains structured career stations extracted from a CV.
+type ExtractedStations struct {
+	Experiences []profile.WorkExperience
+	Educations  []profile.EducationStation
+}
+
+// ParsedCV bundles the flat profile with the structured career stations.
+type ParsedCV struct {
+	Profile     profile.Profile
+	Experiences []profile.WorkExperience
+	Educations  []profile.EducationStation
+}
+
+// ParseAll extracts both profile details and structured career stations from CV text.
+func ParseAll(text string) ParsedCV {
+	p := Parse(text)
+	exps, edus := ExtractStations(text)
+	return ParsedCV{
+		Profile:     p,
+		Experiences: exps,
+		Educations:  edus,
+	}
+}
+
+// ExtractStations extracts structured work experiences and educations from CV text.
+func ExtractStations(text string) ([]profile.WorkExperience, []profile.EducationStation) {
+	lines := strings.Split(text, "\n")
+	parts := split(lines)
+	exps := extractWorkExperiences(parts["experience"])
+	edus := extractEducations(parts["education"])
+	return exps, edus
+}
+
+var (
+	remoteRx = regexp.MustCompile(`(?i)\b(?:remote|vollständig\s+remote|home\s*office)\b`)
+	hybridRx = regexp.MustCompile(`(?i)\b(?:hybrid|teilweise\s+remote)\b`)
+	onsiteRx = regexp.MustCompile(`(?i)\b(?:onsite|on-site|vor\s+ort|präsenz)\b`)
+	gradeRx  = regexp.MustCompile(`(?i)\b(?:grade|gpa|note|bewertung|schnitt|abschlussschnitt)[:\s]+([0-9.,]+(?:\s*/\s*[0-9.,]+)?|\bmit\s+auszeichnung\b|\bsumma\s+cum\s+laude\b)`)
+)
+
+func extractWorkplaceType(s string) (string, string) {
+	wp := ""
+	switch {
+	case remoteRx.MatchString(s):
+		wp = profile.WorkplaceRemote
+	case hybridRx.MatchString(s):
+		wp = profile.WorkplaceHybrid
+	case onsiteRx.MatchString(s):
+		wp = profile.WorkplaceOnsite
+	}
+	s = regexp.MustCompile(`(?i)\s*[\(\[]\s*(?:remote|hybrid|onsite|on-site|vor\s+ort|präsenz)\s*[\)\]]`).ReplaceAllString(s, "")
+	return strings.TrimSpace(s), wp
+}
+
+func parseTitleCompanyLocation(s string) (title, company, location string) {
+	s = strings.Join(strings.Fields(s), " ")
+	for _, sep := range []string{" at ", " bei ", " @ "} {
+		if t, c, ok := strings.Cut(s, sep); ok {
+			title = cut(t, 200)
+			for _, locSep := range []string{" | ", ", ", " - ", " " + enDash + " "} {
+				if comp, loc, ok := strings.Cut(c, locSep); ok {
+					return title, cut(comp, 200), cut(loc, 200)
+				}
+			}
+			return title, cut(c, 200), ""
+		}
+	}
+	for _, sep := range []string{" | ", ", ", " - ", " " + enDash + " "} {
+		parts := strings.Split(s, sep)
+		if len(parts) >= 3 {
+			return cut(parts[0], 200), cut(parts[1], 200), cut(strings.Join(parts[2:], ", "), 200)
+		}
+		if len(parts) == 2 {
+			return cut(parts[0], 200), cut(parts[1], 200), ""
+		}
+	}
+	return cut(s, 200), "", ""
+}
+
+var knownDegrees = []string{
+	"bachelor of science", "master of science", "bachelor of arts", "master of arts",
+	"bachelor of engineering", "master of engineering",
+	"b.sc.", "b.sc", "m.sc.", "m.sc", "b.a.", "b.a", "m.a.", "m.a",
+	"b.eng.", "b.eng", "m.eng.", "m.eng",
+	"bachelor", "master", "ph.d.", "ph.d", "phd", "doctorate", "dr.", "promotion", "diplom", "dipl.-ing.",
+	"abitur", "fachabitur", "matura", "high school diploma",
+	"berufsausbildung", "ausbildung", "apprenticeship",
+}
+
+func parseDegreeAndField(raw string) (degree, field string) {
+	raw = strings.TrimSpace(raw)
+	low := strings.ToLower(raw)
+	for _, kd := range knownDegrees {
+		if strings.HasPrefix(low, kd) {
+			degLen := len(kd)
+			degree = strings.TrimSpace(raw[:degLen])
+			rest := strings.TrimSpace(raw[degLen:])
+			rest = strings.TrimPrefix(rest, "in ")
+			rest = strings.TrimPrefix(rest, "In ")
+			rest = strings.Trim(rest, " -:,|()")
+			field = cut(rest, 200)
+			return cut(degree, 100), field
+		}
+	}
+	if d, f, ok := strings.Cut(raw, " in "); ok {
+		return cut(d, 100), cut(f, 200)
+	}
+	return cut(raw, 100), ""
+}
+
+func extractGrade(s string) string {
+	if m := gradeRx.FindStringSubmatch(s); len(m) > 1 {
+		return strings.TrimSpace(m[1])
+	}
+	return ""
+}
+
+func extractWorkExperiences(lines []string) []profile.WorkExperience {
+	var out []profile.WorkExperience
+	for i, l := range lines {
+		m := rangeRx.FindStringSubmatchIndex(l)
+		if m == nil {
+			if n := len(out); n > 0 && bulletRx.MatchString(l) && len(out[n-1].DescriptionBullets) < 20 {
+				bullet := strings.TrimSpace(bulletRx.ReplaceAllString(l, ""))
+				if bullet != "" {
+					out[n-1].DescriptionBullets = append(out[n-1].DescriptionBullets, bullet)
+				}
+			}
+			continue
+		}
+		we := profile.WorkExperience{
+			StartDate: strings.TrimSpace(l[m[2]:m[3]]),
+			EndDate:   strings.TrimSpace(l[m[4]:m[5]]),
+			SortOrder: len(out),
+		}
+		if isOngoing(we.EndDate) {
+			we.IsCurrent = true
+			we.EndDate = ""
+		}
+		rest := strings.Trim(l[:m[0]]+" "+l[m[1]:], " |,-:"+enDash+emDash)
+		if rest == "" && i > 0 {
+			rest = lines[i-1]
+		}
+		rest, we.WorkplaceType = extractWorkplaceType(rest)
+		we.Title, we.Company, we.Location = parseTitleCompanyLocation(rest)
+		if we.Company == "" && i+1 < len(lines) && rangeRx.FindStringIndex(lines[i+1]) == nil && !bulletRx.MatchString(lines[i+1]) {
+			we.Company = cut(lines[i+1], 200)
+		}
+		out = append(out, we)
+		if len(out) >= profile.MaxStations {
+			break
+		}
+	}
+	return out
+}
+
+func extractEducations(lines []string) []profile.EducationStation {
+	var out []profile.EducationStation
+	for i, l := range lines {
+		m := rangeRx.FindStringSubmatchIndex(l)
+		if m == nil {
+			continue
+		}
+		ed := profile.EducationStation{
+			StartDate: strings.TrimSpace(l[m[2]:m[3]]),
+			EndDate:   strings.TrimSpace(l[m[4]:m[5]]),
+			SortOrder: len(out),
+		}
+		if isOngoing(ed.EndDate) {
+			ed.IsCurrent = true
+			ed.EndDate = ""
+		}
+		rest := strings.Trim(l[:m[0]]+" "+l[m[1]:], " |,-:"+enDash+emDash)
+		if rest == "" && i > 0 {
+			rest = lines[i-1]
+		}
+		rawDegree, inst := titleCompany(rest)
+		if inst == "" && i+1 < len(lines) && rangeRx.FindStringIndex(lines[i+1]) == nil {
+			inst = cut(lines[i+1], 200)
+		}
+		ed.Institution = inst
+		ed.Degree, ed.FieldOfStudy = parseDegreeAndField(rawDegree)
+		ed.Grade = extractGrade(rest)
+		if ed.Grade == "" && i+1 < len(lines) && rangeRx.FindStringIndex(lines[i+1]) == nil {
+			ed.Grade = extractGrade(lines[i+1])
+		}
+		out = append(out, ed)
+		if len(out) >= profile.MaxStations {
+			break
+		}
+	}
+	return out
+}
+
 // Merge fills empty fields of cur with found; lists only when cur has none. Nothing the user entered is replaced.
 func Merge(cur, found profile.Profile) profile.Profile {
 	take := func(dst *string, v string) {
