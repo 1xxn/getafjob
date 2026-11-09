@@ -2,8 +2,12 @@
 # Smoke test for the running Compose stack (go tool task dev:up): TLS front door, security headers, API,
 # hidden readiness details and the egress policy (no private networks, no cloud metadata, no direct internet).
 set -euo pipefail
-compose=(docker compose -f deploy/compose.yaml)
-base="https://localhost:8443"
+project_arg=()
+if [ -n "${COMPOSE_PROJECT_NAME:-}" ]; then
+  project_arg=(-p "$COMPOSE_PROJECT_NAME")
+fi
+compose=(docker compose ${COMPOSE_FILES:--f deploy/compose.yaml} "${project_arg[@]}")
+base="${GETAFJOB_BASE_URL:-https://localhost:8443}"
 fail=0
 ok() { echo "ok   $*"; }
 bad() { echo "FAIL $*"; fail=1; }

@@ -1,0 +1,127 @@
+name: Deploy
+
+# Deploys getafjob to staging (main) or production (tags with environment approval).
+# Supports automated deployment, health check verification, and automatic rollback on failure.
+on:
+  workflow_call:
+    inputs:
+      environment:
+        description: Target environment (staging or production)
+        required: true
+        type: string
+      version:
+        description: Version tag or sha to deploy (e.g. main-<sha> or v0.1.0)
+        required: true
+        type: string
+      action:
+        description: Action to execute (deploy or rollback)
+        required: false
+        type: string
+        default: deploy
+    secrets:
+      DEPLOY_SSH_HOST:
+        required: false
+      DEPLOY_SSH_KEY:
+        required: false
+      DEPLOY_SSH_USER:
+        required: false
+      DEPLOY_SSH_PORT:
+        required: false
+      DEPLOY_SSH_KNOWN_HOSTS:
+        required: false
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: Target environment (staging or production)
+        required: true
+        type: choice
+        options:
+          - staging
+          - production
+        default: staging
+      action:
+        description: Action to execute (deploy or rollback)
+        required: true
+        type: choice
+        options:
+          - deploy
+          - rollback
+        default: deploy
+      version:
+        description: Version tag to deploy (e.g. main-<sha> or v0.1.0; optional for rollback)
+        required: false
+        type: string
+        default: ""
+
+permissions: {}
+
+concurrency:
+  group: deploy-${{ inputs.environment }}
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    name: deploy (${{ inputs.environment }})
+    runs-on: ubuntu-24.04
+    environment: ${{ inputs.environment }}
+    permissions:
+      contents: read
+    steps:
+      - uses: step-security/harden-runner@46b06cea07f9e64621fdf066ba77ac6915163d43 # v2.22.3
+        with:
+          egress-policy: audit
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: check credentials
+        id: check
+        env:
+          SSH_HOST: ${{ secrets.DEPLOY_SSH_HOST }}
+          SSH_KEY: ${{ secrets.DEPLOY_SSH_KEY }}
+          ENV_NAME: ${{ inputs.environment }}
+        run: |
+          if [ -z "$SSH_HOST" ] || [ -z "$SSH_KEY" ]; then
+            echo "configured=false" >> "$GITHUB_OUTPUT"
+            echo "::notice::Server access secrets (DEPLOY_SSH_HOST / DEPLOY_SSH_KEY) are not configured for environment '$ENV_NAME'. Skipping remote deployment. See docs/runbooks/deploy.md for setup instructions."
+          else
+            echo "configured=true" >> "$GITHUB_OUTPUT"
+          fi
+      - name: configure ssh
+        if: steps.check.outputs.configured == 'true'
+        env:
+          SSH_KEY: ${{ secrets.DEPLOY_SSH_KEY }}
+          SSH_HOST: ${{ secrets.DEPLOY_SSH_HOST }}
+          SSH_PORT: ${{ secrets.DEPLOY_SSH_PORT || '22' }}
+          KNOWN_HOSTS: ${{ secrets.DEPLOY_SSH_KNOWN_HOSTS }}
+        run: |
+          mkdir -p ~/.ssh
+          chmod 0700 ~/.ssh
+          printf '%s\n' "$SSH_KEY" > ~/.ssh/deploy_key
+          chmod 0600 ~/.ssh/deploy_key
+          if [ -n "$KNOWN_HOSTS" ]; then
+            printf '%s\n' "$KNOWN_HOSTS" >> ~/.ssh/known_hosts
+            chmod 0644 ~/.ssh/known_hosts
+          else
+            ssh-keyscan -p "$SSH_PORT" -H "$SSH_HOST" >> ~/.ssh/known_hosts 2>/dev/null || true
+            chmod 0644 ~/.ssh/known_hosts
+          fi
+      - name: execute deploy
+        if: steps.check.outputs.configured == 'true'
+        env:
+          SSH_HOST: ${{ secrets.DEPLOY_SSH_HOST }}
+          SSH_USER: ${{ secrets.DEPLOY_SSH_USER || 'deploy' }}
+          SSH_PORT: ${{ secrets.DEPLOY_SSH_PORT || '22' }}
+          TARGET_ENV: ${{ inputs.environment }}
+          TARGET_VERSION: ${{ inputs.version }}
+          TARGET_ACTION: ${{ inputs.action }}
+        run: |
+          if [ "$TARGET_ACTION" = "rollback" ]; then
+            ssh -i ~/.ssh/deploy_key -p "$SSH_PORT" -o BatchMode=yes "${SSH_USER}@${SSH_HOST}" \
+              "cd /opt/getafjob && GETAFJOB_ENV='$TARGET_ENV' deploy/rollback.sh $TARGET_VERSION"
+          else
+            ssh -i ~/.ssh/deploy_key -p "$SSH_PORT" -o BatchMode=yes "${SSH_USER}@${SSH_HOST}" \
+              "cd /opt/getafjob && GETAFJOB_ENV='$TARGET_ENV' GETAFJOB_VERSION='$TARGET_VERSION' deploy/deploy.sh"
+          fi
+      - name: cleanup credentials
+        if: always()
+        run: rm -f ~/.ssh/deploy_key
