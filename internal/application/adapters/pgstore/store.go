@@ -519,7 +519,7 @@ func (s *Store) SaveSettings(ctx context.Context, userID uuid.UUID, st applicati
 	if st.MinScore < 0 || st.MinScore > 100 {
 		return fmt.Errorf("%w: min_score out of range", application.ErrInvalidSettings)
 	}
-	if st.DailyLimit < 0 || st.DailyLimit > 50 {
+	if st.DailyLimit < 0 || st.DailyLimit > application.MaxDailyLimit {
 		return fmt.Errorf("%w: daily_limit out of range", application.ErrInvalidSettings)
 	}
 	choice := string(st.RunnerChoice)

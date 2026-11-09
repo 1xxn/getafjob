@@ -29,7 +29,7 @@ func TestAutonomySettings(t *testing.T) {
 		{Level: LevelAutonomous, MinScore: -1, DailyLimit: 5},
 		{Level: LevelAutonomous, MinScore: 101, DailyLimit: 5},
 		{Level: LevelAutonomous, MinScore: 80, DailyLimit: -1},
-		{Level: LevelAutonomous, MinScore: 80, DailyLimit: 51},
+		{Level: LevelAutonomous, MinScore: 80, DailyLimit: 501},
 		{Level: LevelAutonomous, MinScore: 80, DailyLimit: 5, RunnerChoice: "invalid"},
 	}
 	for _, b := range bad {
