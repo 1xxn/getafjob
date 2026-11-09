@@ -402,9 +402,12 @@ type Run struct {
 	// Session cookies JSON for Easy Apply runs.
 	SessionCookiesJson []byte `protobuf:"bytes,12,opt,name=session_cookies_json,json=sessionCookiesJson,proto3" json:"session_cookies_json,omitempty"`
 	// Portal name if this is an Easy Apply run (linkedin, indeed).
-	Portal        string `protobuf:"bytes,13,opt,name=portal,proto3" json:"portal,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
+	Portal string `protobuf:"bytes,13,opt,name=portal,proto3" json:"portal,omitempty"`
+	// Candidate career stations for multi-entry sections.
+	WorkExperiences []*WorkExperience   `protobuf:"bytes,14,rep,name=work_experiences,json=workExperiences,proto3" json:"work_experiences,omitempty"`
+	Educations      []*EducationStation `protobuf:"bytes,15,rep,name=educations,proto3" json:"educations,omitempty"`
+	unknownFields   protoimpl.UnknownFields
+	sizeCache       protoimpl.SizeCache
 }
 
 func (x *Run) Reset() {
@@ -528,6 +531,244 @@ func (x *Run) GetPortal() string {
 	return ""
 }
 
+func (x *Run) GetWorkExperiences() []*WorkExperience {
+	if x != nil {
+		return x.WorkExperiences
+	}
+	return nil
+}
+
+func (x *Run) GetEducations() []*EducationStation {
+	if x != nil {
+		return x.Educations
+	}
+	return nil
+}
+
+type WorkExperience struct {
+	state              protoimpl.MessageState `protogen:"open.v1"`
+	Id                 string                 `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
+	Company            string                 `protobuf:"bytes,2,opt,name=company,proto3" json:"company,omitempty"`
+	Title              string                 `protobuf:"bytes,3,opt,name=title,proto3" json:"title,omitempty"`
+	Location           string                 `protobuf:"bytes,4,opt,name=location,proto3" json:"location,omitempty"`
+	WorkplaceType      string                 `protobuf:"bytes,5,opt,name=workplace_type,json=workplaceType,proto3" json:"workplace_type,omitempty"`
+	StartDate          string                 `protobuf:"bytes,6,opt,name=start_date,json=startDate,proto3" json:"start_date,omitempty"`
+	EndDate            string                 `protobuf:"bytes,7,opt,name=end_date,json=endDate,proto3" json:"end_date,omitempty"`
+	IsCurrent          bool                   `protobuf:"varint,8,opt,name=is_current,json=isCurrent,proto3" json:"is_current,omitempty"`
+	DescriptionBullets []string               `protobuf:"bytes,9,rep,name=description_bullets,json=descriptionBullets,proto3" json:"description_bullets,omitempty"`
+	SortOrder          int32                  `protobuf:"varint,10,opt,name=sort_order,json=sortOrder,proto3" json:"sort_order,omitempty"`
+	unknownFields      protoimpl.UnknownFields
+	sizeCache          protoimpl.SizeCache
+}
+
+func (x *WorkExperience) Reset() {
+	*x = WorkExperience{}
+	mi := &file_runner_v1_runner_proto_msgTypes[7]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *WorkExperience) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*WorkExperience) ProtoMessage() {}
+
+func (x *WorkExperience) ProtoReflect() protoreflect.Message {
+	mi := &file_runner_v1_runner_proto_msgTypes[7]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use WorkExperience.ProtoReflect.Descriptor instead.
+func (*WorkExperience) Descriptor() ([]byte, []int) {
+	return file_runner_v1_runner_proto_rawDescGZIP(), []int{7}
+}
+
+func (x *WorkExperience) GetId() string {
+	if x != nil {
+		return x.Id
+	}
+	return ""
+}
+
+func (x *WorkExperience) GetCompany() string {
+	if x != nil {
+		return x.Company
+	}
+	return ""
+}
+
+func (x *WorkExperience) GetTitle() string {
+	if x != nil {
+		return x.Title
+	}
+	return ""
+}
+
+func (x *WorkExperience) GetLocation() string {
+	if x != nil {
+		return x.Location
+	}
+	return ""
+}
+
+func (x *WorkExperience) GetWorkplaceType() string {
+	if x != nil {
+		return x.WorkplaceType
+	}
+	return ""
+}
+
+func (x *WorkExperience) GetStartDate() string {
+	if x != nil {
+		return x.StartDate
+	}
+	return ""
+}
+
+func (x *WorkExperience) GetEndDate() string {
+	if x != nil {
+		return x.EndDate
+	}
+	return ""
+}
+
+func (x *WorkExperience) GetIsCurrent() bool {
+	if x != nil {
+		return x.IsCurrent
+	}
+	return false
+}
+
+func (x *WorkExperience) GetDescriptionBullets() []string {
+	if x != nil {
+		return x.DescriptionBullets
+	}
+	return nil
+}
+
+func (x *WorkExperience) GetSortOrder() int32 {
+	if x != nil {
+		return x.SortOrder
+	}
+	return 0
+}
+
+type EducationStation struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Id            string                 `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
+	Institution   string                 `protobuf:"bytes,2,opt,name=institution,proto3" json:"institution,omitempty"`
+	Degree        string                 `protobuf:"bytes,3,opt,name=degree,proto3" json:"degree,omitempty"`
+	FieldOfStudy  string                 `protobuf:"bytes,4,opt,name=field_of_study,json=fieldOfStudy,proto3" json:"field_of_study,omitempty"`
+	StartDate     string                 `protobuf:"bytes,5,opt,name=start_date,json=startDate,proto3" json:"start_date,omitempty"`
+	EndDate       string                 `protobuf:"bytes,6,opt,name=end_date,json=endDate,proto3" json:"end_date,omitempty"`
+	IsCurrent     bool                   `protobuf:"varint,7,opt,name=is_current,json=isCurrent,proto3" json:"is_current,omitempty"`
+	Grade         string                 `protobuf:"bytes,8,opt,name=grade,proto3" json:"grade,omitempty"`
+	SortOrder     int32                  `protobuf:"varint,9,opt,name=sort_order,json=sortOrder,proto3" json:"sort_order,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *EducationStation) Reset() {
+	*x = EducationStation{}
+	mi := &file_runner_v1_runner_proto_msgTypes[8]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *EducationStation) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*EducationStation) ProtoMessage() {}
+
+func (x *EducationStation) ProtoReflect() protoreflect.Message {
+	mi := &file_runner_v1_runner_proto_msgTypes[8]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use EducationStation.ProtoReflect.Descriptor instead.
+func (*EducationStation) Descriptor() ([]byte, []int) {
+	return file_runner_v1_runner_proto_rawDescGZIP(), []int{8}
+}
+
+func (x *EducationStation) GetId() string {
+	if x != nil {
+		return x.Id
+	}
+	return ""
+}
+
+func (x *EducationStation) GetInstitution() string {
+	if x != nil {
+		return x.Institution
+	}
+	return ""
+}
+
+func (x *EducationStation) GetDegree() string {
+	if x != nil {
+		return x.Degree
+	}
+	return ""
+}
+
+func (x *EducationStation) GetFieldOfStudy() string {
+	if x != nil {
+		return x.FieldOfStudy
+	}
+	return ""
+}
+
+func (x *EducationStation) GetStartDate() string {
+	if x != nil {
+		return x.StartDate
+	}
+	return ""
+}
+
+func (x *EducationStation) GetEndDate() string {
+	if x != nil {
+		return x.EndDate
+	}
+	return ""
+}
+
+func (x *EducationStation) GetIsCurrent() bool {
+	if x != nil {
+		return x.IsCurrent
+	}
+	return false
+}
+
+func (x *EducationStation) GetGrade() string {
+	if x != nil {
+		return x.Grade
+	}
+	return ""
+}
+
+func (x *EducationStation) GetSortOrder() int32 {
+	if x != nil {
+		return x.SortOrder
+	}
+	return 0
+}
+
 type Answer struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	Id            string                 `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
@@ -539,7 +780,7 @@ type Answer struct {
 
 func (x *Answer) Reset() {
 	*x = Answer{}
-	mi := &file_runner_v1_runner_proto_msgTypes[7]
+	mi := &file_runner_v1_runner_proto_msgTypes[9]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -551,7 +792,7 @@ func (x *Answer) String() string {
 func (*Answer) ProtoMessage() {}
 
 func (x *Answer) ProtoReflect() protoreflect.Message {
-	mi := &file_runner_v1_runner_proto_msgTypes[7]
+	mi := &file_runner_v1_runner_proto_msgTypes[9]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -564,7 +805,7 @@ func (x *Answer) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use Answer.ProtoReflect.Descriptor instead.
 func (*Answer) Descriptor() ([]byte, []int) {
-	return file_runner_v1_runner_proto_rawDescGZIP(), []int{7}
+	return file_runner_v1_runner_proto_rawDescGZIP(), []int{9}
 }
 
 func (x *Answer) GetId() string {
@@ -601,7 +842,7 @@ type Text struct {
 
 func (x *Text) Reset() {
 	*x = Text{}
-	mi := &file_runner_v1_runner_proto_msgTypes[8]
+	mi := &file_runner_v1_runner_proto_msgTypes[10]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -613,7 +854,7 @@ func (x *Text) String() string {
 func (*Text) ProtoMessage() {}
 
 func (x *Text) ProtoReflect() protoreflect.Message {
-	mi := &file_runner_v1_runner_proto_msgTypes[8]
+	mi := &file_runner_v1_runner_proto_msgTypes[10]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -626,7 +867,7 @@ func (x *Text) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use Text.ProtoReflect.Descriptor instead.
 func (*Text) Descriptor() ([]byte, []int) {
-	return file_runner_v1_runner_proto_rawDescGZIP(), []int{8}
+	return file_runner_v1_runner_proto_rawDescGZIP(), []int{10}
 }
 
 func (x *Text) GetId() string {
@@ -670,7 +911,7 @@ type Document struct {
 
 func (x *Document) Reset() {
 	*x = Document{}
-	mi := &file_runner_v1_runner_proto_msgTypes[9]
+	mi := &file_runner_v1_runner_proto_msgTypes[11]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -682,7 +923,7 @@ func (x *Document) String() string {
 func (*Document) ProtoMessage() {}
 
 func (x *Document) ProtoReflect() protoreflect.Message {
-	mi := &file_runner_v1_runner_proto_msgTypes[9]
+	mi := &file_runner_v1_runner_proto_msgTypes[11]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -695,7 +936,7 @@ func (x *Document) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use Document.ProtoReflect.Descriptor instead.
 func (*Document) Descriptor() ([]byte, []int) {
-	return file_runner_v1_runner_proto_rawDescGZIP(), []int{9}
+	return file_runner_v1_runner_proto_rawDescGZIP(), []int{11}
 }
 
 func (x *Document) GetId() string {
@@ -735,7 +976,7 @@ type FetchDocumentRequest struct {
 
 func (x *FetchDocumentRequest) Reset() {
 	*x = FetchDocumentRequest{}
-	mi := &file_runner_v1_runner_proto_msgTypes[10]
+	mi := &file_runner_v1_runner_proto_msgTypes[12]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -747,7 +988,7 @@ func (x *FetchDocumentRequest) String() string {
 func (*FetchDocumentRequest) ProtoMessage() {}
 
 func (x *FetchDocumentRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_runner_v1_runner_proto_msgTypes[10]
+	mi := &file_runner_v1_runner_proto_msgTypes[12]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -760,7 +1001,7 @@ func (x *FetchDocumentRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use FetchDocumentRequest.ProtoReflect.Descriptor instead.
 func (*FetchDocumentRequest) Descriptor() ([]byte, []int) {
-	return file_runner_v1_runner_proto_rawDescGZIP(), []int{10}
+	return file_runner_v1_runner_proto_rawDescGZIP(), []int{12}
 }
 
 func (x *FetchDocumentRequest) GetDocumentId() string {
@@ -779,7 +1020,7 @@ type FetchDocumentResponse struct {
 
 func (x *FetchDocumentResponse) Reset() {
 	*x = FetchDocumentResponse{}
-	mi := &file_runner_v1_runner_proto_msgTypes[11]
+	mi := &file_runner_v1_runner_proto_msgTypes[13]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -791,7 +1032,7 @@ func (x *FetchDocumentResponse) String() string {
 func (*FetchDocumentResponse) ProtoMessage() {}
 
 func (x *FetchDocumentResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_runner_v1_runner_proto_msgTypes[11]
+	mi := &file_runner_v1_runner_proto_msgTypes[13]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -804,7 +1045,7 @@ func (x *FetchDocumentResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use FetchDocumentResponse.ProtoReflect.Descriptor instead.
 func (*FetchDocumentResponse) Descriptor() ([]byte, []int) {
-	return file_runner_v1_runner_proto_rawDescGZIP(), []int{11}
+	return file_runner_v1_runner_proto_rawDescGZIP(), []int{13}
 }
 
 func (x *FetchDocumentResponse) GetContent() []byte {
@@ -830,7 +1071,7 @@ type CheckpointRequest struct {
 
 func (x *CheckpointRequest) Reset() {
 	*x = CheckpointRequest{}
-	mi := &file_runner_v1_runner_proto_msgTypes[12]
+	mi := &file_runner_v1_runner_proto_msgTypes[14]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -842,7 +1083,7 @@ func (x *CheckpointRequest) String() string {
 func (*CheckpointRequest) ProtoMessage() {}
 
 func (x *CheckpointRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_runner_v1_runner_proto_msgTypes[12]
+	mi := &file_runner_v1_runner_proto_msgTypes[14]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -855,7 +1096,7 @@ func (x *CheckpointRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use CheckpointRequest.ProtoReflect.Descriptor instead.
 func (*CheckpointRequest) Descriptor() ([]byte, []int) {
-	return file_runner_v1_runner_proto_rawDescGZIP(), []int{12}
+	return file_runner_v1_runner_proto_rawDescGZIP(), []int{14}
 }
 
 func (x *CheckpointRequest) GetStep() string {
@@ -908,7 +1149,7 @@ type CheckpointResponse struct {
 
 func (x *CheckpointResponse) Reset() {
 	*x = CheckpointResponse{}
-	mi := &file_runner_v1_runner_proto_msgTypes[13]
+	mi := &file_runner_v1_runner_proto_msgTypes[15]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -920,7 +1161,7 @@ func (x *CheckpointResponse) String() string {
 func (*CheckpointResponse) ProtoMessage() {}
 
 func (x *CheckpointResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_runner_v1_runner_proto_msgTypes[13]
+	mi := &file_runner_v1_runner_proto_msgTypes[15]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -933,7 +1174,7 @@ func (x *CheckpointResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use CheckpointResponse.ProtoReflect.Descriptor instead.
 func (*CheckpointResponse) Descriptor() ([]byte, []int) {
-	return file_runner_v1_runner_proto_rawDescGZIP(), []int{13}
+	return file_runner_v1_runner_proto_rawDescGZIP(), []int{15}
 }
 
 type Question struct {
@@ -949,7 +1190,7 @@ type Question struct {
 
 func (x *Question) Reset() {
 	*x = Question{}
-	mi := &file_runner_v1_runner_proto_msgTypes[14]
+	mi := &file_runner_v1_runner_proto_msgTypes[16]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -961,7 +1202,7 @@ func (x *Question) String() string {
 func (*Question) ProtoMessage() {}
 
 func (x *Question) ProtoReflect() protoreflect.Message {
-	mi := &file_runner_v1_runner_proto_msgTypes[14]
+	mi := &file_runner_v1_runner_proto_msgTypes[16]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -974,7 +1215,7 @@ func (x *Question) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use Question.ProtoReflect.Descriptor instead.
 func (*Question) Descriptor() ([]byte, []int) {
-	return file_runner_v1_runner_proto_rawDescGZIP(), []int{14}
+	return file_runner_v1_runner_proto_rawDescGZIP(), []int{16}
 }
 
 func (x *Question) GetKind() string {
@@ -1007,7 +1248,7 @@ type AskRequest struct {
 
 func (x *AskRequest) Reset() {
 	*x = AskRequest{}
-	mi := &file_runner_v1_runner_proto_msgTypes[15]
+	mi := &file_runner_v1_runner_proto_msgTypes[17]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1019,7 +1260,7 @@ func (x *AskRequest) String() string {
 func (*AskRequest) ProtoMessage() {}
 
 func (x *AskRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_runner_v1_runner_proto_msgTypes[15]
+	mi := &file_runner_v1_runner_proto_msgTypes[17]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1032,7 +1273,7 @@ func (x *AskRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use AskRequest.ProtoReflect.Descriptor instead.
 func (*AskRequest) Descriptor() ([]byte, []int) {
-	return file_runner_v1_runner_proto_rawDescGZIP(), []int{15}
+	return file_runner_v1_runner_proto_rawDescGZIP(), []int{17}
 }
 
 func (x *AskRequest) GetQuestions() []*Question {
@@ -1050,7 +1291,7 @@ type AskResponse struct {
 
 func (x *AskResponse) Reset() {
 	*x = AskResponse{}
-	mi := &file_runner_v1_runner_proto_msgTypes[16]
+	mi := &file_runner_v1_runner_proto_msgTypes[18]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1062,7 +1303,7 @@ func (x *AskResponse) String() string {
 func (*AskResponse) ProtoMessage() {}
 
 func (x *AskResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_runner_v1_runner_proto_msgTypes[16]
+	mi := &file_runner_v1_runner_proto_msgTypes[18]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1075,7 +1316,7 @@ func (x *AskResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use AskResponse.ProtoReflect.Descriptor instead.
 func (*AskResponse) Descriptor() ([]byte, []int) {
-	return file_runner_v1_runner_proto_rawDescGZIP(), []int{16}
+	return file_runner_v1_runner_proto_rawDescGZIP(), []int{18}
 }
 
 type BeginSubmitRequest struct {
@@ -1086,7 +1327,7 @@ type BeginSubmitRequest struct {
 
 func (x *BeginSubmitRequest) Reset() {
 	*x = BeginSubmitRequest{}
-	mi := &file_runner_v1_runner_proto_msgTypes[17]
+	mi := &file_runner_v1_runner_proto_msgTypes[19]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1098,7 +1339,7 @@ func (x *BeginSubmitRequest) String() string {
 func (*BeginSubmitRequest) ProtoMessage() {}
 
 func (x *BeginSubmitRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_runner_v1_runner_proto_msgTypes[17]
+	mi := &file_runner_v1_runner_proto_msgTypes[19]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1111,7 +1352,7 @@ func (x *BeginSubmitRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use BeginSubmitRequest.ProtoReflect.Descriptor instead.
 func (*BeginSubmitRequest) Descriptor() ([]byte, []int) {
-	return file_runner_v1_runner_proto_rawDescGZIP(), []int{17}
+	return file_runner_v1_runner_proto_rawDescGZIP(), []int{19}
 }
 
 type BeginSubmitResponse struct {
@@ -1122,7 +1363,7 @@ type BeginSubmitResponse struct {
 
 func (x *BeginSubmitResponse) Reset() {
 	*x = BeginSubmitResponse{}
-	mi := &file_runner_v1_runner_proto_msgTypes[18]
+	mi := &file_runner_v1_runner_proto_msgTypes[20]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1134,7 +1375,7 @@ func (x *BeginSubmitResponse) String() string {
 func (*BeginSubmitResponse) ProtoMessage() {}
 
 func (x *BeginSubmitResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_runner_v1_runner_proto_msgTypes[18]
+	mi := &file_runner_v1_runner_proto_msgTypes[20]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1147,7 +1388,7 @@ func (x *BeginSubmitResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use BeginSubmitResponse.ProtoReflect.Descriptor instead.
 func (*BeginSubmitResponse) Descriptor() ([]byte, []int) {
-	return file_runner_v1_runner_proto_rawDescGZIP(), []int{18}
+	return file_runner_v1_runner_proto_rawDescGZIP(), []int{20}
 }
 
 type SubmittedRequest struct {
@@ -1161,7 +1402,7 @@ type SubmittedRequest struct {
 
 func (x *SubmittedRequest) Reset() {
 	*x = SubmittedRequest{}
-	mi := &file_runner_v1_runner_proto_msgTypes[19]
+	mi := &file_runner_v1_runner_proto_msgTypes[21]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1173,7 +1414,7 @@ func (x *SubmittedRequest) String() string {
 func (*SubmittedRequest) ProtoMessage() {}
 
 func (x *SubmittedRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_runner_v1_runner_proto_msgTypes[19]
+	mi := &file_runner_v1_runner_proto_msgTypes[21]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1186,7 +1427,7 @@ func (x *SubmittedRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use SubmittedRequest.ProtoReflect.Descriptor instead.
 func (*SubmittedRequest) Descriptor() ([]byte, []int) {
-	return file_runner_v1_runner_proto_rawDescGZIP(), []int{19}
+	return file_runner_v1_runner_proto_rawDescGZIP(), []int{21}
 }
 
 func (x *SubmittedRequest) GetConfirmed() bool {
@@ -1211,7 +1452,7 @@ type SubmittedResponse struct {
 
 func (x *SubmittedResponse) Reset() {
 	*x = SubmittedResponse{}
-	mi := &file_runner_v1_runner_proto_msgTypes[20]
+	mi := &file_runner_v1_runner_proto_msgTypes[22]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1223,7 +1464,7 @@ func (x *SubmittedResponse) String() string {
 func (*SubmittedResponse) ProtoMessage() {}
 
 func (x *SubmittedResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_runner_v1_runner_proto_msgTypes[20]
+	mi := &file_runner_v1_runner_proto_msgTypes[22]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1236,7 +1477,7 @@ func (x *SubmittedResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use SubmittedResponse.ProtoReflect.Descriptor instead.
 func (*SubmittedResponse) Descriptor() ([]byte, []int) {
-	return file_runner_v1_runner_proto_rawDescGZIP(), []int{20}
+	return file_runner_v1_runner_proto_rawDescGZIP(), []int{22}
 }
 
 type ParkRequest struct {
@@ -1249,7 +1490,7 @@ type ParkRequest struct {
 
 func (x *ParkRequest) Reset() {
 	*x = ParkRequest{}
-	mi := &file_runner_v1_runner_proto_msgTypes[21]
+	mi := &file_runner_v1_runner_proto_msgTypes[23]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1261,7 +1502,7 @@ func (x *ParkRequest) String() string {
 func (*ParkRequest) ProtoMessage() {}
 
 func (x *ParkRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_runner_v1_runner_proto_msgTypes[21]
+	mi := &file_runner_v1_runner_proto_msgTypes[23]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1274,7 +1515,7 @@ func (x *ParkRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ParkRequest.ProtoReflect.Descriptor instead.
 func (*ParkRequest) Descriptor() ([]byte, []int) {
-	return file_runner_v1_runner_proto_rawDescGZIP(), []int{21}
+	return file_runner_v1_runner_proto_rawDescGZIP(), []int{23}
 }
 
 func (x *ParkRequest) GetReason() string {
@@ -1299,7 +1540,7 @@ type ParkResponse struct {
 
 func (x *ParkResponse) Reset() {
 	*x = ParkResponse{}
-	mi := &file_runner_v1_runner_proto_msgTypes[22]
+	mi := &file_runner_v1_runner_proto_msgTypes[24]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1311,7 +1552,7 @@ func (x *ParkResponse) String() string {
 func (*ParkResponse) ProtoMessage() {}
 
 func (x *ParkResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_runner_v1_runner_proto_msgTypes[22]
+	mi := &file_runner_v1_runner_proto_msgTypes[24]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1324,7 +1565,7 @@ func (x *ParkResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ParkResponse.ProtoReflect.Descriptor instead.
 func (*ParkResponse) Descriptor() ([]byte, []int) {
-	return file_runner_v1_runner_proto_rawDescGZIP(), []int{22}
+	return file_runner_v1_runner_proto_rawDescGZIP(), []int{24}
 }
 
 type HandoffRequest struct {
@@ -1341,7 +1582,7 @@ type HandoffRequest struct {
 
 func (x *HandoffRequest) Reset() {
 	*x = HandoffRequest{}
-	mi := &file_runner_v1_runner_proto_msgTypes[23]
+	mi := &file_runner_v1_runner_proto_msgTypes[25]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1353,7 +1594,7 @@ func (x *HandoffRequest) String() string {
 func (*HandoffRequest) ProtoMessage() {}
 
 func (x *HandoffRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_runner_v1_runner_proto_msgTypes[23]
+	mi := &file_runner_v1_runner_proto_msgTypes[25]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1366,7 +1607,7 @@ func (x *HandoffRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use HandoffRequest.ProtoReflect.Descriptor instead.
 func (*HandoffRequest) Descriptor() ([]byte, []int) {
-	return file_runner_v1_runner_proto_rawDescGZIP(), []int{23}
+	return file_runner_v1_runner_proto_rawDescGZIP(), []int{25}
 }
 
 func (x *HandoffRequest) GetFrame() []byte {
@@ -1399,7 +1640,7 @@ type HandoffResponse struct {
 
 func (x *HandoffResponse) Reset() {
 	*x = HandoffResponse{}
-	mi := &file_runner_v1_runner_proto_msgTypes[24]
+	mi := &file_runner_v1_runner_proto_msgTypes[26]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1411,7 +1652,7 @@ func (x *HandoffResponse) String() string {
 func (*HandoffResponse) ProtoMessage() {}
 
 func (x *HandoffResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_runner_v1_runner_proto_msgTypes[24]
+	mi := &file_runner_v1_runner_proto_msgTypes[26]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1424,7 +1665,7 @@ func (x *HandoffResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use HandoffResponse.ProtoReflect.Descriptor instead.
 func (*HandoffResponse) Descriptor() ([]byte, []int) {
-	return file_runner_v1_runner_proto_rawDescGZIP(), []int{24}
+	return file_runner_v1_runner_proto_rawDescGZIP(), []int{26}
 }
 
 func (x *HandoffResponse) GetEvents() []*HandoffEvent {
@@ -1450,7 +1691,7 @@ type HandoffEvent struct {
 
 func (x *HandoffEvent) Reset() {
 	*x = HandoffEvent{}
-	mi := &file_runner_v1_runner_proto_msgTypes[25]
+	mi := &file_runner_v1_runner_proto_msgTypes[27]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1462,7 +1703,7 @@ func (x *HandoffEvent) String() string {
 func (*HandoffEvent) ProtoMessage() {}
 
 func (x *HandoffEvent) ProtoReflect() protoreflect.Message {
-	mi := &file_runner_v1_runner_proto_msgTypes[25]
+	mi := &file_runner_v1_runner_proto_msgTypes[27]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1475,7 +1716,7 @@ func (x *HandoffEvent) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use HandoffEvent.ProtoReflect.Descriptor instead.
 func (*HandoffEvent) Descriptor() ([]byte, []int) {
-	return file_runner_v1_runner_proto_rawDescGZIP(), []int{25}
+	return file_runner_v1_runner_proto_rawDescGZIP(), []int{27}
 }
 
 func (x *HandoffEvent) GetMsg() isHandoffEvent_Msg {
@@ -1569,7 +1810,7 @@ type InputMouseEvent struct {
 
 func (x *InputMouseEvent) Reset() {
 	*x = InputMouseEvent{}
-	mi := &file_runner_v1_runner_proto_msgTypes[26]
+	mi := &file_runner_v1_runner_proto_msgTypes[28]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1581,7 +1822,7 @@ func (x *InputMouseEvent) String() string {
 func (*InputMouseEvent) ProtoMessage() {}
 
 func (x *InputMouseEvent) ProtoReflect() protoreflect.Message {
-	mi := &file_runner_v1_runner_proto_msgTypes[26]
+	mi := &file_runner_v1_runner_proto_msgTypes[28]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1594,7 +1835,7 @@ func (x *InputMouseEvent) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use InputMouseEvent.ProtoReflect.Descriptor instead.
 func (*InputMouseEvent) Descriptor() ([]byte, []int) {
-	return file_runner_v1_runner_proto_rawDescGZIP(), []int{26}
+	return file_runner_v1_runner_proto_rawDescGZIP(), []int{28}
 }
 
 func (x *InputMouseEvent) GetType() string {
@@ -1645,7 +1886,7 @@ type InputKeyEvent struct {
 
 func (x *InputKeyEvent) Reset() {
 	*x = InputKeyEvent{}
-	mi := &file_runner_v1_runner_proto_msgTypes[27]
+	mi := &file_runner_v1_runner_proto_msgTypes[29]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1657,7 +1898,7 @@ func (x *InputKeyEvent) String() string {
 func (*InputKeyEvent) ProtoMessage() {}
 
 func (x *InputKeyEvent) ProtoReflect() protoreflect.Message {
-	mi := &file_runner_v1_runner_proto_msgTypes[27]
+	mi := &file_runner_v1_runner_proto_msgTypes[29]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1670,7 +1911,7 @@ func (x *InputKeyEvent) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use InputKeyEvent.ProtoReflect.Descriptor instead.
 func (*InputKeyEvent) Descriptor() ([]byte, []int) {
-	return file_runner_v1_runner_proto_rawDescGZIP(), []int{27}
+	return file_runner_v1_runner_proto_rawDescGZIP(), []int{29}
 }
 
 func (x *InputKeyEvent) GetType() string {
@@ -1729,7 +1970,7 @@ const file_runner_v1_runner_proto_rawDesc = "" +
 	"\fLeaseRequest\x12\x1b\n" +
 	"\trunner_id\x18\x01 \x01(\tR\brunnerId\"1\n" +
 	"\rLeaseResponse\x12 \n" +
-	"\x03run\x18\x01 \x01(\v2\x0e.runner.v1.RunR\x03run\"\xaa\x04\n" +
+	"\x03run\x18\x01 \x01(\v2\x0e.runner.v1.RunR\x03run\"\xad\x05\n" +
 	"\x03Run\x12\x15\n" +
 	"\x06run_id\x18\x01 \x01(\tR\x05runId\x12\x14\n" +
 	"\x05token\x18\x02 \x01(\tR\x05token\x129\n" +
@@ -1745,10 +1986,42 @@ const file_runner_v1_runner_proto_rawDesc = "" +
 	" \x03(\v2\x13.runner.v1.DocumentR\tdocuments\x12$\n" +
 	"\x0ecv_document_id\x18\v \x01(\tR\fcvDocumentId\x120\n" +
 	"\x14session_cookies_json\x18\f \x01(\fR\x12sessionCookiesJson\x12\x16\n" +
-	"\x06portal\x18\r \x01(\tR\x06portal\x1a:\n" +
+	"\x06portal\x18\r \x01(\tR\x06portal\x12D\n" +
+	"\x10work_experiences\x18\x0e \x03(\v2\x19.runner.v1.WorkExperienceR\x0fworkExperiences\x12;\n" +
+	"\n" +
+	"educations\x18\x0f \x03(\v2\x1b.runner.v1.EducationStationR\n" +
+	"educations\x1a:\n" +
 	"\fProfileEntry\x12\x10\n" +
 	"\x03key\x18\x01 \x01(\tR\x03key\x12\x14\n" +
-	"\x05value\x18\x02 \x01(\tR\x05value:\x028\x01\"L\n" +
+	"\x05value\x18\x02 \x01(\tR\x05value:\x028\x01\"\xbc\x02\n" +
+	"\x0eWorkExperience\x12\x0e\n" +
+	"\x02id\x18\x01 \x01(\tR\x02id\x12\x18\n" +
+	"\acompany\x18\x02 \x01(\tR\acompany\x12\x14\n" +
+	"\x05title\x18\x03 \x01(\tR\x05title\x12\x1a\n" +
+	"\blocation\x18\x04 \x01(\tR\blocation\x12%\n" +
+	"\x0eworkplace_type\x18\x05 \x01(\tR\rworkplaceType\x12\x1d\n" +
+	"\n" +
+	"start_date\x18\x06 \x01(\tR\tstartDate\x12\x19\n" +
+	"\bend_date\x18\a \x01(\tR\aendDate\x12\x1d\n" +
+	"\n" +
+	"is_current\x18\b \x01(\bR\tisCurrent\x12/\n" +
+	"\x13description_bullets\x18\t \x03(\tR\x12descriptionBullets\x12\x1d\n" +
+	"\n" +
+	"sort_order\x18\n" +
+	" \x01(\x05R\tsortOrder\"\x90\x02\n" +
+	"\x10EducationStation\x12\x0e\n" +
+	"\x02id\x18\x01 \x01(\tR\x02id\x12 \n" +
+	"\vinstitution\x18\x02 \x01(\tR\vinstitution\x12\x16\n" +
+	"\x06degree\x18\x03 \x01(\tR\x06degree\x12$\n" +
+	"\x0efield_of_study\x18\x04 \x01(\tR\ffieldOfStudy\x12\x1d\n" +
+	"\n" +
+	"start_date\x18\x05 \x01(\tR\tstartDate\x12\x19\n" +
+	"\bend_date\x18\x06 \x01(\tR\aendDate\x12\x1d\n" +
+	"\n" +
+	"is_current\x18\a \x01(\bR\tisCurrent\x12\x14\n" +
+	"\x05grade\x18\b \x01(\tR\x05grade\x12\x1d\n" +
+	"\n" +
+	"sort_order\x18\t \x01(\x05R\tsortOrder\"L\n" +
 	"\x06Answer\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x12\x1a\n" +
 	"\bquestion\x18\x02 \x01(\tR\bquestion\x12\x16\n" +
@@ -1856,7 +2129,7 @@ func file_runner_v1_runner_proto_rawDescGZIP() []byte {
 }
 
 var file_runner_v1_runner_proto_enumTypes = make([]protoimpl.EnumInfo, 1)
-var file_runner_v1_runner_proto_msgTypes = make([]protoimpl.MessageInfo, 29)
+var file_runner_v1_runner_proto_msgTypes = make([]protoimpl.MessageInfo, 31)
 var file_runner_v1_runner_proto_goTypes = []any{
 	(RunnerKind)(0),               // 0: runner.v1.RunnerKind
 	(*RegisterRequest)(nil),       // 1: runner.v1.RegisterRequest
@@ -1866,70 +2139,74 @@ var file_runner_v1_runner_proto_goTypes = []any{
 	(*LeaseRequest)(nil),          // 5: runner.v1.LeaseRequest
 	(*LeaseResponse)(nil),         // 6: runner.v1.LeaseResponse
 	(*Run)(nil),                   // 7: runner.v1.Run
-	(*Answer)(nil),                // 8: runner.v1.Answer
-	(*Text)(nil),                  // 9: runner.v1.Text
-	(*Document)(nil),              // 10: runner.v1.Document
-	(*FetchDocumentRequest)(nil),  // 11: runner.v1.FetchDocumentRequest
-	(*FetchDocumentResponse)(nil), // 12: runner.v1.FetchDocumentResponse
-	(*CheckpointRequest)(nil),     // 13: runner.v1.CheckpointRequest
-	(*CheckpointResponse)(nil),    // 14: runner.v1.CheckpointResponse
-	(*Question)(nil),              // 15: runner.v1.Question
-	(*AskRequest)(nil),            // 16: runner.v1.AskRequest
-	(*AskResponse)(nil),           // 17: runner.v1.AskResponse
-	(*BeginSubmitRequest)(nil),    // 18: runner.v1.BeginSubmitRequest
-	(*BeginSubmitResponse)(nil),   // 19: runner.v1.BeginSubmitResponse
-	(*SubmittedRequest)(nil),      // 20: runner.v1.SubmittedRequest
-	(*SubmittedResponse)(nil),     // 21: runner.v1.SubmittedResponse
-	(*ParkRequest)(nil),           // 22: runner.v1.ParkRequest
-	(*ParkResponse)(nil),          // 23: runner.v1.ParkResponse
-	(*HandoffRequest)(nil),        // 24: runner.v1.HandoffRequest
-	(*HandoffResponse)(nil),       // 25: runner.v1.HandoffResponse
-	(*HandoffEvent)(nil),          // 26: runner.v1.HandoffEvent
-	(*InputMouseEvent)(nil),       // 27: runner.v1.InputMouseEvent
-	(*InputKeyEvent)(nil),         // 28: runner.v1.InputKeyEvent
-	nil,                           // 29: runner.v1.Run.ProfileEntry
-	(*durationpb.Duration)(nil),   // 30: google.protobuf.Duration
-	(*timestamppb.Timestamp)(nil), // 31: google.protobuf.Timestamp
+	(*WorkExperience)(nil),        // 8: runner.v1.WorkExperience
+	(*EducationStation)(nil),      // 9: runner.v1.EducationStation
+	(*Answer)(nil),                // 10: runner.v1.Answer
+	(*Text)(nil),                  // 11: runner.v1.Text
+	(*Document)(nil),              // 12: runner.v1.Document
+	(*FetchDocumentRequest)(nil),  // 13: runner.v1.FetchDocumentRequest
+	(*FetchDocumentResponse)(nil), // 14: runner.v1.FetchDocumentResponse
+	(*CheckpointRequest)(nil),     // 15: runner.v1.CheckpointRequest
+	(*CheckpointResponse)(nil),    // 16: runner.v1.CheckpointResponse
+	(*Question)(nil),              // 17: runner.v1.Question
+	(*AskRequest)(nil),            // 18: runner.v1.AskRequest
+	(*AskResponse)(nil),           // 19: runner.v1.AskResponse
+	(*BeginSubmitRequest)(nil),    // 20: runner.v1.BeginSubmitRequest
+	(*BeginSubmitResponse)(nil),   // 21: runner.v1.BeginSubmitResponse
+	(*SubmittedRequest)(nil),      // 22: runner.v1.SubmittedRequest
+	(*SubmittedResponse)(nil),     // 23: runner.v1.SubmittedResponse
+	(*ParkRequest)(nil),           // 24: runner.v1.ParkRequest
+	(*ParkResponse)(nil),          // 25: runner.v1.ParkResponse
+	(*HandoffRequest)(nil),        // 26: runner.v1.HandoffRequest
+	(*HandoffResponse)(nil),       // 27: runner.v1.HandoffResponse
+	(*HandoffEvent)(nil),          // 28: runner.v1.HandoffEvent
+	(*InputMouseEvent)(nil),       // 29: runner.v1.InputMouseEvent
+	(*InputKeyEvent)(nil),         // 30: runner.v1.InputKeyEvent
+	nil,                           // 31: runner.v1.Run.ProfileEntry
+	(*durationpb.Duration)(nil),   // 32: google.protobuf.Duration
+	(*timestamppb.Timestamp)(nil), // 33: google.protobuf.Timestamp
 }
 var file_runner_v1_runner_proto_depIdxs = []int32{
 	0,  // 0: runner.v1.RegisterRequest.kind:type_name -> runner.v1.RunnerKind
-	30, // 1: runner.v1.RegisterResponse.heartbeat_interval:type_name -> google.protobuf.Duration
+	32, // 1: runner.v1.RegisterResponse.heartbeat_interval:type_name -> google.protobuf.Duration
 	7,  // 2: runner.v1.LeaseResponse.run:type_name -> runner.v1.Run
-	31, // 3: runner.v1.Run.expires_at:type_name -> google.protobuf.Timestamp
-	29, // 4: runner.v1.Run.profile:type_name -> runner.v1.Run.ProfileEntry
-	8,  // 5: runner.v1.Run.answers:type_name -> runner.v1.Answer
-	9,  // 6: runner.v1.Run.texts:type_name -> runner.v1.Text
-	10, // 7: runner.v1.Run.documents:type_name -> runner.v1.Document
-	15, // 8: runner.v1.AskRequest.questions:type_name -> runner.v1.Question
-	26, // 9: runner.v1.HandoffResponse.events:type_name -> runner.v1.HandoffEvent
-	27, // 10: runner.v1.HandoffEvent.mouse:type_name -> runner.v1.InputMouseEvent
-	28, // 11: runner.v1.HandoffEvent.key:type_name -> runner.v1.InputKeyEvent
-	8,  // 12: runner.v1.HandoffEvent.answers:type_name -> runner.v1.Answer
-	1,  // 13: runner.v1.RunnerService.Register:input_type -> runner.v1.RegisterRequest
-	3,  // 14: runner.v1.RunnerService.Heartbeat:input_type -> runner.v1.HeartbeatRequest
-	5,  // 15: runner.v1.RunnerService.Lease:input_type -> runner.v1.LeaseRequest
-	11, // 16: runner.v1.RunnerService.FetchDocument:input_type -> runner.v1.FetchDocumentRequest
-	13, // 17: runner.v1.RunnerService.Checkpoint:input_type -> runner.v1.CheckpointRequest
-	16, // 18: runner.v1.RunnerService.Ask:input_type -> runner.v1.AskRequest
-	18, // 19: runner.v1.RunnerService.BeginSubmit:input_type -> runner.v1.BeginSubmitRequest
-	20, // 20: runner.v1.RunnerService.Submitted:input_type -> runner.v1.SubmittedRequest
-	22, // 21: runner.v1.RunnerService.Park:input_type -> runner.v1.ParkRequest
-	24, // 22: runner.v1.RunnerService.Handoff:input_type -> runner.v1.HandoffRequest
-	2,  // 23: runner.v1.RunnerService.Register:output_type -> runner.v1.RegisterResponse
-	4,  // 24: runner.v1.RunnerService.Heartbeat:output_type -> runner.v1.HeartbeatResponse
-	6,  // 25: runner.v1.RunnerService.Lease:output_type -> runner.v1.LeaseResponse
-	12, // 26: runner.v1.RunnerService.FetchDocument:output_type -> runner.v1.FetchDocumentResponse
-	14, // 27: runner.v1.RunnerService.Checkpoint:output_type -> runner.v1.CheckpointResponse
-	17, // 28: runner.v1.RunnerService.Ask:output_type -> runner.v1.AskResponse
-	19, // 29: runner.v1.RunnerService.BeginSubmit:output_type -> runner.v1.BeginSubmitResponse
-	21, // 30: runner.v1.RunnerService.Submitted:output_type -> runner.v1.SubmittedResponse
-	23, // 31: runner.v1.RunnerService.Park:output_type -> runner.v1.ParkResponse
-	25, // 32: runner.v1.RunnerService.Handoff:output_type -> runner.v1.HandoffResponse
-	23, // [23:33] is the sub-list for method output_type
-	13, // [13:23] is the sub-list for method input_type
-	13, // [13:13] is the sub-list for extension type_name
-	13, // [13:13] is the sub-list for extension extendee
-	0,  // [0:13] is the sub-list for field type_name
+	33, // 3: runner.v1.Run.expires_at:type_name -> google.protobuf.Timestamp
+	31, // 4: runner.v1.Run.profile:type_name -> runner.v1.Run.ProfileEntry
+	10, // 5: runner.v1.Run.answers:type_name -> runner.v1.Answer
+	11, // 6: runner.v1.Run.texts:type_name -> runner.v1.Text
+	12, // 7: runner.v1.Run.documents:type_name -> runner.v1.Document
+	8,  // 8: runner.v1.Run.work_experiences:type_name -> runner.v1.WorkExperience
+	9,  // 9: runner.v1.Run.educations:type_name -> runner.v1.EducationStation
+	17, // 10: runner.v1.AskRequest.questions:type_name -> runner.v1.Question
+	28, // 11: runner.v1.HandoffResponse.events:type_name -> runner.v1.HandoffEvent
+	29, // 12: runner.v1.HandoffEvent.mouse:type_name -> runner.v1.InputMouseEvent
+	30, // 13: runner.v1.HandoffEvent.key:type_name -> runner.v1.InputKeyEvent
+	10, // 14: runner.v1.HandoffEvent.answers:type_name -> runner.v1.Answer
+	1,  // 15: runner.v1.RunnerService.Register:input_type -> runner.v1.RegisterRequest
+	3,  // 16: runner.v1.RunnerService.Heartbeat:input_type -> runner.v1.HeartbeatRequest
+	5,  // 17: runner.v1.RunnerService.Lease:input_type -> runner.v1.LeaseRequest
+	13, // 18: runner.v1.RunnerService.FetchDocument:input_type -> runner.v1.FetchDocumentRequest
+	15, // 19: runner.v1.RunnerService.Checkpoint:input_type -> runner.v1.CheckpointRequest
+	18, // 20: runner.v1.RunnerService.Ask:input_type -> runner.v1.AskRequest
+	20, // 21: runner.v1.RunnerService.BeginSubmit:input_type -> runner.v1.BeginSubmitRequest
+	22, // 22: runner.v1.RunnerService.Submitted:input_type -> runner.v1.SubmittedRequest
+	24, // 23: runner.v1.RunnerService.Park:input_type -> runner.v1.ParkRequest
+	26, // 24: runner.v1.RunnerService.Handoff:input_type -> runner.v1.HandoffRequest
+	2,  // 25: runner.v1.RunnerService.Register:output_type -> runner.v1.RegisterResponse
+	4,  // 26: runner.v1.RunnerService.Heartbeat:output_type -> runner.v1.HeartbeatResponse
+	6,  // 27: runner.v1.RunnerService.Lease:output_type -> runner.v1.LeaseResponse
+	14, // 28: runner.v1.RunnerService.FetchDocument:output_type -> runner.v1.FetchDocumentResponse
+	16, // 29: runner.v1.RunnerService.Checkpoint:output_type -> runner.v1.CheckpointResponse
+	19, // 30: runner.v1.RunnerService.Ask:output_type -> runner.v1.AskResponse
+	21, // 31: runner.v1.RunnerService.BeginSubmit:output_type -> runner.v1.BeginSubmitResponse
+	23, // 32: runner.v1.RunnerService.Submitted:output_type -> runner.v1.SubmittedResponse
+	25, // 33: runner.v1.RunnerService.Park:output_type -> runner.v1.ParkResponse
+	27, // 34: runner.v1.RunnerService.Handoff:output_type -> runner.v1.HandoffResponse
+	25, // [25:35] is the sub-list for method output_type
+	15, // [15:25] is the sub-list for method input_type
+	15, // [15:15] is the sub-list for extension type_name
+	15, // [15:15] is the sub-list for extension extendee
+	0,  // [0:15] is the sub-list for field type_name
 }
 
 func init() { file_runner_v1_runner_proto_init() }
@@ -1937,7 +2214,7 @@ func file_runner_v1_runner_proto_init() {
 	if File_runner_v1_runner_proto != nil {
 		return
 	}
-	file_runner_v1_runner_proto_msgTypes[25].OneofWrappers = []any{
+	file_runner_v1_runner_proto_msgTypes[27].OneofWrappers = []any{
 		(*HandoffEvent_Mouse)(nil),
 		(*HandoffEvent_Key)(nil),
 		(*HandoffEvent_Resume)(nil),
@@ -1949,7 +2226,7 @@ func file_runner_v1_runner_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_runner_v1_runner_proto_rawDesc), len(file_runner_v1_runner_proto_rawDesc)),
 			NumEnums:      1,
-			NumMessages:   29,
+			NumMessages:   31,
 			NumExtensions: 0,
 			NumServices:   1,
 		},

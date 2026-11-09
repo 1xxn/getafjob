@@ -26,6 +26,9 @@ type Knowledge struct {
 	CV        string     // ID of the CV chosen for this job
 	Language  string     // en or de: the form's language
 	Origins   []string   // origins the values may go to
+
+	WorkExperiences []WorkExperience
+	Educations      []EducationStation
 }
 
 // Answer is an answer bank entry.
@@ -61,7 +64,14 @@ var _ engine.Planner = (*Planner)(nil)
 func (p *Planner) Plan(ctx context.Context, st *browser.State) (executor.Plan, []engine.Question, error) {
 	plan := executor.Plan{Origins: p.K.Origins}
 	var qs []engine.Question
+
+	stationValues, handled := p.planStations(st)
+	plan.Values = append(plan.Values, stationValues...)
+
 	for _, f := range st.Fields() {
+		if handled[f.ID] {
+			continue
+		}
 		if f.Kind == "password" || (f.Kind == "file" && strings.Contains(executor.Normalize(f.Label), "autofill")) {
 			continue
 		}

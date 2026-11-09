@@ -5,7 +5,9 @@ import "testing"
 func TestValidSource(t *testing.T) {
 	good := []string{"profile.email", "profile.personal.first_name", "answer#123", "textblock#4",
 		"document#0192f3a4-5b6c-7d8e-9f01-23456789abcd", "ai_draft#9 (approved)",
-		"answer#0192f3a4-5b6c-7d8e-9f01-23456789abcd", "textblock#0192f3a4-5b6c-7d8e-9f01-23456789abcd"}
+		"answer#0192f3a4-5b6c-7d8e-9f01-23456789abcd", "textblock#0192f3a4-5b6c-7d8e-9f01-23456789abcd",
+		"station#0192f3a4-5b6c-7d8e-9f01-23456789abcd", "profile.work_experience.0.company",
+		"profile.education.1.institution"}
 	bad := []string{"", "profile.", "Profile.email", "answer#", "answer#x", "textblock#4 ", "ai_draft#9",
 		"ai_draft#9 (pending)", "document#123", "ai_draft#0192f3a4-5b6c-7d8e-9f01-23456789abcd",
 		"answer#0192F3A4-5b6c-7d8e-9f01-23456789abcd", "guess", "page", "profile.email; answer#1"}

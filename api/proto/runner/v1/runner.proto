@@ -100,6 +100,34 @@ message Run {
   bytes session_cookies_json = 12;
   // Portal name if this is an Easy Apply run (linkedin, indeed).
   string portal = 13;
+  // Candidate career stations for multi-entry sections.
+  repeated WorkExperience work_experiences = 14;
+  repeated EducationStation educations = 15;
+}
+
+message WorkExperience {
+  string id = 1;
+  string company = 2;
+  string title = 3;
+  string location = 4;
+  string workplace_type = 5;
+  string start_date = 6;
+  string end_date = 7;
+  bool is_current = 8;
+  repeated string description_bullets = 9;
+  int32 sort_order = 10;
+}
+
+message EducationStation {
+  string id = 1;
+  string institution = 2;
+  string degree = 3;
+  string field_of_study = 4;
+  string start_date = 5;
+  string end_date = 6;
+  bool is_current = 7;
+  string grade = 8;
+  int32 sort_order = 9;
 }
 
 message Answer {

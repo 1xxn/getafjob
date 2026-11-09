@@ -58,6 +58,34 @@
     const f = el.form || (el.closest && el.closest("form"));
     return f ? `${frameIndex}:form${Math.max(0, forms.indexOf(f))}` : "";
   };
+  const sectionOf = (el) => {
+    if (!el) return "";
+    const fs = el.closest && el.closest("fieldset");
+    if (fs) {
+      const leg = fs.querySelector("legend");
+      if (leg) {
+        const lt = textOf(leg);
+        if (lt && lt.length <= 150) return lt;
+      }
+    }
+    for (let c = el.parentElement; c && c !== document.body; c = c.parentElement) {
+      const aria = c.getAttribute && c.getAttribute("aria-label");
+      if (aria && aria.length <= 150) return aria;
+      const h = c.querySelector && c.querySelector("h1, h2, h3, h4, h5, h6, [role='heading']");
+      if (h && c.contains(h) && !el.contains(h)) {
+        const ht = textOf(h);
+        if (ht && ht.length <= 150) {
+          const inputs = c.querySelectorAll("input, select, textarea");
+          if (inputs.length <= 30) return ht;
+        }
+      }
+      const cls = (typeof c.className === "string" ? c.className : "") + " " + (c.id || "");
+      if (/experience|employment|work-history|education|ausbildung|berufserfahrung/i.test(cls)) {
+        return clean(c.id || c.className).slice(0, 80);
+      }
+    }
+    return "";
+  };
   const tag = (el) => {
     let id = el.getAttribute("data-gaj");
     if (!id || !id.startsWith(PREFIX)) {
@@ -307,7 +335,7 @@
     const isAutofill = !isNativePortalApply && AUTOFILL_RX.test(text);
     const btn = { id: tag(el), text, kind: t === "A" ? "link" : (el.type === "submit" || /submit/i.test(el.getAttribute("type") || "") ? "submit" : "button"),
       href: t === "A" ? (el.href || "").slice(0, 300) : "", disabled: !!el.disabled || el.getAttribute("aria-disabled") === "true",
-      form: formKey(el), autofill: isAutofill, cookie: inCookieBanner(el),
+      form: formKey(el), section: sectionOf(el), autofill: isAutofill, cookie: inCookieBanner(el),
       // toggle buttons (Ashby yes/no): pressed = chosen; another click would clear the choice
       pressed: el.getAttribute("aria-pressed") === "true" };
     // Important ones first: form buttons, autofill, flow buttons; navigation last.
@@ -352,6 +380,7 @@
   for (const f of fields) {
     const el = all.find((e) => e.getAttribute && e.getAttribute("data-gaj") === f.id);
     f.form = el ? formKey(el) : "";
+    f.section = el ? sectionOf(el) : "";
   }
 
   const headings = Array.from(document.querySelectorAll("h1,h2,h3")).filter(visible).map(textOf).filter(Boolean).slice(0, 15);

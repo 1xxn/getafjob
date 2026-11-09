@@ -1,0 +1,111 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>Ashby Multi-Station Application</title>
+  <style>
+    body { font-family: sans-serif; max-width: 720px; margin: 30px auto; padding: 0 20px; }
+    .field { margin: 14px 0; }
+    label { display: block; font-weight: bold; margin-bottom: 4px; }
+    input[type=text], input[type=email], textarea { width: 100%; padding: 8px; border: 1px solid #ccc; border-radius: 4px; box-sizing: border-box; }
+    .group-box { border: 1px solid #e2e8f0; padding: 16px; border-radius: 6px; margin-bottom: 12px; background: #fff; }
+    .btn-add { background: #f8fafc; border: 1px solid #cbd5e1; padding: 8px 16px; border-radius: 4px; cursor: pointer; font-weight: 600; margin-bottom: 16px; }
+    button[type=submit] { background: #4f46e5; color: white; border: none; padding: 12px 24px; font-size: 16px; border-radius: 4px; cursor: pointer; }
+  </style>
+</head>
+<body>
+  <h1>Lead Software Architect - Acme Global</h1>
+  <form id="ashby-form" action="/submit" method="post" novalidate>
+    <div class="field"><label for="name">Full Name *</label><input id="name" name="name" required></div>
+    <div class="field"><label for="email">Email *</label><input id="email" name="email" type="email" required></div>
+    <div class="field"><label for="resume">Resume *</label><input id="resume" name="resume" type="file" required></div>
+
+    <div id="section-work-history">
+      <h3>Work History</h3>
+      <div id="exp-items">
+        <div class="group-box" id="exp-item-0">
+          <div class="field"><label for="exp_company_0">Company *</label><input id="exp_company_0" name="work_history[0].company" required></div>
+          <div class="field"><label for="exp_title_0">Job Title *</label><input id="exp_title_0" name="work_history[0].title" required></div>
+          <div class="field"><label for="exp_start_0">Start Date *</label><input id="exp_start_0" name="work_history[0].start_date" required></div>
+          <div class="field"><label for="exp_end_0">End Date</label><input id="exp_end_0" name="work_history[0].end_date"></div>
+          <div class="field"><label for="exp_desc_0">Description</label><textarea id="exp_desc_0" name="work_history[0].description"></textarea></div>
+        </div>
+      </div>
+      <button type="button" class="btn-add" id="btn-add-exp">+ Add Experience</button>
+    </div>
+
+    <div id="section-education">
+      <h3>Education</h3>
+      <div id="edu-items">
+        <div class="group-box" id="edu-item-0">
+          <div class="field"><label for="edu_school_0">School *</label><input id="edu_school_0" name="education[0].school" required></div>
+          <div class="field"><label for="edu_degree_0">Degree *</label><input id="edu_degree_0" name="education[0].degree" required></div>
+          <div class="field"><label for="edu_major_0">Field of Study</label><input id="edu_major_0" name="education[0].major"></div>
+        </div>
+      </div>
+      <button type="button" class="btn-add" id="btn-add-edu">+ Add Education</button>
+    </div>
+
+    <div class="field"><label><input id="terms" type="checkbox" required> I agree to terms *</label></div>
+    <button type="submit" id="btn-submit">Submit Application</button>
+  </form>
+
+  <script>
+    let expIdx = 1;
+    let eduIdx = 1;
+
+    document.getElementById('btn-add-exp').addEventListener('click', () => {
+      const i = expIdx++;
+      const div = document.createElement('div');
+      div.className = 'group-box';
+      div.id = `exp-item-${i}`;
+      div.innerHTML = `
+        <div class="field"><label for="exp_company_${i}">Company *</label><input id="exp_company_${i}" name="work_history[${i}].company" required></div>
+        <div class="field"><label for="exp_title_${i}">Job Title *</label><input id="exp_title_${i}" name="work_history[${i}].title" required></div>
+        <div class="field"><label for="exp_start_${i}">Start Date *</label><input id="exp_start_${i}" name="work_history[${i}].start_date" required></div>
+        <div class="field"><label for="exp_end_${i}">End Date</label><input id="exp_end_${i}" name="work_history[${i}].end_date"></div>
+        <div class="field"><label for="exp_desc_${i}">Description</label><textarea id="exp_desc_${i}" name="work_history[${i}].description"></textarea></div>
+      `;
+      document.getElementById('exp-items').appendChild(div);
+    });
+
+    document.getElementById('btn-add-edu').addEventListener('click', () => {
+      const i = eduIdx++;
+      const div = document.createElement('div');
+      div.className = 'group-box';
+      div.id = `edu-item-${i}`;
+      div.innerHTML = `
+        <div class="field"><label for="edu_school_${i}">School *</label><input id="edu_school_${i}" name="education[${i}].school" required></div>
+        <div class="field"><label for="edu_degree_${i}">Degree *</label><input id="edu_degree_${i}" name="education[${i}].degree" required></div>
+        <div class="field"><label for="edu_major_${i}">Field of Study</label><input id="edu_major_${i}" name="education[${i}].major"></div>
+      `;
+      document.getElementById('edu-items').appendChild(div);
+    });
+
+    document.getElementById('ashby-form').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const exps = [];
+      for (let i = 0; i < expIdx; i++) {
+        const c = document.getElementById(`exp_company_${i}`);
+        const t = document.getElementById(`exp_title_${i}`);
+        if (c && t && c.value) exps.push({ company: c.value, title: t.value });
+      }
+      const edus = [];
+      for (let i = 0; i < eduIdx; i++) {
+        const s = document.getElementById(`edu_school_${i}`);
+        const d = document.getElementById(`edu_degree_${i}`);
+        if (s && d && s.value) edus.push({ school: s.value, degree: d.value });
+      }
+      const data = {
+        name: document.getElementById('name').value,
+        email: document.getElementById('email').value,
+        resume: document.getElementById('resume').files[0]?.name || '',
+        experiences: exps,
+        educations: edus
+      };
+      await fetch('/submit', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(data) });
+      document.body.innerHTML = '<h2>Application Complete!</h2>';
+    });
+  </script>
+</body>
+</html>

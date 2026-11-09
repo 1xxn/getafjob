@@ -58,6 +58,7 @@ type Field struct {
 	Accept       string   `json:"accept,omitempty"`
 	Autocomplete string   `json:"autocomplete,omitempty"`
 	Form         string   `json:"form,omitempty"`
+	Section      string   `json:"section,omitempty"`
 	Multiple     bool     `json:"multiple,omitempty"`
 	Invalid      bool     `json:"invalid,omitempty"`
 	MaxLength    int      `json:"max_length,omitempty"`
@@ -71,6 +72,7 @@ type Button struct {
 	Kind     string `json:"kind"`
 	Href     string `json:"href,omitempty"`
 	Form     string `json:"form,omitempty"`
+	Section  string `json:"section,omitempty"`
 	Disabled bool   `json:"disabled,omitempty"`
 	Autofill bool   `json:"autofill,omitempty"`
 	Cookie   bool   `json:"cookie,omitempty"`
