@@ -18,25 +18,35 @@ type TextSource interface {
 type Importer struct {
 	docs     *profile.Documents
 	profiles *profile.Service
+	stations *profile.Stations
 	text     TextSource
 }
 
 // NewImporter wires the import.
-func NewImporter(docs *profile.Documents, profiles *profile.Service, text TextSource) *Importer {
-	return &Importer{docs: docs, profiles: profiles, text: text}
+func NewImporter(docs *profile.Documents, profiles *profile.Service, stations *profile.Stations, text TextSource) *Importer {
+	return &Importer{docs: docs, profiles: profiles, stations: stations, text: text}
 }
 
-// Import reads the document, finds what the heuristics can and stores it in the empty fields of the profile.
-// Nothing the user entered is changed. It reports whether anything was filled.
-func (i *Importer) Import(ctx context.Context, userID, docID uuid.UUID) (bool, error) {
+// Extract extracts structured profile and career station data from a document without modifying the database.
+func (i *Importer) Extract(ctx context.Context, userID, docID uuid.UUID) (ParsedCV, error) {
 	d, data, err := i.docs.Read(ctx, userID, docID)
 	if err != nil {
-		return false, err
+		return ParsedCV{}, err
 	}
 	if d.Mime != profile.MimePDF && d.Mime != profile.MimeDOCX {
-		return false, profile.ErrFileType
+		return ParsedCV{}, profile.ErrFileType
 	}
 	text, err := i.text.Text(ctx, d.Mime, data)
+	if err != nil {
+		return ParsedCV{}, err
+	}
+	return ParseAll(text), nil
+}
+
+// Import reads the document, finds what the heuristics can and stores it in the empty fields of the profile
+// and adds career stations if none exist yet. Nothing the user entered is changed. It reports whether anything was filled.
+func (i *Importer) Import(ctx context.Context, userID, docID uuid.UUID) (bool, error) {
+	parsed, err := i.Extract(ctx, userID, docID)
 	if err != nil {
 		return false, err
 	}
@@ -44,13 +54,36 @@ func (i *Importer) Import(ctx context.Context, userID, docID uuid.UUID) (bool, e
 	if err != nil {
 		return false, err
 	}
-	merged := Merge(snap.Profile, Parse(text))
-	if reflect.DeepEqual(merged, snap.Profile) {
-		return false, nil
+	merged := Merge(snap.Profile, parsed.Profile)
+	changed := !reflect.DeepEqual(merged, snap.Profile)
+	if changed {
+		// Heuristics can find odd values; drop what the schema refuses instead of failing the whole import.
+		merged = dropInvalid(merged, snap.Profile)
+		if err := i.profiles.SaveProfile(ctx, userID, merged, snap.Version); err != nil {
+			return false, err
+		}
 	}
-	// Heuristics can find odd values; drop what the schema refuses instead of failing the whole import.
-	merged = dropInvalid(merged, snap.Profile)
-	return true, i.profiles.SaveProfile(ctx, userID, merged, snap.Version)
+	if i.stations != nil {
+		exps, err := i.stations.WorkExperiences(ctx, userID)
+		if err == nil && len(exps) == 0 && len(parsed.Experiences) > 0 {
+			for _, exp := range parsed.Experiences {
+				if _, err := i.stations.SaveWorkExperience(ctx, userID, exp); err != nil {
+					return false, err
+				}
+			}
+			changed = true
+		}
+		edus, err := i.stations.Educations(ctx, userID)
+		if err == nil && len(edus) == 0 && len(parsed.Educations) > 0 {
+			for _, edu := range parsed.Educations {
+				if _, err := i.stations.SaveEducation(ctx, userID, edu); err != nil {
+					return false, err
+				}
+			}
+			changed = true
+		}
+	}
+	return changed, nil
 }
 
 // dropInvalid resets fields that fail validation to the user's value.

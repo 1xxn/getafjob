@@ -143,7 +143,7 @@ func serve(ctx context.Context, cfg config.Config, logger *slog.Logger) error {
 	privacySvc := privacy.NewService(ids, profiles, items, docs, apps, listings, env, sealedFiles)
 	stations := profile.NewStations(pstore, env)
 	(&web.Server{Identity: ids, Logger: logger, Profile: profiles, Documents: docs, Items: items, Stations: stations,
-		Importer: cvimport.NewImporter(docs, profiles, extractor), Jobs: listings,
+		Importer: cvimport.NewImporter(docs, profiles, stations, extractor), Jobs: listings,
 		PushStore: webpush.NewStore(pool), VAPIDPublicKey: vapidPub, Apps: apps, Tracking: trackingSvc, Notify: notifySvc, Assist: assistSvc, Portals: portalsSvc, AI: aiSvc, Privacy: privacySvc, Shots: sealedFiles, Handoffs: gw}).Register(mux)
 
 	h := httpx.Instrument(httpx.Protect(httpx.Routes(mux), maxBody, cfg.PublicURL.Scheme == "https",

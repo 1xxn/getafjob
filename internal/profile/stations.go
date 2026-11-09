@@ -20,6 +20,13 @@ var (
 // MaxStations limits how many entries a user may keep per category.
 const MaxStations = 100
 
+// Workplace types for WorkExperience.
+const (
+	WorkplaceRemote = "remote"
+	WorkplaceHybrid = "hybrid"
+	WorkplaceOnsite = "onsite"
+)
+
 // WorkExperience represents a structured employment position station.
 type WorkExperience struct {
 	ID                 uuid.UUID `json:"id"`

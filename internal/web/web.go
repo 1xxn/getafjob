@@ -162,6 +162,8 @@ func (s *Server) Register(mux *http.ServeMux) {
 	mux.Handle("POST /documents/{id}/variant", s.page(s.documentVariant))
 	mux.Handle("POST /documents/{id}/delete", s.page(s.documentDelete))
 	mux.Handle("POST /documents/{id}/import", s.limited(s.page(s.documentImport)))
+	mux.Handle("GET /documents/{id}/review", s.limited(s.page(s.documentReview)))
+	mux.Handle("POST /documents/{id}/review", s.limited(s.page(s.documentReviewSave)))
 	mux.Handle("GET /answers", s.page(s.answersPage))
 	mux.Handle("POST /answers", s.page(s.answerSave))
 	mux.Handle("POST /answers/{id}", s.page(s.answerSave))

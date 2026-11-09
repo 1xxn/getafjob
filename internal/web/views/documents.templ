@@ -85,7 +85,8 @@ templ DocumentsPage(name, notice string, failed bool, docs []DocumentRow) {
 								Hint: T(ctx, "documents.focus_hint"), MaxLength: 2000})
 							<button type="submit">{ T(ctx, "profile.save") }</button>
 							if d.Import {
-								<button type="submit" class="link" formaction={ templ.SafeURL("/documents/" + d.ID + "/import") }>{ T(ctx, "documents.import") }</button>
+								<a href={ templ.SafeURL("/documents/" + d.ID + "/review") } class="button secondary" style="margin-left: 0.5rem;">{ T(ctx, "documents.review") }</a>
+								<button type="submit" class="link" formaction={ templ.SafeURL("/documents/" + d.ID + "/import") } style="margin-left: 0.5rem;">{ T(ctx, "documents.import") }</button>
 							}
 						</form>
 					}

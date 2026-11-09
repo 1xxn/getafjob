@@ -140,6 +140,106 @@ func TestMergeKeepsUserValues(t *testing.T) {
 	}
 }
 
+const cvRich = `Max Mustermann
+Staff Platform Engineer
+10115 Berlin · max.mustermann@example.org · +49 30 1234567
+
+Experience
+Staff Platform Engineer at Muster Cloud GmbH | Berlin, Germany (Remote)    03/2022 - present
+• Architected multi-region Kubernetes platform
+• Reduced cloud compute spending by 35%
+Senior Backend Developer at Beispiel Systems - Munich (Hybrid)    2018 - 2022
+• Designed distributed caching layer with Redis and Go
+• Maintained PostgreSQL databases
+
+Education
+M.Sc. Computer Science, TU Berlin    2016 - 2018
+Grade: 1.3
+B.Sc. Informatik, TU München    2012 - 2016
+GPA 3.9
+
+Skills
+Go, Kubernetes, PostgreSQL, Linux
+`
+
+func TestExtractStationsEnglish(t *testing.T) {
+	exps, edus := ExtractStations(cvEN)
+	if len(exps) != 2 {
+		t.Fatalf("expected 2 work experiences, got %d", len(exps))
+	}
+	e0 := exps[0]
+	if e0.Title != "Senior Platform Engineer" || e0.Company != "Muster GmbH" || e0.StartDate != "01/2021" || !e0.IsCurrent || e0.EndDate != "" {
+		t.Errorf("e0 mismatch: %+v", e0)
+	}
+	if len(e0.DescriptionBullets) != 2 || e0.DescriptionBullets[0] != "Built the internal developer platform" {
+		t.Errorf("e0 bullets mismatch: %v", e0.DescriptionBullets)
+	}
+	e1 := exps[1]
+	if e1.Title != "Backend Developer" || e1.Company != "Beispiel AG" || e1.StartDate != "2017" || e1.EndDate != "2020" || e1.IsCurrent {
+		t.Errorf("e1 mismatch: %+v", e1)
+	}
+	if len(e1.DescriptionBullets) != 1 || e1.DescriptionBullets[0] != "Payment services in Go" {
+		t.Errorf("e1 bullets mismatch: %v", e1.DescriptionBullets)
+	}
+
+	if len(edus) != 1 {
+		t.Fatalf("expected 1 education station, got %d", len(edus))
+	}
+	ed0 := edus[0]
+	if ed0.Institution != "TU Musterstadt" || ed0.Degree != "B.Sc." || ed0.FieldOfStudy != "Computer Science" || ed0.StartDate != "2013" || ed0.EndDate != "2017" {
+		t.Errorf("ed0 mismatch: %+v", ed0)
+	}
+}
+
+func TestExtractStationsGerman(t *testing.T) {
+	exps, edus := ExtractStations(cvDE)
+	if len(exps) != 1 {
+		t.Fatalf("expected 1 work experience, got %d", len(exps))
+	}
+	e0 := exps[0]
+	if e0.Title != "Softwareentwicklerin" || e0.Company != "Beispiel GmbH" || e0.StartDate != "03/2019" || !e0.IsCurrent {
+		t.Errorf("e0 mismatch: %+v", e0)
+	}
+	if len(e0.DescriptionBullets) != 1 || e0.DescriptionBullets[0] != "Microservices in Go" {
+		t.Errorf("e0 bullets mismatch: %v", e0.DescriptionBullets)
+	}
+	if len(edus) != 0 {
+		t.Errorf("expected 0 educations for cvDE, got %d", len(edus))
+	}
+}
+
+func TestExtractStationsRich(t *testing.T) {
+	parsed := ParseAll(cvRich)
+	if len(parsed.Experiences) != 2 {
+		t.Fatalf("expected 2 work experiences, got %d", len(parsed.Experiences))
+	}
+	e0 := parsed.Experiences[0]
+	if e0.Title != "Staff Platform Engineer" || e0.Company != "Muster Cloud GmbH" || e0.Location != "Berlin, Germany" || e0.WorkplaceType != profile.WorkplaceRemote || !e0.IsCurrent {
+		t.Errorf("e0 mismatch: %+v", e0)
+	}
+	if len(e0.DescriptionBullets) != 2 {
+		t.Errorf("e0 bullets count: %v", e0.DescriptionBullets)
+	}
+
+	e1 := parsed.Experiences[1]
+	if e1.Title != "Senior Backend Developer" || e1.Company != "Beispiel Systems" || e1.Location != "Munich" || e1.WorkplaceType != profile.WorkplaceHybrid || e1.IsCurrent {
+		t.Errorf("e1 mismatch: %+v", e1)
+	}
+
+	if len(parsed.Educations) != 2 {
+		t.Fatalf("expected 2 educations, got %d", len(parsed.Educations))
+	}
+	ed0 := parsed.Educations[0]
+	if ed0.Institution != "TU Berlin" || ed0.Degree != "M.Sc." || ed0.FieldOfStudy != "Computer Science" || ed0.Grade != "1.3" {
+		t.Errorf("ed0 mismatch: %+v", ed0)
+	}
+
+	ed1 := parsed.Educations[1]
+	if ed1.Institution != "TU München" || ed1.Degree != "B.Sc." || ed1.FieldOfStudy != "Informatik" || ed1.Grade != "3.9" {
+		t.Errorf("ed1 mismatch: %+v", ed1)
+	}
+}
+
 func docx(t *testing.T, text string) []byte {
 	t.Helper()
 	var buf bytes.Buffer
