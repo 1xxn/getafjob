@@ -17,7 +17,7 @@ import (
 	"testing"
 	"time"
 
-	"connectrpc.com/connect"
+	"connectrpc.com/connect/v2"
 	"google.golang.org/protobuf/types/known/timestamppb"
 
 	runnerv1 "github.com/1xxn/getafjob/internal/gen/proto/runner/v1"
