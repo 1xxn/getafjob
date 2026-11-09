@@ -13,6 +13,7 @@ import (
 	"net/http/httptest"
 	"net/url"
 	"os"
+	"regexp"
 	"strings"
 	"sync"
 	"testing"
@@ -85,6 +86,7 @@ func newApp(t *testing.T) *app {
 	sealedFiles := blob.NewSealed(dir, env)
 	docs := profile.NewDocuments(pstore, sealedFiles, env)
 	items := profile.NewItems(pstore, env)
+	stations := profile.NewStations(pstore, env)
 	listings := matching.NewListings(matchingstore.New(pool))
 	apps := application.NewService(applicationstore.New(pool))
 	privacySvc := privacy.NewService(ids, profiles, items, docs, apps, listings, env, sealedFiles)
@@ -93,7 +95,7 @@ func newApp(t *testing.T) *app {
 		t.Fatal(err)
 	}
 	importer := cvimport.NewImporter(docs, profiles, cvimport.NewExtractorFor(exe, 20*time.Second))
-	(&web.Server{Identity: ids, Profile: profiles, Documents: docs, Items: items, Importer: importer,
+	(&web.Server{Identity: ids, Profile: profiles, Documents: docs, Items: items, Stations: stations, Importer: importer,
 		Jobs: listings, Apps: apps, Privacy: privacySvc, Logger: slog.New(slog.NewTextHandler(io.Discard, nil))}).Register(mux)
 	return &app{t: t, h: httpx.Protect(mux, 1<<20, true, httpx.Upload{Path: "/documents", Max: web.MaxUpload},
 		httpx.Upload{Path: "/setup/cv", Max: web.MaxUpload}), ids: ids, mail: mb, pool: pool}
@@ -563,6 +565,154 @@ func TestProfilePages(t *testing.T) {
 	}
 	if body := a.do(http.MethodGet, "/preferences", nil, session, nil).Body.String(); !strings.Contains(body, `value="70000"`) {
 		t.Error("invalid preferences were saved")
+	}
+
+	// Station management on /profile
+	expForm := url.Values{
+		"title":          {"Staff Platform Engineer"},
+		"company":        {"Acme Corp"},
+		"location":       {"Munich"},
+		"workplace_type": {"hybrid"},
+		"start_date":     {"2022-04"},
+		"is_current":     {"on"},
+		"bullets":        {"Built scalable infra\nImproved uptime to 99.99%"},
+	}
+	if rec := a.do(http.MethodPost, "/profile/experiences", expForm, session, nil); rec.Code != http.StatusSeeOther {
+		t.Fatalf("add experience failed: %d", rec.Code)
+	}
+	body = a.do(http.MethodGet, "/profile", nil, session, nil).Body.String()
+	for _, want := range []string{"Staff Platform Engineer", "Acme Corp", "Munich", "Built scalable infra"} {
+		if !strings.Contains(body, want) {
+			t.Errorf("profile page lacks experience field %q", want)
+		}
+	}
+
+	eduForm := url.Values{
+		"degree":         {"M.Sc. Computer Science"},
+		"institution":    {"TU Berlin"},
+		"field_of_study": {"Software Systems"},
+		"start_date":     {"2018"},
+		"end_date":       {"2020"},
+		"grade":          {"1.2"},
+	}
+	if rec := a.do(http.MethodPost, "/profile/educations", eduForm, session, nil); rec.Code != http.StatusSeeOther {
+		t.Fatalf("add education failed: %d", rec.Code)
+	}
+	body = a.do(http.MethodGet, "/profile", nil, session, nil).Body.String()
+	for _, want := range []string{"M.Sc. Computer Science", "TU Berlin", "Software Systems", "1.2"} {
+		if !strings.Contains(body, want) {
+			t.Errorf("profile page lacks education field %q", want)
+		}
+	}
+}
+
+func TestProfileStations(t *testing.T) {
+	a := newApp(t)
+	session := signedIn(t, a)
+
+	// Add two work experiences
+	exp1 := url.Values{
+		"title":          {"Junior Dev"},
+		"company":        {"Company 1"},
+		"start_date":     {"2019"},
+		"end_date":       {"2021"},
+		"workplace_type": {"onsite"},
+	}
+	if rec := a.do(http.MethodPost, "/profile/experiences", exp1, session, nil); rec.Code != http.StatusSeeOther {
+		t.Fatalf("add exp1: %d", rec.Code)
+	}
+
+	exp2 := url.Values{
+		"title":          {"Senior Dev"},
+		"company":        {"Company 2"},
+		"start_date":     {"2021"},
+		"is_current":     {"on"},
+		"workplace_type": {"remote"},
+	}
+	if rec := a.do(http.MethodPost, "/profile/experiences", exp2, session, nil); rec.Code != http.StatusSeeOther {
+		t.Fatalf("add exp2: %d", rec.Code)
+	}
+
+	body := a.do(http.MethodGet, "/profile", nil, session, nil).Body.String()
+	m := regexp.MustCompile(`/profile/experiences/([a-f0-9-]+)`).FindAllStringSubmatch(body, -1)
+	if len(m) < 2 {
+		t.Fatalf("expected at least 2 experience actions in body, found %d", len(m))
+	}
+	id1, id2 := m[0][1], m[1][1]
+
+	// Move second experience up
+	if rec := a.do(http.MethodPost, "/profile/experiences/"+id2+"/up", nil, session, nil); rec.Code != http.StatusSeeOther {
+		t.Fatalf("move up: %d", rec.Code)
+	}
+
+	// Update first experience
+	exp1Update := url.Values{
+		"title":          {"Lead Dev"},
+		"company":        {"Company 1 Updated"},
+		"start_date":     {"2019"},
+		"end_date":       {"2021"},
+		"workplace_type": {"hybrid"},
+	}
+	if rec := a.do(http.MethodPost, "/profile/experiences/"+id1, exp1Update, session, nil); rec.Code != http.StatusSeeOther {
+		t.Fatalf("update exp1: %d", rec.Code)
+	}
+
+	// Delete first experience
+	if rec := a.do(http.MethodPost, "/profile/experiences/"+id1+"/delete", nil, session, nil); rec.Code != http.StatusSeeOther {
+		t.Fatalf("delete exp1: %d", rec.Code)
+	}
+
+	body = a.do(http.MethodGet, "/profile", nil, session, nil).Body.String()
+	if strings.Contains(body, "Company 1 Updated") {
+		t.Error("deleted experience should not be in body")
+	}
+	if !strings.Contains(body, "Company 2") {
+		t.Error("exp2 should still be in body")
+	}
+
+	// Add, move, update, delete education
+	edu1 := url.Values{
+		"degree":      {"B.Sc."},
+		"institution": {"Uni 1"},
+		"start_date":  {"2015"},
+		"end_date":    {"2018"},
+	}
+	if rec := a.do(http.MethodPost, "/profile/educations", edu1, session, nil); rec.Code != http.StatusSeeOther {
+		t.Fatalf("add edu1: %d", rec.Code)
+	}
+	edu2 := url.Values{
+		"degree":      {"M.Sc."},
+		"institution": {"Uni 2"},
+		"start_date":  {"2018"},
+		"end_date":    {"2020"},
+	}
+	if rec := a.do(http.MethodPost, "/profile/educations", edu2, session, nil); rec.Code != http.StatusSeeOther {
+		t.Fatalf("add edu2: %d", rec.Code)
+	}
+
+	body = a.do(http.MethodGet, "/profile", nil, session, nil).Body.String()
+	eduMatches := regexp.MustCompile(`/profile/educations/([a-f0-9-]+)`).FindAllStringSubmatch(body, -1)
+	if len(eduMatches) < 2 {
+		t.Fatalf("expected at least 2 education actions, got %d", len(eduMatches))
+	}
+	eduID1, eduID2 := eduMatches[0][1], eduMatches[1][1]
+
+	// Move edu2 up
+	if rec := a.do(http.MethodPost, "/profile/educations/"+eduID2+"/up", nil, session, nil); rec.Code != http.StatusSeeOther {
+		t.Fatalf("move edu2 up: %d", rec.Code)
+	}
+
+	// Delete edu1
+	if rec := a.do(http.MethodPost, "/profile/educations/"+eduID1+"/delete", nil, session, nil); rec.Code != http.StatusSeeOther {
+		t.Fatalf("delete edu1: %d", rec.Code)
+	}
+
+	body = a.do(http.MethodGet, "/profile", nil, session, nil).Body.String()
+	if strings.Contains(body, "Uni 1") {
+		t.Error("deleted education should not be in body")
+	}
+	if !strings.Contains(body, "Uni 2") {
+		t.Error("edu2 should still be in body")
 	}
 }
 

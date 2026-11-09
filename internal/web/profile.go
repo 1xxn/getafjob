@@ -1,6 +1,7 @@
 package web
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"net/http"
@@ -8,6 +9,8 @@ import (
 	"strconv"
 	"strings"
 	"time"
+
+	"github.com/google/uuid"
 
 	"github.com/1xxn/getafjob/internal/ai"
 	"github.com/1xxn/getafjob/internal/application"
@@ -88,6 +91,50 @@ func fieldErrors(r *http.Request, err error) map[string]string {
 	return out
 }
 
+func (s *Server) stationRows(ctx context.Context, userID uuid.UUID) ([]views.ProfileExperienceRow, []views.ProfileEducationRow, error) {
+	if s.Stations == nil {
+		return nil, nil, nil
+	}
+	works, err := s.Stations.WorkExperiences(ctx, userID)
+	if err != nil {
+		return nil, nil, err
+	}
+	edus, err := s.Stations.Educations(ctx, userID)
+	if err != nil {
+		return nil, nil, err
+	}
+	expRows := make([]views.ProfileExperienceRow, len(works))
+	for i, w := range works {
+		expRows[i] = views.ProfileExperienceRow{
+			ID:                 w.ID.String(),
+			Company:            w.Company,
+			Title:              w.Title,
+			Location:           w.Location,
+			WorkplaceType:      w.WorkplaceType,
+			StartDate:          w.StartDate,
+			EndDate:            w.EndDate,
+			IsCurrent:          w.IsCurrent,
+			DescriptionBullets: strings.Join(w.DescriptionBullets, "\n"),
+			SortOrder:          w.SortOrder,
+		}
+	}
+	eduRows := make([]views.ProfileEducationRow, len(edus))
+	for i, e := range edus {
+		eduRows[i] = views.ProfileEducationRow{
+			ID:           e.ID.String(),
+			Institution:  e.Institution,
+			Degree:       e.Degree,
+			FieldOfStudy: e.FieldOfStudy,
+			StartDate:    e.StartDate,
+			EndDate:      e.EndDate,
+			IsCurrent:    e.IsCurrent,
+			Grade:        e.Grade,
+			SortOrder:    e.SortOrder,
+		}
+	}
+	return expRows, eduRows, nil
+}
+
 func (s *Server) profilePage(w http.ResponseWriter, r *http.Request, u *identity.User) {
 	if u == nil {
 		http.Redirect(w, r, "/login", http.StatusSeeOther)
@@ -105,7 +152,12 @@ func (s *Server) profilePage(w http.ResponseWriter, r *http.Request, u *identity
 	case r.URL.Query().Get("imported") == "1":
 		f.Notice = views.T(r.Context(), "profile.imported")
 	}
-	s.render(w, r, http.StatusOK, views.ProfilePage(u.DisplayName, f))
+	expRows, eduRows, err := s.stationRows(r.Context(), u.ID)
+	if err != nil {
+		s.failed(w, r, u, err)
+		return
+	}
+	s.render(w, r, http.StatusOK, views.ProfilePage(u.DisplayName, f, expRows, eduRows))
 }
 
 func (s *Server) profileSave(w http.ResponseWriter, r *http.Request, u *identity.User) {
@@ -121,20 +173,227 @@ func (s *Server) profileSave(w http.ResponseWriter, r *http.Request, u *identity
 	version, _ := strconv.ParseInt(r.PostFormValue("version"), 10, 64)
 	p := readProfile(r, snap.Profile)
 	err = s.Profile.SaveProfile(r.Context(), u.ID, p, version)
+	expRows, eduRows, _ := s.stationRows(r.Context(), u.ID)
 	switch {
 	case err == nil:
 		http.Redirect(w, r, "/profile?saved=1", http.StatusSeeOther)
 	case errors.Is(err, profile.ErrInvalid):
 		f := profileForm(profile.Snapshot{Profile: p, Version: version})
 		f.Errors, f.Notice, f.Failed = fieldErrors(r, err), views.T(r.Context(), "profile.invalid"), true
-		s.render(w, r, http.StatusUnprocessableEntity, views.ProfilePage(u.DisplayName, f))
+		s.render(w, r, http.StatusUnprocessableEntity, views.ProfilePage(u.DisplayName, f, expRows, eduRows))
 	case errors.Is(err, profile.ErrConflict):
 		f := profileForm(snap)
 		f.Notice, f.Failed = views.T(r.Context(), "profile.conflict"), true
-		s.render(w, r, http.StatusConflict, views.ProfilePage(u.DisplayName, f))
+		s.render(w, r, http.StatusConflict, views.ProfilePage(u.DisplayName, f, expRows, eduRows))
 	default:
 		s.failed(w, r, u, err)
 	}
+}
+
+func (s *Server) experienceAdd(w http.ResponseWriter, r *http.Request, u *identity.User) {
+	if u == nil {
+		http.Redirect(w, r, "/login", http.StatusSeeOther)
+		return
+	}
+	if s.Stations == nil {
+		s.notFound(w, r, u)
+		return
+	}
+	we := profile.WorkExperience{
+		Title:              strings.TrimSpace(r.PostFormValue("title")),
+		Company:            strings.TrimSpace(r.PostFormValue("company")),
+		Location:           strings.TrimSpace(r.PostFormValue("location")),
+		WorkplaceType:      strings.TrimSpace(r.PostFormValue("workplace_type")),
+		StartDate:          strings.TrimSpace(r.PostFormValue("start_date")),
+		EndDate:            strings.TrimSpace(r.PostFormValue("end_date")),
+		IsCurrent:          r.PostFormValue("is_current") == "on",
+		DescriptionBullets: profile.Lines(r.PostFormValue("bullets")),
+	}
+	_, err := s.Stations.SaveWorkExperience(r.Context(), u.ID, we)
+	if err != nil {
+		s.failed(w, r, u, err)
+		return
+	}
+	http.Redirect(w, r, "/profile?saved=1#stations", http.StatusSeeOther)
+}
+
+func (s *Server) experienceSave(w http.ResponseWriter, r *http.Request, u *identity.User) {
+	if u == nil {
+		http.Redirect(w, r, "/login", http.StatusSeeOther)
+		return
+	}
+	if s.Stations == nil {
+		s.notFound(w, r, u)
+		return
+	}
+	id, err := uuid.Parse(r.PathValue("id"))
+	if err != nil {
+		s.notFound(w, r, u)
+		return
+	}
+	we := profile.WorkExperience{
+		ID:                 id,
+		Title:              strings.TrimSpace(r.PostFormValue("title")),
+		Company:            strings.TrimSpace(r.PostFormValue("company")),
+		Location:           strings.TrimSpace(r.PostFormValue("location")),
+		WorkplaceType:      strings.TrimSpace(r.PostFormValue("workplace_type")),
+		StartDate:          strings.TrimSpace(r.PostFormValue("start_date")),
+		EndDate:            strings.TrimSpace(r.PostFormValue("end_date")),
+		IsCurrent:          r.PostFormValue("is_current") == "on",
+		DescriptionBullets: profile.Lines(r.PostFormValue("bullets")),
+	}
+	_, err = s.Stations.SaveWorkExperience(r.Context(), u.ID, we)
+	if err != nil {
+		s.failed(w, r, u, err)
+		return
+	}
+	http.Redirect(w, r, "/profile?saved=1#stations", http.StatusSeeOther)
+}
+
+func (s *Server) experienceMove(direction string) func(http.ResponseWriter, *http.Request, *identity.User) {
+	return func(w http.ResponseWriter, r *http.Request, u *identity.User) {
+		if u == nil {
+			http.Redirect(w, r, "/login", http.StatusSeeOther)
+			return
+		}
+		if s.Stations == nil {
+			s.notFound(w, r, u)
+			return
+		}
+		id, err := uuid.Parse(r.PathValue("id"))
+		if err != nil {
+			s.notFound(w, r, u)
+			return
+		}
+		if err := s.Stations.MoveWorkExperience(r.Context(), u.ID, id, direction); err != nil {
+			s.failed(w, r, u, err)
+			return
+		}
+		http.Redirect(w, r, "/profile#stations", http.StatusSeeOther)
+	}
+}
+
+func (s *Server) experienceDelete(w http.ResponseWriter, r *http.Request, u *identity.User) {
+	if u == nil {
+		http.Redirect(w, r, "/login", http.StatusSeeOther)
+		return
+	}
+	if s.Stations == nil {
+		s.notFound(w, r, u)
+		return
+	}
+	id, err := uuid.Parse(r.PathValue("id"))
+	if err != nil {
+		s.notFound(w, r, u)
+		return
+	}
+	if err := s.Stations.DeleteWorkExperience(r.Context(), u.ID, id); err != nil {
+		s.failed(w, r, u, err)
+		return
+	}
+	http.Redirect(w, r, "/profile#stations", http.StatusSeeOther)
+}
+
+func (s *Server) educationAdd(w http.ResponseWriter, r *http.Request, u *identity.User) {
+	if u == nil {
+		http.Redirect(w, r, "/login", http.StatusSeeOther)
+		return
+	}
+	if s.Stations == nil {
+		s.notFound(w, r, u)
+		return
+	}
+	e := profile.EducationStation{
+		Degree:       strings.TrimSpace(r.PostFormValue("degree")),
+		Institution:  strings.TrimSpace(r.PostFormValue("institution")),
+		FieldOfStudy: strings.TrimSpace(r.PostFormValue("field_of_study")),
+		StartDate:    strings.TrimSpace(r.PostFormValue("start_date")),
+		EndDate:      strings.TrimSpace(r.PostFormValue("end_date")),
+		IsCurrent:    r.PostFormValue("is_current") == "on",
+		Grade:        strings.TrimSpace(r.PostFormValue("grade")),
+	}
+	_, err := s.Stations.SaveEducation(r.Context(), u.ID, e)
+	if err != nil {
+		s.failed(w, r, u, err)
+		return
+	}
+	http.Redirect(w, r, "/profile?saved=1#stations", http.StatusSeeOther)
+}
+
+func (s *Server) educationSave(w http.ResponseWriter, r *http.Request, u *identity.User) {
+	if u == nil {
+		http.Redirect(w, r, "/login", http.StatusSeeOther)
+		return
+	}
+	if s.Stations == nil {
+		s.notFound(w, r, u)
+		return
+	}
+	id, err := uuid.Parse(r.PathValue("id"))
+	if err != nil {
+		s.notFound(w, r, u)
+		return
+	}
+	e := profile.EducationStation{
+		ID:           id,
+		Degree:       strings.TrimSpace(r.PostFormValue("degree")),
+		Institution:  strings.TrimSpace(r.PostFormValue("institution")),
+		FieldOfStudy: strings.TrimSpace(r.PostFormValue("field_of_study")),
+		StartDate:    strings.TrimSpace(r.PostFormValue("start_date")),
+		EndDate:      strings.TrimSpace(r.PostFormValue("end_date")),
+		IsCurrent:    r.PostFormValue("is_current") == "on",
+		Grade:        strings.TrimSpace(r.PostFormValue("grade")),
+	}
+	_, err = s.Stations.SaveEducation(r.Context(), u.ID, e)
+	if err != nil {
+		s.failed(w, r, u, err)
+		return
+	}
+	http.Redirect(w, r, "/profile?saved=1#stations", http.StatusSeeOther)
+}
+
+func (s *Server) educationMove(direction string) func(http.ResponseWriter, *http.Request, *identity.User) {
+	return func(w http.ResponseWriter, r *http.Request, u *identity.User) {
+		if u == nil {
+			http.Redirect(w, r, "/login", http.StatusSeeOther)
+			return
+		}
+		if s.Stations == nil {
+			s.notFound(w, r, u)
+			return
+		}
+		id, err := uuid.Parse(r.PathValue("id"))
+		if err != nil {
+			s.notFound(w, r, u)
+			return
+		}
+		if err := s.Stations.MoveEducation(r.Context(), u.ID, id, direction); err != nil {
+			s.failed(w, r, u, err)
+			return
+		}
+		http.Redirect(w, r, "/profile#stations", http.StatusSeeOther)
+	}
+}
+
+func (s *Server) educationDelete(w http.ResponseWriter, r *http.Request, u *identity.User) {
+	if u == nil {
+		http.Redirect(w, r, "/login", http.StatusSeeOther)
+		return
+	}
+	if s.Stations == nil {
+		s.notFound(w, r, u)
+		return
+	}
+	id, err := uuid.Parse(r.PathValue("id"))
+	if err != nil {
+		s.notFound(w, r, u)
+		return
+	}
+	if err := s.Stations.DeleteEducation(r.Context(), u.ID, id); err != nil {
+		s.failed(w, r, u, err)
+		return
+	}
+	http.Redirect(w, r, "/profile#stations", http.StatusSeeOther)
 }
 
 func preferencesForm(p profile.Preferences, a application.Settings, mb tracking.MailboxAccount, np notify.Preferences, accounts []portals.AccountView, easyApplyAdmin bool, aiSettings ai.UserSettings, aiAdmin bool) views.Form {
