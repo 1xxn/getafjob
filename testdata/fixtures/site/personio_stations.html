@@ -1,0 +1,112 @@
+<!doctype html>
+<html lang="de">
+<head>
+  <meta charset="utf-8">
+  <title>Personio Multi-Station Bewerbung</title>
+  <style>
+    body { font-family: sans-serif; max-width: 720px; margin: 30px auto; padding: 0 20px; }
+    .field { margin: 14px 0; }
+    label { display: block; font-weight: bold; margin-bottom: 4px; }
+    input[type=text], input[type=email], input[type=tel] { width: 100%; padding: 8px; border: 1px solid #ccc; border-radius: 4px; box-sizing: border-box; }
+    .station-card { border: 1px solid #e5e7eb; padding: 14px; border-radius: 6px; margin-bottom: 12px; background: #fafafa; }
+    .btn-add { background: #f3f4f6; border: 1px solid #d1d5db; padding: 8px 16px; border-radius: 4px; cursor: pointer; margin-bottom: 16px; }
+    button[type=submit] { background: #2563eb; color: white; border: none; padding: 12px 24px; font-size: 16px; border-radius: 4px; cursor: pointer; }
+  </style>
+</head>
+<body>
+  <h1>Senior Cloud Architekt - Acme Software GmbH</h1>
+  <form id="personio-form" action="/submit" method="post" novalidate>
+    <div class="field"><label for="first_name">Vorname *</label><input id="first_name" name="first_name" required></div>
+    <div class="field"><label for="last_name">Nachname *</label><input id="last_name" name="last_name" required></div>
+    <div class="field"><label for="email">E-Mail *</label><input id="email" name="email" type="email" required></div>
+    <div class="field"><label for="phone">Telefon</label><input id="phone" name="phone" type="tel"></div>
+    <div class="field"><label for="resume">Lebenslauf *</label><input id="resume" name="resume" type="file" required></div>
+
+    <fieldset id="section-experience">
+      <legend>Berufserfahrung</legend>
+      <div id="exp-container">
+        <div class="station-card" id="exp-0">
+          <div class="field"><label for="exp_company_0">Arbeitgeber *</label><input id="exp_company_0" name="experience[0][company]" required></div>
+          <div class="field"><label for="exp_title_0">Berufsbezeichnung *</label><input id="exp_title_0" name="experience[0][title]" required></div>
+          <div class="field"><label for="exp_from_0">Von *</label><input id="exp_from_0" name="experience[0][from]" required></div>
+          <div class="field"><label for="exp_to_0">Bis</label><input id="exp_to_0" name="experience[0][to]"></div>
+        </div>
+      </div>
+      <button type="button" class="btn-add" id="btn-add-exp">+ Position hinzufügen</button>
+    </fieldset>
+
+    <fieldset id="section-education">
+      <legend>Ausbildung</legend>
+      <div id="edu-container">
+        <div class="station-card" id="edu-0">
+          <div class="field"><label for="edu_school_0">Universität / Schule *</label><input id="edu_school_0" name="education[0][school]" required></div>
+          <div class="field"><label for="edu_degree_0">Abschluss *</label><input id="edu_degree_0" name="education[0][degree]" required></div>
+          <div class="field"><label for="edu_major_0">Fachrichtung</label><input id="edu_major_0" name="education[0][major]"></div>
+        </div>
+      </div>
+      <button type="button" class="btn-add" id="btn-add-edu">+ Ausbildung hinzufügen</button>
+    </fieldset>
+
+    <div class="field"><label><input id="privacy" type="checkbox" required> Ich akzeptiere die Datenschutzbestimmungen *</label></div>
+    <button type="submit" id="btn-submit">Bewerbung absenden</button>
+  </form>
+
+  <script>
+    let expCount = 1;
+    let eduCount = 1;
+
+    document.getElementById('btn-add-exp').addEventListener('click', () => {
+      const idx = expCount++;
+      const div = document.createElement('div');
+      div.className = 'station-card';
+      div.id = `exp-${idx}`;
+      div.innerHTML = `
+        <div class="field"><label for="exp_company_${idx}">Arbeitgeber *</label><input id="exp_company_${idx}" name="experience[${idx}][company]" required></div>
+        <div class="field"><label for="exp_title_${idx}">Berufsbezeichnung *</label><input id="exp_title_${idx}" name="experience[${idx}][title]" required></div>
+        <div class="field"><label for="exp_from_${idx}">Von *</label><input id="exp_from_${idx}" name="experience[${idx}][from]" required></div>
+        <div class="field"><label for="exp_to_${idx}">Bis</label><input id="exp_to_${idx}" name="experience[${idx}][to]"></div>
+      `;
+      document.getElementById('exp-container').appendChild(div);
+    });
+
+    document.getElementById('btn-add-edu').addEventListener('click', () => {
+      const idx = eduCount++;
+      const div = document.createElement('div');
+      div.className = 'station-card';
+      div.id = `edu-${idx}`;
+      div.innerHTML = `
+        <div class="field"><label for="edu_school_${idx}">Universität / Schule *</label><input id="edu_school_${idx}" name="education[${idx}][school]" required></div>
+        <div class="field"><label for="edu_degree_${idx}">Abschluss *</label><input id="edu_degree_${idx}" name="education[${idx}][degree]" required></div>
+        <div class="field"><label for="edu_major_${idx}">Fachrichtung</label><input id="edu_major_${idx}" name="education[${idx}][major]"></div>
+      `;
+      document.getElementById('edu-container').appendChild(div);
+    });
+
+    document.getElementById('personio-form').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const exps = [];
+      for (let i = 0; i < expCount; i++) {
+        const c = document.getElementById(`exp_company_${i}`);
+        const t = document.getElementById(`exp_title_${i}`);
+        if (c && t && c.value) exps.push({ company: c.value, title: t.value });
+      }
+      const edus = [];
+      for (let i = 0; i < eduCount; i++) {
+        const s = document.getElementById(`edu_school_${i}`);
+        const d = document.getElementById(`edu_degree_${i}`);
+        if (s && d && s.value) edus.push({ school: s.value, degree: d.value });
+      }
+      const data = {
+        first_name: document.getElementById('first_name').value,
+        last_name: document.getElementById('last_name').value,
+        email: document.getElementById('email').value,
+        resume: document.getElementById('resume').files[0]?.name || '',
+        experiences: exps,
+        educations: edus
+      };
+      await fetch('/submit', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(data) });
+      document.body.innerHTML = '<h2>Vielen Dank für Ihre Bewerbung!</h2>';
+    });
+  </script>
+</body>
+</html>

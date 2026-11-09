@@ -32,6 +32,7 @@ type runData struct {
 	profiles *profile.Service
 	items    *profile.Items
 	docs     *profile.Documents
+	stations *profile.Stations
 	jobs     jobReader
 	portals  portalProvider
 	now      func() time.Time
@@ -74,6 +75,39 @@ func (d runData) RunData(ctx context.Context, userID uuid.UUID, jobID int64) (*r
 			if cookies, err := d.portals.GetDecryptedCookies(ctx, userID, p); err == nil {
 				run.SessionCookiesJson = cookies
 				_ = d.portals.RecordUsed(ctx, userID, p)
+			}
+		}
+	}
+	if d.stations != nil {
+		if exps, err := d.stations.WorkExperiences(ctx, userID); err == nil {
+			for _, w := range exps {
+				run.WorkExperiences = append(run.WorkExperiences, &runnerv1.WorkExperience{
+					Id:                 w.ID.String(),
+					Company:            w.Company,
+					Title:              w.Title,
+					Location:           w.Location,
+					WorkplaceType:      w.WorkplaceType,
+					StartDate:          w.StartDate,
+					EndDate:            w.EndDate,
+					IsCurrent:          w.IsCurrent,
+					DescriptionBullets: w.DescriptionBullets,
+					SortOrder:          int32(w.SortOrder), //nolint:gosec // bounded by MaxStations
+				})
+			}
+		}
+		if edus, err := d.stations.Educations(ctx, userID); err == nil {
+			for _, e := range edus {
+				run.Educations = append(run.Educations, &runnerv1.EducationStation{
+					Id:           e.ID.String(),
+					Institution:  e.Institution,
+					Degree:       e.Degree,
+					FieldOfStudy: e.FieldOfStudy,
+					StartDate:    e.StartDate,
+					EndDate:      e.EndDate,
+					IsCurrent:    e.IsCurrent,
+					Grade:        e.Grade,
+					SortOrder:    int32(e.SortOrder), //nolint:gosec // bounded by MaxStations
+				})
 			}
 		}
 	}

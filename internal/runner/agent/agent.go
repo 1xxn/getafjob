@@ -297,6 +297,34 @@ func (a *Agent) knowledge(ctx context.Context, run *runnerv1.Run, dir string) (p
 	for _, t := range run.GetTexts() {
 		k.Texts = append(k.Texts, planner.Text{ID: t.GetId(), Name: t.GetName(), Language: t.GetLanguage(), Body: t.GetBody()})
 	}
+	for _, w := range run.GetWorkExperiences() {
+		k.WorkExperiences = append(k.WorkExperiences, planner.WorkExperience{
+			ID:                 w.GetId(),
+			Company:            w.GetCompany(),
+			Title:              w.GetTitle(),
+			Location:           w.GetLocation(),
+			WorkplaceType:      w.GetWorkplaceType(),
+			StartDate:          w.GetStartDate(),
+			EndDate:            w.GetEndDate(),
+			IsCurrent:          w.GetIsCurrent(),
+			DescriptionBullets: w.GetDescriptionBullets(),
+			Description:        strings.Join(w.GetDescriptionBullets(), "\n• "),
+			SortOrder:          int(w.GetSortOrder()),
+		})
+	}
+	for _, e := range run.GetEducations() {
+		k.Educations = append(k.Educations, planner.EducationStation{
+			ID:           e.GetId(),
+			Institution:  e.GetInstitution(),
+			Degree:       e.GetDegree(),
+			FieldOfStudy: e.GetFieldOfStudy(),
+			StartDate:    e.GetStartDate(),
+			EndDate:      e.GetEndDate(),
+			IsCurrent:    e.GetIsCurrent(),
+			Grade:        e.GetGrade(),
+			SortOrder:    int(e.GetSortOrder()),
+		})
+	}
 	used := map[string]bool{}
 	for _, d := range run.GetDocuments() {
 		name := safeName(d.GetFileName(), d.GetId())

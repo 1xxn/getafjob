@@ -332,3 +332,174 @@ func TestPhase5DryRunsAcrossAllATSAdapters(t *testing.T) {
 		}
 	}
 }
+
+func TestRepeatingStationsFillingAcrossKeyATSPlatforms(t *testing.T) {
+	fixturesDir := os.Getenv("GETAFJOB_FIXTURES_DIR")
+	if fixturesDir == "" {
+		fixturesDir = filepath.Join("..", "..", "..", "testdata", "fixtures", "site")
+	}
+
+	mux := http.NewServeMux()
+	mux.Handle("GET /", http.FileServer(http.Dir(fixturesDir)))
+	mux.HandleFunc("POST /submit", func(w http.ResponseWriter, _ *http.Request) {
+		w.WriteHeader(http.StatusOK)
+	})
+	srv := httptest.NewServer(mux)
+	defer srv.Close()
+
+	b, err := browser.Launch(context.Background(), browser.Options{Bin: os.Getenv("GETAFJOB_BROWSER_BIN")})
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = b.Close(context.Background()) }()
+
+	cvDir := t.TempDir()
+	if err := os.WriteFile(filepath.Join(cvDir, "Max_Mustermann_CV.pdf"), []byte("%PDF-1.4\n1 0 obj\n<<>>\nendobj\ntrailer\n<<>>\n%%EOF\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	docs, err := browser.NewDocuments(cvDir)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	kTemplate := planner.Knowledge{
+		Origins:  []string{srv.URL},
+		Language: "en",
+		CV:       "0192f3a4-5b6c-7d8e-9f01-000000000001",
+		Profile: map[string]string{
+			"personal.full_name":  "Max Mustermann",
+			"personal.first_name": "Max",
+			"personal.last_name":  "Mustermann",
+			"personal.email":      "max.mustermann@example.org",
+			"personal.phone":      "+49 30 1234567",
+		},
+		Documents: []planner.Document{
+			{ID: "0192f3a4-5b6c-7d8e-9f01-000000000001", File: "Max_Mustermann_CV.pdf", Kind: "cv", Language: "en"},
+		},
+		WorkExperiences: []planner.WorkExperience{
+			{
+				ID:            "exp-1",
+				Company:       "Acme Cloud GmbH",
+				Title:         "Senior Platform Engineer",
+				Location:      "Berlin",
+				WorkplaceType: "hybrid",
+				StartDate:     "2022-04",
+				EndDate:       "",
+				IsCurrent:     true,
+				Description:   "Kubernetes and Go services.",
+			},
+			{
+				ID:            "exp-2",
+				Company:       "Berlin Tech Labs",
+				Title:         "Backend Developer",
+				Location:      "Berlin",
+				WorkplaceType: "remote",
+				StartDate:     "2019-03",
+				EndDate:       "2022-03",
+				IsCurrent:     false,
+				Description:   "Microservices in Go.",
+			},
+		},
+		Educations: []planner.EducationStation{
+			{
+				ID:           "edu-1",
+				Institution:  "TU Berlin",
+				Degree:       "Master of Science",
+				FieldOfStudy: "Computer Science",
+				StartDate:    "2017",
+				EndDate:      "2019",
+			},
+		},
+	}
+
+	stationCases := []struct {
+		adapter string
+		fixture string
+		answers []planner.Answer
+	}{
+		{
+			adapter: Greenhouse,
+			fixture: "greenhouse_stations.html",
+			answers: []planner.Answer{
+				{ID: "101", Question: "I agree to data processing *", Answer: "true"},
+			},
+		},
+		{
+			adapter: Lever,
+			fixture: "lever_stations.html",
+			answers: []planner.Answer{
+				{ID: "102", Question: "I accept data terms *", Answer: "true"},
+			},
+		},
+		{
+			adapter: Ashby,
+			fixture: "ashby_stations.html",
+			answers: []planner.Answer{
+				{ID: "103", Question: "I agree to terms *", Answer: "true"},
+			},
+		},
+		{
+			adapter: Personio,
+			fixture: "personio_stations.html",
+			answers: []planner.Answer{
+				{ID: "104", Question: "Ich akzeptiere die Datenschutzbestimmungen *", Answer: "true"},
+			},
+		},
+		{
+			adapter: Workday,
+			fixture: "workday_stations.html",
+			answers: []planner.Answer{
+				{ID: "105", Question: "I confirm all information provided is accurate *", Answer: "true"},
+			},
+		},
+		{
+			adapter: SmartRecruiters,
+			fixture: "smartrecruiters_stations.html",
+			answers: []planner.Answer{
+				{ID: "106", Question: "I agree to privacy policy *", Answer: "true"},
+			},
+		},
+	}
+
+	for _, tc := range stationCases {
+		t.Run(tc.adapter, func(t *testing.T) {
+			k := kTemplate
+			k.Answers = slices.Clone(tc.answers)
+
+			ad := Lookup(tc.adapter)
+			coord := &dryRunCoordinator{adapter: tc.adapter, runID: "multi-station"}
+
+			p, err := b.Page(proto.TargetCreateTarget{})
+			if err != nil {
+				t.Fatal(err)
+			}
+			defer func() { _ = p.Close() }()
+
+			p = p.Timeout(45 * time.Second)
+			targetURL := srv.URL + "/" + tc.fixture
+			if err := p.Navigate(targetURL); err != nil {
+				t.Fatalf("navigate to %s: %v", targetURL, err)
+			}
+			_ = p.WaitLoad()
+
+			e := ad.NewEngine(&executor.Executor{Docs: docs}, &planner.Planner{K: k}, coord, 2*time.Second)
+
+			runErr := e.Run(t.Context(), p)
+			if !errors.Is(runErr, errDryRunHalt) {
+				t.Fatalf("%s multi-station run failed: expected errDryRunHalt, got: %v (parkReason: %q, questions: %+v)", tc.adapter, runErr, coord.parkReason, coord.asked)
+			}
+
+			coord.mu.Lock()
+			hasBeginSubmit := coord.beginSubmit
+			steps := slices.Clone(coord.steps)
+			coord.mu.Unlock()
+
+			if !hasBeginSubmit {
+				t.Errorf("%s did not reach BeginSubmit", tc.adapter)
+			}
+			if len(steps) == 0 {
+				t.Errorf("%s recorded 0 steps", tc.adapter)
+			}
+		})
+	}
+}

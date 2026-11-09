@@ -1,0 +1,154 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>Greenhouse Multi-Station Application</title>
+  <style>
+    body { font-family: sans-serif; max-width: 750px; margin: 30px auto; padding: 0 20px; }
+    .field { margin: 14px 0; }
+    label { display: block; font-weight: bold; margin-bottom: 4px; }
+    input[type=text], input[type=email], input[type=tel], select, textarea {
+      width: 100%; padding: 8px; border: 1px solid #ccc; border-radius: 4px; box-sizing: border-box;
+    }
+    .row { display: flex; gap: 12px; }
+    .row > div { flex: 1; }
+    .station-block { border: 1px solid #ddd; padding: 14px; border-radius: 6px; margin-bottom: 12px; background: #fafafa; }
+    .btn-add { background: #e0f2fe; color: #0284c7; border: 1px dashed #0284c7; padding: 8px 16px; border-radius: 4px; cursor: pointer; font-weight: bold; margin-bottom: 16px; display: inline-block; }
+    button[type=submit] { background: #16a34a; color: white; border: none; padding: 12px 24px; font-size: 16px; border-radius: 4px; cursor: pointer; }
+  </style>
+</head>
+<body>
+  <h1>Senior Systems Engineer - Acme Platform GmbH</h1>
+  <form id="app-form" action="/submit" method="post" novalidate>
+    <div class="field"><label for="first_name">First Name *</label><input id="first_name" name="first_name" required></div>
+    <div class="field"><label for="last_name">Last Name *</label><input id="last_name" name="last_name" required></div>
+    <div class="field"><label for="email">Email *</label><input id="email" name="email" type="email" required></div>
+    <div class="field"><label for="resume">Resume / CV *</label><input id="resume" name="resume" type="file" required></div>
+
+    <!-- Repeating Employment Section -->
+    <fieldset id="section-employment" class="field">
+      <legend>Employment History</legend>
+      <div id="employment-container">
+        <div class="station-block" data-idx="0">
+          <div class="field"><label for="job_company_0">Company Name *</label><input id="job_company_0" name="job_applications[employment][0][company]" required></div>
+          <div class="field"><label for="job_title_0">Job Title *</label><input id="job_title_0" name="job_applications[employment][0][title]" required></div>
+          <div class="row">
+            <div class="field"><label for="job_start_month_0">Start Month</label>
+              <select id="job_start_month_0" name="job_applications[employment][0][start_month]">
+                <option value="">Month</option><option>01</option><option>02</option><option>03</option><option>04</option><option>05</option><option>06</option>
+                <option>07</option><option>08</option><option>09</option><option>10</option><option>11</option><option>12</option>
+              </select>
+            </div>
+            <div class="field"><label for="job_start_year_0">Start Year</label>
+              <select id="job_start_year_0" name="job_applications[employment][0][start_year]">
+                <option value="">Year</option><option>2018</option><option>2019</option><option>2020</option><option>2021</option><option>2022</option><option>2023</option><option>2024</option>
+              </select>
+            </div>
+          </div>
+        </div>
+      </div>
+      <button type="button" class="btn-add" id="btn-add-exp">+ Add another employment</button>
+    </fieldset>
+
+    <!-- Repeating Education Section -->
+    <fieldset id="section-education" class="field">
+      <legend>Education</legend>
+      <div id="education-container">
+        <div class="station-block" data-idx="0">
+          <div class="field"><label for="edu_school_0">School *</label><input id="edu_school_0" name="job_applications[education][0][school]" required></div>
+          <div class="field"><label for="edu_degree_0">Degree *</label>
+            <select id="edu_degree_0" name="job_applications[education][0][degree]" required>
+              <option value="">Select Degree</option>
+              <option>Bachelor of Science</option>
+              <option>Master of Science</option>
+              <option>Doctorate</option>
+            </select>
+          </div>
+          <div class="field"><label for="edu_discipline_0">Discipline</label><input id="edu_discipline_0" name="job_applications[education][0][discipline]"></div>
+        </div>
+      </div>
+      <button type="button" class="btn-add" id="btn-add-edu">+ Add another education</button>
+    </fieldset>
+
+    <div class="field"><label><input id="consent" type="checkbox" required> I agree to data processing *</label></div>
+    <div id="errors"></div>
+    <button type="submit" id="btn-submit">Submit application</button>
+  </form>
+
+  <script>
+    let expCount = 1;
+    let eduCount = 1;
+
+    document.getElementById('btn-add-exp').addEventListener('click', () => {
+      const idx = expCount++;
+      const div = document.createElement('div');
+      div.className = 'station-block';
+      div.setAttribute('data-idx', String(idx));
+      div.innerHTML = `
+        <div class="field"><label for="job_company_${idx}">Company Name *</label><input id="job_company_${idx}" name="job_applications[employment][${idx}][company]" required></div>
+        <div class="field"><label for="job_title_${idx}">Job Title *</label><input id="job_title_${idx}" name="job_applications[employment][${idx}][title]" required></div>
+        <div class="row">
+          <div class="field"><label for="job_start_month_${idx}">Start Month</label>
+            <select id="job_start_month_${idx}" name="job_applications[employment][${idx}][start_month]">
+              <option value="">Month</option><option>01</option><option>02</option><option>03</option><option>04</option><option>05</option><option>06</option>
+              <option>07</option><option>08</option><option>09</option><option>10</option><option>11</option><option>12</option>
+            </select>
+          </div>
+          <div class="field"><label for="job_start_year_${idx}">Start Year</label>
+            <select id="job_start_year_${idx}" name="job_applications[employment][${idx}][start_year]">
+              <option value="">Year</option><option>2018</option><option>2019</option><option>2020</option><option>2021</option><option>2022</option><option>2023</option><option>2024</option>
+            </select>
+          </div>
+        </div>
+      `;
+      document.getElementById('employment-container').appendChild(div);
+    });
+
+    document.getElementById('btn-add-edu').addEventListener('click', () => {
+      const idx = eduCount++;
+      const div = document.createElement('div');
+      div.className = 'station-block';
+      div.setAttribute('data-idx', String(idx));
+      div.innerHTML = `
+        <div class="field"><label for="edu_school_${idx}">School *</label><input id="edu_school_${idx}" name="job_applications[education][${idx}][school]" required></div>
+        <div class="field"><label for="edu_degree_${idx}">Degree *</label>
+          <select id="edu_degree_${idx}" name="job_applications[education][${idx}][degree]" required>
+            <option value="">Select Degree</option>
+            <option>Bachelor of Science</option>
+            <option>Master of Science</option>
+            <option>Doctorate</option>
+          </select>
+        </div>
+        <div class="field"><label for="edu_discipline_${idx}">Discipline</label><input id="edu_discipline_${idx}" name="job_applications[education][${idx}][discipline]"></div>
+      `;
+      document.getElementById('education-container').appendChild(div);
+    });
+
+    document.getElementById('app-form').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const exps = [];
+      for (let i = 0; i < expCount; i++) {
+        const c = document.getElementById(`job_company_${i}`);
+        const t = document.getElementById(`job_title_${i}`);
+        if (c && t && c.value) exps.push({ company: c.value, title: t.value });
+      }
+      const edus = [];
+      for (let i = 0; i < eduCount; i++) {
+        const s = document.getElementById(`edu_school_${i}`);
+        const d = document.getElementById(`edu_degree_${i}`);
+        if (s && d && s.value) edus.push({ school: s.value, degree: d.value });
+      }
+      const data = {
+        first_name: document.getElementById('first_name').value,
+        last_name: document.getElementById('last_name').value,
+        email: document.getElementById('email').value,
+        resume: document.getElementById('resume').files[0]?.name || '',
+        employments: exps,
+        educations: edus
+      };
+      await fetch('/submit', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(data) });
+      document.body.innerHTML = '<h1>Thank you for applying!</h1><p>Application submitted successfully.</p>';
+    });
+  </script>
+</body>
+</html>

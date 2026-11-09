@@ -1,0 +1,76 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>Lever Multi-Station Application</title>
+  <style>
+    body { font-family: sans-serif; max-width: 700px; margin: 30px auto; padding: 0 20px; }
+    .field { margin: 14px 0; }
+    label { display: block; font-weight: bold; margin-bottom: 4px; }
+    input[type=text], input[type=email], input[type=tel] { width: 100%; padding: 8px; border: 1px solid #ccc; border-radius: 4px; box-sizing: border-box; }
+    .entry-card { border: 1px solid #ccc; padding: 12px; border-radius: 4px; margin-bottom: 10px; background: #fdfdfd; }
+    .btn-add { background: #f3f4f6; border: 1px solid #999; padding: 6px 14px; border-radius: 4px; cursor: pointer; margin-bottom: 14px; }
+    button[type=submit] { background: #0073e6; color: white; border: none; padding: 12px 24px; font-size: 16px; border-radius: 4px; cursor: pointer; }
+  </style>
+</head>
+<body>
+  <h1>DevOps Architect - Acme European Labs</h1>
+  <form id="lever-form" action="/submit" method="post" novalidate>
+    <div class="field"><label for="name">Full Name *</label><input id="name" name="name" required></div>
+    <div class="field"><label for="email">Email *</label><input id="email" name="email" type="email" required></div>
+    <div class="field"><label for="phone">Phone *</label><input id="phone" name="phone" type="tel" required></div>
+    <div class="field"><label for="resume">Resume/CV *</label><input id="resume" name="resume" type="file" required></div>
+
+    <section id="employment-section">
+      <h3>Previous Employment</h3>
+      <div id="position-list">
+        <div class="entry-card" id="pos-0">
+          <div class="field"><label for="employer_0">Employer *</label><input id="employer_0" name="positions[0][employer]" required></div>
+          <div class="field"><label for="title_0">Title *</label><input id="title_0" name="positions[0][title]" required></div>
+          <div class="field"><label for="start_date_0">Start Date (MM/YYYY) *</label><input id="start_date_0" name="positions[0][start]" required></div>
+          <div class="field"><label for="end_date_0">End Date (MM/YYYY)</label><input id="end_date_0" name="positions[0][end]"></div>
+        </div>
+      </div>
+      <button type="button" class="btn-add" id="btn-add-pos">+ Add position</button>
+    </section>
+
+    <div class="field"><label><input id="consent" type="checkbox" required> I accept data terms *</label></div>
+    <button type="submit" id="btn-submit">Submit application</button>
+  </form>
+
+  <script>
+    let posCount = 1;
+    document.getElementById('btn-add-pos').addEventListener('click', () => {
+      const idx = posCount++;
+      const div = document.createElement('div');
+      div.className = 'entry-card';
+      div.id = `pos-${idx}`;
+      div.innerHTML = `
+        <div class="field"><label for="employer_${idx}">Employer *</label><input id="employer_${idx}" name="positions[${idx}][employer]" required></div>
+        <div class="field"><label for="title_${idx}">Title *</label><input id="title_${idx}" name="positions[${idx}][title]" required></div>
+        <div class="field"><label for="start_date_${idx}">Start Date (MM/YYYY) *</label><input id="start_date_${idx}" name="positions[${idx}][start]" required></div>
+        <div class="field"><label for="end_date_${idx}">End Date (MM/YYYY)</label><input id="end_date_${idx}" name="positions[${idx}][end]"></div>
+      `;
+      document.getElementById('position-list').appendChild(div);
+    });
+
+    document.getElementById('lever-form').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const positions = [];
+      for (let i = 0; i < posCount; i++) {
+        const emp = document.getElementById(`employer_${i}`);
+        const tit = document.getElementById(`title_${i}`);
+        if (emp && tit && emp.value) positions.push({ employer: emp.value, title: tit.value });
+      }
+      const data = {
+        name: document.getElementById('name').value,
+        email: document.getElementById('email').value,
+        resume: document.getElementById('resume').files[0]?.name || '',
+        positions
+      };
+      await fetch('/submit', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(data) });
+      document.body.innerHTML = '<h2>Application submitted!</h2>';
+    });
+  </script>
+</body>
+</html>

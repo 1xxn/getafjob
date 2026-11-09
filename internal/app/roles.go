@@ -129,7 +129,7 @@ func serve(ctx context.Context, cfg config.Config, logger *slog.Logger) error {
 		gw = &gateway.Server{Runs: application.NewRuns(apps, astore), Apps: apps, Shots: sealedFiles,
 			Secret: cfg.RunnerSecret.Reveal(), Logger: logger, Notify: appNotifier.YourTurn, ATSMetrics: atsMetrics,
 			Portals: portalsSvc,
-			Data:    runData{profiles: profiles, items: profile.NewItems(pstore, env), docs: docs, jobs: astore, portals: portalsSvc, now: time.Now}}
+			Data:    runData{profiles: profiles, items: profile.NewItems(pstore, env), docs: docs, stations: profile.NewStations(pstore, env), jobs: astore, portals: portalsSvc, now: time.Now}}
 	}
 
 	tstore := trackingstore.New(pool)

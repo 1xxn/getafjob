@@ -1,0 +1,114 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>SmartRecruiters Multi-Station Application</title>
+  <style>
+    body { font-family: sans-serif; max-width: 720px; margin: 30px auto; padding: 0 20px; }
+    .field { margin: 14px 0; }
+    label { display: block; font-weight: bold; margin-bottom: 4px; }
+    input[type=text], input[type=email], input[type=tel], textarea { width: 100%; padding: 8px; border: 1px solid #ccc; border-radius: 4px; box-sizing: border-box; }
+    .card { border: 1px solid #e0e0e0; padding: 14px; border-radius: 4px; margin-bottom: 12px; background: #fafafa; }
+    .btn-add { background: #f0fdf4; border: 1px solid #86efac; color: #16a34a; padding: 8px 16px; border-radius: 4px; cursor: pointer; font-weight: bold; margin-bottom: 16px; }
+    button[type=submit] { background: #16a34a; color: white; border: none; padding: 12px 24px; font-size: 16px; border-radius: 4px; cursor: pointer; }
+  </style>
+</head>
+<body>
+  <h1>Infrastructure Engineer - Delivery Hero</h1>
+  <form id="sr-form" action="/submit" method="post" novalidate>
+    <div class="field"><label for="first_name">First Name *</label><input id="first_name" name="first_name" required></div>
+    <div class="field"><label for="last_name">Last Name *</label><input id="last_name" name="last_name" required></div>
+    <div class="field"><label for="email">Email *</label><input id="email" name="email" type="email" required></div>
+    <div class="field"><label for="phone">Phone *</label><input id="phone" name="phone" type="tel" required></div>
+    <div class="field"><label for="resume">Resume / CV *</label><input id="resume" name="resume" type="file" required></div>
+
+    <div id="section-experience">
+      <h3>Experience</h3>
+      <div id="experience-list">
+        <div class="card" id="exp-0">
+          <div class="field"><label for="sr_company_0">Company *</label><input id="sr_company_0" name="experiences[0].company" required></div>
+          <div class="field"><label for="sr_title_0">Title *</label><input id="sr_title_0" name="experiences[0].title" required></div>
+          <div class="field"><label for="sr_location_0">Location</label><input id="sr_location_0" name="experiences[0].location"></div>
+          <div class="field"><label for="sr_start_0">Start Date *</label><input id="sr_start_0" name="experiences[0].start_date" required></div>
+          <div class="field"><label for="sr_end_0">End Date</label><input id="sr_end_0" name="experiences[0].end_date"></div>
+        </div>
+      </div>
+      <button type="button" class="btn-add" id="btn-add-exp">Add Experience</button>
+    </div>
+
+    <div id="section-education">
+      <h3>Education</h3>
+      <div id="education-list">
+        <div class="card" id="edu-0">
+          <div class="field"><label for="sr_school_0">School *</label><input id="sr_school_0" name="educations[0].school" required></div>
+          <div class="field"><label for="sr_degree_0">Degree *</label><input id="sr_degree_0" name="educations[0].degree" required></div>
+          <div class="field"><label for="sr_major_0">Major</label><input id="sr_major_0" name="educations[0].major"></div>
+        </div>
+      </div>
+      <button type="button" class="btn-add" id="btn-add-edu">Add Education</button>
+    </div>
+
+    <div class="field"><label><input id="privacy" type="checkbox" required> I agree to privacy policy *</label></div>
+    <button type="submit" id="btn-submit">Submit application</button>
+  </form>
+
+  <script>
+    let expCount = 1;
+    let eduCount = 1;
+
+    document.getElementById('btn-add-exp').addEventListener('click', () => {
+      const idx = expCount++;
+      const div = document.createElement('div');
+      div.className = 'card';
+      div.id = `exp-${idx}`;
+      div.innerHTML = `
+        <div class="field"><label for="sr_company_${idx}">Company *</label><input id="sr_company_${idx}" name="experiences[${idx}].company" required></div>
+        <div class="field"><label for="sr_title_${idx}">Title *</label><input id="sr_title_${idx}" name="experiences[${idx}].title" required></div>
+        <div class="field"><label for="sr_location_${idx}">Location</label><input id="sr_location_${idx}" name="experiences[${idx}].location"></div>
+        <div class="field"><label for="sr_start_${idx}">Start Date *</label><input id="sr_start_${idx}" name="experiences[${idx}].start_date" required></div>
+        <div class="field"><label for="sr_end_${idx}">End Date</label><input id="sr_end_${idx}" name="experiences[${idx}].end_date"></div>
+      `;
+      document.getElementById('experience-list').appendChild(div);
+    });
+
+    document.getElementById('btn-add-edu').addEventListener('click', () => {
+      const idx = eduCount++;
+      const div = document.createElement('div');
+      div.className = 'card';
+      div.id = `edu-${idx}`;
+      div.innerHTML = `
+        <div class="field"><label for="sr_school_${idx}">School *</label><input id="sr_school_${idx}" name="educations[${idx}].school" required></div>
+        <div class="field"><label for="sr_degree_${idx}">Degree *</label><input id="sr_degree_${idx}" name="educations[${idx}].degree" required></div>
+        <div class="field"><label for="sr_major_${idx}">Major</label><input id="sr_major_${idx}" name="educations[${idx}].major"></div>
+      `;
+      document.getElementById('education-list').appendChild(div);
+    });
+
+    document.getElementById('sr-form').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const exps = [];
+      for (let i = 0; i < expCount; i++) {
+        const c = document.getElementById(`sr_company_${i}`);
+        const t = document.getElementById(`sr_title_${i}`);
+        if (c && t && c.value) exps.push({ company: c.value, title: t.value });
+      }
+      const edus = [];
+      for (let i = 0; i < eduCount; i++) {
+        const s = document.getElementById(`sr_school_${i}`);
+        const d = document.getElementById(`sr_degree_${i}`);
+        if (s && d && s.value) edus.push({ school: s.value, degree: d.value });
+      }
+      const data = {
+        first_name: document.getElementById('first_name').value,
+        last_name: document.getElementById('last_name').value,
+        email: document.getElementById('email').value,
+        resume: document.getElementById('resume').files[0]?.name || '',
+        experiences: exps,
+        educations: edus
+      };
+      await fetch('/submit', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(data) });
+      document.body.innerHTML = '<h2>Application submitted successfully!</h2>';
+    });
+  </script>
+</body>
+</html>

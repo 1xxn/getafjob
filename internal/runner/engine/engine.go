@@ -71,6 +71,11 @@ type Planner interface {
 	Plan(ctx context.Context, st *browser.State) (executor.Plan, []Question, error)
 }
 
+// StationExpander is optionally implemented by planners that can trigger repeating station groups.
+type StationExpander interface {
+	NextStationButton(st *browser.State) (buttonID string, ok bool)
+}
+
 // Run outcomes besides errors.
 var (
 	ErrAsked  = errors.New("run handed to the user")
@@ -120,6 +125,25 @@ func (e *Engine) Run(ctx context.Context, p *rod.Page) error {
 		st, err := browser.Extract(p)
 		if err != nil {
 			return err
+		}
+		if se, ok := e.Planner.(StationExpander); ok {
+			for range 10 {
+				btnID, needMore := se.NextStationButton(st)
+				if !needMore || btnID == "" {
+					break
+				}
+				eff, err := st.Click(btnID, e.wait()) //nolint:contextcheck // the page carries ctx (bound in Run)
+				if err != nil || !eff.Any() {
+					break
+				}
+				_ = p.Timeout(e.wait()).WaitLoad()
+				time.Sleep(150 * time.Millisecond)
+				newSt, err := browser.Extract(p)
+				if err != nil {
+					break
+				}
+				st = newSt
+			}
 		}
 		if err := e.checkpoint(ctx, p, page, StepExtract, st, nil, nil, dialogs); err != nil {
 			return err
