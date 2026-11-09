@@ -113,7 +113,7 @@ mkdir -p tmp
 staging_dir="$(mktemp -d tmp/restore-XXXXXX)"
 RESTIC_RESTORE_DIR="$staging_dir"
 cleanup() {
-  rm -rf "$staging_dir"
+  rm -rf "$staging_dir" 2>/dev/null || docker run --rm -v "$(cd "$(dirname "$staging_dir")" && pwd):/cleanup" alpine rm -rf "/cleanup/$(basename "$staging_dir")" 2>/dev/null || true
 }
 trap cleanup EXIT
 

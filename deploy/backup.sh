@@ -132,7 +132,7 @@ mkdir -p tmp
 staging_dir="$(mktemp -d tmp/backup-XXXXXX)"
 RESTIC_STAGING_DIR="$staging_dir"
 cleanup() {
-  rm -rf "$staging_dir"
+  rm -rf "$staging_dir" 2>/dev/null || docker run --rm -v "$(cd "$(dirname "$staging_dir")" && pwd):/cleanup" alpine rm -rf "/cleanup/$(basename "$staging_dir")" 2>/dev/null || true
 }
 trap cleanup EXIT
 
@@ -147,7 +147,7 @@ mkdir -p "$staging_dir/blobs"
 docker run --rm \
   -v "${COMPOSE_PROJECT}_blobs:/src:ro" \
   -v "$(cd "$staging_dir/blobs" && pwd):/dst" \
-  alpine sh -c "cp -a /src/. /dst/ 2>/dev/null || true"
+  alpine sh -c "cp -a /src/. /dst/ 2>/dev/null || true; chmod -R a+rwX /dst 2>/dev/null || true"
 
 # Write backup manifest
 timestamp="$(date -u +"%Y-%m-%dT%H:%M:%SZ")"
