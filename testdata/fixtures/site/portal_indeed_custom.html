@@ -1,0 +1,52 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>Indeed Apply - SRE</title>
+  <style>
+    body { font-family: sans-serif; background: #f4f5f8; padding: 20px; }
+    .box { background: white; max-width: 500px; margin: 20px auto; padding: 24px; border-radius: 8px; border: 1px solid #d4d2d0; }
+    .field { margin: 14px 0; }
+    label { display: block; font-weight: bold; margin-bottom: 4px; font-size: 14px; }
+    input[type=text], input[type=email], input[type=tel] { width: 100%; padding: 8px; border: 1px solid #949494; border-radius: 4px; box-sizing: border-box; }
+    .btn { background: #2557a7; color: white; border: none; padding: 12px; font-weight: bold; border-radius: 8px; cursor: pointer; width: 100%; }
+  </style>
+</head>
+<body>
+  <div class="box">
+    <h2>Apply to Trade Republic</h2>
+    <form id="indeed-form" action="/submit" method="post" novalidate>
+      <div class="field">
+        <label for="name">Full Name *</label>
+        <input id="name" name="name" type="text" value="Max Mustermann" required>
+      </div>
+      <div class="field">
+        <label for="email">Email *</label>
+        <input id="email" name="email" type="email" value="max.mustermann@example.org" required>
+      </div>
+      <div class="field">
+        <label for="phone">Phone *</label>
+        <input id="phone" name="phone" type="tel" value="+49 30 1234567" required>
+      </div>
+      <div class="field">
+        <label for="resume">Resume *</label>
+        <input id="resume" name="resume" type="file" required>
+      </div>
+      <button type="submit" class="btn" id="btn-submit">Submit your application</button>
+    </form>
+  </div>
+  <script>
+    document.getElementById('indeed-form').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const data = {
+        name: document.getElementById('name').value,
+        email: document.getElementById('email').value,
+        phone: document.getElementById('phone').value,
+        resume: document.getElementById('resume').files[0]?.name || ''
+      };
+      await fetch('/submit', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(data) });
+      document.body.innerHTML = '<div class="box"><h2>Application Submitted</h2></div>';
+    });
+  </script>
+</body>
+</html>

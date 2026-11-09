@@ -1,0 +1,77 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>Senior Software Engineer @ DeepL (Ashby)</title>
+  <style>
+    body { font-family: -apple-system, BlinkMacSystemFont, sans-serif; max-width: 650px; margin: 40px auto; padding: 0 16px; }
+    .field { margin: 16px 0; }
+    label { display: block; font-weight: 500; margin-bottom: 6px; font-size: 15px; }
+    input[type=text], input[type=email], input[type=tel] {
+      width: 100%; padding: 10px; border: 1px solid #d0d5dd; border-radius: 6px; box-sizing: border-box;
+    }
+    .dropzone { border: 2px dashed #b0b7c3; border-radius: 8px; padding: 24px; text-align: center; cursor: pointer; background: #fafbfc; }
+    .btn-submit { background: #0f172a; color: white; border: none; padding: 12px 20px; font-weight: 600; border-radius: 6px; cursor: pointer; width: 100%; margin-top: 12px; }
+  </style>
+</head>
+<body>
+  <h1>Senior Software Engineer - Core AI</h1>
+  <p style="color:#64748b;">DeepL · Cologne / Remote (Germany)</p>
+  <div id="ashby-app">
+    <div class="field">
+      <label for="name">Name *</label>
+      <input id="name" placeholder="First and last name" required>
+    </div>
+    <div class="field">
+      <label for="email">Email *</label>
+      <input id="email" type="email" placeholder="you@domain.com" required>
+    </div>
+    <div class="field">
+      <label for="phone">Phone *</label>
+      <input id="phone" type="tel" placeholder="+49 170 1234567" required>
+    </div>
+    <div class="field">
+      <label id="resume-lbl">Resume / CV *</label>
+      <div class="dropzone" id="dz-upload" onclick="document.getElementById('file-input').click()">
+        <span>Upload your resume or drag and drop</span>
+        <input id="file-input" type="file" style="display:none" aria-labelledby="resume-lbl">
+      </div>
+      <div id="dz-file-name" style="margin-top:6px; color:#059669; font-weight:500;"></div>
+    </div>
+    <div class="field">
+      <label for="location">Location (City, Country) *</label>
+      <input id="location" placeholder="e.g. Berlin, Germany" required>
+    </div>
+    <div class="field">
+      <label for="github">GitHub Profile</label>
+      <input id="github" placeholder="https://github.com/...">
+    </div>
+    <div id="msg-box"></div>
+    <button type="button" class="btn-submit" id="btn-ashby-submit">Submit Application</button>
+  </div>
+  <script>
+    document.getElementById('file-input').addEventListener('change', (e) => {
+      if (e.target.files.length) {
+        document.getElementById('dz-file-name').textContent = 'Selected: ' + e.target.files[0].name;
+      }
+    });
+
+    document.getElementById('btn-ashby-submit').addEventListener('click', async () => {
+      const fileInput = document.getElementById('file-input');
+      const data = {
+        name: document.getElementById('name').value,
+        email: document.getElementById('email').value,
+        phone: document.getElementById('phone').value,
+        location: document.getElementById('location').value,
+        resume: fileInput.files[0]?.name || ''
+      };
+      if (!data.name || !data.email || !data.phone || !data.resume) {
+        document.getElementById('msg-box').innerHTML = '<p style="color:red">Please fill all required fields.</p>';
+        return;
+      }
+      await fetch('/submit', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(data) });
+      document.getElementById('ashby-app').innerHTML = '<h2>Application submitted!</h2><p>Thank you for applying to DeepL.</p>';
+    });
+  </script>
+</body>
+</html>

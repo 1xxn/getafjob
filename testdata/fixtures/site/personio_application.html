@@ -1,0 +1,77 @@
+<!doctype html>
+<html lang="de">
+<head>
+  <meta charset="utf-8">
+  <title>Bewerbung - Personio Jobs</title>
+  <style>
+    body { font-family: sans-serif; max-width: 680px; margin: 30px auto; padding: 0 20px; }
+    .field { margin: 16px 0; }
+    label { display: block; font-weight: bold; margin-bottom: 4px; }
+    input[type=text], input[type=email], input[type=tel] { width: 100%; padding: 8px; border: 1px solid #ccc; border-radius: 4px; box-sizing: border-box; }
+    button[type=submit] { background: #1f2937; color: white; border: none; padding: 12px 24px; font-size: 16px; border-radius: 4px; cursor: pointer; }
+  </style>
+</head>
+<body>
+  <h1>Senior DevOps Engineer (m/w/d)</h1>
+  <p>everphone GmbH · Berlin · Vollzeit</p>
+  <hr>
+  <h2>Online-Bewerbung</h2>
+  <form id="personio-form" action="/submit" method="post" novalidate>
+    <div class="field">
+      <label for="first_name">Vorname *</label>
+      <input id="first_name" name="first_name" type="text" required>
+    </div>
+    <div class="field">
+      <label for="last_name">Nachname *</label>
+      <input id="last_name" name="last_name" type="text" required>
+    </div>
+    <div class="field">
+      <label for="email">E-Mail *</label>
+      <input id="email" name="email" type="email" required>
+    </div>
+    <div class="field">
+      <label for="phone">Telefon *</label>
+      <input id="phone" name="phone" type="tel" required>
+    </div>
+    <div class="field">
+      <label for="resume">Lebenslauf *</label>
+      <input id="resume" name="resume" type="file" required>
+    </div>
+    <div class="field">
+      <label for="start_date">Frühester Eintrittstermin *</label>
+      <input id="start_date" name="start_date" type="text" placeholder="z. B. 01.01.2027 oder ab sofort" required>
+    </div>
+    <div class="field">
+      <label for="salary">Gehaltsvorstellung (brutto/Jahr in EUR) *</label>
+      <input id="salary" name="salary" type="text" placeholder="z. B. 85000" required>
+    </div>
+    <div class="field">
+      <label><input id="privacy" type="checkbox" name="privacy" required> Ich willige in die Verarbeitung meiner Daten gemäß Datenschutzerklärung ein *</label>
+    </div>
+    <div id="errors"></div>
+    <button type="submit" id="btn-submit">Bewerbung absenden</button>
+  </form>
+  <script>
+    document.getElementById('personio-form').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const f = e.target;
+      const data = {
+        first_name: f.first_name.value,
+        last_name: f.last_name.value,
+        email: f.email.value,
+        phone: f.phone.value,
+        resume: f.resume.files[0]?.name || '',
+        start_date: f.start_date.value,
+        salary: f.salary.value,
+        privacy: f.privacy.checked
+      };
+      if (!data.first_name || !data.last_name || !data.email || !data.phone || !data.resume || !data.privacy) {
+        document.getElementById('errors').innerHTML = '<p style="color:red">Bitte füllen Sie alle Pflichtfelder aus.</p>';
+        return;
+      }
+      await fetch('/submit', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(data) });
+      document.body.innerHTML = '<h2>Vielen Dank für Ihre Bewerbung!</h2><p>Ihre Unterlagen wurden erfolgreich übermittelt.</p>';
+    });
+  </script>
+</body>
+</html>

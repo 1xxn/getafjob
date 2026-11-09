@@ -1,0 +1,81 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>Staff Platform Engineer - Veepee Berlin (Lever)</title>
+  <style>
+    body { font-family: sans-serif; max-width: 700px; margin: 30px auto; padding: 0 20px; }
+    .field { margin: 16px 0; }
+    label { display: block; font-weight: bold; margin-bottom: 4px; }
+    input[type=text], input[type=email], input[type=tel], select {
+      width: 100%; padding: 8px; border: 1px solid #ccc; border-radius: 4px; box-sizing: border-box;
+    }
+    button[type=submit] { background: #111; color: white; border: none; padding: 12px 24px; font-size: 16px; border-radius: 4px; cursor: pointer; }
+  </style>
+</head>
+<body>
+  <h1>Staff Platform Engineer</h1>
+  <p>Berlin, Germany · Tech &amp; Product</p>
+  <form id="lever-eu" action="/submit" method="post" novalidate>
+    <div class="field">
+      <label for="name">Full Name *</label>
+      <input id="name" name="name" type="text" required>
+    </div>
+    <div class="field">
+      <label for="email">Email *</label>
+      <input id="email" name="email" type="email" required>
+    </div>
+    <div class="field">
+      <label for="phone">Phone *</label>
+      <input id="phone" name="phone" type="tel" required>
+    </div>
+    <div class="field">
+      <label for="resume">Resume/CV *</label>
+      <input id="resume" name="resume" type="file" required>
+    </div>
+    <div class="field">
+      <label for="salary">Desired Annual Gross Salary (EUR) *</label>
+      <input id="salary" name="salary" type="text" placeholder="e.g. 95000" required>
+    </div>
+    <div class="field">
+      <label for="notice">Notice Period *</label>
+      <select id="notice" name="notice" required>
+        <option value="">Select an option</option>
+        <option value="Immediately">Immediately</option>
+        <option value="1 month">1 month</option>
+        <option value="3 months">3 months</option>
+      </select>
+    </div>
+    <div class="field">
+      <label for="auth">Are you legally authorized to work in Germany? *</label>
+      <select id="auth" name="work_auth" required>
+        <option value="">Select an option</option>
+        <option value="Yes">Yes</option>
+        <option value="No">No</option>
+      </select>
+    </div>
+    <div class="field">
+      <label><input id="privacy" type="checkbox" name="privacy" required> I accept the candidate privacy policy *</label>
+    </div>
+    <div id="errors"></div>
+    <button type="submit" id="submit-btn">Submit application</button>
+  </form>
+  <script>
+    document.getElementById('lever-eu').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const f = e.target;
+      const data = {
+        name: f.name.value, email: f.email.value, phone: f.phone.value,
+        resume: f.resume.files[0]?.name || '', salary: f.salary.value,
+        notice: f.notice.value, work_auth: f.work_auth.value, privacy: f.privacy.checked
+      };
+      if (!data.name || !data.email || !data.phone || !data.resume || !data.privacy) {
+        document.getElementById('errors').innerHTML = '<p style="color:red">Missing required fields.</p>';
+        return;
+      }
+      await fetch('/submit', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(data) });
+      document.body.innerHTML = '<h2>Application submitted!</h2><p>Thank you for applying to Veepee.</p>';
+    });
+  </script>
+</body>
+</html>

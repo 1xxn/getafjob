@@ -1,0 +1,60 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>Indeed Apply Modal</title>
+  <style>
+    body { font-family: sans-serif; background: #f4f5f8; padding: 20px; }
+    .box { background: white; max-width: 500px; margin: 20px auto; padding: 24px; border-radius: 8px; border: 1px solid #d4d2d0; }
+    .field { margin: 14px 0; }
+    label { display: block; font-weight: bold; margin-bottom: 4px; font-size: 14px; }
+    input[type=text], input[type=email], input[type=tel] { width: 100%; padding: 8px; border: 1px solid #949494; border-radius: 4px; box-sizing: border-box; }
+    .btn-indeed { background: #2557a7; color: white; border: none; padding: 12px; font-weight: bold; border-radius: 8px; cursor: pointer; width: 100%; }
+  </style>
+</head>
+<body>
+  <div class="box">
+    <h2>Apply to Cloud Specialist</h2>
+    <div id="part1">
+      <div class="field">
+        <label for="name">Your Name *</label>
+        <input id="name" name="name" type="text" value="Max Mustermann" required>
+      </div>
+      <div class="field">
+        <label for="email">Email *</label>
+        <input id="email" name="email" type="email" value="max.mustermann@example.org" required>
+      </div>
+      <div class="field">
+        <label for="phone">Phone *</label>
+        <input id="phone" name="phone" type="tel" value="+49 30 1234567" required>
+      </div>
+      <div class="field">
+        <label for="cv">Resume *</label>
+        <input id="cv" type="file" required>
+      </div>
+      <button type="button" class="btn-indeed" id="btn-part2">Continue</button>
+    </div>
+    <div id="part2" style="display:none;">
+      <h3>Review and Apply</h3>
+      <p>Confirm your details before sending.</p>
+      <button type="button" class="btn-indeed" id="btn-submit">Submit your application</button>
+    </div>
+  </div>
+  <script>
+    document.getElementById('btn-part2').addEventListener('click', () => {
+      document.getElementById('part1').style.display = 'none';
+      document.getElementById('part2').style.display = 'block';
+    });
+    document.getElementById('btn-submit').addEventListener('click', async () => {
+      const data = {
+        name: document.getElementById('name').value,
+        email: document.getElementById('email').value,
+        phone: document.getElementById('phone').value,
+        cv: document.getElementById('cv').files[0]?.name || 'Max_Mustermann_CV.pdf'
+      };
+      await fetch('/submit', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(data) });
+      document.body.innerHTML = '<div class="box"><h2>Application Submitted</h2><p>Your application was submitted to the employer.</p></div>';
+    });
+  </script>
+</body>
+</html>

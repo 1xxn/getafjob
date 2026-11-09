@@ -1,0 +1,68 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>Teamtailor Career - Lead SRE</title>
+  <style>
+    body { font-family: sans-serif; max-width: 650px; margin: 30px auto; padding: 0 20px; }
+    .field { margin: 16px 0; }
+    label { display: block; font-weight: bold; margin-bottom: 4px; }
+    input[type=text], input[type=email], input[type=tel], select { width: 100%; padding: 8px; border: 1px solid #ccc; border-radius: 4px; box-sizing: border-box; }
+    button[type=submit] { background: #e11d48; color: white; border: none; padding: 12px 24px; font-size: 16px; border-radius: 4px; cursor: pointer; }
+  </style>
+</head>
+<body>
+  <h1>Lead Site Reliability Engineer</h1>
+  <p>Remote (Europe) · Operations</p>
+  <form id="tt-custom" action="/submit" method="post" novalidate>
+    <div class="field">
+      <label for="name">Full Name *</label>
+      <input id="name" name="name" type="text" required>
+    </div>
+    <div class="field">
+      <label for="email">E-mail address *</label>
+      <input id="email" name="email" type="email" required>
+    </div>
+    <div class="field">
+      <label for="phone">Phone number *</label>
+      <input id="phone" name="phone" type="tel" required>
+    </div>
+    <div class="field">
+      <label for="resume">Resume / CV *</label>
+      <input id="resume" name="resume" type="file" required>
+    </div>
+    <div class="field">
+      <label for="salary">Salary Expectation (EUR) *</label>
+      <input id="salary" name="salary" type="text" required>
+    </div>
+    <div class="field">
+      <label for="remote">Are you located in Europe? *</label>
+      <select id="remote" name="eu_located" required>
+        <option value="">Choose one</option>
+        <option value="Yes">Yes</option>
+        <option value="No">No</option>
+      </select>
+    </div>
+    <div class="field">
+      <label><input id="gdpr" type="checkbox" name="gdpr" required> I consent to the processing of personal data *</label>
+    </div>
+    <button type="submit" id="btn-submit">Submit application</button>
+  </form>
+  <script>
+    document.getElementById('tt-custom').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const f = e.target;
+      const data = {
+        name: f.name.value,
+        email: f.email.value,
+        phone: f.phone.value,
+        resume: f.resume.files[0]?.name || '',
+        salary: f.salary.value,
+        eu_located: f.eu_located.value
+      };
+      await fetch('/submit', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(data) });
+      document.body.innerHTML = '<h2>Thank you!</h2><p>Application successfully received.</p>';
+    });
+  </script>
+</body>
+</html>

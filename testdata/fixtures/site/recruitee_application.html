@@ -1,0 +1,69 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>Application - Recruitee Careers</title>
+  <style>
+    body { font-family: sans-serif; max-width: 650px; margin: 30px auto; padding: 0 20px; }
+    .field { margin: 16px 0; }
+    label { display: block; font-weight: bold; margin-bottom: 4px; }
+    input[type=text], input[type=email], input[type=tel] { width: 100%; padding: 8px; border: 1px solid #ccc; border-radius: 4px; box-sizing: border-box; }
+    .dropzone { border: 2px dashed #999; padding: 20px; text-align: center; border-radius: 4px; cursor: pointer; }
+    button[type=submit] { background: #3b82f6; color: white; border: none; padding: 12px 24px; font-size: 16px; border-radius: 4px; cursor: pointer; width: 100%; }
+  </style>
+</head>
+<body>
+  <h1>Fullstack Engineer (Go &amp; TypeScript)</h1>
+  <p>Amsterdam / Remote EU</p>
+  <form id="recruitee-form" action="/submit" method="post" novalidate>
+    <div class="field">
+      <label for="name">Full Name *</label>
+      <input id="name" name="name" type="text" required>
+    </div>
+    <div class="field">
+      <label for="email">Email *</label>
+      <input id="email" name="email" type="email" required>
+    </div>
+    <div class="field">
+      <label for="phone">Phone *</label>
+      <input id="phone" name="phone" type="tel" required>
+    </div>
+    <div class="field">
+      <label id="lbl-cv">Resume *</label>
+      <div class="dropzone" onclick="document.getElementById('cv-file').click()">
+        <span>Upload your CV / Resume</span>
+        <input id="cv-file" name="resume" type="file" style="display:none" aria-labelledby="lbl-cv" required>
+      </div>
+      <div id="cv-name" style="margin-top:6px; color:#2563eb;"></div>
+    </div>
+    <div class="field">
+      <label for="linkedin">LinkedIn</label>
+      <input id="linkedin" name="linkedin" type="text">
+    </div>
+    <div class="field">
+      <label><input id="privacy" type="checkbox" name="privacy" required> I agree to the processing of personal data *</label>
+    </div>
+    <button type="submit" id="btn-submit">Submit application</button>
+  </form>
+  <script>
+    document.getElementById('cv-file').addEventListener('change', (e) => {
+      if (e.target.files.length) {
+        document.getElementById('cv-name').textContent = 'Selected file: ' + e.target.files[0].name;
+      }
+    });
+    document.getElementById('recruitee-form').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const f = e.target;
+      const cvInput = document.getElementById('cv-file');
+      const data = {
+        name: f.name.value,
+        email: f.email.value,
+        phone: f.phone.value,
+        resume: cvInput.files[0]?.name || ''
+      };
+      await fetch('/submit', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(data) });
+      document.body.innerHTML = '<h2>Application submitted!</h2><p>Thanks for applying.</p>';
+    });
+  </script>
+</body>
+</html>

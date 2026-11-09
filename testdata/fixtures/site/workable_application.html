@@ -1,0 +1,63 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>Application for Site Reliability Engineer - Workable</title>
+  <style>
+    body { font-family: sans-serif; max-width: 680px; margin: 30px auto; padding: 0 20px; }
+    .field { margin: 16px 0; }
+    label { display: block; font-weight: bold; margin-bottom: 4px; }
+    input[type=text], input[type=email], input[type=tel] { width: 100%; padding: 8px; border: 1px solid #ccc; border-radius: 4px; box-sizing: border-box; }
+    button[type=submit] { background: #00857c; color: white; border: none; padding: 12px 24px; font-size: 16px; border-radius: 4px; cursor: pointer; }
+  </style>
+</head>
+<body>
+  <h1>Site Reliability Engineer</h1>
+  <p>Athens, Greece / Remote EU</p>
+  <form id="workable-form" action="/submit" method="post" novalidate>
+    <div class="field">
+      <label for="first_name">First Name *</label>
+      <input id="first_name" name="first_name" type="text" required>
+    </div>
+    <div class="field">
+      <label for="last_name">Last Name *</label>
+      <input id="last_name" name="last_name" type="text" required>
+    </div>
+    <div class="field">
+      <label for="email">Email *</label>
+      <input id="email" name="email" type="email" required>
+    </div>
+    <div class="field">
+      <label for="phone">Phone *</label>
+      <input id="phone" name="phone" type="tel" required>
+    </div>
+    <div class="field">
+      <label for="city">City, Country *</label>
+      <input id="city" name="city" type="text" placeholder="e.g. Berlin, Germany" required>
+    </div>
+    <div class="field">
+      <label for="resume">Resume / CV *</label>
+      <input id="resume" name="resume" type="file" required>
+    </div>
+    <div class="field">
+      <label><input id="gdpr" type="checkbox" name="gdpr" required> I consent to the storage of my data *</label>
+    </div>
+    <button type="submit" id="btn-submit">Submit application</button>
+  </form>
+  <script>
+    document.getElementById('workable-form').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const f = e.target;
+      const data = {
+        name: f.first_name.value + ' ' + f.last_name.value,
+        email: f.email.value,
+        phone: f.phone.value,
+        city: f.city.value,
+        resume: f.resume.files[0]?.name || ''
+      };
+      await fetch('/submit', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(data) });
+      document.body.innerHTML = '<h2>Application submitted!</h2><p>Your application was successfully sent.</p>';
+    });
+  </script>
+</body>
+</html>

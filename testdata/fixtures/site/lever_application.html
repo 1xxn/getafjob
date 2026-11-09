@@ -1,0 +1,103 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>Senior Backend Engineer - Example Tech (Lever)</title>
+  <style>
+    body { font-family: sans-serif; max-width: 700px; margin: 30px auto; padding: 0 20px; }
+    .field { margin: 16px 0; }
+    label { display: block; font-weight: bold; margin-bottom: 4px; }
+    input[type=text], input[type=email], input[type=tel], input[type=url], textarea {
+      width: 100%; padding: 8px; border: 1px solid #ccc; border-radius: 4px; box-sizing: border-box;
+    }
+    .resume-upload { border: 2px dashed #999; padding: 20px; text-align: center; border-radius: 4px; cursor: pointer; }
+    button[type=submit] { background: #0073e6; color: white; border: none; padding: 12px 24px; font-size: 16px; border-radius: 4px; cursor: pointer; }
+    .error { color: #d93025; font-size: 14px; margin-top: 4px; }
+  </style>
+</head>
+<body>
+  <h1>Senior Backend Engineer (Go / Distributed Systems)</h1>
+  <p>Berlin, Germany · Full Time · Engineering</p>
+  <hr>
+  <h2>Submit your application</h2>
+  <form id="lever-form" action="/submit" method="post" novalidate>
+    <div class="field">
+      <label for="name">Full Name <span class="req">*</span></label>
+      <input id="name" name="name" type="text" placeholder="e.g. Max Mustermann" required>
+    </div>
+    <div class="field">
+      <label for="email">Email <span class="req">*</span></label>
+      <input id="email" name="email" type="email" placeholder="e.g. max@example.com" required>
+    </div>
+    <div class="field">
+      <label for="phone">Phone <span class="req">*</span></label>
+      <input id="phone" name="phone" type="tel" placeholder="+49 30 1234567" required>
+    </div>
+    <div class="field">
+      <label for="org">Current Company</label>
+      <input id="org" name="org" type="text">
+    </div>
+    <div class="field">
+      <label for="resume">Resume/CV <span class="req">*</span></label>
+      <div class="resume-upload" onclick="document.getElementById('resume').click()">
+        <span>Attach Resume/CV</span>
+        <input id="resume" name="resume" type="file" style="display:none" required>
+      </div>
+      <div id="resume-name" style="margin-top:6px; font-style:italic;"></div>
+    </div>
+    <div class="field">
+      <label for="linkedin">LinkedIn URL</label>
+      <input id="linkedin" name="urls[LinkedIn]" type="url" placeholder="https://www.linkedin.com/in/...">
+    </div>
+    <div class="field">
+      <label for="github">GitHub URL</label>
+      <input id="github" name="urls[GitHub]" type="url" placeholder="https://github.com/...">
+    </div>
+    <div class="field">
+      <label for="comments">Additional Information</label>
+      <textarea id="comments" name="comments" rows="3"></textarea>
+    </div>
+    <div class="field">
+      <label><input id="consent" type="checkbox" name="consent" required> I agree to the processing of my personal data *</label>
+    </div>
+    <div id="error-box"></div>
+    <button type="submit" id="btn-submit">Submit application</button>
+  </form>
+
+  <script>
+    document.getElementById('resume').addEventListener('change', (e) => {
+      if (e.target.files.length) {
+        document.getElementById('resume-name').textContent = 'Attached: ' + e.target.files[0].name;
+      }
+    });
+
+    document.getElementById('lever-form').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const f = e.target;
+      const fileInput = document.getElementById('resume');
+      const payload = {
+        name: f.name.value,
+        email: f.email.value,
+        phone: f.phone.value,
+        org: f.org.value,
+        resume: fileInput.files.length ? fileInput.files[0].name : '',
+        linkedin: f['urls[LinkedIn]'].value,
+        github: f['urls[GitHub]'].value,
+        consent: f.consent.checked
+      };
+
+      if (!payload.name || !payload.email || !payload.phone || !payload.resume || !payload.consent) {
+        document.getElementById('error-box').innerHTML = '<p class="error">Please fill in all required fields.</p>';
+        return;
+      }
+
+      await fetch('/submit', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+      });
+      document.body.innerHTML = '<h2>Application submitted!</h2><p>Thanks for applying to Example Tech.</p>';
+    });
+  </script>
+</body>
+</html>
