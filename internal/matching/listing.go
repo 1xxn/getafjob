@@ -62,11 +62,25 @@ type Detail struct {
 	ComputedAt  time.Time
 }
 
+// MatchSummary is one job match of the user for export or summary.
+type MatchSummary struct {
+	JobID      int64
+	Title      string
+	Company    string
+	Location   string
+	Workplace  string
+	Score      int
+	Decision   Decision
+	Reasons    []Reason
+	ComputedAt time.Time
+}
+
 // Reader reads results per user (row-level security).
 type Reader interface {
 	ListMatches(ctx context.Context, userID uuid.UUID, f Filter, offset, limit int) ([]Item, int, error)
 	MatchCounts(ctx context.Context, userID uuid.UUID) (map[Decision]int, error)
 	Match(ctx context.Context, userID uuid.UUID, jobID int64) (Detail, error) // ErrNotFound
+	UserMatches(ctx context.Context, userID uuid.UUID) ([]MatchSummary, error)
 }
 
 // Listings serves the job list and detail pages.
@@ -112,4 +126,9 @@ func (l *Listings) List(ctx context.Context, userID uuid.UUID, f Filter) (List, 
 // Detail returns one job with its reasons.
 func (l *Listings) Detail(ctx context.Context, userID uuid.UUID, jobID int64) (Detail, error) {
 	return l.r.Match(ctx, userID, jobID)
+}
+
+// UserMatches returns all matches computed for the user.
+func (l *Listings) UserMatches(ctx context.Context, userID uuid.UUID) ([]MatchSummary, error) {
+	return l.r.UserMatches(ctx, userID)
 }

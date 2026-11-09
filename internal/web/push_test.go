@@ -351,6 +351,14 @@ func (f *fakeAppStore) SubmitsSince(context.Context, uuid.UUID, time.Time) (int,
 	return 0, nil
 }
 
+func (f *fakeAppStore) UserApplications(context.Context, uuid.UUID) ([]application.ApplicationSummary, error) {
+	return nil, nil
+}
+
+func (f *fakeAppStore) UserScreenshots(context.Context, uuid.UUID) ([]string, error) {
+	return nil, nil
+}
+
 type fakeShots map[string][]byte
 
 func (s fakeShots) Get(_ context.Context, _ uuid.UUID, key string) ([]byte, error) {

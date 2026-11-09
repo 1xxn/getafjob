@@ -202,7 +202,9 @@ func (q *Queries) CreateUser(ctx context.Context, arg CreateUserParams) (CreateU
 
 const deleteExpired = `-- name: DeleteExpired :exec
 WITH s AS (DELETE FROM sessions WHERE sessions.expires_at < $1 OR sessions.replaced_at < $1 - interval '5 minutes'),
-     m AS (DELETE FROM magic_links WHERE magic_links.expires_at < $1)
+     m AS (DELETE FROM magic_links WHERE magic_links.expires_at < $1),
+     r AS (DELETE FROM recoveries WHERE recoveries.expires_at < $1),
+     i AS (DELETE FROM invitations WHERE invitations.expires_at < $1 AND invitations.accepted_at IS NULL)
 DELETE FROM webauthn_challenges WHERE webauthn_challenges.expires_at < $1
 `
 
@@ -255,6 +257,18 @@ WHERE t.token_hash = $1 AND s.family = t.family
 func (q *Queries) DeleteSession(ctx context.Context, tokenHash []byte) error {
 	_, err := q.db.Exec(ctx, deleteSession, tokenHash)
 	return err
+}
+
+const deleteUser = `-- name: DeleteUser :execrows
+DELETE FROM users WHERE id = $1
+`
+
+func (q *Queries) DeleteUser(ctx context.Context, id uuid.UUID) (int64, error) {
+	result, err := q.db.Exec(ctx, deleteUser, id)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
 }
 
 const deleteUserSessions = `-- name: DeleteUserSessions :execrows
@@ -639,6 +653,45 @@ func (q *Queries) UseRecovery(ctx context.Context, arg UseRecoveryParams) (uuid.
 	var user_id uuid.UUID
 	err := row.Scan(&user_id)
 	return user_id, err
+}
+
+const userAuditEvents = `-- name: UserAuditEvents :many
+SELECT id, actor, code, params, created_at FROM audit_events
+WHERE user_id = $1 ORDER BY id ASC
+`
+
+type UserAuditEventsRow struct {
+	ID        int64
+	Actor     string
+	Code      string
+	Params    []byte
+	CreatedAt time.Time
+}
+
+func (q *Queries) UserAuditEvents(ctx context.Context, userID *uuid.UUID) ([]UserAuditEventsRow, error) {
+	rows, err := q.db.Query(ctx, userAuditEvents, userID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []UserAuditEventsRow{}
+	for rows.Next() {
+		var i UserAuditEventsRow
+		if err := rows.Scan(
+			&i.ID,
+			&i.Actor,
+			&i.Code,
+			&i.Params,
+			&i.CreatedAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
 }
 
 const userPasskeys = `-- name: UserPasskeys :many

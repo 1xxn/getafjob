@@ -63,6 +63,16 @@ func (s *Service) CheckpointScreenshot(ctx context.Context, userID, appID uuid.U
 	return s.store.CheckpointScreenshot(ctx, userID, appID, checkpointID)
 }
 
+// UserApplications returns all applications of the user with their timeline events.
+func (s *Service) UserApplications(ctx context.Context, userID uuid.UUID) ([]ApplicationSummary, error) {
+	return s.store.UserApplications(ctx, userID)
+}
+
+// UserScreenshots returns all distinct screenshot blob keys for the user.
+func (s *Service) UserScreenshots(ctx context.Context, userID uuid.UUID) ([]string, error) {
+	return s.store.UserScreenshots(ctx, userID)
+}
+
 // PurgeExpiredScreenshots deletes run screenshots older than ScreenshotRetention from the blob store and clears
 // their checkpoint references.
 func (s *Service) PurgeExpiredScreenshots(ctx context.Context, blobs ScreenshotDeleter) (int, error) {

@@ -450,3 +450,43 @@ func (s *Store) DeletePasskey(ctx context.Context, userID uuid.UUID, id []byte, 
 	})
 	return ok, err
 }
+
+// DeleteUser deletes the user row; cascade foreign keys delete all tenant rows.
+func (s *Store) DeleteUser(ctx context.Context, userID uuid.UUID) error {
+	return s.system(ctx, func(qs *q.Queries) error {
+		n, err := qs.DeleteUser(ctx, userID)
+		if err != nil {
+			return err
+		}
+		if n == 0 {
+			return identity.ErrNotFound
+		}
+		return nil
+	})
+}
+
+// AuditEvents returns audit log entries for the given user.
+func (s *Store) AuditEvents(ctx context.Context, userID uuid.UUID) ([]identity.AuditEvent, error) {
+	var list []identity.AuditEvent
+	err := s.user(ctx, userID, func(qs *q.Queries) error {
+		rows, err := qs.UserAuditEvents(ctx, &userID)
+		if err != nil {
+			return err
+		}
+		list = make([]identity.AuditEvent, len(rows))
+		for i, r := range rows {
+			var params map[string]any
+			if len(r.Params) > 0 {
+				_ = json.Unmarshal(r.Params, &params)
+			}
+			list[i] = identity.AuditEvent{
+				UserID: &userID,
+				Actor:  r.Actor,
+				Code:   r.Code,
+				Params: params,
+			}
+		}
+		return nil
+	})
+	return list, err
+}

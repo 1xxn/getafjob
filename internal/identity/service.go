@@ -327,3 +327,19 @@ func (s *Service) UserByEmail(ctx context.Context, email string) (User, error) {
 	}
 	return s.store.UserByEmail(ctx, e)
 }
+
+// UserByID returns the account of an ID; ErrNotFound if there is none.
+func (s *Service) UserByID(ctx context.Context, id uuid.UUID) (User, error) {
+	u, _, err := s.store.UserByID(ctx, id)
+	return u, err
+}
+
+// DeleteUser permanently deletes an account and all its personal data.
+func (s *Service) DeleteUser(ctx context.Context, userID uuid.UUID) error {
+	return s.store.DeleteUser(ctx, userID)
+}
+
+// AuditEvents returns all audit log events recorded for a user.
+func (s *Service) AuditEvents(ctx context.Context, userID uuid.UUID) ([]AuditEvent, error) {
+	return s.store.AuditEvents(ctx, userID)
+}

@@ -182,6 +182,14 @@ func (f *fakePlannerStore) SubmitsSince(_ context.Context, userID uuid.UUID, _ t
 	return f.submits[userID], nil
 }
 
+func (f *fakePlannerStore) UserApplications(_ context.Context, _ uuid.UUID) ([]application.ApplicationSummary, error) {
+	return nil, nil
+}
+
+func (f *fakePlannerStore) UserScreenshots(_ context.Context, _ uuid.UUID) ([]string, error) {
+	return nil, nil
+}
+
 func TestPlanner(t *testing.T) {
 	u1 := uuid.New()
 	u2 := uuid.New()

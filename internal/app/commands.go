@@ -22,9 +22,12 @@ const adminUsage = `Usage:
 Commands:
   boards         company boards for the crawler (admin boards import | list)
   check-config   validate the configuration (prints variable names, never values)
+  cleanup        run retention and token cleanup now
   crawl          queue a crawl now (the worker runs it)
+  delete-user    permanently delete a user account and crypto-shred data key (admin delete-user -email …)
   demo           invented users, profiles and jobs for development (admin demo [-jobs 2000] [-seed 1])
   env            list all configuration variables
+  export-user    export all personal data of a user to a ZIP file (admin export-user -email … -out …)
   gen-secret     print 32 random bytes (base64url) for passwords and keys
   gen-vapid-key  print a fresh VAPID P-256 key pair for web push notifications
   invite         create a one-time invitation link (admin invite -email … [-role admin] [-send])
@@ -42,7 +45,8 @@ func admin(ctx context.Context, args []string, env Env) int {
 		_, _ = fmt.Fprint(env.Stderr, adminUsage)
 		return ExitUsage
 	}
-	switch args[0] {
+	cmd := args[0]
+	switch cmd {
 	case "check-config":
 		cfg, err := config.Load(env.Config)
 		if err != nil {
@@ -79,6 +83,12 @@ func admin(ctx context.Context, args []string, env Env) int {
 		return adminLoadTest(ctx, args[1:], env)
 	case "notify":
 		return adminNotifySummary(ctx, args[1:], env)
+	case "delete-user":
+		return adminDeleteUser(ctx, args[1:], env)
+	case "export-user":
+		return adminExportUser(ctx, args[1:], env)
+	case "cleanup":
+		return adminCleanup(ctx, args[1:], env)
 	case "gen-secret":
 		b := make([]byte, 32)
 		_, _ = rand.Read(b) // crypto/rand.Read never returns an error (it crashes instead)
@@ -96,7 +106,7 @@ func admin(ctx context.Context, args []string, env Env) int {
 		_, _ = fmt.Fprint(env.Stdout, adminUsage)
 		return ExitOK
 	default:
-		_, _ = fmt.Fprintf(env.Stderr, "unknown admin command %q\n\n%s", args[0], adminUsage)
+		_, _ = fmt.Fprintf(env.Stderr, "unknown admin command %q\n\n%s", cmd, adminUsage)
 		return ExitUsage
 	}
 }

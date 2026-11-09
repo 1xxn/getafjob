@@ -3,6 +3,7 @@ package web
 import (
 	"encoding/base64"
 	"errors"
+	"fmt"
 	"net/http"
 	"strconv"
 	"time"
@@ -61,6 +62,8 @@ func (s *Server) loginForm(w http.ResponseWriter, r *http.Request, u *identity.U
 		notice = views.T(r.Context(), "login.reauth")
 	case r.URL.Query().Get("expired") == "1":
 		notice = identity.Msg(identity.ErrSessionExpired).Render(views.Locale(r.Context()))
+	case r.URL.Query().Get("deleted") == "1":
+		notice = views.T(r.Context(), "account.deleted.notice")
 	}
 	s.render(w, r, http.StatusOK, views.Login("", notice, s.Identity.PasskeysEnabled()))
 }
@@ -239,4 +242,49 @@ func (s *Server) cancelRecovery(w http.ResponseWriter, r *http.Request, u *ident
 		return
 	}
 	s.renderAccount(w, r, u, views.T(r.Context(), "account.recovery.canceled"))
+}
+
+func (s *Server) privacyPage(w http.ResponseWriter, r *http.Request, u *identity.User) {
+	name := ""
+	passkeys := false
+	if u != nil {
+		name = u.DisplayName
+		passkeys = s.Identity.PasskeysEnabled()
+	}
+	s.render(w, r, http.StatusOK, views.Privacy(views.PrivacyData{UserName: name, Passkeys: passkeys}))
+}
+
+func (s *Server) accountExport(w http.ResponseWriter, r *http.Request, u *identity.User) {
+	if u == nil {
+		http.Redirect(w, r, "/login", http.StatusSeeOther)
+		return
+	}
+	if s.Privacy == nil {
+		http.Error(w, "export not configured", http.StatusInternalServerError)
+		return
+	}
+	filename := fmt.Sprintf("getafjob-export-%s-%s.zip", u.ID.String()[:8], time.Now().UTC().Format("20060102150405"))
+	w.Header().Set("Content-Type", "application/zip")
+	w.Header().Set("Content-Disposition", fmt.Sprintf("attachment; filename=%q", filename))
+	if err := s.Privacy.Export(r.Context(), u.ID, w); err != nil {
+		s.Logger.ErrorContext(r.Context(), "data export failed", "err", err, "user", u.ID)
+	}
+}
+
+func (s *Server) accountDelete(w http.ResponseWriter, r *http.Request, u *identity.User) {
+	if u == nil {
+		http.Redirect(w, r, "/login", http.StatusSeeOther)
+		return
+	}
+	if s.Privacy == nil {
+		http.Error(w, "deletion not configured", http.StatusInternalServerError)
+		return
+	}
+	if err := s.Privacy.DeleteAccount(r.Context(), u.ID); err != nil {
+		s.Logger.ErrorContext(r.Context(), "account deletion failed", "err", err, "user", u.ID)
+		s.failed(w, r, u, err)
+		return
+	}
+	clearSession(w)
+	http.Redirect(w, r, "/login?deleted=1", http.StatusSeeOther)
 }

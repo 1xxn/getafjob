@@ -117,6 +117,21 @@ templ Account(d AccountData) {
 					<button type="submit">{ T(ctx, "account.sessions.sign_out_others") }</button>
 				</form>
 			}
+			<h2>{ T(ctx, "account.privacy.title") }</h2>
+			<p class="muted">{ T(ctx, "account.privacy.text") }</p>
+			<p><a href="/privacy">{ T(ctx, "account.privacy.policy_link") }</a></p>
+			<div class="stack">
+				<h3>{ T(ctx, "account.privacy.export_title") }</h3>
+				<p class="muted">{ T(ctx, "account.privacy.export_text") }</p>
+				<form method="get" action="/account/export">
+					<button type="submit">{ T(ctx, "account.privacy.export_button") }</button>
+				</form>
+				<h3>{ T(ctx, "account.privacy.delete_title") }</h3>
+				<p class="muted">{ T(ctx, "account.privacy.delete_text") }</p>
+				<form method="post" action="/account/delete">
+					<button type="submit" class="danger">{ T(ctx, "account.privacy.delete_button") }</button>
+				</form>
+			</div>
 		}
 	}
 }

@@ -125,6 +125,15 @@
   .stack > * + * {
     margin-top: var(--space-4);
   }
+
+  .footer {
+    max-width: var(--measure);
+    margin: var(--space-8) auto var(--space-4) auto;
+    padding: var(--space-4) var(--space-6);
+    border-top: 1px solid var(--line);
+    text-align: center;
+    font-size: 0.9rem;
+  }
 }
 
 @layer components {
@@ -191,6 +200,12 @@
       border-color: var(--accent);
       color: var(--accent-ink);
       font-weight: 600;
+    }
+
+    &.danger {
+      background: var(--danger);
+      border-color: var(--danger);
+      color: #fff;
     }
 
     &.link {

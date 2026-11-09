@@ -34,3 +34,9 @@ WHERE m.user_id = $1 AND j.status = 'open' GROUP BY m.decision;
 SELECT j.id, j.title, j.company, j.location, j.workplace, j.posted, j.first_seen, j.description, j.url,
   j.apply_url, j.status, m.score, m.decision, m.reasons, m.computed_at
 FROM matches m JOIN jobs j ON j.id = m.job_id WHERE m.user_id = $1 AND j.id = $2;
+
+-- name: UserMatches :many
+SELECT j.id, j.title, j.company, j.location, j.workplace, m.score, m.decision, m.reasons, m.computed_at
+FROM matches m JOIN jobs j ON j.id = m.job_id
+WHERE m.user_id = $1
+ORDER BY m.score DESC, j.id DESC;

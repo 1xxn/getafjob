@@ -106,6 +106,10 @@ type Store interface {
 	DeletePasskey(ctx context.Context, userID uuid.UUID, id []byte, audit AuditEvent) (bool, error)
 	DeleteSession(ctx context.Context, h Hash, audit AuditEvent) error
 	DeleteExpired(ctx context.Context, before time.Time) error
+	// DeleteUser permanently removes a user and their cascading tenant rows.
+	DeleteUser(ctx context.Context, userID uuid.UUID) error
+	// AuditEvents returns all audit log events recorded for a user.
+	AuditEvents(ctx context.Context, userID uuid.UUID) ([]AuditEvent, error)
 }
 
 // Mail is a plain-text mail.

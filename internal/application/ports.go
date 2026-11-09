@@ -47,6 +47,34 @@ type Approval struct {
 	Asked   time.Time
 }
 
+// ApplicationSummary is a concise summary of an application for export or listing.
+type ApplicationSummary struct {
+	ID              uuid.UUID
+	JobID           int64
+	State           State
+	Version         int64
+	CreatedAt       time.Time
+	UpdatedAt       time.Time
+	ApprovalAsked   *time.Time
+	ApprovalReasons []Reason
+	Approved        *time.Time
+	Company         string
+	Title           string
+	Location        string
+	URL             string
+	ApplyURL        string
+	Events          []EventRecord
+}
+
+// EventRecord records a state machine transition event.
+type EventRecord struct {
+	Event    Event
+	From, To State
+	Actor    Actor
+	Detail   map[string]any
+	At       time.Time
+}
+
 // Change is one transition as the store writes it: state, event and, for the submit, the register row.
 type Change struct {
 	Event       Event
@@ -205,4 +233,8 @@ type Store interface {
 	PlannerCandidates(ctx context.Context, userID uuid.UUID, minScore int) ([]PlannerCandidate, error)
 	// SubmitsSince counts the submit attempts of the user started since at.
 	SubmitsSince(ctx context.Context, userID uuid.UUID, since time.Time) (int, error)
+	// UserApplications returns all applications of the user, ordered by creation descending.
+	UserApplications(ctx context.Context, userID uuid.UUID) ([]ApplicationSummary, error)
+	// UserScreenshots returns all distinct screenshot blob keys belonging to the user's run checkpoints.
+	UserScreenshots(ctx context.Context, userID uuid.UUID) ([]string, error)
 }

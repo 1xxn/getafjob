@@ -740,3 +740,90 @@ func (q *Queries) StaleSubmitting(ctx context.Context, updatedAt time.Time) ([]S
 	}
 	return items, nil
 }
+
+const userApplications = `-- name: UserApplications :many
+SELECT a.id, a.job_id, a.state, a.version, a.created_at, a.updated_at,
+       a.approval_asked_at, a.approval_reasons, a.approved_at,
+       j.company, j.title, j.location, j.url, j.apply_url
+FROM applications a
+JOIN jobs j ON j.id = a.job_id
+WHERE a.user_id = $1
+ORDER BY a.created_at DESC
+`
+
+type UserApplicationsRow struct {
+	ID              uuid.UUID
+	JobID           int64
+	State           string
+	Version         int64
+	CreatedAt       time.Time
+	UpdatedAt       time.Time
+	ApprovalAskedAt *time.Time
+	ApprovalReasons []string
+	ApprovedAt      *time.Time
+	Company         string
+	Title           string
+	Location        string
+	Url             string
+	ApplyUrl        string
+}
+
+func (q *Queries) UserApplications(ctx context.Context, userID uuid.UUID) ([]UserApplicationsRow, error) {
+	rows, err := q.db.Query(ctx, userApplications, userID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []UserApplicationsRow{}
+	for rows.Next() {
+		var i UserApplicationsRow
+		if err := rows.Scan(
+			&i.ID,
+			&i.JobID,
+			&i.State,
+			&i.Version,
+			&i.CreatedAt,
+			&i.UpdatedAt,
+			&i.ApprovalAskedAt,
+			&i.ApprovalReasons,
+			&i.ApprovedAt,
+			&i.Company,
+			&i.Title,
+			&i.Location,
+			&i.Url,
+			&i.ApplyUrl,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const userRunScreenshots = `-- name: UserRunScreenshots :many
+SELECT DISTINCT screenshot FROM run_checkpoints
+WHERE user_id = $1 AND screenshot <> ''
+`
+
+func (q *Queries) UserRunScreenshots(ctx context.Context, userID uuid.UUID) ([]string, error) {
+	rows, err := q.db.Query(ctx, userRunScreenshots, userID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []string{}
+	for rows.Next() {
+		var screenshot string
+		if err := rows.Scan(&screenshot); err != nil {
+			return nil, err
+		}
+		items = append(items, screenshot)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}

@@ -3,7 +3,6 @@ package app
 import (
 	"cmp"
 	"context"
-	"errors"
 	"log/slog"
 	"slices"
 	"time"
@@ -14,13 +13,12 @@ import (
 	"go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp"
 	"go.opentelemetry.io/otel/propagation"
 
-	"github.com/1xxn/getafjob/internal/application"
 	"github.com/1xxn/getafjob/internal/discovery"
 	"github.com/1xxn/getafjob/internal/discovery/adapters/sources"
-	"github.com/1xxn/getafjob/internal/identity"
 	"github.com/1xxn/getafjob/internal/platform/config"
 	"github.com/1xxn/getafjob/internal/platform/netguard"
 	"github.com/1xxn/getafjob/internal/platform/queue"
+	"github.com/1xxn/getafjob/internal/privacy"
 )
 
 // CrawlArgs starts a crawl of all sources. Manual crawls (admin crawl) are unique apart from scheduled ones, so one
@@ -187,18 +185,14 @@ func (CleanupArgs) Kind() string { return "identity_cleanup" }
 
 type cleanupWorker struct {
 	river.WorkerDefaults[CleanupArgs]
-	ids   *identity.Service
-	apps  *application.Service
-	blobs application.ScreenshotDeleter
+	privacy *privacy.Service
 }
 
 func (w *cleanupWorker) Work(ctx context.Context, _ *river.Job[CleanupArgs]) error {
-	err := w.ids.Cleanup(ctx)
-	if w.apps != nil {
-		_, sErr := w.apps.PurgeExpiredScreenshots(ctx, w.blobs)
-		err = errors.Join(err, sErr)
+	if w.privacy != nil {
+		return w.privacy.Cleanup(ctx)
 	}
-	return err
+	return nil
 }
 
 // periodicJobs schedules the crawl, the cleanup, the recovery of stuck submits and the handoff watch; all also run

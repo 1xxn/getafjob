@@ -146,8 +146,10 @@ This document grows with every module.
 | Req. | Requirement (short) | How getafjob satisfies it | Proof / Test |
 |---|---|---|---|
 | 8.1.1 | Personal data minimization | Search preferences hold no contact data; cover letters strictly refused | `TestProfileItems`, `TestCoverLetterRefused` |
-| 8.2.1 | Evidence & screenshot retention limits | Checkpoint screenshots automatically expired and purged from blob store after 90 days | `TestExpiredCheckpointScreenshots`, `TestBlobPurge` |
-| 8.3.1 | Secure data destruction | `Forget` zeroes and deletes user data key rendering stored ciphertexts unrecoverable | `TestEnvelope` |
+| 8.2.1 | Evidence & screenshot retention limits | Checkpoint screenshots automatically expired and purged from blob store after 90 days; expired sessions, magic links, WebAuthn challenges, recoveries, and unaccepted invitations pruned on schedule or via `admin cleanup` | `TestCleanupRunsAllPruning`, `TestPruneExpired` |
+| 8.3.1 | Secure data destruction (GDPR Art. 17) | Crypto-shredding via `crypto.Envelope.Forget(ctx, userID)` zeroes and drops the user data key rendering stored ciphertexts mathematically unrecoverable; document and screenshot blobs purged from blob store; tenant cascade deletion drops user records | `TestUserAccountDeletion`, `TestEnvelope`, `TestPrivacyExportAndDelete` |
+| 8.4.1 | Data portability (GDPR Art. 20) | User profile, text blocks, answers, matches, applications, audit events, and decrypted documents exportable as structured JSON and raw files inside a ZIP archive via web UI or `admin export-user` | `TestUserDataExport`, `TestPrivacyExportAndDelete` |
+| 8.5.1 | Transparent privacy notice | Public `/privacy` page served in English and German with security architecture explanation; customizable operator privacy policy template provided for self-hosters | `TestPrivacyExportAndDelete`, `docs/privacy-policy-template.md` |
 
 ### V9: Communication Security
 

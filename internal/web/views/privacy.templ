@@ -1,0 +1,25 @@
+package views
+
+// PrivacyData holds information for the privacy notice page.
+type PrivacyData struct {
+	UserName string
+	Passkeys bool
+}
+
+templ Privacy(d PrivacyData) {
+	@Layout(Page{Title: T(ctx, "privacy.title"), UserName: d.UserName, Passkeys: d.Passkeys}) {
+		@Section(T(ctx, "privacy.title")) {
+			<p>{ T(ctx, "privacy.intro") }</p>
+			<h2>{ T(ctx, "privacy.section.self_hosted.title") }</h2>
+			<p class="muted">{ T(ctx, "privacy.section.self_hosted.text") }</p>
+			<h2>{ T(ctx, "privacy.section.encryption.title") }</h2>
+			<p class="muted">{ T(ctx, "privacy.section.encryption.text") }</p>
+			<h2>{ T(ctx, "privacy.section.retention.title") }</h2>
+			<p class="muted">{ T(ctx, "privacy.section.retention.text") }</p>
+			<h2>{ T(ctx, "privacy.section.ai.title") }</h2>
+			<p class="muted">{ T(ctx, "privacy.section.ai.text") }</p>
+			<h2>{ T(ctx, "privacy.section.rights.title") }</h2>
+			<p class="muted">{ T(ctx, "privacy.section.rights.text") }</p>
+		}
+	}
+}

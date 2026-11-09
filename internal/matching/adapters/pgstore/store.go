@@ -141,3 +141,33 @@ func (s *Store) Match(ctx context.Context, userID uuid.UUID, jobID int64) (d mat
 	})
 	return d, err
 }
+
+// UserMatches returns all job matches for the user.
+func (s *Store) UserMatches(ctx context.Context, userID uuid.UUID) (out []matching.MatchSummary, err error) {
+	err = db.InUserTx(ctx, s.pool, userID, func(tx pgx.Tx) error {
+		rows, err := q.New(tx).UserMatches(ctx, userID)
+		if err != nil {
+			return err
+		}
+		out = make([]matching.MatchSummary, len(rows))
+		for i, r := range rows {
+			var reasons []matching.Reason
+			if len(r.Reasons) > 0 {
+				_ = json.Unmarshal(r.Reasons, &reasons)
+			}
+			out[i] = matching.MatchSummary{
+				JobID:      r.ID,
+				Title:      r.Title,
+				Company:    r.Company,
+				Location:   r.Location,
+				Workplace:  r.Workplace,
+				Score:      int(r.Score),
+				Decision:   matching.Decision(r.Decision),
+				Reasons:    reasons,
+				ComputedAt: r.ComputedAt,
+			}
+		}
+		return nil
+	})
+	return out, err
+}

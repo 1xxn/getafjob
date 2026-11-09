@@ -742,3 +742,67 @@ func (s *Store) SubmitsSince(ctx context.Context, userID uuid.UUID, since time.T
 	})
 	return n, err
 }
+
+// UserApplications returns all applications of the user, ordered by creation descending.
+func (s *Store) UserApplications(ctx context.Context, userID uuid.UUID) (out []application.ApplicationSummary, err error) {
+	err = s.user(ctx, userID, func(qs *q.Queries) error {
+		rows, err := qs.UserApplications(ctx, userID)
+		if err != nil {
+			return err
+		}
+		out = make([]application.ApplicationSummary, len(rows))
+		for i, r := range rows {
+			var reasons []application.Reason
+			for _, re := range r.ApprovalReasons {
+				reasons = append(reasons, application.Reason(re))
+			}
+			evs, err := qs.Events(ctx, q.EventsParams{ApplicationID: r.ID, UserID: userID})
+			if err != nil {
+				return err
+			}
+			events := make([]application.EventRecord, len(evs))
+			for j, e := range evs {
+				var detail map[string]any
+				if len(e.Detail) > 0 {
+					_ = json.Unmarshal(e.Detail, &detail)
+				}
+				events[j] = application.EventRecord{
+					Event:  application.Event(e.Event),
+					From:   application.State(e.FromState),
+					To:     application.State(e.ToState),
+					Actor:  application.Actor(e.Actor),
+					Detail: detail,
+					At:     e.At,
+				}
+			}
+			out[i] = application.ApplicationSummary{
+				ID:              r.ID,
+				JobID:           r.JobID,
+				State:           application.State(r.State),
+				Version:         r.Version,
+				CreatedAt:       r.CreatedAt,
+				UpdatedAt:       r.UpdatedAt,
+				ApprovalAsked:   r.ApprovalAskedAt,
+				ApprovalReasons: reasons,
+				Approved:        r.ApprovedAt,
+				Company:         r.Company,
+				Title:           r.Title,
+				Location:        r.Location,
+				URL:             r.Url,
+				ApplyURL:        r.ApplyUrl,
+				Events:          events,
+			}
+		}
+		return nil
+	})
+	return out, err
+}
+
+// UserScreenshots returns all distinct screenshot blob keys belonging to the user's run checkpoints.
+func (s *Store) UserScreenshots(ctx context.Context, userID uuid.UUID) (out []string, err error) {
+	err = s.user(ctx, userID, func(qs *q.Queries) error {
+		out, err = qs.UserRunScreenshots(ctx, userID)
+		return err
+	})
+	return out, err
+}

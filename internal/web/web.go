@@ -5,6 +5,7 @@ import (
 	"context"
 	"embed"
 	"errors"
+	"io"
 	"io/fs"
 	"log/slog"
 	"net"
@@ -77,6 +78,12 @@ type AIService interface {
 	SaveSettings(ctx context.Context, userID uuid.UUID, enabled bool, customKey string, clearKey bool) error
 }
 
+// PrivacyService exports and permanently deletes user data.
+type PrivacyService interface {
+	Export(ctx context.Context, userID uuid.UUID, w io.Writer) error
+	DeleteAccount(ctx context.Context, userID uuid.UUID) error
+}
+
 // Server holds the dependencies of the UI.
 type Server struct {
 	Identity       *identity.Service
@@ -91,6 +98,7 @@ type Server struct {
 	Assist         AssistService
 	Portals        PortalsService
 	AI             AIService
+	Privacy        PrivacyService
 	Shots          Screenshots
 	Handoffs       HandoffHub
 	PushStore      webpush.Store
@@ -162,6 +170,9 @@ func (s *Server) Register(mux *http.ServeMux) {
 	mux.Handle("POST /account/passkeys", s.page(s.passkeyAdd))
 	mux.Handle("POST /account/passkeys/{id}/delete", s.page(s.passkeyDelete))
 	mux.Handle("POST /account/recovery/cancel", s.page(s.cancelRecovery))
+	mux.Handle("GET /account/export", s.page(s.accountExport))
+	mux.Handle("POST /account/delete", s.page(s.accountDelete))
+	mux.Handle("GET /privacy", s.page(s.privacyPage))
 	mux.Handle("POST /login/passkey/options", s.limited(s.page(s.passkeyLoginOptions)))
 	mux.Handle("POST /login/passkey", s.limited(s.page(s.passkeyLogin)))
 	mux.Handle("/", s.page(s.notFound))
