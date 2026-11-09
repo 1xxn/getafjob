@@ -20,6 +20,7 @@ import (
 	"time"
 
 	"connectrpc.com/connect/v2"
+	"connectrpc.com/connect/v2/connecthttp"
 	"github.com/google/uuid"
 	gotel "go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/attribute"
@@ -121,12 +122,17 @@ func (s *Server) SessionFor(appID uuid.UUID) (*HandoffSession, bool) {
 
 var _ runnerv1connect.RunnerServiceHandler = (*Server)(nil)
 
-// Handler returns the path and handler of the service.
-func (s *Server) Handler() (string, http.Handler) {
-	return runnerv1connect.NewRunnerServiceHandler(s, connect.WithReadMaxBytes(MaxMessage))
+// Mount mounts the service onto mux.
+func (s *Server) Mount(mux *http.ServeMux) {
+	srv := connect.NewServer()
+	runnerv1connect.RegisterRunnerServiceHandler(srv, s)
+	connecthttp.Mount(mux, srv, connecthttp.WithReadMaxBytes(MaxMessage))
 }
 
-func bearer(h http.Header) string {
+func bearer(h *connect.Header) string {
+	if h == nil {
+		return ""
+	}
 	v := h.Get("Authorization")
 	if t, ok := strings.CutPrefix(v, "Bearer "); ok {
 		return strings.TrimSpace(t)
@@ -135,10 +141,15 @@ func bearer(h http.Header) string {
 }
 
 // runner checks the runner secret (constant time) or a user's home runner token.
-func (s *Server) runner(ctx context.Context, h http.Header) (runnerIdentity, error) {
+func (s *Server) runner(ctx context.Context) (runnerIdentity, error) {
+	info, _ := connect.CallInfoForServerContext(ctx)
+	var h *connect.Header
+	if info != nil {
+		h = info.RequestHeader()
+	}
 	tok := bearer(h)
 	if tok == "" {
-		return runnerIdentity{}, connect.NewError(connect.CodeUnauthenticated, errors.New("missing token"))
+		return runnerIdentity{}, connect.NewError(connect.CodeUnauthenticated, "missing token")
 	}
 	if s.Secret != "" {
 		got, want := sha256.Sum256([]byte(tok)), sha256.Sum256([]byte(s.Secret))
@@ -152,14 +163,19 @@ func (s *Server) runner(ctx context.Context, h http.Header) (runnerIdentity, err
 			return runnerIdentity{kind: runnerv1.RunnerKind_RUNNER_KIND_HOME, userID: userID}, nil
 		}
 	}
-	return runnerIdentity{}, connect.NewError(connect.CodeUnauthenticated, errors.New("runner not authenticated"))
+	return runnerIdentity{}, connect.NewError(connect.CodeUnauthenticated, "runner not authenticated")
 }
 
 // run returns the run of the call's token.
-func (s *Server) run(ctx context.Context, h http.Header) (application.RunRef, error) {
+func (s *Server) run(ctx context.Context) (application.RunRef, error) {
+	info, _ := connect.CallInfoForServerContext(ctx)
+	var h *connect.Header
+	if info != nil {
+		h = info.RequestHeader()
+	}
 	ref, err := s.Runs.Authorize(ctx, bearer(h))
 	if errors.Is(err, application.ErrNoRun) {
-		return ref, connect.NewError(connect.CodeUnauthenticated, err)
+		return ref, connect.NewError(connect.CodeUnauthenticated, err.Error())
 	}
 	return ref, err
 }
@@ -171,22 +187,22 @@ func code(err error) error {
 		return nil
 	case errors.Is(err, application.ErrTransition), errors.Is(err, application.ErrAlreadySubmitted),
 		errors.Is(err, application.ErrConflict):
-		return connect.NewError(connect.CodeFailedPrecondition, err)
+		return connect.NewError(connect.CodeFailedPrecondition, err.Error())
 	case errors.Is(err, application.ErrNoRun):
-		return connect.NewError(connect.CodeUnauthenticated, err)
+		return connect.NewError(connect.CodeUnauthenticated, err.Error())
 	default:
 		return err
 	}
 }
 
 // Register announces a runner; the ID only names it in logs and leases.
-func (s *Server) Register(ctx context.Context, req *connect.Request[runnerv1.RegisterRequest]) (*connect.Response[runnerv1.RegisterResponse], error) {
-	ident, err := s.runner(ctx, req.Header())
+func (s *Server) Register(ctx context.Context, req *runnerv1.RegisterRequest) (*runnerv1.RegisterResponse, error) {
+	ident, err := s.runner(ctx)
 	if err != nil {
 		return nil, err
 	}
 	kind := ident.kind
-	if req.Msg.GetKind() == runnerv1.RunnerKind_RUNNER_KIND_HOME {
+	if req.GetKind() == runnerv1.RunnerKind_RUNNER_KIND_HOME {
 		kind = runnerv1.RunnerKind_RUNNER_KIND_HOME
 	}
 	b := make([]byte, 8)
@@ -197,27 +213,27 @@ func (s *Server) Register(ctx context.Context, req *connect.Request[runnerv1.Reg
 		kind:     kind,
 		userID:   ident.userID,
 	})
-	return connect.NewResponse(&runnerv1.RegisterResponse{RunnerId: runnerID,
-		HeartbeatInterval: durationpb.New(30 * time.Second)}), nil
+	return &runnerv1.RegisterResponse{RunnerId: runnerID,
+		HeartbeatInterval: durationpb.New(30 * time.Second)}, nil
 }
 
 // Heartbeat keeps a runner registered.
-func (s *Server) Heartbeat(ctx context.Context, req *connect.Request[runnerv1.HeartbeatRequest]) (*connect.Response[runnerv1.HeartbeatResponse], error) {
-	if _, err := s.runner(ctx, req.Header()); err != nil {
+func (s *Server) Heartbeat(ctx context.Context, req *runnerv1.HeartbeatRequest) (*runnerv1.HeartbeatResponse, error) {
+	if _, err := s.runner(ctx); err != nil {
 		return nil, err
 	}
-	return connect.NewResponse(&runnerv1.HeartbeatResponse{}), nil
+	return &runnerv1.HeartbeatResponse{}, nil
 }
 
 // Lease hands out the next run.
-func (s *Server) Lease(ctx context.Context, req *connect.Request[runnerv1.LeaseRequest]) (*connect.Response[runnerv1.LeaseResponse], error) {
-	ident, err := s.runner(ctx, req.Header())
+func (s *Server) Lease(ctx context.Context, req *runnerv1.LeaseRequest) (*runnerv1.LeaseResponse, error) {
+	ident, err := s.runner(ctx)
 	if err != nil {
 		return nil, err
 	}
-	runnerID := req.Msg.GetRunnerId()
+	runnerID := req.GetRunnerId()
 	if runnerID == "" || len(runnerID) > 100 {
-		return nil, connect.NewError(connect.CodeInvalidArgument, errors.New("runner id"))
+		return nil, connect.NewError(connect.CodeInvalidArgument, "runner id")
 	}
 	choice := application.RunnerServer
 	var userPtr *uuid.UUID
@@ -237,7 +253,7 @@ func (s *Server) Lease(ctx context.Context, req *connect.Request[runnerv1.LeaseR
 	}
 	l, ok, err := s.Runs.Lease(ctx, runnerID, choice, userPtr)
 	if err != nil || !ok {
-		return connect.NewResponse(&runnerv1.LeaseResponse{}), err
+		return &runnerv1.LeaseResponse{}, err
 	}
 	ref := application.RunRef{RunID: l.RunID, AppID: l.AppID, UserID: l.UserID}
 	run, err := s.Data.RunData(ctx, l.UserID, l.JobID)
@@ -251,12 +267,12 @@ func (s *Server) Lease(ctx context.Context, req *connect.Request[runnerv1.LeaseR
 	_ = s.Runs.SetAdapter(ctx, ref, adapter)
 	s.runSteps.Store(ref.RunID, runStepState{at: time.Now(), adapter: adapter})
 	s.Logger.InfoContext(ctx, "run leased", "run", l.RunID, "runner", runnerID, "host", l.Host)
-	return connect.NewResponse(&runnerv1.LeaseResponse{Run: run}), nil
+	return &runnerv1.LeaseResponse{Run: run}, nil
 }
 
 // FetchDocument returns a document that belongs to the run.
-func (s *Server) FetchDocument(ctx context.Context, req *connect.Request[runnerv1.FetchDocumentRequest]) (*connect.Response[runnerv1.FetchDocumentResponse], error) {
-	ref, err := s.run(ctx, req.Header())
+func (s *Server) FetchDocument(ctx context.Context, req *runnerv1.FetchDocumentRequest) (*runnerv1.FetchDocumentResponse, error) {
+	ref, err := s.run(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -268,15 +284,15 @@ func (s *Server) FetchDocument(ctx context.Context, req *connect.Request[runnerv
 	if err != nil {
 		return nil, err
 	}
-	id := req.Msg.GetDocumentId()
+	id := req.GetDocumentId()
 	if !slices.ContainsFunc(run.GetDocuments(), func(d *runnerv1.Document) bool { return d.GetId() == id }) {
-		return nil, connect.NewError(connect.CodePermissionDenied, errors.New("not a document of this run"))
+		return nil, connect.NewError(connect.CodePermissionDenied, "not a document of this run")
 	}
 	b, err := s.Data.Document(ctx, ref.UserID, id)
 	if err != nil {
 		return nil, err
 	}
-	return connect.NewResponse(&runnerv1.FetchDocumentResponse{Content: b}), nil
+	return &runnerv1.FetchDocumentResponse{Content: b}, nil
 }
 
 // screenshot stores a PNG of the run and returns its key; empty input stores nothing.
@@ -285,25 +301,25 @@ func (s *Server) screenshot(ctx context.Context, ref application.RunRef, png []b
 		return "", nil
 	}
 	if len(png) > maxScreenshot || !bytes.HasPrefix(png, []byte("\x89PNG\r\n\x1a\n")) {
-		return "", connect.NewError(connect.CodeInvalidArgument, errors.New("screenshot must be a PNG of at most 8 MB"))
+		return "", connect.NewError(connect.CodeInvalidArgument, "screenshot must be a PNG of at most 8 MB")
 	}
 	key := fmt.Sprintf("runs/%s/%d.png", ref.RunID, time.Now().UnixNano())
 	return key, s.Shots.Put(ctx, ref.UserID, key, png)
 }
 
 // Checkpoint records a step.
-func (s *Server) Checkpoint(ctx context.Context, req *connect.Request[runnerv1.CheckpointRequest]) (*connect.Response[runnerv1.CheckpointResponse], error) {
-	ref, err := s.run(ctx, req.Header())
+func (s *Server) Checkpoint(ctx context.Context, req *runnerv1.CheckpointRequest) (*runnerv1.CheckpointResponse, error) {
+	ref, err := s.run(ctx)
 	if err != nil {
 		return nil, err
 	}
-	m := req.Msg
+	m := req
 	data := m.GetDataJson()
 	if len(data) == 0 {
 		data = []byte("{}")
 	}
 	if len(data) > maxData || !json.Valid(data) || len(m.GetStep()) > 20 || len(m.GetUrl()) > 2000 {
-		return nil, connect.NewError(connect.CodeInvalidArgument, errors.New("checkpoint too large or malformed"))
+		return nil, connect.NewError(connect.CodeInvalidArgument, "checkpoint too large or malformed")
 	}
 	key, err := s.screenshot(ctx, ref, m.GetScreenshot())
 	if err != nil {
@@ -319,19 +335,19 @@ func (s *Server) Checkpoint(ctx context.Context, req *connect.Request[runnerv1.C
 	s.recordStepDuration(ctx, ref, m.GetStep())
 	err = s.Runs.Checkpoint(ctx, ref, application.Checkpoint{Step: m.GetStep(), Page: int(m.GetPage()), URL: m.GetUrl(),
 		Data: data, Screenshot: key})
-	return connect.NewResponse(&runnerv1.CheckpointResponse{}), err
+	return &runnerv1.CheckpointResponse{}, err
 }
 
 // Ask hands the run to the user.
-func (s *Server) Ask(ctx context.Context, req *connect.Request[runnerv1.AskRequest]) (*connect.Response[runnerv1.AskResponse], error) {
-	ref, err := s.run(ctx, req.Header())
+func (s *Server) Ask(ctx context.Context, req *runnerv1.AskRequest) (*runnerv1.AskResponse, error) {
+	ref, err := s.run(ctx)
 	if err != nil {
 		return nil, err
 	}
 	s.runSteps.Delete(ref.RunID)
-	qs := req.Msg.GetQuestions()
+	qs := req.GetQuestions()
 	if len(qs) == 0 || len(qs) > 50 {
-		return nil, connect.NewError(connect.CodeInvalidArgument, errors.New("between 1 and 50 questions"))
+		return nil, connect.NewError(connect.CodeInvalidArgument, "between 1 and 50 questions")
 	}
 	out := make([]map[string]string, len(qs))
 	for i, q := range qs {
@@ -344,52 +360,52 @@ func (s *Server) Ask(ctx context.Context, req *connect.Request[runnerv1.AskReque
 	if s.Notify != nil {
 		s.Notify(ctx, ref.UserID, ref.AppID)
 	}
-	return connect.NewResponse(&runnerv1.AskResponse{}), nil
+	return &runnerv1.AskResponse{}, nil
 }
 
 // BeginSubmit registers the submit.
-func (s *Server) BeginSubmit(ctx context.Context, req *connect.Request[runnerv1.BeginSubmitRequest]) (*connect.Response[runnerv1.BeginSubmitResponse], error) {
-	ref, err := s.run(ctx, req.Header())
+func (s *Server) BeginSubmit(ctx context.Context, req *runnerv1.BeginSubmitRequest) (*runnerv1.BeginSubmitResponse, error) {
+	ref, err := s.run(ctx)
 	if err != nil {
 		return nil, err
 	}
-	return connect.NewResponse(&runnerv1.BeginSubmitResponse{}), code(s.Runs.BeginSubmit(ctx, ref))
+	return &runnerv1.BeginSubmitResponse{}, code(s.Runs.BeginSubmit(ctx, ref))
 }
 
 // Submitted records the submit.
-func (s *Server) Submitted(ctx context.Context, req *connect.Request[runnerv1.SubmittedRequest]) (*connect.Response[runnerv1.SubmittedResponse], error) {
-	ref, err := s.run(ctx, req.Header())
+func (s *Server) Submitted(ctx context.Context, req *runnerv1.SubmittedRequest) (*runnerv1.SubmittedResponse, error) {
+	ref, err := s.run(ctx)
 	if err != nil {
 		return nil, err
 	}
 	var effect any
-	if e := req.Msg.GetEffectJson(); len(e) > 0 && len(e) <= maxData && json.Valid(e) {
+	if e := req.GetEffectJson(); len(e) > 0 && len(e) <= maxData && json.Valid(e) {
 		effect = json.RawMessage(e)
 	}
-	if err := s.Runs.Submitted(ctx, ref, req.Msg.GetConfirmed(), effect); err != nil {
+	if err := s.Runs.Submitted(ctx, ref, req.GetConfirmed(), effect); err != nil {
 		return nil, code(err)
 	}
 	s.finishStepDuration(ctx, ref, "submit")
 	s.recordATSOutcome(ctx, ref, ats.OutcomeSubmitted)
-	return connect.NewResponse(&runnerv1.SubmittedResponse{}), nil
+	return &runnerv1.SubmittedResponse{}, nil
 }
 
 // Park stops the run.
-func (s *Server) Park(ctx context.Context, req *connect.Request[runnerv1.ParkRequest]) (*connect.Response[runnerv1.ParkResponse], error) {
-	ref, err := s.run(ctx, req.Header())
+func (s *Server) Park(ctx context.Context, req *runnerv1.ParkRequest) (*runnerv1.ParkResponse, error) {
+	ref, err := s.run(ctx)
 	if err != nil {
 		return nil, err
 	}
 	s.runSteps.Delete(ref.RunID)
-	key, err := s.screenshot(ctx, ref, req.Msg.GetScreenshot())
+	key, err := s.screenshot(ctx, ref, req.GetScreenshot())
 	if err != nil {
 		return nil, err
 	}
-	if err := s.Runs.Park(ctx, ref, clip(req.Msg.GetReason(), 1000), key); err != nil {
+	if err := s.Runs.Park(ctx, ref, clip(req.GetReason(), 1000), key); err != nil {
 		return nil, code(err)
 	}
 	s.recordATSOutcome(ctx, ref, ats.OutcomeParked)
-	return connect.NewResponse(&runnerv1.ParkResponse{}), nil
+	return &runnerv1.ParkResponse{}, nil
 }
 
 func (s *Server) recordATSOutcome(ctx context.Context, ref application.RunRef, outcome ats.Outcome) {
@@ -415,16 +431,16 @@ func clip(s string, n int) string {
 }
 
 // Handoff exchanges live screencast frames and user input during an interactive handoff.
-func (s *Server) Handoff(ctx context.Context, req *connect.Request[runnerv1.HandoffRequest]) (*connect.Response[runnerv1.HandoffResponse], error) {
-	ref, err := s.run(ctx, req.Header())
+func (s *Server) Handoff(ctx context.Context, req *runnerv1.HandoffRequest) (*runnerv1.HandoffResponse, error) {
+	ref, err := s.run(ctx)
 	if err != nil {
 		return nil, err
 	}
-	if req.Msg.GetDone() {
+	if req.GetDone() {
 		if v, ok := s.handoffs.LoadAndDelete(ref.AppID); ok {
 			v.(*HandoffSession).closeDone()
 		}
-		return connect.NewResponse(&runnerv1.HandoffResponse{}), nil
+		return &runnerv1.HandoffResponse{}, nil
 	}
 	v, _ := s.handoffs.LoadOrStore(ref.AppID, &HandoffSession{
 		Frames: make(chan []byte, 4),
@@ -433,7 +449,7 @@ func (s *Server) Handoff(ctx context.Context, req *connect.Request[runnerv1.Hand
 	})
 	sess := v.(*HandoffSession)
 
-	if f := req.Msg.GetFrame(); len(f) > 0 && len(f) <= maxScreenshot {
+	if f := req.GetFrame(); len(f) > 0 && len(f) <= maxScreenshot {
 		sess.mu.Lock()
 		sess.last = f
 		sess.mu.Unlock()
@@ -455,7 +471,7 @@ func (s *Server) Handoff(ctx context.Context, req *connect.Request[runnerv1.Hand
 		}
 	}
 	drain()
-	if len(out) == 0 && req.Msg.GetWait() {
+	if len(out) == 0 && req.GetWait() {
 		select {
 		case <-ctx.Done():
 			return nil, ctx.Err()
@@ -465,7 +481,7 @@ func (s *Server) Handoff(ctx context.Context, req *connect.Request[runnerv1.Hand
 			drain()
 		}
 	}
-	return connect.NewResponse(&runnerv1.HandoffResponse{Events: out}), nil
+	return &runnerv1.HandoffResponse{Events: out}, nil
 }
 
 func (s *Server) histogram() metric.Float64Histogram {

@@ -5,7 +5,7 @@ go 1.27.0
 toolchain go1.27.3
 
 tool (
-	connectrpc.com/connect/cmd/protoc-gen-connect-go
+	connectrpc.com/connect/v2/cmd/protoc-gen-connect-go
 	github.com/a-h/templ/cmd/templ
 	github.com/bufbuild/buf/cmd/buf
 	github.com/evilmartians/lefthook/v2
@@ -79,7 +79,6 @@ require (
 	cloud.google.com/go/iam v1.14.0 // indirect
 	cloud.google.com/go/monitoring v1.31.0 // indirect
 	cloud.google.com/go/storage v1.65.1 // indirect
-	connectrpc.com/connect v1.21.1 // indirect
 	connectrpc.com/otelconnect v0.11.0 // indirect
 	dario.cat/mergo v1.0.2 // indirect
 	filippo.io/edwards25519 v1.2.0 // indirect

@@ -18,6 +18,7 @@ import (
 	"time"
 
 	"connectrpc.com/connect/v2"
+	"connectrpc.com/connect/v2/connecthttp"
 	"google.golang.org/protobuf/types/known/timestamppb"
 
 	runnerv1 "github.com/1xxn/getafjob/internal/gen/proto/runner/v1"
@@ -37,88 +38,93 @@ type gateway struct {
 	handoff func(*runnerv1.HandoffRequest) (*runnerv1.HandoffResponse, error)
 }
 
-func (g *gateway) Handoff(ctx context.Context, r *connect.Request[runnerv1.HandoffRequest]) (*connect.Response[runnerv1.HandoffResponse], error) {
-	if err := check(r.Header()); err != nil {
+func (g *gateway) Handoff(ctx context.Context, r *runnerv1.HandoffRequest) (*runnerv1.HandoffResponse, error) {
+	if err := check(ctx); err != nil {
 		return nil, err
 	}
 	if g.handoff == nil {
 		return g.UnimplementedRunnerServiceHandler.Handoff(ctx, r)
 	}
-	res, err := g.handoff(r.Msg)
+	res, err := g.handoff(r)
 	if err != nil {
 		return nil, err
 	}
-	return connect.NewResponse(res), nil
+	return res, nil
 }
 
 func (g *gateway) log(s string) { g.mu.Lock(); g.calls = append(g.calls, s); g.mu.Unlock() }
 
-func check(h http.Header) error {
-	if h.Get("Authorization") != "Bearer "+token {
-		return connect.NewError(connect.CodeUnauthenticated, errors.New("token"))
+func check(ctx context.Context) error {
+	info, _ := connect.CallInfoForServerContext(ctx)
+	var h *connect.Header
+	if info != nil {
+		h = info.RequestHeader()
+	}
+	if h == nil || h.Get("Authorization") != "Bearer "+token {
+		return connect.NewError(connect.CodeUnauthenticated, "token")
 	}
 	return nil
 }
 
-func (g *gateway) FetchDocument(_ context.Context, r *connect.Request[runnerv1.FetchDocumentRequest]) (*connect.Response[runnerv1.FetchDocumentResponse], error) {
-	if err := check(r.Header()); err != nil {
+func (g *gateway) FetchDocument(ctx context.Context, r *runnerv1.FetchDocumentRequest) (*runnerv1.FetchDocumentResponse, error) {
+	if err := check(ctx); err != nil {
 		return nil, err
 	}
 	g.log("document")
-	return connect.NewResponse(&runnerv1.FetchDocumentResponse{Content: []byte("%PDF-1.4\n")}), nil
+	return &runnerv1.FetchDocumentResponse{Content: []byte("%PDF-1.4\n")}, nil
 }
 
-func (g *gateway) Checkpoint(_ context.Context, r *connect.Request[runnerv1.CheckpointRequest]) (*connect.Response[runnerv1.CheckpointResponse], error) {
-	if err := check(r.Header()); err != nil {
+func (g *gateway) Checkpoint(ctx context.Context, r *runnerv1.CheckpointRequest) (*runnerv1.CheckpointResponse, error) {
+	if err := check(ctx); err != nil {
 		return nil, err
 	}
-	if !json.Valid(r.Msg.GetDataJson()) {
+	if !json.Valid(r.GetDataJson()) {
 		return nil, errors.New("invalid json")
 	}
 	g.mu.Lock()
-	if len(r.Msg.GetScreenshot()) > 0 {
+	if len(r.GetScreenshot()) > 0 {
 		g.shots++
 	}
 	g.mu.Unlock()
-	g.log("checkpoint:" + r.Msg.GetStep())
-	return connect.NewResponse(&runnerv1.CheckpointResponse{}), nil
+	g.log("checkpoint:" + r.GetStep())
+	return &runnerv1.CheckpointResponse{}, nil
 }
 
-func (g *gateway) Ask(_ context.Context, r *connect.Request[runnerv1.AskRequest]) (*connect.Response[runnerv1.AskResponse], error) {
-	if err := check(r.Header()); err != nil {
+func (g *gateway) Ask(ctx context.Context, r *runnerv1.AskRequest) (*runnerv1.AskResponse, error) {
+	if err := check(ctx); err != nil {
 		return nil, err
 	}
-	g.asked = r.Msg.GetQuestions()
+	g.asked = r.GetQuestions()
 	g.log("ask")
-	return connect.NewResponse(&runnerv1.AskResponse{}), nil
+	return &runnerv1.AskResponse{}, nil
 }
 
-func (g *gateway) BeginSubmit(_ context.Context, r *connect.Request[runnerv1.BeginSubmitRequest]) (*connect.Response[runnerv1.BeginSubmitResponse], error) {
-	if err := check(r.Header()); err != nil {
+func (g *gateway) BeginSubmit(ctx context.Context, r *runnerv1.BeginSubmitRequest) (*runnerv1.BeginSubmitResponse, error) {
+	if err := check(ctx); err != nil {
 		return nil, err
 	}
 	g.log("begin_submit")
-	return connect.NewResponse(&runnerv1.BeginSubmitResponse{}), nil
+	return &runnerv1.BeginSubmitResponse{}, nil
 }
 
-func (g *gateway) Submitted(_ context.Context, r *connect.Request[runnerv1.SubmittedRequest]) (*connect.Response[runnerv1.SubmittedResponse], error) {
-	if err := check(r.Header()); err != nil {
+func (g *gateway) Submitted(ctx context.Context, r *runnerv1.SubmittedRequest) (*runnerv1.SubmittedResponse, error) {
+	if err := check(ctx); err != nil {
 		return nil, err
 	}
 	state := "unconfirmed"
-	if r.Msg.GetConfirmed() {
+	if r.GetConfirmed() {
 		state = "confirmed"
 	}
 	g.log("submitted:" + state)
-	return connect.NewResponse(&runnerv1.SubmittedResponse{}), nil
+	return &runnerv1.SubmittedResponse{}, nil
 }
 
-func (g *gateway) Park(_ context.Context, r *connect.Request[runnerv1.ParkRequest]) (*connect.Response[runnerv1.ParkResponse], error) {
-	if err := check(r.Header()); err != nil {
+func (g *gateway) Park(ctx context.Context, r *runnerv1.ParkRequest) (*runnerv1.ParkResponse, error) {
+	if err := check(ctx); err != nil {
 		return nil, err
 	}
-	g.log("park:" + r.Msg.GetReason())
-	return connect.NewResponse(&runnerv1.ParkResponse{}), nil
+	g.log("park:" + r.GetReason())
+	return &runnerv1.ParkResponse{}, nil
 }
 
 func setup(t *testing.T) (*gateway, *Agent, string, func() []map[string]any) {
@@ -142,11 +148,14 @@ func setup(t *testing.T) (*gateway, *Agent, string, func() []map[string]any) {
 	t.Cleanup(site.Close)
 
 	g := &gateway{}
+	srv := connect.NewServer()
+	runnerv1connect.RegisterRunnerServiceHandler(srv, g)
 	gmux := http.NewServeMux()
-	gmux.Handle(runnerv1connect.NewRunnerServiceHandler(g))
+	connecthttp.Mount(gmux, srv)
 	gs := httptest.NewServer(gmux)
 	t.Cleanup(gs.Close)
-	a := &Agent{Client: runnerv1connect.NewRunnerServiceClient(gs.Client(), gs.URL), Logger: slog.New(slog.NewTextHandler(io.Discard, nil)),
+	client := connect.NewClient(connecthttp.NewTransport(gs.Client(), gs.URL))
+	a := &Agent{Client: runnerv1connect.NewRunnerServiceClient(client), Logger: slog.New(slog.NewTextHandler(io.Discard, nil)),
 		Browser: browser.Options{Bin: os.Getenv("GETAFJOB_BROWSER_BIN")}, Wait: 5 * time.Second}
 	return g, a, site.URL, func() []map[string]any { mu.Lock(); defer mu.Unlock(); return slices.Clone(subs) }
 }

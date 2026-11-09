@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"connectrpc.com/connect/v2"
+	"connectrpc.com/connect/v2/connecthttp"
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
@@ -57,18 +58,20 @@ func setup(t *testing.T) (*pgxpool.Pool, *application.Service, runnerv1connect.R
 	srv := &gateway.Server{Runs: application.NewRuns(apps, st), Apps: apps, Data: data{}, Shots: sh, Secret: secret,
 		Logger: slog.New(slog.NewTextHandler(io.Discard, nil))}
 	mux := http.NewServeMux()
-	mux.Handle(srv.Handler())
+	srv.Mount(mux)
 	hs := httptest.NewServer(mux)
 	t.Cleanup(hs.Close)
-	return pool, apps, runnerv1connect.NewRunnerServiceClient(hs.Client(), hs.URL), sh
+	client := connect.NewClient(connecthttp.NewTransport(hs.Client(), hs.URL))
+	return pool, apps, runnerv1connect.NewRunnerServiceClient(client), sh
 }
 
-func with[T any](msg *T, token string) *connect.Request[T] {
-	r := connect.NewRequest(msg)
-	if token != "" {
-		r.Header().Set("Authorization", "Bearer "+token)
+func with(ctx context.Context, token string) context.Context {
+	if token == "" {
+		return ctx
 	}
-	return r
+	ctx, info := connect.NewClientContext(ctx)
+	info.RequestHeader().Set("Authorization", "Bearer "+token)
+	return ctx
 }
 
 func codeOf(err error) connect.Code { return connect.CodeOf(err) }
@@ -105,63 +108,63 @@ func TestGateway(t *testing.T) {
 	ctx := t.Context()
 
 	for _, tok := range []string{"", "wrong"} {
-		if _, err := c.Register(ctx, with(&runnerv1.RegisterRequest{}, tok)); codeOf(err) != connect.CodeUnauthenticated {
+		if _, err := c.Register(with(ctx, tok), &runnerv1.RegisterRequest{}); codeOf(err) != connect.CodeUnauthenticated {
 			t.Fatalf("register with %q: %v", tok, err)
 		}
 	}
-	reg, err := c.Register(ctx, with(&runnerv1.RegisterRequest{Version: "test"}, secret))
-	if err != nil || reg.Msg.GetRunnerId() == "" {
+	reg, err := c.Register(with(ctx, secret), &runnerv1.RegisterRequest{Version: "test"})
+	if err != nil || reg.GetRunnerId() == "" {
 		t.Fatalf("register: %v", err)
 	}
-	runner := reg.Msg.GetRunnerId()
-	if l, err := c.Lease(ctx, with(&runnerv1.LeaseRequest{RunnerId: runner}, secret)); err != nil || l.Msg.GetRun() != nil {
+	runner := reg.GetRunnerId()
+	if l, err := c.Lease(with(ctx, secret), &runnerv1.LeaseRequest{RunnerId: runner}); err != nil || l.GetRun() != nil {
 		t.Fatalf("empty lease: %v", err)
 	}
 
 	u := queue(t, pool, apps)
-	l, err := c.Lease(ctx, with(&runnerv1.LeaseRequest{RunnerId: runner}, secret))
-	if err != nil || l.Msg.GetRun() == nil {
+	l, err := c.Lease(with(ctx, secret), &runnerv1.LeaseRequest{RunnerId: runner})
+	if err != nil || l.GetRun() == nil {
 		t.Fatalf("lease: %v", err)
 	}
-	run := l.Msg.GetRun()
+	run := l.GetRun()
 	tok := run.GetToken()
 	if run.GetProfile()["personal.first_name"] != "Max" || run.GetExpiresAt().AsTime().Before(time.Now()) {
 		t.Fatalf("run = %+v", run)
 	}
 
 	// Run calls need the run's token, not the runner secret.
-	if _, err := c.BeginSubmit(ctx, with(&runnerv1.BeginSubmitRequest{}, secret)); codeOf(err) != connect.CodeUnauthenticated {
+	if _, err := c.BeginSubmit(with(ctx, secret), &runnerv1.BeginSubmitRequest{}); codeOf(err) != connect.CodeUnauthenticated {
 		t.Fatalf("submit with the runner secret: %v", err)
 	}
-	if d, err := c.FetchDocument(ctx, with(&runnerv1.FetchDocumentRequest{DocumentId: run.GetDocuments()[0].GetId()}, tok)); err != nil ||
-		string(d.Msg.GetContent()) != "%PDF-1.4" {
+	if d, err := c.FetchDocument(with(ctx, tok), &runnerv1.FetchDocumentRequest{DocumentId: run.GetDocuments()[0].GetId()}); err != nil ||
+		string(d.GetContent()) != "%PDF-1.4" {
 		t.Fatalf("document: %v", err)
 	}
-	if _, err := c.FetchDocument(ctx, with(&runnerv1.FetchDocumentRequest{DocumentId: uuid.NewString()}, tok)); codeOf(err) != connect.CodePermissionDenied {
+	if _, err := c.FetchDocument(with(ctx, tok), &runnerv1.FetchDocumentRequest{DocumentId: uuid.NewString()}); codeOf(err) != connect.CodePermissionDenied {
 		t.Fatalf("foreign document: %v", err)
 	}
-	if _, err := c.Checkpoint(ctx, with(&runnerv1.CheckpointRequest{Step: "extract", Page: 1, Url: run.GetStartUrl(),
-		DataJson: []byte(`{"fields":[]}`), Screenshot: png}, tok)); err != nil || len(sh.keys) != 1 {
+	if _, err := c.Checkpoint(with(ctx, tok), &runnerv1.CheckpointRequest{Step: "extract", Page: 1, Url: run.GetStartUrl(),
+		DataJson: []byte(`{"fields":[]}`), Screenshot: png}); err != nil || len(sh.keys) != 1 {
 		t.Fatalf("checkpoint: %v, %v", err, sh.keys)
 	}
 	for name, req := range map[string]*runnerv1.CheckpointRequest{
 		"not a png":    {Step: "extract", Screenshot: []byte("GIF89a")},
 		"invalid json": {Step: "extract", DataJson: []byte("{")},
 	} {
-		if _, err := c.Checkpoint(ctx, with(req, tok)); codeOf(err) != connect.CodeInvalidArgument {
+		if _, err := c.Checkpoint(with(ctx, tok), req); codeOf(err) != connect.CodeInvalidArgument {
 			t.Errorf("%s: %v", name, err)
 		}
 	}
-	if _, err := c.BeginSubmit(ctx, with(&runnerv1.BeginSubmitRequest{}, tok)); err != nil {
+	if _, err := c.BeginSubmit(with(ctx, tok), &runnerv1.BeginSubmitRequest{}); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := c.BeginSubmit(ctx, with(&runnerv1.BeginSubmitRequest{}, tok)); codeOf(err) != connect.CodeFailedPrecondition {
+	if _, err := c.BeginSubmit(with(ctx, tok), &runnerv1.BeginSubmitRequest{}); codeOf(err) != connect.CodeFailedPrecondition {
 		t.Fatalf("second submit: %v", err)
 	}
-	if _, err := c.Submitted(ctx, with(&runnerv1.SubmittedRequest{Confirmed: true, EffectJson: []byte(`{"navigated":true}`)}, tok)); err != nil {
+	if _, err := c.Submitted(with(ctx, tok), &runnerv1.SubmittedRequest{Confirmed: true, EffectJson: []byte(`{"navigated":true}`)}); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := c.Park(ctx, with(&runnerv1.ParkRequest{Reason: "late"}, tok)); codeOf(err) != connect.CodeUnauthenticated {
+	if _, err := c.Park(with(ctx, tok), &runnerv1.ParkRequest{Reason: "late"}); codeOf(err) != connect.CodeUnauthenticated {
 		t.Fatalf("call after the run ended: %v", err)
 	}
 	var state string
@@ -176,20 +179,20 @@ func TestGateway(t *testing.T) {
 func TestGatewayAskQuestionsSurviveRestartAndStreamHandoff(t *testing.T) {
 	pool, apps, c, _ := setup(t)
 	ctx := t.Context()
-	reg, err := c.Register(ctx, with(&runnerv1.RegisterRequest{Version: "test"}, secret))
+	reg, err := c.Register(with(ctx, secret), &runnerv1.RegisterRequest{Version: "test"})
 	if err != nil {
 		t.Fatal(err)
 	}
 	u := queue(t, pool, apps)
-	l, err := c.Lease(ctx, with(&runnerv1.LeaseRequest{RunnerId: reg.Msg.GetRunnerId()}, secret))
-	if err != nil || l.Msg.GetRun() == nil {
+	l, err := c.Lease(with(ctx, secret), &runnerv1.LeaseRequest{RunnerId: reg.GetRunnerId()})
+	if err != nil || l.GetRun() == nil {
 		t.Fatalf("lease: %v", err)
 	}
-	tok := l.Msg.GetRun().GetToken()
+	tok := l.GetRun().GetToken()
 
-	if _, err := c.Ask(ctx, with(&runnerv1.AskRequest{Questions: []*runnerv1.Question{
+	if _, err := c.Ask(with(ctx, tok), &runnerv1.AskRequest{Questions: []*runnerv1.Question{
 		{Kind: "field", Label: "Earliest start date?", Draft: "2027-01-01"},
-	}}, tok)); err != nil {
+	}}); err != nil {
 		t.Fatalf("ask: %v", err)
 	}
 
@@ -206,10 +209,10 @@ func TestGatewayAskQuestionsSurviveRestartAndStreamHandoff(t *testing.T) {
 	}
 
 	// Handoff stays authorized while in needs_input.
-	if _, err := c.Handoff(ctx, with(&runnerv1.HandoffRequest{Frame: []byte{0xff, 0xd8, 0xff, 0xd9}}, tok)); err != nil {
+	if _, err := c.Handoff(with(ctx, tok), &runnerv1.HandoffRequest{Frame: []byte{0xff, 0xd8, 0xff, 0xd9}}); err != nil {
 		t.Fatalf("handoff frame: %v", err)
 	}
-	if _, err := c.Handoff(ctx, with(&runnerv1.HandoffRequest{Done: true}, tok)); err != nil {
+	if _, err := c.Handoff(with(ctx, tok), &runnerv1.HandoffRequest{Done: true}); err != nil {
 		t.Fatalf("handoff done: %v", err)
 	}
 }
@@ -234,46 +237,46 @@ func TestGatewayHomeRunnerAuthenticationAndLeasing(t *testing.T) {
 	}
 
 	// Invalid home runner token is rejected.
-	if _, err := c.Register(ctx, with(&runnerv1.RegisterRequest{
+	if _, err := c.Register(with(ctx, "invalid-token-1234567890"), &runnerv1.RegisterRequest{
 		Version: "test",
 		Kind:    runnerv1.RunnerKind_RUNNER_KIND_HOME,
-	}, "invalid-token-1234567890")); codeOf(err) != connect.CodeUnauthenticated {
+	}); codeOf(err) != connect.CodeUnauthenticated {
 		t.Fatalf("register with bad token: %v", err)
 	}
 
 	// Register home runner with valid token.
-	hreg, err := c.Register(ctx, with(&runnerv1.RegisterRequest{
+	hreg, err := c.Register(with(ctx, token), &runnerv1.RegisterRequest{
 		Version: "test",
 		Kind:    runnerv1.RunnerKind_RUNNER_KIND_HOME,
-	}, token))
-	if err != nil || hreg.Msg.GetRunnerId() == "" {
+	})
+	if err != nil || hreg.GetRunnerId() == "" {
 		t.Fatalf("register home runner: %v", err)
 	}
-	hrunnerID := hreg.Msg.GetRunnerId()
+	hrunnerID := hreg.GetRunnerId()
 
 	// Register server runner with shared secret.
-	sreg, err := c.Register(ctx, with(&runnerv1.RegisterRequest{
+	sreg, err := c.Register(with(ctx, secret), &runnerv1.RegisterRequest{
 		Version: "test",
 		Kind:    runnerv1.RunnerKind_RUNNER_KIND_SERVER,
-	}, secret))
-	if err != nil || sreg.Msg.GetRunnerId() == "" {
+	})
+	if err != nil || sreg.GetRunnerId() == "" {
 		t.Fatalf("register server runner: %v", err)
 	}
-	srunnerID := sreg.Msg.GetRunnerId()
+	srunnerID := sreg.GetRunnerId()
 
 	// Server runner must NOT receive the application because runner_choice is home_runner.
-	sl, err := c.Lease(ctx, with(&runnerv1.LeaseRequest{RunnerId: srunnerID}, secret))
-	if err != nil || sl.Msg.GetRun() != nil {
-		t.Fatalf("server runner leased home runner job: %v, %+v", err, sl.Msg.GetRun())
+	sl, err := c.Lease(with(ctx, secret), &runnerv1.LeaseRequest{RunnerId: srunnerID})
+	if err != nil || sl.GetRun() != nil {
+		t.Fatalf("server runner leased home runner job: %v, %+v", err, sl.GetRun())
 	}
 
 	// Home runner receives the user's application.
-	hl, err := c.Lease(ctx, with(&runnerv1.LeaseRequest{RunnerId: hrunnerID}, token))
-	if err != nil || hl.Msg.GetRun() == nil {
+	hl, err := c.Lease(with(ctx, token), &runnerv1.LeaseRequest{RunnerId: hrunnerID})
+	if err != nil || hl.GetRun() == nil {
 		t.Fatalf("home runner lease: %v", err)
 	}
-	if hl.Msg.GetRun().GetProfile()["personal.first_name"] != "Max" {
-		t.Fatalf("unexpected profile: %+v", hl.Msg.GetRun().GetProfile())
+	if hl.GetRun().GetProfile()["personal.first_name"] != "Max" {
+		t.Fatalf("unexpected profile: %+v", hl.GetRun().GetProfile())
 	}
 }
 
@@ -287,31 +290,31 @@ func TestGatewayStepDurationMetrics(t *testing.T) {
 	pool, apps, c, _ := setup(t)
 	ctx := t.Context()
 
-	reg, err := c.Register(ctx, with(&runnerv1.RegisterRequest{Version: "test"}, secret))
+	reg, err := c.Register(with(ctx, secret), &runnerv1.RegisterRequest{Version: "test"})
 	if err != nil {
 		t.Fatal(err)
 	}
-	runner := reg.Msg.GetRunnerId()
+	runner := reg.GetRunnerId()
 
 	_ = queue(t, pool, apps)
-	l, err := c.Lease(ctx, with(&runnerv1.LeaseRequest{RunnerId: runner}, secret))
-	if err != nil || l.Msg.GetRun() == nil {
+	l, err := c.Lease(with(ctx, secret), &runnerv1.LeaseRequest{RunnerId: runner})
+	if err != nil || l.GetRun() == nil {
 		t.Fatalf("lease: %v", err)
 	}
-	run := l.Msg.GetRun()
+	run := l.GetRun()
 	tok := run.GetToken()
 
-	if _, err := c.Checkpoint(ctx, with(&runnerv1.CheckpointRequest{
+	if _, err := c.Checkpoint(with(ctx, tok), &runnerv1.CheckpointRequest{
 		Step: "extract", Page: 1, Url: run.GetStartUrl(),
 		DataJson: []byte(`{"fields":[]}`), Screenshot: png,
-	}, tok)); err != nil {
+	}); err != nil {
 		t.Fatal(err)
 	}
 
-	if _, err := c.BeginSubmit(ctx, with(&runnerv1.BeginSubmitRequest{}, tok)); err != nil {
+	if _, err := c.BeginSubmit(with(ctx, tok), &runnerv1.BeginSubmitRequest{}); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := c.Submitted(ctx, with(&runnerv1.SubmittedRequest{Confirmed: true}, tok)); err != nil {
+	if _, err := c.Submitted(with(ctx, tok), &runnerv1.SubmittedRequest{Confirmed: true}); err != nil {
 		t.Fatal(err)
 	}
 
