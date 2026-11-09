@@ -213,6 +213,21 @@ tasks:
     cmds:
       - deploy/test-restore.sh
 
+  deploy:
+    desc: Deploy the stack to staging or production with automated migration and health check
+    cmds:
+      - deploy/deploy.sh {{.CLI_ARGS}}
+
+  rollback:
+    desc: Roll back the stack to the previous or specified version
+    cmds:
+      - deploy/rollback.sh {{.CLI_ARGS}}
+
+  test:deploy:
+    desc: Rehearse deployment, health check, and automatic rollback on failure
+    cmds:
+      - deploy/test-deploy.sh
+
   release:snapshot:
     desc: goreleaser dry run (no publishing)
     cmds:

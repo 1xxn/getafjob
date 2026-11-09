@@ -291,6 +291,8 @@ jobs:
         run: deploy/smoke.sh
       - name: "rehearsal: backup and restore into a fresh stack"
         run: deploy/test-restore.sh
+      - name: "rehearsal: deploy and automatic rollback"
+        run: deploy/test-deploy.sh
       - name: logs
         if: failure()
         run: docker compose -f deploy/compose.yaml logs --no-color

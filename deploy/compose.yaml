@@ -5,7 +5,7 @@
 #
 # Networks: only caddy and egress reach the internet. Everything else sits on internal networks; the runner and
 # the worker reach the web exclusively through the egress proxy, which blocks private networks and cloud metadata.
-name: getafjob
+name: ${COMPOSE_PROJECT_NAME:-getafjob}
 
 x-hardening: &hardening
   read_only: true
