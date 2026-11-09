@@ -80,11 +80,13 @@ services:
       # Runner gateway, reachable only on the internal gateway network.
       GETAFJOB_GATEWAY_ADDR: ":8090"
       GETAFJOB_RUNNER_SECRET_FILE: /run/secrets/runner_secret
+      GETAFJOB_EGRESS_PROXY: http://egress:4750
     secrets: [db_app_password, master_key, smtp_url, runner_secret]
     volumes:
       - blobs:/var/lib/getafjob/blobs
     depends_on:
       migrate: { condition: service_completed_successfully }
+      egress: { condition: service_healthy }
     healthcheck:
       test: ["CMD", "/usr/local/bin/getafjob", "healthcheck", "http://127.0.0.1:8080/readyz"]
       interval: 10s

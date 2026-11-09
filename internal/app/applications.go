@@ -4,6 +4,7 @@ import (
 	"context"
 	"crypto/ecdsa"
 	"log/slog"
+	"net/http"
 	"time"
 
 	"github.com/google/uuid"
@@ -12,6 +13,7 @@ import (
 
 	"github.com/1xxn/getafjob/internal/application"
 	"github.com/1xxn/getafjob/internal/platform/config"
+	"github.com/1xxn/getafjob/internal/platform/netguard"
 	"github.com/1xxn/getafjob/internal/platform/webpush"
 )
 
@@ -93,7 +95,11 @@ func newPushNotifier(pool *pgxpool.Pool, cfg config.Config, logger *slog.Logger)
 		if subject == "" {
 			subject = "mailto:" + cfg.MailFrom
 		}
-		client = &webpush.Client{VAPIDKey: priv, Subject: subject}
+		var hc *http.Client
+		if cfg.EgressProxy != nil {
+			hc = netguard.NewClient(netguard.ClientOptions{Proxy: cfg.EgressProxy, Timeout: 10 * time.Second})
+		}
+		client = &webpush.Client{VAPIDKey: priv, Subject: subject, HTTPClient: hc}
 	}
 	return pushNotifier{push: &webpush.Notifier{Store: webpush.NewStore(pool), Client: client, Logger: logger}}, pub
 }

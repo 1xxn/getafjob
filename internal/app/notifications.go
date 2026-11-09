@@ -20,13 +20,19 @@ import (
 	"github.com/1xxn/getafjob/internal/platform/config"
 	"github.com/1xxn/getafjob/internal/platform/db"
 	"github.com/1xxn/getafjob/internal/platform/mail"
+	"github.com/1xxn/getafjob/internal/platform/netguard"
 	"github.com/1xxn/getafjob/internal/platform/queue"
 )
 
 func newNotifyService(pool *pgxpool.Pool, cfg config.Config, logger *slog.Logger) (*notify.Service, pushNotifier, string) {
 	notifier, vapidPub := newPushNotifier(pool, cfg, logger)
 	nstore := notifystore.New(pool)
-	ntfyClient := ntfy.NewClient()
+	var ntfyClient *ntfy.Client
+	if cfg.EgressProxy != nil {
+		ntfyClient = ntfy.NewClientWithHTTP(netguard.NewClient(netguard.ClientOptions{Proxy: cfg.EgressProxy, Timeout: 10 * time.Second}))
+	} else {
+		ntfyClient = ntfy.NewClient()
+	}
 
 	var emailClient notify.EmailClient
 	if cfg.SMTPURL != "" {
