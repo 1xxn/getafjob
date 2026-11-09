@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"connectrpc.com/connect/v2"
+	"connectrpc.com/connect/v2/connecthttp"
 	"github.com/go-rod/rod/lib/proto"
 	"github.com/google/uuid"
 	"github.com/riverqueue/river"
@@ -153,7 +154,7 @@ func serve(ctx context.Context, cfg config.Config, logger *slog.Logger) error {
 		close(gatewayDone)
 	} else {
 		gmux := http.NewServeMux()
-		gmux.Handle(gw.Handler())
+		gw.Mount(gmux)
 		go func() {
 			err := httpx.Run(ctx, httpx.NewServer(cfg.GatewayAddr, httpx.Instrument(gmux), logger), cfg.ShutdownTimeout, logger)
 			stop()
@@ -246,8 +247,9 @@ func runner(ctx context.Context, cfg config.Config, logger *slog.Logger) error {
 		return serveHealth(ctx, cfg, health, logger)
 	}
 	// The gateway sits on the internal network; everything else the runner loads goes through the egress proxy.
-	client := runnerv1connect.NewRunnerServiceClient(&http.Client{Timeout: 2 * time.Minute}, strings.TrimSuffix(cfg.GatewayURL.String(), "/"),
-		connect.WithReadMaxBytes(gateway.MaxMessage), connect.WithSendMaxBytes(gateway.MaxMessage))
+	transport := connecthttp.NewTransport(&http.Client{Timeout: 2 * time.Minute}, strings.TrimSuffix(cfg.GatewayURL.String(), "/"),
+		connecthttp.WithReadMaxBytes(gateway.MaxMessage), connecthttp.WithSendMaxBytes(gateway.MaxMessage))
+	client := runnerv1connect.NewRunnerServiceClient(connect.NewClient(transport))
 	kind := runnerv1.RunnerKind_RUNNER_KIND_SERVER
 	if cfg.RunnerKind == "home" {
 		kind = runnerv1.RunnerKind_RUNNER_KIND_HOME

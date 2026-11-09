@@ -39,10 +39,10 @@ type Agent struct {
 	HandoffHold time.Duration       // how long a handoff keeps the browser open; 0: 15 min
 }
 
-func auth[T any](msg *T, token string) *connect.Request[T] {
-	r := connect.NewRequest(msg)
-	r.Header().Set("Authorization", "Bearer "+token)
-	return r
+func auth(ctx context.Context, token string) context.Context {
+	ctx, info := connect.NewClientContext(ctx)
+	info.RequestHeader().Set("Authorization", "Bearer "+token)
+	return ctx
 }
 
 // Run registers and works until ctx ends.
@@ -57,10 +57,10 @@ func (a *Agent) Run(ctx context.Context) error {
 	}
 	var id string
 	for id == "" { // the gateway may start after the runner
-		reg, err := a.Client.Register(ctx, auth(&runnerv1.RegisterRequest{Version: buildinfo.Version,
-			Kind: kind, MaxParallel: 1}, a.Secret))
+		reg, err := a.Client.Register(auth(ctx, a.Secret), &runnerv1.RegisterRequest{Version: buildinfo.Version,
+			Kind: kind, MaxParallel: 1})
 		if err == nil {
-			id = reg.Msg.GetRunnerId()
+			id = reg.GetRunnerId()
 			break
 		}
 		if connect.CodeOf(err) == connect.CodeUnauthenticated {
@@ -75,15 +75,15 @@ func (a *Agent) Run(ctx context.Context) error {
 	}
 	a.Logger.InfoContext(ctx, "runner registered", "runner", id)
 	for {
-		l, err := a.Client.Lease(ctx, auth(&runnerv1.LeaseRequest{RunnerId: id}, a.Secret))
+		l, err := a.Client.Lease(auth(ctx, a.Secret), &runnerv1.LeaseRequest{RunnerId: id})
 		switch {
 		case ctx.Err() != nil:
 			return ctx.Err()
 		case err != nil:
 			a.Logger.WarnContext(ctx, "lease failed", "err", err)
-		case l.Msg.GetRun() != nil:
-			if err := a.RunOne(ctx, l.Msg.GetRun()); err != nil {
-				a.Logger.WarnContext(ctx, "run ended with an error", "run", l.Msg.GetRun().GetRunId(), "err", err)
+		case l.GetRun() != nil:
+			if err := a.RunOne(ctx, l.GetRun()); err != nil {
+				a.Logger.WarnContext(ctx, "run ended with an error", "run", l.GetRun().GetRunId(), "err", err)
 			}
 			continue // ask for the next run at once
 		}
@@ -211,14 +211,14 @@ func (a *Agent) handoff(ctx context.Context, p *rod.Page, c *coordinator, run *r
 	defer cancel()
 
 	tok := run.GetToken()
-	if _, err := a.Client.Handoff(hctx, auth(&runnerv1.HandoffRequest{}, tok)); err != nil {
+	if _, err := a.Client.Handoff(auth(hctx, tok), &runnerv1.HandoffRequest{}); err != nil {
 		if connect.CodeOf(err) == connect.CodeUnimplemented {
 			return nil, false, nil
 		}
 		return nil, false, err
 	}
 	defer func() {
-		_, _ = a.Client.Handoff(context.WithoutCancel(ctx), auth(&runnerv1.HandoffRequest{Done: true}, tok))
+		_, _ = a.Client.Handoff(auth(context.WithoutCancel(ctx), tok), &runnerv1.HandoffRequest{Done: true})
 	}()
 
 	quality := 70
@@ -232,7 +232,7 @@ func (a *Agent) handoff(ctx context.Context, p *rod.Page, c *coordinator, run *r
 
 	sctx, stopScreencast := context.WithCancel(hctx)
 	waitEvents := p.Context(sctx).EachEvent(func(e *proto.PageScreencastFrame) {
-		_, _ = a.Client.Handoff(sctx, auth(&runnerv1.HandoffRequest{Frame: e.Data}, tok))
+		_, _ = a.Client.Handoff(auth(sctx, tok), &runnerv1.HandoffRequest{Frame: e.Data})
 		_ = (proto.PageScreencastFrameAck{SessionID: e.SessionID}).Call(p)
 	})
 	eventsDone := make(chan struct{})
@@ -246,7 +246,7 @@ func (a *Agent) handoff(ctx context.Context, p *rod.Page, c *coordinator, run *r
 	}()
 
 	for {
-		res, err := a.Client.Handoff(hctx, auth(&runnerv1.HandoffRequest{Wait: true}, tok))
+		res, err := a.Client.Handoff(auth(hctx, tok), &runnerv1.HandoffRequest{Wait: true})
 		if err != nil {
 			if connect.CodeOf(err) == connect.CodeUnimplemented {
 				return nil, false, nil
@@ -257,7 +257,7 @@ func (a *Agent) handoff(ctx context.Context, p *rod.Page, c *coordinator, run *r
 			}
 			return nil, false, err
 		}
-		for _, ev := range res.Msg.GetEvents() {
+		for _, ev := range res.GetEvents() {
 			switch {
 			case ev.GetResume():
 				return ev.GetAnswers(), true, nil
@@ -304,11 +304,11 @@ func (a *Agent) knowledge(ctx context.Context, run *runnerv1.Run, dir string) (p
 			name = d.GetId() + "-" + name
 		}
 		used[name] = true
-		resp, err := a.Client.FetchDocument(ctx, auth(&runnerv1.FetchDocumentRequest{DocumentId: d.GetId()}, run.GetToken()))
+		resp, err := a.Client.FetchDocument(auth(ctx, run.GetToken()), &runnerv1.FetchDocumentRequest{DocumentId: d.GetId()})
 		if err != nil {
 			return k, err
 		}
-		if err := os.WriteFile(filepath.Join(dir, name), resp.Msg.GetContent(), 0o600); err != nil {
+		if err := os.WriteFile(filepath.Join(dir, name), resp.GetContent(), 0o600); err != nil {
 			return k, err
 		}
 		k.Documents = append(k.Documents, planner.Document{ID: d.GetId(), File: name, Kind: d.GetKind(), Language: d.GetLanguage()})
@@ -342,8 +342,8 @@ func (c *coordinator) Checkpoint(ctx context.Context, cp engine.Checkpoint) erro
 	if len(data) > 200<<10 { // page data is capped by the gateway; keep the step, drop the details
 		data, _ = json.Marshal(map[string]any{"step": cp.Step, "page": cp.Page, "truncated": true})
 	}
-	_, err = c.client.Checkpoint(ctx, auth(&runnerv1.CheckpointRequest{Step: string(cp.Step), Page: int32(min(cp.Page, 100)), //nolint:gosec // bounded
-		Url: cp.URL, DataJson: data, Screenshot: cp.Screenshot}, c.token))
+	_, err = c.client.Checkpoint(auth(ctx, c.token), &runnerv1.CheckpointRequest{Step: string(cp.Step), Page: int32(min(cp.Page, 100)), //nolint:gosec // bounded
+		Url: cp.URL, DataJson: data, Screenshot: cp.Screenshot})
 	return err
 }
 
@@ -355,14 +355,14 @@ func (c *coordinator) CheckpointWithCookies(ctx context.Context, cp engine.Check
 	if len(data) > 200<<10 {
 		data, _ = json.Marshal(map[string]any{"step": cp.Step, "page": cp.Page, "truncated": true})
 	}
-	_, err = c.client.Checkpoint(ctx, auth(&runnerv1.CheckpointRequest{
+	_, err = c.client.Checkpoint(auth(ctx, c.token), &runnerv1.CheckpointRequest{
 		Step:                      string(cp.Step),
 		Page:                      int32(min(cp.Page, 100)), //nolint:gosec // bounded
 		Url:                       cp.URL,
 		DataJson:                  data,
 		Screenshot:                cp.Screenshot,
 		UpdatedSessionCookiesJson: cookiesJSON,
-	}, c.token))
+	})
 	return err
 }
 
@@ -371,12 +371,12 @@ func (c *coordinator) Ask(ctx context.Context, qs []engine.Question) error {
 	for _, q := range qs {
 		req.Questions = append(req.Questions, &runnerv1.Question{Kind: q.Kind, Label: q.Label, Draft: q.Draft})
 	}
-	_, err := c.client.Ask(ctx, auth(req, c.token))
+	_, err := c.client.Ask(auth(ctx, c.token), req)
 	return err
 }
 
 func (c *coordinator) BeginSubmit(ctx context.Context) error {
-	if _, err := c.client.BeginSubmit(ctx, auth(&runnerv1.BeginSubmitRequest{}, c.token)); err != nil {
+	if _, err := c.client.BeginSubmit(auth(ctx, c.token), &runnerv1.BeginSubmitRequest{}); err != nil {
 		return err
 	}
 	c.submitting = true
@@ -385,7 +385,7 @@ func (c *coordinator) BeginSubmit(ctx context.Context) error {
 
 func (c *coordinator) Submitted(ctx context.Context, confirmed bool, eff browser.Effect) error {
 	b, _ := json.Marshal(eff)
-	_, err := c.client.Submitted(ctx, auth(&runnerv1.SubmittedRequest{Confirmed: confirmed, EffectJson: b}, c.token))
+	_, err := c.client.Submitted(auth(ctx, c.token), &runnerv1.SubmittedRequest{Confirmed: confirmed, EffectJson: b})
 	if err == nil {
 		c.submitting = false
 	}
@@ -393,6 +393,6 @@ func (c *coordinator) Submitted(ctx context.Context, confirmed bool, eff browser
 }
 
 func (c *coordinator) Park(ctx context.Context, reason string, screenshot []byte) error {
-	_, err := c.client.Park(ctx, auth(&runnerv1.ParkRequest{Reason: reason, Screenshot: screenshot}, c.token))
+	_, err := c.client.Park(auth(ctx, c.token), &runnerv1.ParkRequest{Reason: reason, Screenshot: screenshot})
 	return err
 }
