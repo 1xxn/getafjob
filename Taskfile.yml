@@ -150,12 +150,14 @@ tasks:
       - test -f deploy/secrets/master_key
       - test -f deploy/secrets/smtp_url
       - test -f deploy/secrets/runner_secret
+      - test -f deploy/secrets/backup_password
     cmds:
       - test -f deploy/secrets/db_password || go run ./cmd/getafjob admin gen-secret > deploy/secrets/db_password
       - test -f deploy/secrets/db_app_password || go run ./cmd/getafjob admin gen-secret > deploy/secrets/db_app_password
       - test -f deploy/secrets/master_key || go run ./cmd/getafjob admin gen-secret > deploy/secrets/master_key
       - test -f deploy/secrets/smtp_url || printf 'smtp+insecure://mailpit:1025' > deploy/secrets/smtp_url
       - test -f deploy/secrets/runner_secret || go run ./cmd/getafjob admin gen-secret > deploy/secrets/runner_secret
+      - test -f deploy/secrets/backup_password || go run ./cmd/getafjob admin gen-secret > deploy/secrets/backup_password
 
   dev:up:
     desc: Start the full stack locally (https://localhost:8443) and wait until every service is healthy
@@ -195,6 +197,21 @@ tasks:
     desc: "Generate concurrent load on the local stack to populate Grafana dashboards (SLO: p95 < 200 ms)"
     cmds:
       - go run ./cmd/getafjob admin load-test -url https://localhost:8443 -insecure -users 10 -duration 15s
+
+  backup:
+    desc: Create an encrypted restic backup of PostgreSQL and blobs
+    cmds:
+      - deploy/backup.sh {{.CLI_ARGS}}
+
+  restore:
+    desc: Restore from an encrypted restic backup into PostgreSQL and blobs
+    cmds:
+      - deploy/restore.sh {{.CLI_ARGS}}
+
+  test:restore:
+    desc: Rehearse backup and restore into a fresh stack and verify with smoke test
+    cmds:
+      - deploy/test-restore.sh
 
   release:snapshot:
     desc: goreleaser dry run (no publishing)
