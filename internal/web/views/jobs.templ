@@ -116,7 +116,64 @@ type JobData struct {
 	Fit              FitData
 	CV               CVVariantData
 	ApplicationState string
+	ApplicationID    string
 	Notice           string
+}
+
+// PreviewExperience is one experience station in the pre-fill preview.
+type PreviewExperience struct {
+	Title       string
+	Company     string
+	Location    string
+	Dates       string
+	Current     bool
+	Description string
+}
+
+// PreviewEducation is one education station in the pre-fill preview.
+type PreviewEducation struct {
+	Institution string
+	Degree      string
+	Field       string
+	Dates       string
+	Grade       string
+}
+
+// PreviewAnswer is an answer bank entry mapped to form fields.
+type PreviewAnswer struct {
+	Question string
+	Answer   string
+}
+
+// PreviewGuardStatus holds safety guard evaluation results.
+type PreviewGuardStatus struct {
+	Allowed bool
+	Reason  string
+}
+
+// ApplyPreviewData holds all facts, stations, documents, and guard checks for the pre-fill preview.
+type ApplyPreviewData struct {
+	Name               string
+	JobID              int64
+	Title              string
+	Company            string
+	Location           string
+	Workplace          string
+	Score              int
+	CandidateName      string
+	CandidateEmail     string
+	CandidatePhone     string
+	CandidateLocation  string
+	CandidateLinkedIn  string
+	CandidateGitHub    string
+	CandidatePortfolio string
+	CV                 CVVariantData
+	SelectedCVName     string
+	WorkExperiences    []PreviewExperience
+	Educations         []PreviewEducation
+	Answers            []PreviewAnswer
+	Guard              PreviewGuardStatus
+	Notice             string
 }
 
 templ jobMeta(r JobRow) {
@@ -612,6 +669,23 @@ templ JobPage(d JobData) {
 				@Notice("success", d.Notice)
 			}
 			<div class="job-pipeline-actions">
+				if d.ApplicationState == "running" || d.ApplicationState == "needs_input" || d.ApplicationState == "queued" {
+					<a href={ templ.SafeURL("/applications/" + d.ApplicationID) } class="button primary btn-sm">
+						🏃 { T(ctx, "jobs.view_application") }
+					</a>
+				} else if d.ApplicationState == "submitted" || d.ApplicationState == "confirmed" || d.ApplicationState == "interview" || d.ApplicationState == "offer" {
+					<a href={ templ.SafeURL("/applications/" + d.ApplicationID) } class="button secondary btn-sm">
+						✓ { T(ctx, "jobs.applied_status") }
+					</a>
+				} else {
+					<a
+						href={ templ.SafeURL("/jobs/" + i64(d.Row.ID) + "/apply") }
+						class="button primary btn-sm btn-instant-apply"
+						{ HX(ctx, "hx-get", "/jobs/" + i64(d.Row.ID) + "/apply", "hx-target", "#apply-preview-container", "hx-swap", "innerHTML")... }
+					>
+						⚡ { T(ctx, "jobs.apply_now") }
+					</a>
+				}
 				<form method="post" action={ templ.SafeURL("/jobs/" + i64(d.Row.ID) + "/bookmark") } style="display:inline">
 					<button type="submit" class="btn-sm secondary">
 						if d.ApplicationState != "" {
@@ -632,6 +706,7 @@ templ JobPage(d JobData) {
 					</a>
 				}
 			</div>
+			<div id="apply-preview-container"></div>
 			<p>
 				if d.URL != "" {
 					<a href={ templ.SafeURL(d.URL) } rel="noopener noreferrer external">{ T(ctx, "jobs.open_posting") }</a>
@@ -661,6 +736,158 @@ templ JobPage(d JobData) {
 				<h2>{ T(ctx, "jobs.description") }</h2>
 				<div class="description">{ d.Description }</div>
 			}
+		}
+	}
+}
+
+templ ApplyPreview(d ApplyPreviewData) {
+	<div id="apply-preview" class="apply-preview-panel">
+		<div class="apply-preview-header">
+			<div class="apply-preview-titles">
+				<h3>⚡ { T(ctx, "jobs.apply_preview.title") }: { d.Title }</h3>
+				<p class="muted text-sm">{ d.Company } · { d.Location } · { itoa(d.Score) }% Match</p>
+			</div>
+			<button
+				type="button"
+				class="btn-sm btn-link"
+				onclick="document.getElementById('apply-preview-container').innerHTML=''"
+				title={ T(ctx, "actions.cancel") }
+			>
+				✕
+			</button>
+		</div>
+
+		<div class="apply-guarantee-box">
+			<strong>🛡️ { T(ctx, "jobs.apply_preview.guarantee_title") }</strong>
+			<p class="text-sm">
+				{ T(ctx, "jobs.apply_preview.guarantee_desc") }
+			</p>
+		</div>
+
+		if !d.Guard.Allowed {
+			@Notice("error", d.Guard.Reason)
+		} else {
+			<div class="apply-guard-pass text-sm">
+				<span class="badge badge-match">✓ { T(ctx, "jobs.apply_preview.guards_passed") }</span>
+			</div>
+		}
+
+		<div class="apply-preview-sections">
+			<div class="apply-preview-card">
+				<h4>1. { T(ctx, "jobs.apply_preview.contact_section") }</h4>
+				<div class="preview-fields-grid">
+					<div class="preview-field">
+						<span class="preview-label">{ T(ctx, "jobs.apply_preview.name") }</span>
+						<strong class="preview-val">{ d.CandidateName }</strong>
+					</div>
+					<div class="preview-field">
+						<span class="preview-label">{ T(ctx, "jobs.apply_preview.email") }</span>
+						<strong class="preview-val">{ d.CandidateEmail }</strong>
+					</div>
+					if d.CandidatePhone != "" {
+						<div class="preview-field">
+							<span class="preview-label">{ T(ctx, "jobs.apply_preview.phone") }</span>
+							<span class="preview-val">{ d.CandidatePhone }</span>
+						</div>
+					}
+					if d.CandidateLocation != "" {
+						<div class="preview-field">
+							<span class="preview-label">{ T(ctx, "jobs.apply_preview.location") }</span>
+							<span class="preview-val">{ d.CandidateLocation }</span>
+						</div>
+					}
+					if d.CandidateLinkedIn != "" {
+						<div class="preview-field">
+							<span class="preview-label">LinkedIn</span>
+							<span class="preview-val text-sm">{ d.CandidateLinkedIn }</span>
+						</div>
+					}
+					if d.CandidateGitHub != "" {
+						<div class="preview-field">
+							<span class="preview-label">GitHub</span>
+							<span class="preview-val text-sm">{ d.CandidateGitHub }</span>
+						</div>
+					}
+				</div>
+			</div>
+
+			<div class="apply-preview-card">
+				<h4>2. { T(ctx, "jobs.apply_preview.cv_section") }</h4>
+				if len(d.CV.Variants) == 0 {
+					<p class="muted text-sm">{ T(ctx, "jobs.cv_switcher.empty") }</p>
+				} else {
+					<div class="preview-cv-info">
+						<span class="badge badge-selected">📄 { or(d.SelectedCVName, T(ctx, "jobs.apply_preview.default_cv")) }</span>
+						<p class="muted text-sm">{ T(ctx, "jobs.apply_preview.cv_hint") }</p>
+					</div>
+				}
+			</div>
+
+			<div class="apply-preview-card">
+				<h4>3. { T(ctx, "jobs.apply_preview.stations_section") } ({ itoa(len(d.WorkExperiences)) } Work, { itoa(len(d.Educations)) } Education)</h4>
+				if len(d.WorkExperiences) == 0 && len(d.Educations) == 0 {
+					<p class="muted text-sm">{ T(ctx, "jobs.apply_preview.no_stations") }</p>
+				} else {
+					<div class="preview-stations-list">
+						for _, exp := range d.WorkExperiences {
+							<div class="preview-station-item">
+								<strong>{ exp.Title }</strong>{ " @ " }{ exp.Company }
+								<span class="muted text-sm"> ({ exp.Dates })</span>
+							</div>
+						}
+						for _, edu := range d.Educations {
+							<div class="preview-station-item">
+								<strong>{ edu.Degree }{ " in " }{ edu.Field }</strong>{ " @ " }{ edu.Institution }
+								<span class="muted text-sm"> ({ edu.Dates })</span>
+							</div>
+						}
+					</div>
+				}
+			</div>
+
+			if len(d.Answers) > 0 {
+				<div class="apply-preview-card">
+					<h4>4. { T(ctx, "jobs.apply_preview.answers_section") } ({ itoa(len(d.Answers)) })</h4>
+					<div class="preview-answers-list">
+						for _, ans := range d.Answers {
+							<div class="preview-answer-item">
+								<span class="preview-q">Q: { ans.Question }</span>
+								<p class="preview-a">A: { ans.Answer }</p>
+							</div>
+						}
+					</div>
+				</div>
+			}
+		</div>
+
+		<div class="apply-preview-footer">
+			<form method="post" action={ templ.SafeURL("/jobs/" + i64(d.JobID) + "/apply") }>
+				if d.Guard.Allowed {
+					<button type="submit" class="button primary">
+						🚀 { T(ctx, "jobs.apply_preview.confirm_start") }
+					</button>
+				} else {
+					<button type="submit" class="button primary" disabled>
+						⚠️ { T(ctx, "jobs.apply_preview.blocked_by_guard") }
+					</button>
+				}
+				<button
+					type="button"
+					class="button secondary"
+					onclick="document.getElementById('apply-preview-container').innerHTML=''"
+				>
+					{ T(ctx, "actions.cancel") }
+				</button>
+			</form>
+		</div>
+	</div>
+}
+
+templ ApplyPreviewPage(d ApplyPreviewData) {
+	@Layout(Page{Title: T(ctx, "jobs.apply_preview.title") + " · " + d.Title, UserName: d.Name}) {
+		@Section(T(ctx, "jobs.apply_preview.title")) {
+			<p><a href={ templ.SafeURL("/jobs/" + i64(d.JobID)) }>← { T(ctx, "jobs.back") }</a></p>
+			@ApplyPreview(d)
 		}
 	}
 }

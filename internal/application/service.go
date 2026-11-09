@@ -375,3 +375,22 @@ func (s *Service) ApplyExternal(ctx context.Context, userID uuid.UUID, jobID int
 	})
 	return appID, nil
 }
+
+// Candidate collects guard inputs for a job of the user.
+func (s *Service) Candidate(ctx context.Context, userID uuid.UUID, jobID int64) (Candidate, error) {
+	return s.store.Candidate(ctx, userID, jobID)
+}
+
+// CheckGuard verifies whether an application can start for a job based on filters, duplicates, and company limit.
+func (s *Service) CheckGuard(ctx context.Context, userID uuid.UUID, jobID int64) error {
+	if app, err := s.store.ByJob(ctx, userID, jobID); err == nil {
+		if app.State.Open() || app.State.Sent() {
+			return ErrDuplicate
+		}
+	}
+	c, err := s.store.Candidate(ctx, userID, jobID)
+	if err != nil {
+		return err
+	}
+	return Guard(c, s.now())
+}

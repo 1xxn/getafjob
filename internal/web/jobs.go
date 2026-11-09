@@ -13,6 +13,7 @@ import (
 
 	"github.com/google/uuid"
 
+	"github.com/1xxn/getafjob/internal/application"
 	"github.com/1xxn/getafjob/internal/discovery/urlimport"
 	"github.com/1xxn/getafjob/internal/identity"
 	"github.com/1xxn/getafjob/internal/matching"
@@ -237,6 +238,7 @@ func (s *Server) jobPage(w http.ResponseWriter, r *http.Request, u *identity.Use
 	if s.Apps != nil {
 		if app, err := s.Apps.ByJob(r.Context(), u.ID, j.JobID); err == nil {
 			d.ApplicationState = string(app.State)
+			d.ApplicationID = app.ID.String()
 		}
 	}
 	s.render(w, r, http.StatusOK, views.JobPage(d))
@@ -355,6 +357,202 @@ func (s *Server) setJobCV(w http.ResponseWriter, r *http.Request, u *identity.Us
 		return
 	}
 	http.Redirect(w, r, fmt.Sprintf("/jobs/%d", id), http.StatusSeeOther)
+}
+
+func (s *Server) jobApplyPreview(w http.ResponseWriter, r *http.Request, u *identity.User) {
+	if u == nil {
+		http.Redirect(w, r, "/login", http.StatusSeeOther)
+		return
+	}
+	id, err := strconv.ParseInt(r.PathValue("id"), 10, 64)
+	if err != nil || id <= 0 {
+		s.notFound(w, r, u)
+		return
+	}
+	if s.Jobs == nil || s.Apps == nil {
+		s.failed(w, r, u, errors.New("service unavailable"))
+		return
+	}
+	j, err := s.Jobs.Detail(r.Context(), u.ID, id)
+	if err != nil {
+		s.notFound(w, r, u)
+		return
+	}
+
+	d := views.ApplyPreviewData{
+		Name:      u.Email,
+		JobID:     j.JobID,
+		Title:     j.Title,
+		Company:   j.Company,
+		Location:  j.Location,
+		Workplace: j.Workplace,
+		Score:     j.Score,
+	}
+
+	if s.Profile != nil {
+		if snap, err := s.Profile.Get(r.Context(), u.ID); err == nil {
+			p := snap.Profile.Personal
+			name := strings.TrimSpace(p.FirstName + " " + p.LastName)
+			if name == "" {
+				name = u.DisplayName
+			}
+			if name == "" {
+				name = u.Email
+			}
+			d.CandidateName = name
+			d.CandidateEmail = p.Email
+			if d.CandidateEmail == "" {
+				d.CandidateEmail = u.Email
+			}
+			d.CandidatePhone = p.Phone
+			loc := strings.TrimSpace(p.City)
+			if p.Country != "" {
+				if loc != "" {
+					loc += ", " + p.Country
+				} else {
+					loc = p.Country
+				}
+			}
+			d.CandidateLocation = loc
+			d.CandidateLinkedIn = p.LinkedIn
+			d.CandidateGitHub = p.GitHub
+			d.CandidatePortfolio = p.Website
+		}
+	}
+	if d.CandidateName == "" {
+		d.CandidateName = u.Email
+	}
+	if d.CandidateEmail == "" {
+		d.CandidateEmail = u.Email
+	}
+
+	d.CV = s.buildCVVariantData(r.Context(), u.ID, j, "")
+	for _, v := range d.CV.Variants {
+		if v.Selected {
+			d.SelectedCVName = v.Label
+			if d.SelectedCVName == "" {
+				d.SelectedCVName = v.Name
+			}
+			break
+		}
+	}
+
+	if s.Stations != nil {
+		if exps, err := s.Stations.WorkExperiences(r.Context(), u.ID); err == nil {
+			for _, exp := range exps {
+				dates := exp.StartDate
+				if exp.IsCurrent {
+					dates += " – " + views.T(r.Context(), "profile.station.present")
+				} else if exp.EndDate != "" {
+					dates += " – " + exp.EndDate
+				}
+				d.WorkExperiences = append(d.WorkExperiences, views.PreviewExperience{
+					Title:       exp.Title,
+					Company:     exp.Company,
+					Location:    exp.Location,
+					Dates:       dates,
+					Current:     exp.IsCurrent,
+					Description: strings.Join(exp.DescriptionBullets, "\n"),
+				})
+			}
+		}
+		if edus, err := s.Stations.Educations(r.Context(), u.ID); err == nil {
+			for _, edu := range edus {
+				dates := edu.StartDate
+				if edu.EndDate != "" {
+					dates += " – " + edu.EndDate
+				}
+				d.Educations = append(d.Educations, views.PreviewEducation{
+					Institution: edu.Institution,
+					Degree:      edu.Degree,
+					Field:       edu.FieldOfStudy,
+					Dates:       dates,
+					Grade:       edu.Grade,
+				})
+			}
+		}
+	}
+
+	if s.Items != nil {
+		if ans, err := s.Items.Answers(r.Context(), u.ID); err == nil {
+			for _, a := range ans {
+				d.Answers = append(d.Answers, views.PreviewAnswer{
+					Question: a.Question,
+					Answer:   a.Answer,
+				})
+			}
+		}
+	}
+
+	d.Guard = views.PreviewGuardStatus{Allowed: true}
+	if err := s.Apps.CheckGuard(r.Context(), u.ID, id); err != nil {
+		d.Guard.Allowed = false
+		switch {
+		case errors.Is(err, application.ErrDuplicate):
+			d.Guard.Reason = views.T(r.Context(), "jobs.apply_preview.error_duplicate")
+		case errors.Is(err, application.ErrCompanyWindow):
+			d.Guard.Reason = views.T(r.Context(), "jobs.apply_preview.error_company_window")
+		case errors.Is(err, application.ErrExcluded):
+			d.Guard.Reason = views.T(r.Context(), "jobs.apply_preview.error_excluded")
+		default:
+			d.Guard.Reason = err.Error()
+		}
+	}
+
+	if partial(r) {
+		s.render(w, r, http.StatusOK, views.ApplyPreview(d))
+		return
+	}
+	s.render(w, r, http.StatusOK, views.ApplyPreviewPage(d))
+}
+
+func (s *Server) jobApplySubmit(w http.ResponseWriter, r *http.Request, u *identity.User) {
+	if u == nil {
+		http.Redirect(w, r, "/login", http.StatusSeeOther)
+		return
+	}
+	id, err := strconv.ParseInt(r.PathValue("id"), 10, 64)
+	if err != nil || id <= 0 {
+		s.notFound(w, r, u)
+		return
+	}
+	if s.Apps == nil {
+		s.failed(w, r, u, errors.New("application service unavailable"))
+		return
+	}
+	if s.Jobs != nil {
+		if _, err := s.Jobs.Detail(r.Context(), u.ID, id); err != nil {
+			s.notFound(w, r, u)
+			return
+		}
+	}
+
+	if err := s.Apps.CheckGuard(r.Context(), u.ID, id); err != nil {
+		s.Logger.WarnContext(r.Context(), "instant apply refused by safety guard", "job_id", id, "err", err)
+		http.Redirect(w, r, fmt.Sprintf("/jobs/%d", id), http.StatusSeeOther)
+		return
+	}
+
+	if cvStr := strings.TrimSpace(r.PostFormValue("cv_id")); cvStr != "" {
+		if cvID, err := uuid.Parse(cvStr); err == nil {
+			_, _ = s.Apps.SetJobCV(r.Context(), u.ID, id, &cvID)
+		}
+	}
+
+	appID, _, err := s.Apps.Queue(r.Context(), u.ID, id)
+	if err != nil {
+		s.failed(w, r, u, err)
+		return
+	}
+
+	destURL := fmt.Sprintf("/applications/%s", appID)
+	if partial(r) {
+		w.Header().Set("HX-Location", destURL)
+		w.WriteHeader(http.StatusOK)
+		return
+	}
+	//nolint:gosec // G710: destURL is formatted /applications/%s with internal UUID
+	http.Redirect(w, r, destURL, http.StatusSeeOther)
 }
 
 func criteriaFromSnapshot(snap profile.Snapshot) matching.Criteria {
