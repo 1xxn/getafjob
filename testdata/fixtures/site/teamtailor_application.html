@@ -1,0 +1,54 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>Teamtailor Career - Apply</title>
+  <style>
+    body { font-family: sans-serif; max-width: 650px; margin: 30px auto; padding: 0 20px; }
+    .field { margin: 16px 0; }
+    label { display: block; font-weight: bold; margin-bottom: 4px; }
+    input[type=text], input[type=email], input[type=tel] { width: 100%; padding: 8px; border: 1px solid #ccc; border-radius: 4px; box-sizing: border-box; }
+    button[type=submit] { background: #e11d48; color: white; border: none; padding: 12px 24px; font-size: 16px; border-radius: 4px; cursor: pointer; }
+  </style>
+</head>
+<body>
+  <h1>Senior Backend Developer</h1>
+  <p>Stockholm / Remote EU</p>
+  <form id="tt-form" action="/submit" method="post" novalidate>
+    <div class="field">
+      <label for="name">Name *</label>
+      <input id="name" name="name" type="text" required>
+    </div>
+    <div class="field">
+      <label for="email">E-mail *</label>
+      <input id="email" name="email" type="email" required>
+    </div>
+    <div class="field">
+      <label for="phone">Phone *</label>
+      <input id="phone" name="phone" type="tel" required>
+    </div>
+    <div class="field">
+      <label for="resume">Resume/CV *</label>
+      <input id="resume" name="resume" type="file" required>
+    </div>
+    <div class="field">
+      <label><input id="gdpr" type="checkbox" name="gdpr" required> I consent to the processing of personal data *</label>
+    </div>
+    <button type="submit" id="btn-submit">Submit application</button>
+  </form>
+  <script>
+    document.getElementById('tt-form').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const f = e.target;
+      const data = {
+        name: f.name.value,
+        email: f.email.value,
+        phone: f.phone.value,
+        resume: f.resume.files[0]?.name || ''
+      };
+      await fetch('/submit', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(data) });
+      document.body.innerHTML = '<h2>Thank you!</h2><p>Application received.</p>';
+    });
+  </script>
+</body>
+</html>

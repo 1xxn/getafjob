@@ -1,0 +1,57 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>Easy Apply - Staff Engineer - LinkedIn</title>
+  <style>
+    body { font-family: -apple-system, system-ui, sans-serif; background: #f3f2ef; padding: 20px; }
+    .modal { background: #fff; border-radius: 8px; max-width: 550px; margin: 20px auto; padding: 24px; box-shadow: 0 4px 12px rgba(0,0,0,0.15); }
+    .field { margin: 14px 0; }
+    label { display: block; font-size: 14px; font-weight: 600; margin-bottom: 4px; }
+    input[type=text], input[type=email], input[type=tel] { width: 100%; padding: 8px; border: 1px solid rgba(0,0,0,0.3); border-radius: 4px; box-sizing: border-box; }
+    .btn { background: #0a66c2; color: white; border: none; padding: 10px 20px; font-weight: 600; border-radius: 24px; cursor: pointer; }
+  </style>
+</head>
+<body>
+  <div class="modal">
+    <h3>Apply to Celonis via Easy Apply</h3>
+    <form id="li-form" action="/submit" method="post" novalidate>
+      <div class="field">
+        <label for="first_name">First Name *</label>
+        <input id="first_name" name="first_name" type="text" value="Max" required>
+      </div>
+      <div class="field">
+        <label for="last_name">Last Name *</label>
+        <input id="last_name" name="last_name" type="text" value="Mustermann" required>
+      </div>
+      <div class="field">
+        <label for="email">Email address *</label>
+        <input id="email" name="email" type="email" value="max.mustermann@example.org" required>
+      </div>
+      <div class="field">
+        <label for="phone">Phone *</label>
+        <input id="phone" name="phone" type="tel" value="+49 30 1234567" required>
+      </div>
+      <div class="field">
+        <label for="cv">Resume *</label>
+        <input id="cv" type="file" required>
+      </div>
+      <button type="submit" class="btn" id="btn-submit">Submit application</button>
+    </form>
+  </div>
+  <script>
+    document.getElementById('li-form').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const data = {
+        first_name: document.getElementById('first_name').value,
+        last_name: document.getElementById('last_name').value,
+        email: document.getElementById('email').value,
+        phone: document.getElementById('phone').value,
+        cv: document.getElementById('cv').files[0]?.name || ''
+      };
+      await fetch('/submit', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(data) });
+      document.body.innerHTML = '<div class="modal"><h2>Application sent</h2></div>';
+    });
+  </script>
+</body>
+</html>

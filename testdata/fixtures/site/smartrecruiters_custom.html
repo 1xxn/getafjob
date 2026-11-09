@@ -1,0 +1,68 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>SmartRecruiters Custom Questions - Bosch</title>
+  <style>
+    body { font-family: sans-serif; max-width: 700px; margin: 30px auto; padding: 0 20px; }
+    .field { margin: 16px 0; }
+    label { display: block; font-weight: bold; margin-bottom: 4px; }
+    input[type=text], input[type=email], input[type=tel], select { width: 100%; padding: 8px; border: 1px solid #ccc; border-radius: 4px; box-sizing: border-box; }
+    button[type=submit] { background: #005691; color: white; border: none; padding: 12px 24px; font-size: 16px; border-radius: 4px; cursor: pointer; }
+  </style>
+</head>
+<body>
+  <h1>Senior Cloud Security Engineer</h1>
+  <p>Robert Bosch GmbH · Stuttgart / Hybrid</p>
+  <form id="sr-custom" action="/submit" method="post" novalidate>
+    <div class="field">
+      <label for="first_name">First Name *</label>
+      <input id="first_name" name="first_name" type="text" required>
+    </div>
+    <div class="field">
+      <label for="last_name">Last Name *</label>
+      <input id="last_name" name="last_name" type="text" required>
+    </div>
+    <div class="field">
+      <label for="email">Email *</label>
+      <input id="email" name="email" type="email" required>
+    </div>
+    <div class="field">
+      <label for="resume">Resume *</label>
+      <input id="resume" name="resume" type="file" required>
+    </div>
+    <div class="field">
+      <label for="salary">Annual Salary Expectation (EUR) *</label>
+      <input id="salary" name="salary" type="text" required>
+    </div>
+    <div class="field">
+      <label for="experience">Years of Experience in Go / Cloud *</label>
+      <select id="experience" name="experience" required>
+        <option value="">Please select</option>
+        <option value="1-3">1-3 years</option>
+        <option value="3-5">3-5 years</option>
+        <option value="5+">5+ years</option>
+      </select>
+    </div>
+    <div class="field">
+      <label><input id="privacy" type="checkbox" name="privacy" required> I accept the data processing terms *</label>
+    </div>
+    <button type="submit" id="btn-submit">Send Application</button>
+  </form>
+  <script>
+    document.getElementById('sr-custom').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const f = e.target;
+      const data = {
+        name: f.first_name.value + ' ' + f.last_name.value,
+        email: f.email.value,
+        resume: f.resume.files[0]?.name || '',
+        salary: f.salary.value,
+        experience: f.experience.value
+      };
+      await fetch('/submit', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(data) });
+      document.body.innerHTML = '<h2>Application submitted successfully!</h2><p>Bosch Talent Acquisition Team</p>';
+    });
+  </script>
+</body>
+</html>

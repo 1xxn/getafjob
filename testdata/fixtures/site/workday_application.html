@@ -1,0 +1,82 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>Workday Candidate Portal - Example Workday</title>
+  <style>
+    body { font-family: sans-serif; max-width: 750px; margin: 30px auto; padding: 0 20px; }
+    .field { margin: 14px 0; }
+    label { display: block; font-weight: bold; margin-bottom: 4px; }
+    input[type=text], input[type=email], input[type=tel] { width: 100%; padding: 8px; border: 1px solid #aaa; border-radius: 4px; box-sizing: border-box; }
+    .btn { background: #0056b3; color: white; border: none; padding: 10px 20px; border-radius: 4px; cursor: pointer; }
+    .step-box { border: 1px solid #ddd; padding: 20px; border-radius: 6px; margin-bottom: 20px; }
+  </style>
+</head>
+<body>
+  <h1>Apply for Job: Cloud Infrastructure Architect</h1>
+  <div id="step-1" class="step-box">
+    <h2>1. Personal Information</h2>
+    <div class="field">
+      <label for="first_name">First Name *</label>
+      <input id="first_name" name="first_name" type="text" required>
+    </div>
+    <div class="field">
+      <label for="last_name">Last Name *</label>
+      <input id="last_name" name="last_name" type="text" required>
+    </div>
+    <div class="field">
+      <label for="email">Email Address *</label>
+      <input id="email" name="email" type="email" required>
+    </div>
+    <div class="field">
+      <label for="phone">Phone Number *</label>
+      <input id="phone" name="phone" type="tel" required>
+    </div>
+    <div class="field">
+      <label for="city">City *</label>
+      <input id="city" name="city" type="text" required>
+    </div>
+    <div class="field">
+      <label for="resume">Resume / CV Document *</label>
+      <input id="resume" name="resume" type="file" required>
+    </div>
+    <button type="button" class="btn" id="btn-next">Save and Continue</button>
+  </div>
+
+  <div id="step-2" class="step-box" style="display:none;">
+    <h2>2. Review and Submit</h2>
+    <p>Please review your information before final submission.</p>
+    <div id="summary"></div>
+    <div class="field">
+      <label><input id="confirm-chk" type="checkbox"> I confirm all information provided is accurate and truthful *</label>
+    </div>
+    <button type="button" class="btn" id="btn-submit">Submit Application</button>
+  </div>
+
+  <script>
+    document.getElementById('btn-next').addEventListener('click', () => {
+      const fn = document.getElementById('first_name').value;
+      const ln = document.getElementById('last_name').value;
+      const em = document.getElementById('email').value;
+      const resume = document.getElementById('resume').files[0];
+      if (!fn || !ln || !em || !resume) {
+        alert('Please fill all required fields');
+        return;
+      }
+      document.getElementById('summary').innerHTML = '<p>Name: ' + fn + ' ' + ln + '<br>Email: ' + em + '<br>CV: ' + resume.name + '</p>';
+      document.getElementById('step-1').style.display = 'none';
+      document.getElementById('step-2').style.display = 'block';
+    });
+
+    document.getElementById('btn-submit').addEventListener('click', async () => {
+      const data = {
+        name: document.getElementById('first_name').value + ' ' + document.getElementById('last_name').value,
+        email: document.getElementById('email').value,
+        resume: document.getElementById('resume').files[0]?.name || ''
+      };
+      await fetch('/submit', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(data) });
+      document.body.innerHTML = '<h2>Application Complete!</h2><p>Thank you for submitting your application.</p>';
+    });
+  </script>
+</body>
+</html>
