@@ -5,6 +5,7 @@ import (
 	"errors"
 	"net/http"
 	"net/url"
+	"slices"
 	"strconv"
 	"time"
 
@@ -29,33 +30,123 @@ func (s *Server) jobsPage(w http.ResponseWriter, r *http.Request, u *identity.Us
 	}
 	qv := r.URL.Query()
 	dec := qv.Get("decision")
-	if _, ok := decisionFilters[dec]; !ok {
-		dec = "relevant"
+	var decisions []matching.Decision
+	blocked := false
+	if dec == "blocked" {
+		blocked = true
+	} else {
+		if _, ok := decisionFilters[dec]; !ok {
+			dec = "relevant"
+		}
+		decisions = decisionFilters[dec]
 	}
+
 	page, _ := strconv.Atoi(qv.Get("page"))
-	f := matching.Filter{Query: qv.Get("q"), Decisions: decisionFilters[dec], Workplace: qv.Get("workplace"),
-		Page: page}.Clean()
+	minSalary, _ := strconv.Atoi(qv.Get("min_salary"))
+	freshness := qv.Get("freshness")
+	var freshnessDays int
+	switch freshness {
+	case "24h":
+		freshnessDays = 1
+	case "3d":
+		freshnessDays = 3
+	case "7d":
+		freshnessDays = 7
+	case "14d":
+		freshnessDays = 14
+	case "30d":
+		freshnessDays = 30
+	default:
+		freshness = "all"
+		freshnessDays = 0
+	}
+
+	sort := qv.Get("sort")
+	if !slices.Contains([]string{"match", "newest", "salary", "company"}, sort) {
+		sort = "match"
+	}
+
+	f := matching.Filter{
+		Query:         qv.Get("q"),
+		Decisions:     decisions,
+		Workplace:     qv.Get("workplace"),
+		Location:      qv.Get("location"),
+		Source:        qv.Get("source"),
+		MinSalary:     minSalary,
+		FreshnessDays: freshnessDays,
+		Sort:          sort,
+		Blocked:       blocked,
+		Page:          page,
+	}.Clean()
+
 	l, err := s.Jobs.List(r.Context(), u.ID, f)
 	if err != nil {
 		s.failed(w, r, u, err)
 		return
 	}
+
+	rawBlocklist, err := s.Jobs.Blocklist(r.Context(), u.ID)
+	if err != nil {
+		s.failed(w, r, u, err)
+		return
+	}
+	blData := make([]views.BlocklistItemData, len(rawBlocklist))
+	for i, b := range rawBlocklist {
+		blData[i] = views.BlocklistItemData{
+			ID:        b.ID,
+			Kind:      views.T(r.Context(), "jobs.blocklist_kind_"+b.Kind),
+			Pattern:   b.Pattern,
+			CreatedAt: views.When(r.Context(), b.CreatedAt),
+		}
+	}
+
 	now := time.Now()
-	d := views.JobsData{Name: u.DisplayName, Query: f.Query, Decision: dec, Workplace: f.Workplace, Total: l.Total,
-		Page: f.Page, Pages: (l.Total + matching.PageSize - 1) / matching.PageSize, Counts: map[string]int{}}
+	d := views.JobsData{
+		Name:         u.DisplayName,
+		Query:        f.Query,
+		Decision:     dec,
+		Workplace:    f.Workplace,
+		Location:     f.Location,
+		Source:       f.Source,
+		MinSalary:    f.MinSalary,
+		Freshness:    freshness,
+		Sort:         f.Sort,
+		Total:        l.Total,
+		Page:         f.Page,
+		Pages:        (l.Total + matching.PageSize - 1) / matching.PageSize,
+		Counts:       map[string]int{},
+		BlockedCount: l.BlockedCount,
+		Blocklist:    blData,
+	}
 	for k, n := range l.Counts {
 		d.Counts[string(k)] = n
 	}
-	d.Pending = len(l.Counts) == 0
+	d.Pending = len(l.Counts) == 0 && l.BlockedCount == 0
+
 	for _, it := range l.Items {
-		d.Rows = append(d.Rows, jobRow(it, now))
+		d.Rows = append(d.Rows, jobRow(r.Context(), it, now))
 	}
+
 	link := func(p int) string {
 		v := url.Values{}
-		for k, val := range map[string]string{"q": f.Query, "workplace": f.Workplace} {
+		for k, val := range map[string]string{
+			"q":         f.Query,
+			"workplace": f.Workplace,
+			"location":  f.Location,
+			"source":    f.Source,
+		} {
 			if val != "" {
 				v.Set(k, val)
 			}
+		}
+		if f.MinSalary > 0 {
+			v.Set("min_salary", strconv.Itoa(f.MinSalary))
+		}
+		if freshness != "all" && freshness != "" {
+			v.Set("freshness", freshness)
+		}
+		if f.Sort != "match" && f.Sort != "" {
+			v.Set("sort", f.Sort)
 		}
 		if dec != "relevant" {
 			v.Set("decision", dec)
@@ -68,6 +159,7 @@ func (s *Server) jobsPage(w http.ResponseWriter, r *http.Request, u *identity.Us
 		}
 		return "/jobs?" + v.Encode()
 	}
+
 	if f.Page > 1 {
 		d.PrevURL = link(min(f.Page-1, max(d.Pages, 1)))
 	}
@@ -100,16 +192,74 @@ func (s *Server) jobPage(w http.ResponseWriter, r *http.Request, u *identity.Use
 		s.failed(w, r, u, err)
 		return
 	}
-	d := views.JobData{Name: u.DisplayName, Row: jobRow(j.Item, time.Now()), Description: j.Description,
-		URL: webLink(j.URL), ApplyURL: webLink(j.ApplyURL), Open: j.Open, Computed: views.When(r.Context(), j.ComputedAt),
-		Back: "/jobs"}
+	d := views.JobData{
+		Name:        u.DisplayName,
+		Row:         jobRow(r.Context(), j.Item, time.Now()),
+		Description: j.Description,
+		URL:         webLink(j.URL),
+		ApplyURL:    webLink(j.ApplyURL),
+		Open:        j.Open,
+		Computed:    views.When(r.Context(), j.ComputedAt),
+		Back:        "/jobs",
+	}
 	for _, rs := range j.Reasons {
 		d.Reasons = append(d.Reasons, views.Reason{Text: reasonText(r.Context(), rs), Points: rs.Points, Hard: rs.Hard})
 	}
 	s.render(w, r, http.StatusOK, views.JobPage(d))
 }
 
-func jobRow(it matching.Item, now time.Time) views.JobRow {
+func (s *Server) addBlocklist(w http.ResponseWriter, r *http.Request, u *identity.User) {
+	if u == nil {
+		http.Redirect(w, r, "/login", http.StatusSeeOther)
+		return
+	}
+	if err := r.ParseForm(); err != nil {
+		http.Error(w, "bad request", http.StatusBadRequest)
+		return
+	}
+	kind := r.PostFormValue("kind")
+	if kind != "company" && kind != "keyword" {
+		kind = "company"
+	}
+	pattern := r.PostFormValue("pattern")
+	if pattern != "" {
+		_ = s.Jobs.AddBlocklist(r.Context(), u.ID, kind, pattern)
+	}
+	if partial(r) {
+		s.jobsPage(w, r, u)
+		return
+	}
+	http.Redirect(w, r, "/jobs", http.StatusSeeOther)
+}
+
+func (s *Server) deleteBlocklist(w http.ResponseWriter, r *http.Request, u *identity.User) {
+	if u == nil {
+		http.Redirect(w, r, "/login", http.StatusSeeOther)
+		return
+	}
+	if err := r.ParseForm(); err != nil {
+		http.Error(w, "bad request", http.StatusBadRequest)
+		return
+	}
+	if idStr := r.PostFormValue("id"); idStr != "" {
+		if id, err := strconv.ParseInt(idStr, 10, 64); err == nil && id > 0 {
+			_ = s.Jobs.RemoveBlocklist(r.Context(), u.ID, id)
+		}
+	} else if pattern := r.PostFormValue("pattern"); pattern != "" {
+		kind := r.PostFormValue("kind")
+		if kind != "company" && kind != "keyword" {
+			kind = "company"
+		}
+		_ = s.Jobs.RemoveBlocklistByPattern(r.Context(), u.ID, kind, pattern)
+	}
+	if partial(r) {
+		s.jobsPage(w, r, u)
+		return
+	}
+	http.Redirect(w, r, "/jobs", http.StatusSeeOther)
+}
+
+func jobRow(ctx context.Context, it matching.Item, now time.Time) views.JobRow {
 	at := it.Posted
 	if at.IsZero() || it.FirstSeen.Before(at) {
 		at = it.FirstSeen
@@ -118,8 +268,44 @@ func jobRow(it matching.Item, now time.Time) views.JobRow {
 	if !at.IsZero() {
 		age = max(int(now.Sub(at).Hours()/24), 0)
 	}
-	return views.JobRow{ID: it.JobID, Title: it.Title, Company: it.Company, Location: it.Location,
-		Workplace: it.Workplace, Age: age, Score: it.Score, Decision: string(it.Decision)}
+	return views.JobRow{
+		ID:        it.JobID,
+		Title:     it.Title,
+		Company:   it.Company,
+		Location:  it.Location,
+		Workplace: it.Workplace,
+		Salary:    formatSalary(ctx, it.SalaryMin, it.SalaryMax, it.SalaryCurrency),
+		Source:    it.Source,
+		Blocked:   it.Blocked,
+		Age:       age,
+		Score:     it.Score,
+		Decision:  string(it.Decision),
+	}
+}
+
+func formatSalary(ctx context.Context, min, max int, currency string) string {
+	if min <= 0 && max <= 0 {
+		return ""
+	}
+	sym := "€"
+	switch currency {
+	case "USD":
+		sym = "$"
+	case "GBP":
+		sym = "£"
+	}
+	minStr := sym + views.Amount(ctx, strconv.Itoa(min))
+	maxStr := sym + views.Amount(ctx, strconv.Itoa(max))
+	if min > 0 && max > 0 && min != max {
+		return minStr + " – " + maxStr
+	}
+	if min > 0 && max > 0 && min == max {
+		return minStr
+	}
+	if min > 0 {
+		return views.T(ctx, "jobs.min_salary.val", "val", views.Amount(ctx, strconv.Itoa(min)))
+	}
+	return "≤ " + maxStr
 }
 
 // reasonText translates a reason; levels and languages in its parameters are translated too.

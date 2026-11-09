@@ -161,26 +161,29 @@ type Invitation struct {
 }
 
 type Job struct {
-	ID          int64
-	Fingerprint string
-	MatchKey    string
-	Source      string
-	ExternalID  string
-	Company     string
-	Title       string
-	Location    string
-	Workplace   string
-	Url         string
-	ApplyUrl    string
-	AltUrls     []string
-	Description string
-	Posted      pgtype.Date
-	ContentHash string
-	Status      string
-	FirstSeen   time.Time
-	LastSeen    time.Time
-	ClosedAt    *time.Time
-	Search      interface{}
+	ID             int64
+	Fingerprint    string
+	MatchKey       string
+	Source         string
+	ExternalID     string
+	Company        string
+	Title          string
+	Location       string
+	Workplace      string
+	Url            string
+	ApplyUrl       string
+	AltUrls        []string
+	Description    string
+	Posted         pgtype.Date
+	ContentHash    string
+	Status         string
+	FirstSeen      time.Time
+	LastSeen       time.Time
+	ClosedAt       *time.Time
+	Search         interface{}
+	SalaryMin      *int32
+	SalaryMax      *int32
+	SalaryCurrency string
 }
 
 type JobSnapshot struct {
@@ -380,6 +383,14 @@ type UserAiSetting struct {
 	SpentCents      int32
 	CreatedAt       time.Time
 	UpdatedAt       time.Time
+}
+
+type UserBlocklist struct {
+	ID        int64
+	UserID    uuid.UUID
+	Kind      string
+	Pattern   string
+	CreatedAt time.Time
 }
 
 type UserKey struct {

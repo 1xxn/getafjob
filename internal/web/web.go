@@ -129,6 +129,8 @@ func (s *Server) Register(mux *http.ServeMux) {
 	mux.Handle("POST /invite/{token}", s.limited(s.page(s.inviteSubmit)))
 	mux.Handle("POST /logout", s.page(s.logout))
 	mux.Handle("GET /jobs", s.page(s.jobsPage))
+	mux.Handle("POST /jobs/blocklist", s.page(s.addBlocklist))
+	mux.Handle("POST /jobs/blocklist/delete", s.page(s.deleteBlocklist))
 	mux.Handle("GET /jobs/{id}", s.page(s.jobPage))
 	mux.Handle("GET /approvals", s.page(s.approvalsPage))
 	mux.Handle("POST /approvals/{id}/approve", s.page(s.approvalApprove))
