@@ -37,6 +37,7 @@ import (
 	"github.com/1xxn/getafjob/internal/platform/crypto"
 	"github.com/1xxn/getafjob/internal/platform/db"
 	"github.com/1xxn/getafjob/internal/platform/httpx"
+	"github.com/1xxn/getafjob/internal/platform/netguard"
 	"github.com/1xxn/getafjob/internal/platform/queue"
 	"github.com/1xxn/getafjob/internal/platform/webpush"
 	"github.com/1xxn/getafjob/internal/portals"
@@ -119,7 +120,12 @@ func serve(ctx context.Context, cfg config.Config, logger *slog.Logger) error {
 	portalsSvc := portals.NewService(portalsStore, portalsCipher, newAutonomyAdapter(apps), cfg.EasyApplyEnabled)
 	aiStore := aistore.New(pool)
 	aiCipher := aicrypto.NewCipher(env)
-	aiClient := aianthropic.NewClient()
+	var aiClient *aianthropic.Client
+	if cfg.EgressProxy != nil {
+		aiClient = aianthropic.NewClient(aianthropic.WithHTTPClient(netguard.NewClient(netguard.ClientOptions{Proxy: cfg.EgressProxy, Timeout: 45 * time.Second})))
+	} else {
+		aiClient = aianthropic.NewClient()
+	}
 	aiSvc := ai.NewService(aiStore, aiCipher, aiClient, cfg.AIEnabled, cfg.AnthropicAPIKey.Reveal(), cfg.AnthropicModel, cfg.AIBudgetPerUserCents)
 	var gw *gateway.Server
 	if cfg.RunnerSecret != "" {
@@ -148,6 +154,10 @@ func serve(ctx context.Context, cfg config.Config, logger *slog.Logger) error {
 	crawlQueue := NewCrawlQueue(inserter, pool)
 	evaluator := NewMatchEvaluator(profileCriteria{svc: profiles, store: pstore}, mstore)
 	discoverySvc := urlimport.NewService(urlimport.Options{
+		Client: netguard.NewClient(netguard.ClientOptions{
+			Proxy:   cfg.EgressProxy,
+			Timeout: 20 * time.Second,
+		}),
 		Discovery: dstore,
 		Boards:    dstore,
 		Matcher:   evaluator,

@@ -203,3 +203,38 @@ func TestExtract_GreenhouseURL(t *testing.T) {
 		t.Errorf("Workplace = %q, want 'hybrid'", job.Workplace)
 	}
 }
+
+func TestExtract_JobBoardsGreenhouseURL(t *testing.T) {
+	html := `<!DOCTYPE html>
+<html>
+<head>
+  <meta property="og:title" content="Platform Engineer" />
+  <meta property="og:description" content="London" />
+</head>
+<body>
+  <h1>Platform Engineer</h1>
+</body>
+</html>`
+
+	rawURL := "https://job-boards.greenhouse.io/capitalontap/jobs/8902990002"
+	job, err := Extract(rawURL, []byte(html))
+	if err != nil {
+		t.Fatalf("Extract error: %v", err)
+	}
+
+	if job.ATS != "greenhouse" {
+		t.Errorf("ATS = %q, want 'greenhouse'", job.ATS)
+	}
+	if job.Source != "greenhouse:capitalontap" {
+		t.Errorf("Source = %q, want 'greenhouse:capitalontap'", job.Source)
+	}
+	if job.Company != "Capitalontap" {
+		t.Errorf("Company = %q, want 'Capitalontap'", job.Company)
+	}
+	if job.ExternalID != "8902990002" {
+		t.Errorf("ExternalID = %q, want '8902990002'", job.ExternalID)
+	}
+	if job.Title != "Platform Engineer" {
+		t.Errorf("Title = %q, want 'Platform Engineer'", job.Title)
+	}
+}
