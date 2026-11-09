@@ -88,7 +88,7 @@ func (s *Store) InsertWorkExperience(ctx context.Context, w profile.StoredWorkEx
 			EndDate:       w.EndDate,
 			IsCurrent:     w.IsCurrent,
 			SealedBullets: w.SealedBullets,
-			SortOrder:     int32(w.SortOrder),
+			SortOrder:     int32(w.SortOrder), //nolint:gosec // bounded by MaxStations
 			CreatedAt:     w.CreatedAt,
 			UpdatedAt:     w.UpdatedAt,
 		})
@@ -109,7 +109,7 @@ func (s *Store) UpdateWorkExperience(ctx context.Context, w profile.StoredWorkEx
 			EndDate:       w.EndDate,
 			IsCurrent:     w.IsCurrent,
 			SealedBullets: w.SealedBullets,
-			SortOrder:     int32(w.SortOrder),
+			SortOrder:     int32(w.SortOrder), //nolint:gosec // bounded by MaxStations
 			UpdatedAt:     w.UpdatedAt,
 		})
 		ok = n == 1
@@ -124,7 +124,7 @@ func (s *Store) UpdateWorkExperienceOrder(ctx context.Context, userID, id uuid.U
 		n, err := qs.UpdateWorkExperienceOrder(ctx, q.UpdateWorkExperienceOrderParams{
 			ID:        id,
 			UserID:    userID,
-			SortOrder: int32(sortOrder),
+			SortOrder: int32(sortOrder), //nolint:gosec // bounded by MaxStations
 			UpdatedAt: updatedAt,
 		})
 		ok = n == 1
@@ -190,7 +190,7 @@ func (s *Store) InsertEducation(ctx context.Context, e profile.StoredEducation) 
 			EndDate:      e.EndDate,
 			IsCurrent:    e.IsCurrent,
 			Grade:        e.Grade,
-			SortOrder:    int32(e.SortOrder),
+			SortOrder:    int32(e.SortOrder), //nolint:gosec // bounded by MaxStations
 			CreatedAt:    e.CreatedAt,
 			UpdatedAt:    e.UpdatedAt,
 		})
@@ -210,7 +210,7 @@ func (s *Store) UpdateEducation(ctx context.Context, e profile.StoredEducation) 
 			EndDate:      e.EndDate,
 			IsCurrent:    e.IsCurrent,
 			Grade:        e.Grade,
-			SortOrder:    int32(e.SortOrder),
+			SortOrder:    int32(e.SortOrder), //nolint:gosec // bounded by MaxStations
 			UpdatedAt:    e.UpdatedAt,
 		})
 		ok = n == 1
@@ -225,7 +225,7 @@ func (s *Store) UpdateEducationOrder(ctx context.Context, userID, id uuid.UUID, 
 		n, err := qs.UpdateEducationOrder(ctx, q.UpdateEducationOrderParams{
 			ID:        id,
 			UserID:    userID,
-			SortOrder: int32(sortOrder),
+			SortOrder: int32(sortOrder), //nolint:gosec // bounded by MaxStations
 			UpdatedAt: updatedAt,
 		})
 		ok = n == 1
