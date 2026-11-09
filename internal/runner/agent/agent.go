@@ -100,7 +100,15 @@ func (a *Agent) Run(ctx context.Context) error {
 func (a *Agent) RunOne(ctx context.Context, run *runnerv1.Run) error {
 	ctx, cancel := context.WithDeadline(ctx, run.GetExpiresAt().AsTime())
 	defer cancel()
-	c := &coordinator{client: a.Client, token: run.GetToken()}
+	tok := run.GetToken()
+	c := &coordinator{client: a.Client, token: tok}
+
+	// Register handoff session with gateway immediately so screencast can be viewed at any time (#157).
+	_, _ = a.Client.Handoff(auth(ctx, tok), &runnerv1.HandoffRequest{})
+	defer func() {
+		_, _ = a.Client.Handoff(auth(context.WithoutCancel(ctx), tok), &runnerv1.HandoffRequest{Done: true})
+	}()
+
 	dir, err := os.MkdirTemp("", "getafjob-run-*")
 	if err != nil {
 		return err
@@ -123,6 +131,13 @@ func (a *Agent) RunOne(ctx context.Context, run *runnerv1.Run) error {
 	if err != nil {
 		return err
 	}
+	stopStream := a.startLiveScreencast(ctx, p, tok)
+	defer func() {
+		if stopStream != nil {
+			stopStream()
+		}
+	}()
+
 	if len(run.GetSessionCookiesJson()) > 0 {
 		var cookies []*proto.NetworkCookieParam
 		if err := json.Unmarshal(run.GetSessionCookiesJson(), &cookies); err == nil && len(cookies) > 0 {
@@ -146,6 +161,10 @@ func (a *Agent) RunOne(ctx context.Context, run *runnerv1.Run) error {
 			}}); err != nil {
 				return err
 			}
+			if stopStream != nil {
+				stopStream()
+				stopStream = nil
+			}
 			_, ok, herr := a.handoff(ctx, p, c, run)
 			if herr != nil {
 				return herr
@@ -153,6 +172,7 @@ func (a *Agent) RunOne(ctx context.Context, run *runnerv1.Run) error {
 			if !ok {
 				return nil
 			}
+			stopStream = a.startLiveScreencast(ctx, p, tok)
 			if res, err := (proto.NetworkGetCookies{}).Call(p); err == nil && len(res.Cookies) > 0 {
 				params := proto.CookiesToParams(res.Cookies)
 				if updatedJSON, err := json.Marshal(params); err == nil {
@@ -172,10 +192,20 @@ func (a *Agent) RunOne(ctx context.Context, run *runnerv1.Run) error {
 		shot, _ := p.Screenshot(false, nil)
 		return c.Park(ctx, "find the form: "+err.Error(), shot)
 	}
+	if form != nil && form != p {
+		if stopStream != nil {
+			stopStream()
+		}
+		stopStream = a.startLiveScreencast(ctx, form, tok)
+	}
 	for {
 		err = e.Run(ctx, form)
 		switch {
 		case errors.Is(err, engine.ErrAsked):
+			if stopStream != nil {
+				stopStream()
+				stopStream = nil
+			}
 			ans, ok, herr := a.handoff(ctx, form, c, run)
 			if herr != nil {
 				return herr
@@ -183,6 +213,7 @@ func (a *Agent) RunOne(ctx context.Context, run *runnerv1.Run) error {
 			if !ok {
 				return nil
 			}
+			stopStream = a.startLiveScreencast(ctx, form, tok)
 			for _, an := range ans {
 				k.Answers = append(k.Answers, planner.Answer{ID: an.GetId(), Question: an.GetQuestion(), Answer: an.GetAnswer()})
 			}
@@ -196,6 +227,38 @@ func (a *Agent) RunOne(ctx context.Context, run *runnerv1.Run) error {
 		default:
 			shot, _ := form.Screenshot(false, nil)
 			return errors.Join(err, c.Park(ctx, "run: "+err.Error(), shot))
+		}
+	}
+}
+
+// startLiveScreencast streams CDP screencast frames to the gateway in the background throughout the run (#157).
+func (a *Agent) startLiveScreencast(ctx context.Context, p *rod.Page, tok string) func() {
+	if p == nil {
+		return func() {}
+	}
+	quality := 70
+	if err := (proto.PageStartScreencast{
+		Format:  proto.PageStartScreencastFormatJpeg,
+		Quality: &quality,
+	}).Call(p); err != nil {
+		return func() {}
+	}
+	sctx, stopScreencast := context.WithCancel(ctx)
+	waitEvents := p.Context(sctx).EachEvent(func(e *proto.PageScreencastFrame) {
+		_, _ = a.Client.Handoff(auth(sctx, tok), &runnerv1.HandoffRequest{Frame: e.Data})
+		_ = (proto.PageScreencastFrameAck{SessionID: e.SessionID}).Call(p)
+	})
+	eventsDone := make(chan struct{})
+	go func() {
+		waitEvents()
+		close(eventsDone)
+	}()
+	return func() {
+		stopScreencast()
+		_ = (proto.PageStopScreencast{}).Call(p)
+		select {
+		case <-eventsDone:
+		case <-time.After(2 * time.Second):
 		}
 	}
 }
@@ -217,9 +280,6 @@ func (a *Agent) handoff(ctx context.Context, p *rod.Page, c *coordinator, run *r
 		}
 		return nil, false, err
 	}
-	defer func() {
-		_, _ = a.Client.Handoff(auth(context.WithoutCancel(ctx), tok), &runnerv1.HandoffRequest{Done: true})
-	}()
 
 	quality := 70
 	if err := (proto.PageStartScreencast{

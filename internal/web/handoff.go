@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/coder/websocket"
 	"github.com/google/uuid"
@@ -24,6 +25,7 @@ import (
 // HandoffHub accesses active runner handoff sessions.
 type HandoffHub interface {
 	SessionFor(appID uuid.UUID) (*gateway.HandoffSession, bool)
+	ActiveSessions() []uuid.UUID
 }
 
 // Screenshots reads sealed run screenshots per user.
@@ -72,11 +74,6 @@ func (s *Server) screenWebSocket(w http.ResponseWriter, r *http.Request, u *iden
 		http.Error(w, "handoffs unavailable", http.StatusServiceUnavailable)
 		return
 	}
-	sess, ok := s.Handoffs.SessionFor(appID)
-	if !ok {
-		http.Error(w, "no active browser session", http.StatusNotFound)
-		return
-	}
 
 	ws, err := websocket.Accept(w, r, &websocket.AcceptOptions{
 		Subprotocols: []string{"getafjob-screencast"},
@@ -88,6 +85,27 @@ func (s *Server) screenWebSocket(w http.ResponseWriter, r *http.Request, u *iden
 
 	ctx, cancel := context.WithCancel(r.Context())
 	defer cancel()
+
+	sess, ok := s.Handoffs.SessionFor(appID)
+	if !ok {
+		ticker := time.NewTicker(250 * time.Millisecond)
+		defer ticker.Stop()
+		timeout := time.After(10 * time.Second)
+	waitLoop:
+		for {
+			select {
+			case <-ctx.Done():
+				return
+			case <-timeout:
+				_ = ws.Close(websocket.StatusPolicyViolation, "no active browser session")
+				return
+			case <-ticker.C:
+				if sess, ok = s.Handoffs.SessionFor(appID); ok {
+					break waitLoop
+				}
+			}
+		}
+	}
 
 	// Forward screencast frames to the client
 	go func() {
@@ -271,6 +289,26 @@ func (s *Server) applicationPage(w http.ResponseWriter, r *http.Request, u *iden
 		d.JobID = app.JobID
 		d.State = string(app.State)
 		d.Status = appStatus(app.State)
+		if s.Handoffs != nil {
+			for _, actID := range s.Handoffs.ActiveSessions() {
+				actApp, err := s.Apps.Get(r.Context(), u.ID, actID)
+				if err != nil {
+					continue
+				}
+				item := views.ActiveRunItem{
+					AppID:   actID.String(),
+					JobID:   actApp.JobID,
+					Current: actID == appID,
+				}
+				if s.Jobs != nil {
+					if j, err := s.Jobs.Detail(r.Context(), u.ID, actApp.JobID); err == nil {
+						item.JobTitle = j.Title
+						item.Company = j.Company
+					}
+				}
+				d.ActiveRuns = append(d.ActiveRuns, item)
+			}
+		}
 		if app.AwaitingApproval() {
 			d.ApprovalAsked = true
 			for _, re := range app.ApprovalReasons {

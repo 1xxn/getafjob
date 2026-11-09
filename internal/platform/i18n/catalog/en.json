@@ -484,6 +484,7 @@
   "texts.text": "Reusable texts for cover letters and free-text fields. getafjob fills placeholders from your profile and the job, and never sends a text with an empty placeholder.",
   "texts.title": "Text blocks",
   "handoff.title": "Remote browser",
+  "handoff.active_sessions": "Active live runs",
   "handoff.approval_reasons": "This application requires your approval before submit:",
   "handoff.approve": "Approve application",
   "handoff.connecting": "Connecting to remote browser...",

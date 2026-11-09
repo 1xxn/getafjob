@@ -343,6 +343,76 @@
   .screencast { max-inline-size: 100%; block-size: auto; border: 1px solid var(--line); display: block; background: #000; }
   .actions { display: flex; flex-wrap: wrap; gap: var(--space-3); margin-block-start: var(--space-3); }
 
+  /* Active Runner Switcher (#157) */
+  .active-runners-banner {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: var(--space-3);
+    padding: var(--space-3) var(--space-4);
+    margin-block: var(--space-2) var(--space-4);
+    background: var(--raised);
+    border: 1px solid var(--line);
+    border-radius: var(--radius);
+  }
+  .active-runners-label {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--space-2);
+    font-weight: 600;
+    font-size: 0.9rem;
+    color: var(--ink-1);
+  }
+  .active-runners-list {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--space-2);
+  }
+  .active-runner-pill {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--space-2);
+    padding: var(--space-1) var(--space-3);
+    background: var(--surface);
+    border: 1px solid var(--line);
+    border-radius: 9999px;
+    font-size: 0.85rem;
+    text-decoration: none;
+    color: var(--ink-2);
+    transition: all 0.15s ease-in-out;
+  }
+  .active-runner-pill:hover {
+    border-color: var(--brand);
+    color: var(--ink-1);
+  }
+  .active-runner-pill.current {
+    background: #ecfdf5;
+    border-color: #10b981;
+    color: #065f46;
+    font-weight: 600;
+  }
+  .live-dot {
+    inline-size: 8px;
+    block-size: 8px;
+    border-radius: 50%;
+    background-color: #ef4444;
+    display: inline-block;
+  }
+  .live-dot.pulse {
+    animation: live-pulse 1.5s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+  }
+  .live-dot.mini {
+    inline-size: 6px;
+    block-size: 6px;
+    background-color: #10b981;
+  }
+  @keyframes live-pulse {
+    0%, 100% { opacity: 1; transform: scale(1); }
+    50% { opacity: 0.4; transform: scale(1.2); }
+  }
+  .runner-company { font-weight: 600; }
+  .runner-title { opacity: 0.9; }
+
   /* Fit Inspector */
   .fit-inspector {
     border: 1px solid var(--line);

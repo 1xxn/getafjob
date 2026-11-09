@@ -44,6 +44,15 @@ type SuggestionData struct {
 	Subject        string
 }
 
+// ActiveRunItem holds a summary of an active runner session for switching (#157).
+type ActiveRunItem struct {
+	AppID    string
+	JobID    int64
+	JobTitle string
+	Company  string
+	Current  bool
+}
+
 // HandoffData fills the application evidence and remote browser page.
 type HandoffData struct {
 	Name                string
@@ -53,6 +62,7 @@ type HandoffData struct {
 	Company             string
 	State               string
 	Status              string
+	ActiveRuns          []ActiveRunItem
 	ApprovalAsked       bool
 	ApprovalReasons     []string
 	Suggestion          *SuggestionData
@@ -67,6 +77,32 @@ type HandoffData struct {
 
 templ HandoffPage(d HandoffData) {
 	@Layout(Page{Title: T(ctx, "handoff.title"), UserName: d.Name, Handoff: true}) {
+		if len(d.ActiveRuns) > 0 {
+			<div class="active-runners-banner">
+				<span class="active-runners-label">
+					<span class="live-dot pulse"></span>
+					{ T(ctx, "handoff.active_sessions") } ({ strconv.Itoa(len(d.ActiveRuns)) }):
+				</span>
+				<div class="active-runners-list">
+					for _, ar := range d.ActiveRuns {
+						<a
+							href={ templ.SafeURL("/applications/" + ar.AppID) }
+							class={ "active-runner-pill", templ.KV("current", ar.Current) }
+						>
+							<span class="live-dot mini"></span>
+							if ar.Company != "" {
+								<span class="runner-company">{ ar.Company }</span>
+							}
+							if ar.JobTitle != "" {
+								<span class="runner-title">{ ar.JobTitle }</span>
+							} else {
+								<span class="runner-title">{ ar.AppID[:8] }</span>
+							}
+						</a>
+					}
+				</div>
+			</div>
+		}
 		@Section(d.Company + " · " + d.JobTitle) {
 			<p>
 				<a href="/jobs">{ T(ctx, "jobs.back") }</a>
@@ -87,6 +123,11 @@ templ HandoffPage(d HandoffData) {
 					id="screencast"
 					class="screencast"
 					data-app={ d.AppID }
+					if d.BeforeSubmitURL != "" {
+						data-fallback={ d.BeforeSubmitURL }
+					} else if d.ConfirmationShotURL != "" {
+						data-fallback={ d.ConfirmationShotURL }
+					}
 					width="1280"
 					height="800"
 					tabindex="0"
