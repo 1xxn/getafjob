@@ -57,7 +57,7 @@ CMD ["--listen-ip=0.0.0.0", "--listen-port=4750", "--timeout=15s", \
      "--deny-range=fc00::/7", "--deny-range=fe80::/10", "--deny-range=ff00::/8", \
      "--additional-error-message-on-deny=blocked by the getafjob egress policy"]
 
-FROM chromedp/headless-shell:157.0.8103.27@sha256:7bee201478b2f6266aae01243740ee85c16281e32f42d3aed9fdf04f4eace7a1 AS runner
+FROM chromedp/headless-shell:158.0.8117.2@sha256:8ffed8e29a6427515410a54a93dee50b0ec3f206095233dc374e113e9324cc7a AS runner
 USER root
 # The upstream image ships locales readable by root only; the runner user needs them. Upgrade any packages with
 # Debian security updates before removing apt, so the runner needs no package manager at run time and has no
