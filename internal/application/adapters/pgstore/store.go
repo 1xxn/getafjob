@@ -871,3 +871,137 @@ func (s *Store) UserScreenshots(ctx context.Context, userID uuid.UUID) (out []st
 	})
 	return out, err
 }
+
+// GetNotes returns the private notes for an application.
+func (s *Store) GetNotes(ctx context.Context, userID, appID uuid.UUID) (out application.NoteData, err error) {
+	err = s.user(ctx, userID, func(qs *q.Queries) error {
+		if _, err := qs.GetApplication(ctx, q.GetApplicationParams{ID: appID, UserID: userID}); err != nil {
+			if errors.Is(err, pgx.ErrNoRows) {
+				return application.ErrNotFound
+			}
+			return err
+		}
+		row, err := qs.GetNotes(ctx, q.GetNotesParams{
+			ApplicationID: appID,
+			UserID:        userID,
+		})
+		if errors.Is(err, pgx.ErrNoRows) {
+			out = application.NoteData{
+				ApplicationID: appID,
+			}
+			return nil
+		}
+		if err != nil {
+			return err
+		}
+		out = application.NoteData{
+			ID:              row.ID,
+			ApplicationID:   row.ApplicationID,
+			Notes:           row.Notes,
+			SalaryDiscussed: row.SalaryDiscussed,
+			InterviewAt:     row.InterviewAt,
+			FollowUpAt:      row.FollowUpAt,
+			UpdatedAt:       row.UpdatedAt,
+		}
+		return nil
+	})
+	return out, err
+}
+
+// SaveNotes updates or creates private notes for an application.
+func (s *Store) SaveNotes(ctx context.Context, userID, appID uuid.UUID, notes, salary string, interviewAt, followUpAt *time.Time, now time.Time) error {
+	return s.user(ctx, userID, func(qs *q.Queries) error {
+		if _, err := qs.GetApplication(ctx, q.GetApplicationParams{ID: appID, UserID: userID}); err != nil {
+			if errors.Is(err, pgx.ErrNoRows) {
+				return application.ErrNotFound
+			}
+			return err
+		}
+		_, err := qs.UpsertNotes(ctx, q.UpsertNotesParams{
+			UserID:          userID,
+			ApplicationID:   appID,
+			Notes:           notes,
+			SalaryDiscussed: salary,
+			InterviewAt:     interviewAt,
+			FollowUpAt:      followUpAt,
+			Now:             now,
+		})
+		return err
+	})
+}
+
+// PipelineApplications returns all applications for a user with their pipeline information.
+func (s *Store) PipelineApplications(ctx context.Context, userID uuid.UUID) (out []application.PipelineApplication, err error) {
+	err = s.user(ctx, userID, func(qs *q.Queries) error {
+		rows, err := qs.UserApplicationsWithPipeline(ctx, userID)
+		if err != nil {
+			return err
+		}
+		out = make([]application.PipelineApplication, len(rows))
+		for i, r := range rows {
+			var reasons []application.Reason
+			for _, re := range r.ApprovalReasons {
+				reasons = append(reasons, application.Reason(re))
+			}
+			out[i] = application.PipelineApplication{
+				ID:              r.ID,
+				JobID:           r.JobID,
+				State:           application.State(r.State),
+				Version:         r.Version,
+				CreatedAt:       r.CreatedAt,
+				UpdatedAt:       r.UpdatedAt,
+				ApprovalAskedAt: r.ApprovalAskedAt,
+				ApprovalReasons: reasons,
+				ApprovedAt:      r.ApprovedAt,
+				CvDocumentID:    r.CvDocumentID,
+				Company:         r.Company,
+				Title:           r.Title,
+				Location:        r.Location,
+				Workplace:       r.Workplace,
+				URL:             r.Url,
+				ApplyURL:        r.ApplyUrl,
+				Score:           int(r.Score),
+				Notes:           r.Notes,
+				SalaryDiscussed: r.SalaryDiscussed,
+				InterviewAt:     r.InterviewAt,
+				FollowUpAt:      r.FollowUpAt,
+			}
+		}
+		return nil
+	})
+	return out, err
+}
+
+// BookmarkJob saves a job to the user's applications in matched state.
+func (s *Store) BookmarkJob(ctx context.Context, userID uuid.UUID, jobID int64, now time.Time) (id uuid.UUID, err error) {
+	err = s.user(ctx, userID, func(qs *q.Queries) error {
+		row, err := qs.SaveBookmark(ctx, q.SaveBookmarkParams{
+			UserID: userID,
+			JobID:  jobID,
+			Now:    now,
+		})
+		if err != nil {
+			return err
+		}
+		id = row.ID
+		return nil
+	})
+	return id, err
+}
+
+// MarkExternalApplied marks a job as applied externally (state: submitted).
+func (s *Store) MarkExternalApplied(ctx context.Context, userID uuid.UUID, jobID int64, now time.Time) (id uuid.UUID, err error) {
+	err = s.user(ctx, userID, func(qs *q.Queries) error {
+		row, err := qs.SetExternalSubmit(ctx, q.SetExternalSubmitParams{
+			UserID: userID,
+			JobID:  jobID,
+			Now:    now,
+		})
+		if err != nil {
+			return err
+		}
+		id = row.ID
+		return nil
+	})
+	return id, err
+}

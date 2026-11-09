@@ -438,3 +438,113 @@ func TestApplicationCVVariant(t *testing.T) {
 		t.Fatalf("other user SetCV: got %v, want ErrNotFound", err)
 	}
 }
+
+func TestPipelineAndNotes(t *testing.T) {
+	pool, _, svc, now := setup(t)
+	ctx := t.Context()
+	max := user(t, pool, "max-pipeline@muster.example")
+	erika := user(t, pool, "erika-pipeline@muster.example")
+	jID1 := job(t, pool, "greenhouse:acme", "Acme Corp", "mk-p1")
+	jID2 := job(t, pool, "lever:globex", "Globex", "mk-p2")
+
+	// 1. Bookmark a job (should create application in Matched state)
+	appID1, err := svc.Bookmark(ctx, max, jID1)
+	if err != nil {
+		t.Fatalf("Bookmark err = %v", err)
+	}
+	app1, err := svc.Get(ctx, max, appID1)
+	if err != nil || app1.State != application.Matched {
+		t.Fatalf("app1 state = %v, err = %v; want Matched", app1.State, err)
+	}
+
+	// Bookmarking again should return the existing application
+	appID1Dup, err := svc.Bookmark(ctx, max, jID1)
+	if err != nil || appID1Dup != appID1 {
+		t.Fatalf("Bookmark duplicate = %v, %v; want %v", appID1Dup, err, appID1)
+	}
+
+	// 2. Mark externally applied (should create/update application in Submitted state)
+	appID2, err := svc.ApplyExternal(ctx, max, jID2)
+	if err != nil {
+		t.Fatalf("ApplyExternal err = %v", err)
+	}
+	app2, err := svc.Get(ctx, max, appID2)
+	if err != nil || app2.State != application.Submitted {
+		t.Fatalf("app2 state = %v, err = %v; want Submitted", app2.State, err)
+	}
+
+	// 3. Notes: initial GetNotes returns empty
+	notes1, err := svc.GetNotes(ctx, max, appID1)
+	if err != nil {
+		t.Fatalf("GetNotes empty err = %v", err)
+	}
+	if notes1.Notes != "" || notes1.SalaryDiscussed != "" {
+		t.Fatalf("expected empty notes, got %+v", notes1)
+	}
+
+	// 4. SaveNotes
+	interviewTime := now.Add(48 * time.Hour)
+	followUpTime := now.Add(24 * time.Hour)
+	err = svc.SaveNotes(ctx, max, appID1, "Spoke with recruiter", "85.000 €", &interviewTime, &followUpTime)
+	if err != nil {
+		t.Fatalf("SaveNotes err = %v", err)
+	}
+
+	notesSaved, err := svc.GetNotes(ctx, max, appID1)
+	if err != nil {
+		t.Fatalf("GetNotes after save err = %v", err)
+	}
+	if notesSaved.Notes != "Spoke with recruiter" || notesSaved.SalaryDiscussed != "85.000 €" {
+		t.Fatalf("unexpected notes: %+v", notesSaved)
+	}
+	if notesSaved.InterviewAt == nil || !notesSaved.InterviewAt.Equal(interviewTime) {
+		t.Fatalf("unexpected interview_at: %v, want %v", notesSaved.InterviewAt, interviewTime)
+	}
+	if notesSaved.FollowUpAt == nil || !notesSaved.FollowUpAt.Equal(followUpTime) {
+		t.Fatalf("unexpected follow_up_at: %v, want %v", notesSaved.FollowUpAt, followUpTime)
+	}
+
+	// 5. Pipeline applications retrieval
+	pipeline, err := svc.Pipeline(ctx, max)
+	if err != nil {
+		t.Fatalf("Pipeline err = %v", err)
+	}
+	if len(pipeline) != 2 {
+		t.Fatalf("len(pipeline) = %d, want 2", len(pipeline))
+	}
+
+	// Verify enriched notes in pipeline
+	var foundApp1 bool
+	for _, p := range pipeline {
+		if p.ID == appID1 {
+			foundApp1 = true
+			if p.Company != "Acme Corp" {
+				t.Errorf("p.Company = %q, want Acme Corp", p.Company)
+			}
+			if p.Notes != "Spoke with recruiter" {
+				t.Errorf("p.Notes = %q, want 'Spoke with recruiter'", p.Notes)
+			}
+			if p.SalaryDiscussed != "85.000 €" {
+				t.Errorf("p.SalaryDiscussed = %q, want '85.000 €'", p.SalaryDiscussed)
+			}
+		}
+	}
+	if !foundApp1 {
+		t.Fatalf("app1 not found in pipeline")
+	}
+
+	// 6. Tenant isolation
+	if _, err := svc.GetNotes(ctx, erika, appID1); !errors.Is(err, application.ErrNotFound) {
+		t.Fatalf("erika GetNotes on max's app: got %v, want ErrNotFound", err)
+	}
+	if err := svc.SaveNotes(ctx, erika, appID1, "Hacked", "", nil, nil); !errors.Is(err, application.ErrNotFound) {
+		t.Fatalf("erika SaveNotes on max's app: got %v, want ErrNotFound", err)
+	}
+	erikaPipeline, err := svc.Pipeline(ctx, erika)
+	if err != nil {
+		t.Fatalf("erika Pipeline err = %v", err)
+	}
+	if len(erikaPipeline) != 0 {
+		t.Fatalf("erika saw %d pipeline items, want 0", len(erikaPipeline))
+	}
+}

@@ -337,3 +337,41 @@ func (s *Service) WatchHandoffs(ctx context.Context, n Notifier) (warned, parked
 	}
 	return warned, parked, errors.Join(errs...)
 }
+
+// GetNotes returns private notes and interview dates for an application.
+func (s *Service) GetNotes(ctx context.Context, userID, appID uuid.UUID) (NoteData, error) {
+	return s.store.GetNotes(ctx, userID, appID)
+}
+
+// SaveNotes saves private notes, compensation discussed, and interview/follow-up dates for an application.
+func (s *Service) SaveNotes(ctx context.Context, userID, appID uuid.UUID, notes, salary string, interviewAt, followUpAt *time.Time) error {
+	return s.store.SaveNotes(ctx, userID, appID, notes, salary, interviewAt, followUpAt, s.now())
+}
+
+// Pipeline returns all applications of a user categorized for the pipeline tracker.
+func (s *Service) Pipeline(ctx context.Context, userID uuid.UUID) ([]PipelineApplication, error) {
+	return s.store.PipelineApplications(ctx, userID)
+}
+
+// Bookmark saves a job into the candidate's pipeline in matched state.
+func (s *Service) Bookmark(ctx context.Context, userID uuid.UUID, jobID int64) (uuid.UUID, error) {
+	return s.store.BookmarkJob(ctx, userID, jobID, s.now())
+}
+
+// ApplyExternal records that the candidate applied to the job externally (state: submitted).
+func (s *Service) ApplyExternal(ctx context.Context, userID uuid.UUID, jobID int64) (uuid.UUID, error) {
+	appID, err := s.store.MarkExternalApplied(ctx, userID, jobID, s.now())
+	if err != nil {
+		return uuid.Nil, err
+	}
+	// Record an application event for the audit trail
+	_ = s.store.Apply(ctx, userID, App{ID: appID, State: Matched, Version: 1}, Change{
+		Event:  EvSubmitted,
+		Actor:  ActorUser,
+		From:   Matched,
+		To:     Submitted,
+		Detail: map[string]any{"external": true},
+		At:     s.now(),
+	})
+	return appID, nil
+}

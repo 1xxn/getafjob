@@ -104,17 +104,19 @@ type CVVariantData struct {
 
 // JobData fills the job detail page.
 type JobData struct {
-	Name        string
-	Row         JobRow
-	Reasons     []Reason
-	Description string
-	URL         string // http(s) only, empty otherwise
-	ApplyURL    string
-	Open        bool
-	Computed    string
-	Back        string
-	Fit         FitData
-	CV          CVVariantData
+	Name             string
+	Row              JobRow
+	Reasons          []Reason
+	Description      string
+	URL              string // http(s) only, empty otherwise
+	ApplyURL         string
+	Open             bool
+	Computed         string
+	Back             string
+	Fit              FitData
+	CV               CVVariantData
+	ApplicationState string
+	Notice           string
 }
 
 templ jobMeta(r JobRow) {
@@ -606,6 +608,30 @@ templ JobPage(d JobData) {
 			if !d.Open {
 				@Notice("info", T(ctx, "jobs.closed"))
 			}
+			if d.Notice != "" {
+				@Notice("success", d.Notice)
+			}
+			<div class="job-pipeline-actions">
+				<form method="post" action={ templ.SafeURL("/jobs/" + i64(d.Row.ID) + "/bookmark") } style="display:inline">
+					<button type="submit" class="btn-sm secondary">
+						if d.ApplicationState != "" {
+							★ { T(ctx, "jobs.saved_to_tracker") }
+						} else {
+							☆ { T(ctx, "jobs.bookmark") }
+						}
+					</button>
+				</form>
+				<form method="post" action={ templ.SafeURL("/jobs/" + i64(d.Row.ID) + "/apply-external") } style="display:inline">
+					<button type="submit" class="btn-sm">
+						{ T(ctx, "jobs.apply_external") }
+					</button>
+				</form>
+				if d.ApplicationState != "" {
+					<a href="/tracker" class="button secondary btn-sm">
+						{ T(ctx, "jobs.view_in_tracker") }
+					</a>
+				}
+			</div>
 			<p>
 				if d.URL != "" {
 					<a href={ templ.SafeURL(d.URL) } rel="noopener noreferrer external">{ T(ctx, "jobs.open_posting") }</a>

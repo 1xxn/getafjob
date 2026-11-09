@@ -245,4 +245,50 @@ type Store interface {
 	UserApplications(ctx context.Context, userID uuid.UUID) ([]ApplicationSummary, error)
 	// UserScreenshots returns all distinct screenshot blob keys belonging to the user's run checkpoints.
 	UserScreenshots(ctx context.Context, userID uuid.UUID) ([]string, error)
+	// GetNotes returns the private notes for an application.
+	GetNotes(ctx context.Context, userID, appID uuid.UUID) (NoteData, error)
+	// SaveNotes updates or creates private notes for an application.
+	SaveNotes(ctx context.Context, userID, appID uuid.UUID, notes, salary string, interviewAt, followUpAt *time.Time, now time.Time) error
+	// PipelineApplications returns all applications for a user with their pipeline information.
+	PipelineApplications(ctx context.Context, userID uuid.UUID) ([]PipelineApplication, error)
+	// BookmarkJob saves a job to the user's applications in matched state.
+	BookmarkJob(ctx context.Context, userID uuid.UUID, jobID int64, now time.Time) (uuid.UUID, error)
+	// MarkExternalApplied marks a job as applied externally (state: submitted).
+	MarkExternalApplied(ctx context.Context, userID uuid.UUID, jobID int64, now time.Time) (uuid.UUID, error)
+}
+
+// NoteData represents user's private notes and interview tracking for an application.
+type NoteData struct {
+	ID              uuid.UUID  `json:"id"`
+	ApplicationID   uuid.UUID  `json:"application_id"`
+	Notes           string     `json:"notes"`
+	SalaryDiscussed string     `json:"salary_discussed"`
+	InterviewAt     *time.Time `json:"interview_at,omitempty"`
+	FollowUpAt      *time.Time `json:"follow_up_at,omitempty"`
+	UpdatedAt       time.Time  `json:"updated_at"`
+}
+
+// PipelineApplication represents an application item in the Kanban pipeline.
+type PipelineApplication struct {
+	ID              uuid.UUID
+	JobID           int64
+	State           State
+	Version         int64
+	CreatedAt       time.Time
+	UpdatedAt       time.Time
+	ApprovalAskedAt *time.Time
+	ApprovalReasons []Reason
+	ApprovedAt      *time.Time
+	CvDocumentID    *uuid.UUID
+	Company         string
+	Title           string
+	Location        string
+	Workplace       string
+	URL             string
+	ApplyURL        string
+	Score           int
+	Notes           string
+	SalaryDiscussed string
+	InterviewAt     *time.Time
+	FollowUpAt      *time.Time
 }

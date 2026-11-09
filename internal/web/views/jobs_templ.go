@@ -113,17 +113,19 @@ type CVVariantData struct {
 
 // JobData fills the job detail page.
 type JobData struct {
-	Name        string
-	Row         JobRow
-	Reasons     []Reason
-	Description string
-	URL         string // http(s) only, empty otherwise
-	ApplyURL    string
-	Open        bool
-	Computed    string
-	Back        string
-	Fit         FitData
-	CV          CVVariantData
+	Name             string
+	Row              JobRow
+	Reasons          []Reason
+	Description      string
+	URL              string // http(s) only, empty otherwise
+	ApplyURL         string
+	Open             bool
+	Computed         string
+	Back             string
+	Fit              FitData
+	CV               CVVariantData
+	ApplicationState string
+	Notice           string
 }
 
 func jobMeta(r JobRow) templ.Component {
@@ -150,7 +152,7 @@ func jobMeta(r JobRow) templ.Component {
 		var templ_7745c5c3_Var2 string
 		templ_7745c5c3_Var2, templ_7745c5c3_Err = templ.JoinStringErrs(r.Company)
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `jobs.templ`, Line: 122, Col: 13}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `jobs.templ`, Line: 124, Col: 13}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var2))
 		if templ_7745c5c3_Err != nil {
@@ -168,7 +170,7 @@ func jobMeta(r JobRow) templ.Component {
 			var templ_7745c5c3_Var3 string
 			templ_7745c5c3_Var3, templ_7745c5c3_Err = templ.JoinStringErrs(r.Location)
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `jobs.templ`, Line: 124, Col: 18}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `jobs.templ`, Line: 126, Col: 18}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var3))
 			if templ_7745c5c3_Err != nil {
@@ -187,7 +189,7 @@ func jobMeta(r JobRow) templ.Component {
 			var templ_7745c5c3_Var4 string
 			templ_7745c5c3_Var4, templ_7745c5c3_Err = templ.JoinStringErrs(T(ctx, "jobs.workplace."+r.Workplace))
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `jobs.templ`, Line: 127, Col: 47}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `jobs.templ`, Line: 129, Col: 47}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var4))
 			if templ_7745c5c3_Err != nil {
@@ -206,7 +208,7 @@ func jobMeta(r JobRow) templ.Component {
 			var templ_7745c5c3_Var5 string
 			templ_7745c5c3_Var5, templ_7745c5c3_Err = templ.JoinStringErrs(r.Salary)
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `jobs.templ`, Line: 130, Col: 16}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `jobs.templ`, Line: 132, Col: 16}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var5))
 			if templ_7745c5c3_Err != nil {
@@ -225,7 +227,7 @@ func jobMeta(r JobRow) templ.Component {
 			var templ_7745c5c3_Var6 string
 			templ_7745c5c3_Var6, templ_7745c5c3_Err = templ.JoinStringErrs(r.Source)
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `jobs.templ`, Line: 133, Col: 36}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `jobs.templ`, Line: 135, Col: 36}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var6))
 			if templ_7745c5c3_Err != nil {
@@ -244,7 +246,7 @@ func jobMeta(r JobRow) templ.Component {
 			var templ_7745c5c3_Var7 string
 			templ_7745c5c3_Var7, templ_7745c5c3_Err = templ.JoinStringErrs(T(ctx, "jobs.age_today"))
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `jobs.templ`, Line: 136, Col: 32}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `jobs.templ`, Line: 138, Col: 32}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var7))
 			if templ_7745c5c3_Err != nil {
@@ -258,7 +260,7 @@ func jobMeta(r JobRow) templ.Component {
 			var templ_7745c5c3_Var8 string
 			templ_7745c5c3_Var8, templ_7745c5c3_Err = templ.JoinStringErrs(T(ctx, "jobs.age_days", "days", r.Age))
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `jobs.templ`, Line: 138, Col: 46}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `jobs.templ`, Line: 140, Col: 46}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var8))
 			if templ_7745c5c3_Err != nil {
@@ -333,7 +335,7 @@ func decision(r JobRow) templ.Component {
 		var templ_7745c5c3_Var12 string
 		templ_7745c5c3_Var12, templ_7745c5c3_Err = templ.JoinStringErrs(T(ctx, "match.decision."+r.Decision))
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `jobs.templ`, Line: 145, Col: 42}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `jobs.templ`, Line: 147, Col: 42}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var12))
 		if templ_7745c5c3_Err != nil {
@@ -346,7 +348,7 @@ func decision(r JobRow) templ.Component {
 		var templ_7745c5c3_Var13 string
 		templ_7745c5c3_Var13, templ_7745c5c3_Err = templ.JoinStringErrs(T(ctx, "jobs.score", "score", r.Score))
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `jobs.templ`, Line: 145, Col: 86}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `jobs.templ`, Line: 147, Col: 86}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var13))
 		if templ_7745c5c3_Err != nil {
@@ -384,7 +386,7 @@ func option(value, current, label string) templ.Component {
 		var templ_7745c5c3_Var15 string
 		templ_7745c5c3_Var15, templ_7745c5c3_Err = templruntime.NewAttributeExpression(value).Resolve(ctx)
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `jobs.templ`, Line: 150, Col: 22}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `jobs.templ`, Line: 152, Col: 22}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var15)
 		if templ_7745c5c3_Err != nil {
@@ -407,7 +409,7 @@ func option(value, current, label string) templ.Component {
 		var templ_7745c5c3_Var16 string
 		templ_7745c5c3_Var16, templ_7745c5c3_Err = templ.JoinStringErrs(label)
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `jobs.templ`, Line: 150, Col: 63}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `jobs.templ`, Line: 152, Col: 63}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var16))
 		if templ_7745c5c3_Err != nil {
@@ -474,7 +476,7 @@ func CrawlStatus(c CrawlStatusData) templ.Component {
 			var templ_7745c5c3_Var18 string
 			templ_7745c5c3_Var18, templ_7745c5c3_Err = templ.JoinStringErrs(T(ctx, "jobs.crawl_running"))
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `jobs.templ`, Line: 163, Col: 82}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `jobs.templ`, Line: 165, Col: 82}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var18))
 			if templ_7745c5c3_Err != nil {
@@ -492,7 +494,7 @@ func CrawlStatus(c CrawlStatusData) templ.Component {
 			var templ_7745c5c3_Var19 string
 			templ_7745c5c3_Var19, templ_7745c5c3_Err = templ.JoinStringErrs(T(ctx, "jobs.crawl_queued"))
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `jobs.templ`, Line: 165, Col: 66}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `jobs.templ`, Line: 167, Col: 66}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var19))
 			if templ_7745c5c3_Err != nil {
@@ -510,7 +512,7 @@ func CrawlStatus(c CrawlStatusData) templ.Component {
 			var templ_7745c5c3_Var20 string
 			templ_7745c5c3_Var20, templ_7745c5c3_Err = templ.JoinStringErrs(T(ctx, "jobs.crawl_last_run", "time", c.LastRun))
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `jobs.templ`, Line: 167, Col: 86}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `jobs.templ`, Line: 169, Col: 86}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var20))
 			if templ_7745c5c3_Err != nil {
@@ -528,7 +530,7 @@ func CrawlStatus(c CrawlStatusData) templ.Component {
 			var templ_7745c5c3_Var21 string
 			templ_7745c5c3_Var21, templ_7745c5c3_Err = templ.JoinStringErrs(T(ctx, "jobs.crawl_never"))
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `jobs.templ`, Line: 169, Col: 64}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `jobs.templ`, Line: 171, Col: 64}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var21))
 			if templ_7745c5c3_Err != nil {
@@ -582,7 +584,7 @@ func CrawlStatus(c CrawlStatusData) templ.Component {
 		var templ_7745c5c3_Var22 string
 		templ_7745c5c3_Var22, templ_7745c5c3_Err = templ.JoinStringErrs(T(ctx, "jobs.crawl_button"))
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `jobs.templ`, Line: 179, Col: 33}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `jobs.templ`, Line: 181, Col: 33}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var22))
 		if templ_7745c5c3_Err != nil {
@@ -728,7 +730,7 @@ func JobsPage(d JobsData) templ.Component {
 				var templ_7745c5c3_Var28 string
 				templ_7745c5c3_Var28, templ_7745c5c3_Err = templruntime.NewAttributeExpression(T(ctx, "jobs.import_placeholder")).Resolve(ctx)
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `jobs.templ`, Line: 209, Col: 53}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `jobs.templ`, Line: 211, Col: 53}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var28)
 				if templ_7745c5c3_Err != nil {
@@ -741,7 +743,7 @@ func JobsPage(d JobsData) templ.Component {
 				var templ_7745c5c3_Var29 string
 				templ_7745c5c3_Var29, templ_7745c5c3_Err = templ.JoinStringErrs(T(ctx, "jobs.import_button"))
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `jobs.templ`, Line: 213, Col: 57}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `jobs.templ`, Line: 215, Col: 57}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var29))
 				if templ_7745c5c3_Err != nil {
@@ -754,7 +756,7 @@ func JobsPage(d JobsData) templ.Component {
 				var templ_7745c5c3_Var30 string
 				templ_7745c5c3_Var30, templ_7745c5c3_Err = templ.JoinStringErrs(T(ctx, "jobs.board_add_title"))
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `jobs.templ`, Line: 216, Col: 74}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `jobs.templ`, Line: 218, Col: 74}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var30))
 				if templ_7745c5c3_Err != nil {
@@ -793,7 +795,7 @@ func JobsPage(d JobsData) templ.Component {
 				var templ_7745c5c3_Var31 string
 				templ_7745c5c3_Var31, templ_7745c5c3_Err = templruntime.NewAttributeExpression(T(ctx, "jobs.board_add_placeholder")).Resolve(ctx)
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `jobs.templ`, Line: 227, Col: 58}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `jobs.templ`, Line: 229, Col: 58}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var31)
 				if templ_7745c5c3_Err != nil {
@@ -806,7 +808,7 @@ func JobsPage(d JobsData) templ.Component {
 				var templ_7745c5c3_Var32 string
 				templ_7745c5c3_Var32, templ_7745c5c3_Err = templ.JoinStringErrs(T(ctx, "jobs.board_add_button"))
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `jobs.templ`, Line: 231, Col: 62}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `jobs.templ`, Line: 233, Col: 62}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var32))
 				if templ_7745c5c3_Err != nil {
@@ -860,7 +862,7 @@ func JobsPage(d JobsData) templ.Component {
 				var templ_7745c5c3_Var33 string
 				templ_7745c5c3_Var33, templ_7745c5c3_Err = templ.JoinStringErrs(T(ctx, "jobs.decision"))
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `jobs.templ`, Line: 251, Col: 54}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `jobs.templ`, Line: 253, Col: 54}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var33))
 				if templ_7745c5c3_Err != nil {
@@ -903,7 +905,7 @@ func JobsPage(d JobsData) templ.Component {
 				var templ_7745c5c3_Var34 string
 				templ_7745c5c3_Var34, templ_7745c5c3_Err = templ.JoinStringErrs(T(ctx, "jobs.freshness"))
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `jobs.templ`, Line: 264, Col: 56}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `jobs.templ`, Line: 266, Col: 56}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var34))
 				if templ_7745c5c3_Err != nil {
@@ -944,7 +946,7 @@ func JobsPage(d JobsData) templ.Component {
 				var templ_7745c5c3_Var35 string
 				templ_7745c5c3_Var35, templ_7745c5c3_Err = templ.JoinStringErrs(T(ctx, "jobs.sort"))
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `jobs.templ`, Line: 275, Col: 46}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `jobs.templ`, Line: 277, Col: 46}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var35))
 				if templ_7745c5c3_Err != nil {
@@ -977,7 +979,7 @@ func JobsPage(d JobsData) templ.Component {
 				var templ_7745c5c3_Var36 string
 				templ_7745c5c3_Var36, templ_7745c5c3_Err = templ.JoinStringErrs(T(ctx, "jobs.workplace"))
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `jobs.templ`, Line: 284, Col: 56}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `jobs.templ`, Line: 286, Col: 56}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var36))
 				if templ_7745c5c3_Err != nil {
@@ -1010,7 +1012,7 @@ func JobsPage(d JobsData) templ.Component {
 				var templ_7745c5c3_Var37 string
 				templ_7745c5c3_Var37, templ_7745c5c3_Err = templ.JoinStringErrs(T(ctx, "jobs.source_label"))
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `jobs.templ`, Line: 293, Col: 56}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `jobs.templ`, Line: 295, Col: 56}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var37))
 				if templ_7745c5c3_Err != nil {
@@ -1063,7 +1065,7 @@ func JobsPage(d JobsData) templ.Component {
 				var templ_7745c5c3_Var38 string
 				templ_7745c5c3_Var38, templ_7745c5c3_Err = templ.JoinStringErrs(T(ctx, "jobs.min_salary_label"))
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `jobs.templ`, Line: 307, Col: 64}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `jobs.templ`, Line: 309, Col: 64}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var38))
 				if templ_7745c5c3_Err != nil {
@@ -1108,7 +1110,7 @@ func JobsPage(d JobsData) templ.Component {
 				var templ_7745c5c3_Var39 string
 				templ_7745c5c3_Var39, templ_7745c5c3_Err = templ.JoinStringErrs(T(ctx, "jobs.apply_filter"))
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `jobs.templ`, Line: 318, Col: 55}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `jobs.templ`, Line: 320, Col: 55}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var39))
 				if templ_7745c5c3_Err != nil {
@@ -1173,7 +1175,7 @@ func JobResults(d JobsData) templ.Component {
 			var templ_7745c5c3_Var41 string
 			templ_7745c5c3_Var41, templ_7745c5c3_Err = templ.JoinStringErrs(T(ctx, "jobs.blocklist_manage"))
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `jobs.templ`, Line: 333, Col: 38}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `jobs.templ`, Line: 335, Col: 38}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var41))
 			if templ_7745c5c3_Err != nil {
@@ -1191,7 +1193,7 @@ func JobResults(d JobsData) templ.Component {
 				var templ_7745c5c3_Var42 string
 				templ_7745c5c3_Var42, templ_7745c5c3_Err = templ.JoinStringErrs(i64(int64(d.BlockedCount)))
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `jobs.templ`, Line: 335, Col: 68}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `jobs.templ`, Line: 337, Col: 68}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var42))
 				if templ_7745c5c3_Err != nil {
@@ -1209,7 +1211,7 @@ func JobResults(d JobsData) templ.Component {
 			var templ_7745c5c3_Var43 string
 			templ_7745c5c3_Var43, templ_7745c5c3_Err = templ.JoinStringErrs(T(ctx, "jobs.blocklist_title"))
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `jobs.templ`, Line: 339, Col: 41}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `jobs.templ`, Line: 341, Col: 41}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var43))
 			if templ_7745c5c3_Err != nil {
@@ -1248,7 +1250,7 @@ func JobResults(d JobsData) templ.Component {
 			var templ_7745c5c3_Var44 string
 			templ_7745c5c3_Var44, templ_7745c5c3_Err = templ.JoinStringErrs(T(ctx, "jobs.blocklist_kind_company"))
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `jobs.templ`, Line: 347, Col: 70}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `jobs.templ`, Line: 349, Col: 70}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var44))
 			if templ_7745c5c3_Err != nil {
@@ -1261,7 +1263,7 @@ func JobResults(d JobsData) templ.Component {
 			var templ_7745c5c3_Var45 string
 			templ_7745c5c3_Var45, templ_7745c5c3_Err = templ.JoinStringErrs(T(ctx, "jobs.blocklist_kind_keyword"))
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `jobs.templ`, Line: 348, Col: 70}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `jobs.templ`, Line: 350, Col: 70}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var45))
 			if templ_7745c5c3_Err != nil {
@@ -1274,7 +1276,7 @@ func JobResults(d JobsData) templ.Component {
 			var templ_7745c5c3_Var46 string
 			templ_7745c5c3_Var46, templ_7745c5c3_Err = templruntime.NewAttributeExpression(T(ctx, "jobs.blocklist_pattern")).Resolve(ctx)
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `jobs.templ`, Line: 350, Col: 86}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `jobs.templ`, Line: 352, Col: 86}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var46)
 			if templ_7745c5c3_Err != nil {
@@ -1287,7 +1289,7 @@ func JobResults(d JobsData) templ.Component {
 			var templ_7745c5c3_Var47 string
 			templ_7745c5c3_Var47, templ_7745c5c3_Err = templ.JoinStringErrs(T(ctx, "jobs.blocklist_add"))
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `jobs.templ`, Line: 351, Col: 58}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `jobs.templ`, Line: 353, Col: 58}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var47))
 			if templ_7745c5c3_Err != nil {
@@ -1305,7 +1307,7 @@ func JobResults(d JobsData) templ.Component {
 				var templ_7745c5c3_Var48 string
 				templ_7745c5c3_Var48, templ_7745c5c3_Err = templ.JoinStringErrs(T(ctx, "jobs.blocklist_empty"))
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `jobs.templ`, Line: 354, Col: 55}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `jobs.templ`, Line: 356, Col: 55}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var48))
 				if templ_7745c5c3_Err != nil {
@@ -1328,7 +1330,7 @@ func JobResults(d JobsData) templ.Component {
 					var templ_7745c5c3_Var49 string
 					templ_7745c5c3_Var49, templ_7745c5c3_Err = templ.JoinStringErrs(b.Kind)
 					if templ_7745c5c3_Err != nil {
-						return templ.Error{Err: templ_7745c5c3_Err, FileName: `jobs.templ`, Line: 359, Col: 37}
+						return templ.Error{Err: templ_7745c5c3_Err, FileName: `jobs.templ`, Line: 361, Col: 37}
 					}
 					_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var49))
 					if templ_7745c5c3_Err != nil {
@@ -1341,7 +1343,7 @@ func JobResults(d JobsData) templ.Component {
 					var templ_7745c5c3_Var50 string
 					templ_7745c5c3_Var50, templ_7745c5c3_Err = templ.JoinStringErrs(b.Pattern)
 					if templ_7745c5c3_Err != nil {
-						return templ.Error{Err: templ_7745c5c3_Err, FileName: `jobs.templ`, Line: 360, Col: 42}
+						return templ.Error{Err: templ_7745c5c3_Err, FileName: `jobs.templ`, Line: 362, Col: 42}
 					}
 					_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var50))
 					if templ_7745c5c3_Err != nil {
@@ -1380,7 +1382,7 @@ func JobResults(d JobsData) templ.Component {
 					var templ_7745c5c3_Var51 string
 					templ_7745c5c3_Var51, templ_7745c5c3_Err = templruntime.NewAttributeExpression(i64(b.ID)).Resolve(ctx)
 					if templ_7745c5c3_Err != nil {
-						return templ.Error{Err: templ_7745c5c3_Err, FileName: `jobs.templ`, Line: 367, Col: 58}
+						return templ.Error{Err: templ_7745c5c3_Err, FileName: `jobs.templ`, Line: 369, Col: 58}
 					}
 					_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var51)
 					if templ_7745c5c3_Err != nil {
@@ -1393,7 +1395,7 @@ func JobResults(d JobsData) templ.Component {
 					var templ_7745c5c3_Var52 string
 					templ_7745c5c3_Var52, templ_7745c5c3_Err = templ.JoinStringErrs(T(ctx, "jobs.blocklist_remove"))
 					if templ_7745c5c3_Err != nil {
-						return templ.Error{Err: templ_7745c5c3_Err, FileName: `jobs.templ`, Line: 368, Col: 89}
+						return templ.Error{Err: templ_7745c5c3_Err, FileName: `jobs.templ`, Line: 370, Col: 89}
 					}
 					_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var52))
 					if templ_7745c5c3_Err != nil {
@@ -1416,7 +1418,7 @@ func JobResults(d JobsData) templ.Component {
 			var templ_7745c5c3_Var53 string
 			templ_7745c5c3_Var53, templ_7745c5c3_Err = templ.JoinStringErrs(T(ctx, "jobs.count", "total", d.Total))
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `jobs.templ`, Line: 377, Col: 44}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `jobs.templ`, Line: 379, Col: 44}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var53))
 			if templ_7745c5c3_Err != nil {
@@ -1429,7 +1431,7 @@ func JobResults(d JobsData) templ.Component {
 			var templ_7745c5c3_Var54 string
 			templ_7745c5c3_Var54, templ_7745c5c3_Err = templ.JoinStringErrs(T(ctx, "jobs.counts", "match", d.Counts["match"], "maybe", d.Counts["maybe"], "skip", d.Counts["skip"]))
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `jobs.templ`, Line: 378, Col: 109}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `jobs.templ`, Line: 380, Col: 109}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var54))
 			if templ_7745c5c3_Err != nil {
@@ -1443,7 +1445,7 @@ func JobResults(d JobsData) templ.Component {
 				var templ_7745c5c3_Var55 string
 				templ_7745c5c3_Var55, templ_7745c5c3_Err = templ.JoinStringErrs(" ")
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `jobs.templ`, Line: 380, Col: 10}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `jobs.templ`, Line: 382, Col: 10}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var55))
 				if templ_7745c5c3_Err != nil {
@@ -1456,7 +1458,7 @@ func JobResults(d JobsData) templ.Component {
 				var templ_7745c5c3_Var56 string
 				templ_7745c5c3_Var56, templ_7745c5c3_Err = templ.JoinStringErrs(T(ctx, "jobs.counts_blocked", "blocked", d.BlockedCount))
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `jobs.templ`, Line: 381, Col: 63}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `jobs.templ`, Line: 383, Col: 63}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var56))
 				if templ_7745c5c3_Err != nil {
@@ -1475,7 +1477,7 @@ func JobResults(d JobsData) templ.Component {
 				var templ_7745c5c3_Var57 string
 				templ_7745c5c3_Var57, templ_7745c5c3_Err = templ.JoinStringErrs(T(ctx, "jobs.none"))
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `jobs.templ`, Line: 385, Col: 28}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `jobs.templ`, Line: 387, Col: 28}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var57))
 				if templ_7745c5c3_Err != nil {
@@ -1498,7 +1500,7 @@ func JobResults(d JobsData) templ.Component {
 				var templ_7745c5c3_Var58 string
 				templ_7745c5c3_Var58, templ_7745c5c3_Err = templruntime.NewAttributeExpression(templ.SafeURL("/jobs/" + i64(r.ID))).ResolveURL(ctx)
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `jobs.templ`, Line: 391, Col: 56}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `jobs.templ`, Line: 393, Col: 56}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var58)
 				if templ_7745c5c3_Err != nil {
@@ -1511,7 +1513,7 @@ func JobResults(d JobsData) templ.Component {
 				var templ_7745c5c3_Var59 string
 				templ_7745c5c3_Var59, templ_7745c5c3_Err = templ.JoinStringErrs(r.Title)
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `jobs.templ`, Line: 391, Col: 68}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `jobs.templ`, Line: 393, Col: 68}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var59))
 				if templ_7745c5c3_Err != nil {
@@ -1529,7 +1531,7 @@ func JobResults(d JobsData) templ.Component {
 					var templ_7745c5c3_Var60 string
 					templ_7745c5c3_Var60, templ_7745c5c3_Err = templ.JoinStringErrs(T(ctx, "jobs.blocked_badge"))
 					if templ_7745c5c3_Err != nil {
-						return templ.Error{Err: templ_7745c5c3_Err, FileName: `jobs.templ`, Line: 394, Col: 73}
+						return templ.Error{Err: templ_7745c5c3_Err, FileName: `jobs.templ`, Line: 396, Col: 73}
 					}
 					_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var60))
 					if templ_7745c5c3_Err != nil {
@@ -1568,7 +1570,7 @@ func JobResults(d JobsData) templ.Component {
 					var templ_7745c5c3_Var61 string
 					templ_7745c5c3_Var61, templ_7745c5c3_Err = templruntime.NewAttributeExpression(r.Company).Resolve(ctx)
 					if templ_7745c5c3_Err != nil {
-						return templ.Error{Err: templ_7745c5c3_Err, FileName: `jobs.templ`, Line: 402, Col: 63}
+						return templ.Error{Err: templ_7745c5c3_Err, FileName: `jobs.templ`, Line: 404, Col: 63}
 					}
 					_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var61)
 					if templ_7745c5c3_Err != nil {
@@ -1581,7 +1583,7 @@ func JobResults(d JobsData) templ.Component {
 					var templ_7745c5c3_Var62 string
 					templ_7745c5c3_Var62, templ_7745c5c3_Err = templ.JoinStringErrs(T(ctx, "jobs.unblock"))
 					if templ_7745c5c3_Err != nil {
-						return templ.Error{Err: templ_7745c5c3_Err, FileName: `jobs.templ`, Line: 403, Col: 73}
+						return templ.Error{Err: templ_7745c5c3_Err, FileName: `jobs.templ`, Line: 405, Col: 73}
 					}
 					_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var62))
 					if templ_7745c5c3_Err != nil {
@@ -1621,7 +1623,7 @@ func JobResults(d JobsData) templ.Component {
 					var templ_7745c5c3_Var63 string
 					templ_7745c5c3_Var63, templ_7745c5c3_Err = templruntime.NewAttributeExpression(r.Company).Resolve(ctx)
 					if templ_7745c5c3_Err != nil {
-						return templ.Error{Err: templ_7745c5c3_Err, FileName: `jobs.templ`, Line: 413, Col: 63}
+						return templ.Error{Err: templ_7745c5c3_Err, FileName: `jobs.templ`, Line: 415, Col: 63}
 					}
 					_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var63)
 					if templ_7745c5c3_Err != nil {
@@ -1634,7 +1636,7 @@ func JobResults(d JobsData) templ.Component {
 					var templ_7745c5c3_Var64 string
 					templ_7745c5c3_Var64, templ_7745c5c3_Err = templruntime.NewAttributeExpression(T(ctx, "jobs.block_company")).Resolve(ctx)
 					if templ_7745c5c3_Err != nil {
-						return templ.Error{Err: templ_7745c5c3_Err, FileName: `jobs.templ`, Line: 414, Col: 91}
+						return templ.Error{Err: templ_7745c5c3_Err, FileName: `jobs.templ`, Line: 416, Col: 91}
 					}
 					_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var64)
 					if templ_7745c5c3_Err != nil {
@@ -1647,7 +1649,7 @@ func JobResults(d JobsData) templ.Component {
 					var templ_7745c5c3_Var65 string
 					templ_7745c5c3_Var65, templ_7745c5c3_Err = templ.JoinStringErrs(T(ctx, "jobs.block_company"))
 					if templ_7745c5c3_Err != nil {
-						return templ.Error{Err: templ_7745c5c3_Err, FileName: `jobs.templ`, Line: 414, Col: 124}
+						return templ.Error{Err: templ_7745c5c3_Err, FileName: `jobs.templ`, Line: 416, Col: 124}
 					}
 					_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var65))
 					if templ_7745c5c3_Err != nil {
@@ -1687,7 +1689,7 @@ func JobResults(d JobsData) templ.Component {
 				var templ_7745c5c3_Var66 string
 				templ_7745c5c3_Var66, templ_7745c5c3_Err = templruntime.NewAttributeExpression(T(ctx, "jobs.pages")).Resolve(ctx)
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `jobs.templ`, Line: 425, Col: 56}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `jobs.templ`, Line: 427, Col: 56}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var66)
 				if templ_7745c5c3_Err != nil {
@@ -1709,7 +1711,7 @@ func JobResults(d JobsData) templ.Component {
 						var templ_7745c5c3_Var67 string
 						templ_7745c5c3_Var67, templ_7745c5c3_Err = templruntime.NewAttributeExpression(templ.SafeURL(d.PrevURL)).ResolveURL(ctx)
 						if templ_7745c5c3_Err != nil {
-							return templ.Error{Err: templ_7745c5c3_Err, FileName: `jobs.templ`, Line: 427, Col: 40}
+							return templ.Error{Err: templ_7745c5c3_Err, FileName: `jobs.templ`, Line: 429, Col: 40}
 						}
 						_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var67)
 						if templ_7745c5c3_Err != nil {
@@ -1740,7 +1742,7 @@ func JobResults(d JobsData) templ.Component {
 					var templ_7745c5c3_Var68 string
 					templ_7745c5c3_Var68, templ_7745c5c3_Err = templ.JoinStringErrs(T(ctx, "jobs.prev"))
 					if templ_7745c5c3_Err != nil {
-						return templ.Error{Err: templ_7745c5c3_Err, FileName: `jobs.templ`, Line: 427, Col: 107}
+						return templ.Error{Err: templ_7745c5c3_Err, FileName: `jobs.templ`, Line: 429, Col: 107}
 					}
 					_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var68))
 					if templ_7745c5c3_Err != nil {
@@ -1758,7 +1760,7 @@ func JobResults(d JobsData) templ.Component {
 				var templ_7745c5c3_Var69 string
 				templ_7745c5c3_Var69, templ_7745c5c3_Err = templ.JoinStringErrs(T(ctx, "jobs.page", "page", d.Page, "pages", d.Pages))
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `jobs.templ`, Line: 429, Col: 66}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `jobs.templ`, Line: 431, Col: 66}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var69))
 				if templ_7745c5c3_Err != nil {
@@ -1780,7 +1782,7 @@ func JobResults(d JobsData) templ.Component {
 						var templ_7745c5c3_Var70 string
 						templ_7745c5c3_Var70, templ_7745c5c3_Err = templruntime.NewAttributeExpression(templ.SafeURL(d.NextURL)).ResolveURL(ctx)
 						if templ_7745c5c3_Err != nil {
-							return templ.Error{Err: templ_7745c5c3_Err, FileName: `jobs.templ`, Line: 431, Col: 40}
+							return templ.Error{Err: templ_7745c5c3_Err, FileName: `jobs.templ`, Line: 433, Col: 40}
 						}
 						_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var70)
 						if templ_7745c5c3_Err != nil {
@@ -1811,7 +1813,7 @@ func JobResults(d JobsData) templ.Component {
 					var templ_7745c5c3_Var71 string
 					templ_7745c5c3_Var71, templ_7745c5c3_Err = templ.JoinStringErrs(T(ctx, "jobs.next"))
 					if templ_7745c5c3_Err != nil {
-						return templ.Error{Err: templ_7745c5c3_Err, FileName: `jobs.templ`, Line: 431, Col: 107}
+						return templ.Error{Err: templ_7745c5c3_Err, FileName: `jobs.templ`, Line: 433, Col: 107}
 					}
 					_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var71))
 					if templ_7745c5c3_Err != nil {
@@ -1860,7 +1862,7 @@ func FitInspector(d FitData) templ.Component {
 		var templ_7745c5c3_Var73 string
 		templ_7745c5c3_Var73, templ_7745c5c3_Err = templ.JoinStringErrs(T(ctx, "jobs.fit.title"))
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `jobs.templ`, Line: 442, Col: 33}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `jobs.templ`, Line: 444, Col: 33}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var73))
 		if templ_7745c5c3_Err != nil {
@@ -1913,7 +1915,7 @@ func FitInspector(d FitData) templ.Component {
 		var templ_7745c5c3_Var76 string
 		templ_7745c5c3_Var76, templ_7745c5c3_Err = templ.JoinStringErrs(T(ctx, "match.decision."+d.Decision))
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `jobs.templ`, Line: 444, Col: 44}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `jobs.templ`, Line: 446, Col: 44}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var76))
 		if templ_7745c5c3_Err != nil {
@@ -1926,7 +1928,7 @@ func FitInspector(d FitData) templ.Component {
 		var templ_7745c5c3_Var77 string
 		templ_7745c5c3_Var77, templ_7745c5c3_Err = templ.JoinStringErrs(T(ctx, "jobs.score", "score", d.Score))
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `jobs.templ`, Line: 444, Col: 88}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `jobs.templ`, Line: 446, Col: 88}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var77))
 		if templ_7745c5c3_Err != nil {
@@ -1949,7 +1951,7 @@ func FitInspector(d FitData) templ.Component {
 		var templ_7745c5c3_Var78 string
 		templ_7745c5c3_Var78, templ_7745c5c3_Err = templ.JoinStringErrs(T(ctx, "jobs.fit.matching_skills"))
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `jobs.templ`, Line: 451, Col: 43}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `jobs.templ`, Line: 453, Col: 43}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var78))
 		if templ_7745c5c3_Err != nil {
@@ -1967,7 +1969,7 @@ func FitInspector(d FitData) templ.Component {
 			var templ_7745c5c3_Var79 string
 			templ_7745c5c3_Var79, templ_7745c5c3_Err = templ.JoinStringErrs(T(ctx, "jobs.fit.no_matching_skills"))
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `jobs.templ`, Line: 453, Col: 60}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `jobs.templ`, Line: 455, Col: 60}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var79))
 			if templ_7745c5c3_Err != nil {
@@ -1990,7 +1992,7 @@ func FitInspector(d FitData) templ.Component {
 				var templ_7745c5c3_Var80 string
 				templ_7745c5c3_Var80, templ_7745c5c3_Err = templ.JoinStringErrs(s)
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `jobs.templ`, Line: 457, Col: 45}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `jobs.templ`, Line: 459, Col: 45}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var80))
 				if templ_7745c5c3_Err != nil {
@@ -2013,7 +2015,7 @@ func FitInspector(d FitData) templ.Component {
 		var templ_7745c5c3_Var81 string
 		templ_7745c5c3_Var81, templ_7745c5c3_Err = templ.JoinStringErrs(T(ctx, "jobs.fit.missing_skills"))
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `jobs.templ`, Line: 461, Col: 42}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `jobs.templ`, Line: 463, Col: 42}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var81))
 		if templ_7745c5c3_Err != nil {
@@ -2031,7 +2033,7 @@ func FitInspector(d FitData) templ.Component {
 			var templ_7745c5c3_Var82 string
 			templ_7745c5c3_Var82, templ_7745c5c3_Err = templ.JoinStringErrs(T(ctx, "jobs.fit.no_missing_skills"))
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `jobs.templ`, Line: 463, Col: 59}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `jobs.templ`, Line: 465, Col: 59}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var82))
 			if templ_7745c5c3_Err != nil {
@@ -2049,7 +2051,7 @@ func FitInspector(d FitData) templ.Component {
 			var templ_7745c5c3_Var83 string
 			templ_7745c5c3_Var83, templ_7745c5c3_Err = templ.JoinStringErrs(T(ctx, "jobs.fit.missing_skills_hint"))
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `jobs.templ`, Line: 465, Col: 69}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `jobs.templ`, Line: 467, Col: 69}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var83))
 			if templ_7745c5c3_Err != nil {
@@ -2067,7 +2069,7 @@ func FitInspector(d FitData) templ.Component {
 				var templ_7745c5c3_Var84 string
 				templ_7745c5c3_Var84, templ_7745c5c3_Err = templ.JoinStringErrs(s)
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `jobs.templ`, Line: 469, Col: 41}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `jobs.templ`, Line: 471, Col: 41}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var84))
 				if templ_7745c5c3_Err != nil {
@@ -2088,7 +2090,7 @@ func FitInspector(d FitData) templ.Component {
 					var templ_7745c5c3_Var85 string
 					templ_7745c5c3_Var85, templ_7745c5c3_Err = templruntime.NewAttributeExpression(templ.SafeURL("/jobs/" + i64(d.JobID) + "/skills")).ResolveURL(ctx)
 					if templ_7745c5c3_Err != nil {
-						return templ.Error{Err: templ_7745c5c3_Err, FileName: `jobs.templ`, Line: 472, Col: 67}
+						return templ.Error{Err: templ_7745c5c3_Err, FileName: `jobs.templ`, Line: 474, Col: 67}
 					}
 					_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var85)
 					if templ_7745c5c3_Err != nil {
@@ -2119,7 +2121,7 @@ func FitInspector(d FitData) templ.Component {
 				var templ_7745c5c3_Var86 string
 				templ_7745c5c3_Var86, templ_7745c5c3_Err = templruntime.NewAttributeExpression(s).Resolve(ctx)
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `jobs.templ`, Line: 476, Col: 51}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `jobs.templ`, Line: 478, Col: 51}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var86)
 				if templ_7745c5c3_Err != nil {
@@ -2132,7 +2134,7 @@ func FitInspector(d FitData) templ.Component {
 				var templ_7745c5c3_Var87 string
 				templ_7745c5c3_Var87, templ_7745c5c3_Err = templruntime.NewAttributeExpression(T(ctx, "jobs.fit.add_skill_hint", "skill", s)).Resolve(ctx)
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `jobs.templ`, Line: 477, Col: 105}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `jobs.templ`, Line: 479, Col: 105}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var87)
 				if templ_7745c5c3_Err != nil {
@@ -2145,7 +2147,7 @@ func FitInspector(d FitData) templ.Component {
 				var templ_7745c5c3_Var88 string
 				templ_7745c5c3_Var88, templ_7745c5c3_Err = templ.JoinStringErrs(T(ctx, "jobs.fit.add"))
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `jobs.templ`, Line: 478, Col: 35}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `jobs.templ`, Line: 480, Col: 35}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var88))
 				if templ_7745c5c3_Err != nil {
@@ -2168,7 +2170,7 @@ func FitInspector(d FitData) templ.Component {
 		var templ_7745c5c3_Var89 string
 		templ_7745c5c3_Var89, templ_7745c5c3_Err = templ.JoinStringErrs(T(ctx, "jobs.fit.breakdown_title"))
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `jobs.templ`, Line: 487, Col: 43}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `jobs.templ`, Line: 489, Col: 43}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var89))
 		if templ_7745c5c3_Err != nil {
@@ -2186,7 +2188,7 @@ func FitInspector(d FitData) templ.Component {
 			var templ_7745c5c3_Var90 string
 			templ_7745c5c3_Var90, templ_7745c5c3_Err = templ.JoinStringErrs(b.Label)
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `jobs.templ`, Line: 492, Col: 46}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `jobs.templ`, Line: 494, Col: 46}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var90))
 			if templ_7745c5c3_Err != nil {
@@ -2204,7 +2206,7 @@ func FitInspector(d FitData) templ.Component {
 				var templ_7745c5c3_Var91 string
 				templ_7745c5c3_Var91, templ_7745c5c3_Err = templ.JoinStringErrs(b.Detail)
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `jobs.templ`, Line: 494, Col: 63}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `jobs.templ`, Line: 496, Col: 63}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var91))
 				if templ_7745c5c3_Err != nil {
@@ -2223,7 +2225,7 @@ func FitInspector(d FitData) templ.Component {
 				var templ_7745c5c3_Var92 string
 				templ_7745c5c3_Var92, templ_7745c5c3_Err = templ.JoinStringErrs(itoa(b.Points))
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `jobs.templ`, Line: 500, Col: 25}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `jobs.templ`, Line: 502, Col: 25}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var92))
 				if templ_7745c5c3_Err != nil {
@@ -2236,7 +2238,7 @@ func FitInspector(d FitData) templ.Component {
 				var templ_7745c5c3_Var93 string
 				templ_7745c5c3_Var93, templ_7745c5c3_Err = templ.JoinStringErrs(itoa(b.Max))
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `jobs.templ`, Line: 500, Col: 43}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `jobs.templ`, Line: 502, Col: 43}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var93))
 				if templ_7745c5c3_Err != nil {
@@ -2246,7 +2248,7 @@ func FitInspector(d FitData) templ.Component {
 				var templ_7745c5c3_Var94 string
 				templ_7745c5c3_Var94, templ_7745c5c3_Err = templ.JoinStringErrs(points(b.Points))
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `jobs.templ`, Line: 502, Col: 27}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `jobs.templ`, Line: 504, Col: 27}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var94))
 				if templ_7745c5c3_Err != nil {
@@ -2265,7 +2267,7 @@ func FitInspector(d FitData) templ.Component {
 				var templ_7745c5c3_Var95 string
 				templ_7745c5c3_Var95, templ_7745c5c3_Err = templruntime.NewAttributeExpression(itoa(b.Points)).Resolve(ctx)
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `jobs.templ`, Line: 506, Col: 83}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `jobs.templ`, Line: 508, Col: 83}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var95)
 				if templ_7745c5c3_Err != nil {
@@ -2278,7 +2280,7 @@ func FitInspector(d FitData) templ.Component {
 				var templ_7745c5c3_Var96 string
 				templ_7745c5c3_Var96, templ_7745c5c3_Err = templruntime.NewAttributeExpression(itoa(b.Max)).Resolve(ctx)
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `jobs.templ`, Line: 506, Col: 131}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `jobs.templ`, Line: 508, Col: 131}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var96)
 				if templ_7745c5c3_Err != nil {
@@ -2291,7 +2293,7 @@ func FitInspector(d FitData) templ.Component {
 				var templ_7745c5c3_Var97 string
 				templ_7745c5c3_Var97, templ_7745c5c3_Err = templruntime.SanitizeStyleAttributeValues("width: " + itoa(min(100, max(0, (b.Points*100)/b.Max))) + "%")
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `jobs.templ`, Line: 507, Col: 106}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `jobs.templ`, Line: 509, Col: 106}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var97))
 				if templ_7745c5c3_Err != nil {
@@ -2339,7 +2341,7 @@ func CVVariantSwitcher(d CVVariantData) templ.Component {
 		var templ_7745c5c3_Var99 string
 		templ_7745c5c3_Var99, templ_7745c5c3_Err = templ.JoinStringErrs(T(ctx, "jobs.cv_switcher.title"))
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `jobs.templ`, Line: 520, Col: 40}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `jobs.templ`, Line: 522, Col: 40}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var99))
 		if templ_7745c5c3_Err != nil {
@@ -2352,7 +2354,7 @@ func CVVariantSwitcher(d CVVariantData) templ.Component {
 		var templ_7745c5c3_Var100 string
 		templ_7745c5c3_Var100, templ_7745c5c3_Err = templ.JoinStringErrs(T(ctx, "jobs.cv_switcher.hint"))
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `jobs.templ`, Line: 521, Col: 60}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `jobs.templ`, Line: 523, Col: 60}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var100))
 		if templ_7745c5c3_Err != nil {
@@ -2376,7 +2378,7 @@ func CVVariantSwitcher(d CVVariantData) templ.Component {
 			var templ_7745c5c3_Var101 string
 			templ_7745c5c3_Var101, templ_7745c5c3_Err = templ.JoinStringErrs(T(ctx, "jobs.cv_switcher.empty"))
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `jobs.templ`, Line: 526, Col: 54}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `jobs.templ`, Line: 528, Col: 54}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var101))
 			if templ_7745c5c3_Err != nil {
@@ -2398,7 +2400,7 @@ func CVVariantSwitcher(d CVVariantData) templ.Component {
 				var templ_7745c5c3_Var102 string
 				templ_7745c5c3_Var102, templ_7745c5c3_Err = templruntime.NewAttributeExpression(templ.SafeURL("/jobs/" + i64(d.JobID) + "/cv")).ResolveURL(ctx)
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `jobs.templ`, Line: 530, Col: 59}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `jobs.templ`, Line: 532, Col: 59}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var102)
 				if templ_7745c5c3_Err != nil {
@@ -2470,7 +2472,7 @@ func CVVariantSwitcher(d CVVariantData) templ.Component {
 				var templ_7745c5c3_Var105 string
 				templ_7745c5c3_Var105, templ_7745c5c3_Err = templruntime.NewAttributeExpression(v.ID).Resolve(ctx)
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `jobs.templ`, Line: 540, Col: 20}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `jobs.templ`, Line: 542, Col: 20}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var105)
 				if templ_7745c5c3_Err != nil {
@@ -2494,7 +2496,7 @@ func CVVariantSwitcher(d CVVariantData) templ.Component {
 					var templ_7745c5c3_Var106 string
 					templ_7745c5c3_Var106, templ_7745c5c3_Err = templ.JoinStringErrs(v.Label)
 					if templ_7745c5c3_Err != nil {
-						return templ.Error{Err: templ_7745c5c3_Err, FileName: `jobs.templ`, Line: 548, Col: 20}
+						return templ.Error{Err: templ_7745c5c3_Err, FileName: `jobs.templ`, Line: 550, Col: 20}
 					}
 					_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var106))
 					if templ_7745c5c3_Err != nil {
@@ -2504,7 +2506,7 @@ func CVVariantSwitcher(d CVVariantData) templ.Component {
 					var templ_7745c5c3_Var107 string
 					templ_7745c5c3_Var107, templ_7745c5c3_Err = templ.JoinStringErrs(v.Name)
 					if templ_7745c5c3_Err != nil {
-						return templ.Error{Err: templ_7745c5c3_Err, FileName: `jobs.templ`, Line: 550, Col: 19}
+						return templ.Error{Err: templ_7745c5c3_Err, FileName: `jobs.templ`, Line: 552, Col: 19}
 					}
 					_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var107))
 					if templ_7745c5c3_Err != nil {
@@ -2523,7 +2525,7 @@ func CVVariantSwitcher(d CVVariantData) templ.Component {
 					var templ_7745c5c3_Var108 string
 					templ_7745c5c3_Var108, templ_7745c5c3_Err = templ.JoinStringErrs(T(ctx, "jobs.cv_switcher.selected"))
 					if templ_7745c5c3_Err != nil {
-						return templ.Error{Err: templ_7745c5c3_Err, FileName: `jobs.templ`, Line: 555, Col: 83}
+						return templ.Error{Err: templ_7745c5c3_Err, FileName: `jobs.templ`, Line: 557, Col: 83}
 					}
 					_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var108))
 					if templ_7745c5c3_Err != nil {
@@ -2542,7 +2544,7 @@ func CVVariantSwitcher(d CVVariantData) templ.Component {
 					var templ_7745c5c3_Var109 string
 					templ_7745c5c3_Var109, templ_7745c5c3_Err = templ.JoinStringErrs(T(ctx, "jobs.cv_switcher.recommended"))
 					if templ_7745c5c3_Err != nil {
-						return templ.Error{Err: templ_7745c5c3_Err, FileName: `jobs.templ`, Line: 558, Col: 89}
+						return templ.Error{Err: templ_7745c5c3_Err, FileName: `jobs.templ`, Line: 560, Col: 89}
 					}
 					_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var109))
 					if templ_7745c5c3_Err != nil {
@@ -2561,7 +2563,7 @@ func CVVariantSwitcher(d CVVariantData) templ.Component {
 					var templ_7745c5c3_Var110 string
 					templ_7745c5c3_Var110, templ_7745c5c3_Err = templ.JoinStringErrs(strings.ToUpper(v.Language))
 					if templ_7745c5c3_Err != nil {
-						return templ.Error{Err: templ_7745c5c3_Err, FileName: `jobs.templ`, Line: 561, Col: 71}
+						return templ.Error{Err: templ_7745c5c3_Err, FileName: `jobs.templ`, Line: 563, Col: 71}
 					}
 					_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var110))
 					if templ_7745c5c3_Err != nil {
@@ -2584,7 +2586,7 @@ func CVVariantSwitcher(d CVVariantData) templ.Component {
 					var templ_7745c5c3_Var111 string
 					templ_7745c5c3_Var111, templ_7745c5c3_Err = templ.JoinStringErrs(v.Name)
 					if templ_7745c5c3_Err != nil {
-						return templ.Error{Err: templ_7745c5c3_Err, FileName: `jobs.templ`, Line: 567, Col: 52}
+						return templ.Error{Err: templ_7745c5c3_Err, FileName: `jobs.templ`, Line: 569, Col: 52}
 					}
 					_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var111))
 					if templ_7745c5c3_Err != nil {
@@ -2603,7 +2605,7 @@ func CVVariantSwitcher(d CVVariantData) templ.Component {
 					var templ_7745c5c3_Var112 string
 					templ_7745c5c3_Var112, templ_7745c5c3_Err = templ.JoinStringErrs(strings.Join(v.Focus, " · "))
 					if templ_7745c5c3_Err != nil {
-						return templ.Error{Err: templ_7745c5c3_Err, FileName: `jobs.templ`, Line: 570, Col: 72}
+						return templ.Error{Err: templ_7745c5c3_Err, FileName: `jobs.templ`, Line: 572, Col: 72}
 					}
 					_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var112))
 					if templ_7745c5c3_Err != nil {
@@ -2626,7 +2628,7 @@ func CVVariantSwitcher(d CVVariantData) templ.Component {
 			var templ_7745c5c3_Var113 string
 			templ_7745c5c3_Var113, templ_7745c5c3_Err = templ.JoinStringErrs(T(ctx, "jobs.cv_switcher.save"))
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `jobs.templ`, Line: 578, Col: 75}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `jobs.templ`, Line: 580, Col: 75}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var113))
 			if templ_7745c5c3_Err != nil {
@@ -2693,7 +2695,7 @@ func JobPage(d JobData) templ.Component {
 				var templ_7745c5c3_Var117 string
 				templ_7745c5c3_Var117, templ_7745c5c3_Err = templruntime.NewAttributeExpression(templ.SafeURL(d.Back)).ResolveURL(ctx)
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `jobs.templ`, Line: 588, Col: 37}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `jobs.templ`, Line: 590, Col: 37}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var117)
 				if templ_7745c5c3_Err != nil {
@@ -2706,7 +2708,7 @@ func JobPage(d JobData) templ.Component {
 				var templ_7745c5c3_Var118 string
 				templ_7745c5c3_Var118, templ_7745c5c3_Err = templ.JoinStringErrs(T(ctx, "jobs.back"))
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `jobs.templ`, Line: 588, Col: 61}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `jobs.templ`, Line: 590, Col: 61}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var118))
 				if templ_7745c5c3_Err != nil {
@@ -2732,7 +2734,7 @@ func JobPage(d JobData) templ.Component {
 					var templ_7745c5c3_Var119 string
 					templ_7745c5c3_Var119, templ_7745c5c3_Err = templ.JoinStringErrs(T(ctx, "jobs.blocked_badge"))
 					if templ_7745c5c3_Err != nil {
-						return templ.Error{Err: templ_7745c5c3_Err, FileName: `jobs.templ`, Line: 592, Col: 69}
+						return templ.Error{Err: templ_7745c5c3_Err, FileName: `jobs.templ`, Line: 594, Col: 69}
 					}
 					_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var119))
 					if templ_7745c5c3_Err != nil {
@@ -2745,7 +2747,7 @@ func JobPage(d JobData) templ.Component {
 					var templ_7745c5c3_Var120 string
 					templ_7745c5c3_Var120, templ_7745c5c3_Err = templruntime.NewAttributeExpression(d.Row.Company).Resolve(ctx)
 					if templ_7745c5c3_Err != nil {
-						return templ.Error{Err: templ_7745c5c3_Err, FileName: `jobs.templ`, Line: 595, Col: 63}
+						return templ.Error{Err: templ_7745c5c3_Err, FileName: `jobs.templ`, Line: 597, Col: 63}
 					}
 					_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var120)
 					if templ_7745c5c3_Err != nil {
@@ -2758,7 +2760,7 @@ func JobPage(d JobData) templ.Component {
 					var templ_7745c5c3_Var121 string
 					templ_7745c5c3_Var121, templ_7745c5c3_Err = templ.JoinStringErrs(T(ctx, "jobs.unblock"))
 					if templ_7745c5c3_Err != nil {
-						return templ.Error{Err: templ_7745c5c3_Err, FileName: `jobs.templ`, Line: 596, Col: 69}
+						return templ.Error{Err: templ_7745c5c3_Err, FileName: `jobs.templ`, Line: 598, Col: 69}
 					}
 					_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var121))
 					if templ_7745c5c3_Err != nil {
@@ -2776,7 +2778,7 @@ func JobPage(d JobData) templ.Component {
 					var templ_7745c5c3_Var122 string
 					templ_7745c5c3_Var122, templ_7745c5c3_Err = templruntime.NewAttributeExpression(d.Row.Company).Resolve(ctx)
 					if templ_7745c5c3_Err != nil {
-						return templ.Error{Err: templ_7745c5c3_Err, FileName: `jobs.templ`, Line: 601, Col: 63}
+						return templ.Error{Err: templ_7745c5c3_Err, FileName: `jobs.templ`, Line: 603, Col: 63}
 					}
 					_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var122)
 					if templ_7745c5c3_Err != nil {
@@ -2789,7 +2791,7 @@ func JobPage(d JobData) templ.Component {
 					var templ_7745c5c3_Var123 string
 					templ_7745c5c3_Var123, templ_7745c5c3_Err = templ.JoinStringErrs(T(ctx, "jobs.block_company"))
 					if templ_7745c5c3_Err != nil {
-						return templ.Error{Err: templ_7745c5c3_Err, FileName: `jobs.templ`, Line: 602, Col: 81}
+						return templ.Error{Err: templ_7745c5c3_Err, FileName: `jobs.templ`, Line: 604, Col: 81}
 					}
 					_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var123))
 					if templ_7745c5c3_Err != nil {
@@ -2810,75 +2812,180 @@ func JobPage(d JobData) templ.Component {
 						return templ_7745c5c3_Err
 					}
 				}
-				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 217, " <p>")
+				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 217, " ")
 				if templ_7745c5c3_Err != nil {
 					return templ_7745c5c3_Err
 				}
-				if d.URL != "" {
-					templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 218, "<a href=\"")
+				if d.Notice != "" {
+					templ_7745c5c3_Err = Notice("success", d.Notice).Render(ctx, templ_7745c5c3_Buffer)
 					if templ_7745c5c3_Err != nil {
 						return templ_7745c5c3_Err
 					}
-					var templ_7745c5c3_Var124 string
-					templ_7745c5c3_Var124, templ_7745c5c3_Err = templruntime.NewAttributeExpression(templ.SafeURL(d.URL)).ResolveURL(ctx)
-					if templ_7745c5c3_Err != nil {
-						return templ.Error{Err: templ_7745c5c3_Err, FileName: `jobs.templ`, Line: 611, Col: 35}
-					}
-					_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var124)
-					if templ_7745c5c3_Err != nil {
-						return templ_7745c5c3_Err
-					}
-					templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 219, "\" rel=\"noopener noreferrer external\">")
+				}
+				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 218, " <div class=\"job-pipeline-actions\"><form method=\"post\" action=\"")
+				if templ_7745c5c3_Err != nil {
+					return templ_7745c5c3_Err
+				}
+				var templ_7745c5c3_Var124 string
+				templ_7745c5c3_Var124, templ_7745c5c3_Err = templruntime.NewAttributeExpression(templ.SafeURL("/jobs/" + i64(d.Row.ID) + "/bookmark")).ResolveURL(ctx)
+				if templ_7745c5c3_Err != nil {
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `jobs.templ`, Line: 615, Col: 86}
+				}
+				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var124)
+				if templ_7745c5c3_Err != nil {
+					return templ_7745c5c3_Err
+				}
+				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 219, "\" style=\"display:inline\"><button type=\"submit\" class=\"btn-sm secondary\">")
+				if templ_7745c5c3_Err != nil {
+					return templ_7745c5c3_Err
+				}
+				if d.ApplicationState != "" {
+					templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 220, "★ ")
 					if templ_7745c5c3_Err != nil {
 						return templ_7745c5c3_Err
 					}
 					var templ_7745c5c3_Var125 string
-					templ_7745c5c3_Var125, templ_7745c5c3_Err = templ.JoinStringErrs(T(ctx, "jobs.open_posting"))
+					templ_7745c5c3_Var125, templ_7745c5c3_Err = templ.JoinStringErrs(T(ctx, "jobs.saved_to_tracker"))
 					if templ_7745c5c3_Err != nil {
-						return templ.Error{Err: templ_7745c5c3_Err, FileName: `jobs.templ`, Line: 611, Col: 102}
+						return templ.Error{Err: templ_7745c5c3_Err, FileName: `jobs.templ`, Line: 618, Col: 44}
 					}
 					_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var125))
 					if templ_7745c5c3_Err != nil {
 						return templ_7745c5c3_Err
 					}
-					templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 220, "</a> ")
+				} else {
+					templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 221, "☆ ")
+					if templ_7745c5c3_Err != nil {
+						return templ_7745c5c3_Err
+					}
+					var templ_7745c5c3_Var126 string
+					templ_7745c5c3_Var126, templ_7745c5c3_Err = templ.JoinStringErrs(T(ctx, "jobs.bookmark"))
+					if templ_7745c5c3_Err != nil {
+						return templ.Error{Err: templ_7745c5c3_Err, FileName: `jobs.templ`, Line: 620, Col: 36}
+					}
+					_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var126))
+					if templ_7745c5c3_Err != nil {
+						return templ_7745c5c3_Err
+					}
+				}
+				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 222, "</button></form><form method=\"post\" action=\"")
+				if templ_7745c5c3_Err != nil {
+					return templ_7745c5c3_Err
+				}
+				var templ_7745c5c3_Var127 string
+				templ_7745c5c3_Var127, templ_7745c5c3_Err = templruntime.NewAttributeExpression(templ.SafeURL("/jobs/" + i64(d.Row.ID) + "/apply-external")).ResolveURL(ctx)
+				if templ_7745c5c3_Err != nil {
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `jobs.templ`, Line: 624, Col: 92}
+				}
+				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var127)
+				if templ_7745c5c3_Err != nil {
+					return templ_7745c5c3_Err
+				}
+				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 223, "\" style=\"display:inline\"><button type=\"submit\" class=\"btn-sm\">")
+				if templ_7745c5c3_Err != nil {
+					return templ_7745c5c3_Err
+				}
+				var templ_7745c5c3_Var128 string
+				templ_7745c5c3_Var128, templ_7745c5c3_Err = templ.JoinStringErrs(T(ctx, "jobs.apply_external"))
+				if templ_7745c5c3_Err != nil {
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `jobs.templ`, Line: 626, Col: 37}
+				}
+				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var128))
+				if templ_7745c5c3_Err != nil {
+					return templ_7745c5c3_Err
+				}
+				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 224, "</button></form>")
+				if templ_7745c5c3_Err != nil {
+					return templ_7745c5c3_Err
+				}
+				if d.ApplicationState != "" {
+					templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 225, "<a href=\"/tracker\" class=\"button secondary btn-sm\">")
+					if templ_7745c5c3_Err != nil {
+						return templ_7745c5c3_Err
+					}
+					var templ_7745c5c3_Var129 string
+					templ_7745c5c3_Var129, templ_7745c5c3_Err = templ.JoinStringErrs(T(ctx, "jobs.view_in_tracker"))
+					if templ_7745c5c3_Err != nil {
+						return templ.Error{Err: templ_7745c5c3_Err, FileName: `jobs.templ`, Line: 631, Col: 38}
+					}
+					_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var129))
+					if templ_7745c5c3_Err != nil {
+						return templ_7745c5c3_Err
+					}
+					templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 226, "</a>")
+					if templ_7745c5c3_Err != nil {
+						return templ_7745c5c3_Err
+					}
+				}
+				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 227, "</div><p>")
+				if templ_7745c5c3_Err != nil {
+					return templ_7745c5c3_Err
+				}
+				if d.URL != "" {
+					templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 228, "<a href=\"")
+					if templ_7745c5c3_Err != nil {
+						return templ_7745c5c3_Err
+					}
+					var templ_7745c5c3_Var130 string
+					templ_7745c5c3_Var130, templ_7745c5c3_Err = templruntime.NewAttributeExpression(templ.SafeURL(d.URL)).ResolveURL(ctx)
+					if templ_7745c5c3_Err != nil {
+						return templ.Error{Err: templ_7745c5c3_Err, FileName: `jobs.templ`, Line: 637, Col: 35}
+					}
+					_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var130)
+					if templ_7745c5c3_Err != nil {
+						return templ_7745c5c3_Err
+					}
+					templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 229, "\" rel=\"noopener noreferrer external\">")
+					if templ_7745c5c3_Err != nil {
+						return templ_7745c5c3_Err
+					}
+					var templ_7745c5c3_Var131 string
+					templ_7745c5c3_Var131, templ_7745c5c3_Err = templ.JoinStringErrs(T(ctx, "jobs.open_posting"))
+					if templ_7745c5c3_Err != nil {
+						return templ.Error{Err: templ_7745c5c3_Err, FileName: `jobs.templ`, Line: 637, Col: 102}
+					}
+					_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var131))
+					if templ_7745c5c3_Err != nil {
+						return templ_7745c5c3_Err
+					}
+					templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 230, "</a> ")
 					if templ_7745c5c3_Err != nil {
 						return templ_7745c5c3_Err
 					}
 				}
 				if d.ApplyURL != "" && d.ApplyURL != d.URL {
-					templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 221, "· <a href=\"")
+					templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 231, "· <a href=\"")
 					if templ_7745c5c3_Err != nil {
 						return templ_7745c5c3_Err
 					}
-					var templ_7745c5c3_Var126 string
-					templ_7745c5c3_Var126, templ_7745c5c3_Err = templruntime.NewAttributeExpression(templ.SafeURL(d.ApplyURL)).ResolveURL(ctx)
+					var templ_7745c5c3_Var132 string
+					templ_7745c5c3_Var132, templ_7745c5c3_Err = templruntime.NewAttributeExpression(templ.SafeURL(d.ApplyURL)).ResolveURL(ctx)
 					if templ_7745c5c3_Err != nil {
-						return templ.Error{Err: templ_7745c5c3_Err, FileName: `jobs.templ`, Line: 614, Col: 43}
+						return templ.Error{Err: templ_7745c5c3_Err, FileName: `jobs.templ`, Line: 640, Col: 43}
 					}
-					_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var126)
-					if templ_7745c5c3_Err != nil {
-						return templ_7745c5c3_Err
-					}
-					templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 222, "\" rel=\"noopener noreferrer external\">")
+					_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var132)
 					if templ_7745c5c3_Err != nil {
 						return templ_7745c5c3_Err
 					}
-					var templ_7745c5c3_Var127 string
-					templ_7745c5c3_Var127, templ_7745c5c3_Err = templ.JoinStringErrs(T(ctx, "jobs.apply_link"))
-					if templ_7745c5c3_Err != nil {
-						return templ.Error{Err: templ_7745c5c3_Err, FileName: `jobs.templ`, Line: 614, Col: 108}
-					}
-					_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var127))
+					templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 232, "\" rel=\"noopener noreferrer external\">")
 					if templ_7745c5c3_Err != nil {
 						return templ_7745c5c3_Err
 					}
-					templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 223, "</a>")
+					var templ_7745c5c3_Var133 string
+					templ_7745c5c3_Var133, templ_7745c5c3_Err = templ.JoinStringErrs(T(ctx, "jobs.apply_link"))
+					if templ_7745c5c3_Err != nil {
+						return templ.Error{Err: templ_7745c5c3_Err, FileName: `jobs.templ`, Line: 640, Col: 108}
+					}
+					_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var133))
+					if templ_7745c5c3_Err != nil {
+						return templ_7745c5c3_Err
+					}
+					templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 233, "</a>")
 					if templ_7745c5c3_Err != nil {
 						return templ_7745c5c3_Err
 					}
 				}
-				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 224, "</p>")
+				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 234, "</p>")
 				if templ_7745c5c3_Err != nil {
 					return templ_7745c5c3_Err
 				}
@@ -2890,20 +2997,20 @@ func JobPage(d JobData) templ.Component {
 				if templ_7745c5c3_Err != nil {
 					return templ_7745c5c3_Err
 				}
-				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 225, "<h2>")
+				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 235, "<h2>")
 				if templ_7745c5c3_Err != nil {
 					return templ_7745c5c3_Err
 				}
-				var templ_7745c5c3_Var128 string
-				templ_7745c5c3_Var128, templ_7745c5c3_Err = templ.JoinStringErrs(T(ctx, "jobs.reasons"))
+				var templ_7745c5c3_Var134 string
+				templ_7745c5c3_Var134, templ_7745c5c3_Err = templ.JoinStringErrs(T(ctx, "jobs.reasons"))
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `jobs.templ`, Line: 619, Col: 31}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `jobs.templ`, Line: 645, Col: 31}
 				}
-				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var128))
+				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var134))
 				if templ_7745c5c3_Err != nil {
 					return templ_7745c5c3_Err
 				}
-				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 226, "</h2><p>")
+				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 236, "</h2><p>")
 				if templ_7745c5c3_Err != nil {
 					return templ_7745c5c3_Err
 				}
@@ -2911,111 +3018,111 @@ func JobPage(d JobData) templ.Component {
 				if templ_7745c5c3_Err != nil {
 					return templ_7745c5c3_Err
 				}
-				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 227, "</p><ul class=\"reasons\">")
+				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 237, "</p><ul class=\"reasons\">")
 				if templ_7745c5c3_Err != nil {
 					return templ_7745c5c3_Err
 				}
 				for _, r := range d.Reasons {
-					templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 228, "<li>")
+					templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 238, "<li>")
 					if templ_7745c5c3_Err != nil {
 						return templ_7745c5c3_Err
 					}
 					if r.Hard {
-						templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 229, "<strong>")
+						templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 239, "<strong>")
 						if templ_7745c5c3_Err != nil {
 							return templ_7745c5c3_Err
 						}
-						var templ_7745c5c3_Var129 string
-						templ_7745c5c3_Var129, templ_7745c5c3_Err = templ.JoinStringErrs(T(ctx, "jobs.reason_filter"))
+						var templ_7745c5c3_Var135 string
+						templ_7745c5c3_Var135, templ_7745c5c3_Err = templ.JoinStringErrs(T(ctx, "jobs.reason_filter"))
 						if templ_7745c5c3_Err != nil {
-							return templ.Error{Err: templ_7745c5c3_Err, FileName: `jobs.templ`, Line: 625, Col: 45}
+							return templ.Error{Err: templ_7745c5c3_Err, FileName: `jobs.templ`, Line: 651, Col: 45}
 						}
-						_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var129))
+						_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var135))
 						if templ_7745c5c3_Err != nil {
 							return templ_7745c5c3_Err
 						}
-						templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 230, ":</strong> ")
+						templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 240, ":</strong> ")
 						if templ_7745c5c3_Err != nil {
 							return templ_7745c5c3_Err
 						}
 					} else {
-						templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 231, "<span class=\"points\">")
+						templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 241, "<span class=\"points\">")
 						if templ_7745c5c3_Err != nil {
 							return templ_7745c5c3_Err
 						}
-						var templ_7745c5c3_Var130 string
-						templ_7745c5c3_Var130, templ_7745c5c3_Err = templ.JoinStringErrs(points(r.Points))
+						var templ_7745c5c3_Var136 string
+						templ_7745c5c3_Var136, templ_7745c5c3_Err = templ.JoinStringErrs(points(r.Points))
 						if templ_7745c5c3_Err != nil {
-							return templ.Error{Err: templ_7745c5c3_Err, FileName: `jobs.templ`, Line: 627, Col: 46}
+							return templ.Error{Err: templ_7745c5c3_Err, FileName: `jobs.templ`, Line: 653, Col: 46}
 						}
-						_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var130))
+						_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var136))
 						if templ_7745c5c3_Err != nil {
 							return templ_7745c5c3_Err
 						}
-						templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 232, "</span> ")
+						templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 242, "</span> ")
 						if templ_7745c5c3_Err != nil {
 							return templ_7745c5c3_Err
 						}
 					}
-					var templ_7745c5c3_Var131 string
-					templ_7745c5c3_Var131, templ_7745c5c3_Err = templ.JoinStringErrs(r.Text)
+					var templ_7745c5c3_Var137 string
+					templ_7745c5c3_Var137, templ_7745c5c3_Err = templ.JoinStringErrs(r.Text)
 					if templ_7745c5c3_Err != nil {
-						return templ.Error{Err: templ_7745c5c3_Err, FileName: `jobs.templ`, Line: 629, Col: 14}
+						return templ.Error{Err: templ_7745c5c3_Err, FileName: `jobs.templ`, Line: 655, Col: 14}
 					}
-					_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var131))
-					if templ_7745c5c3_Err != nil {
-						return templ_7745c5c3_Err
-					}
-					templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 233, "</li>")
+					_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var137))
 					if templ_7745c5c3_Err != nil {
 						return templ_7745c5c3_Err
 					}
+					templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 243, "</li>")
+					if templ_7745c5c3_Err != nil {
+						return templ_7745c5c3_Err
+					}
 				}
-				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 234, "</ul><p class=\"muted\">")
+				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 244, "</ul><p class=\"muted\">")
 				if templ_7745c5c3_Err != nil {
 					return templ_7745c5c3_Err
 				}
-				var templ_7745c5c3_Var132 string
-				templ_7745c5c3_Var132, templ_7745c5c3_Err = templ.JoinStringErrs(T(ctx, "jobs.computed", "when", d.Computed))
+				var templ_7745c5c3_Var138 string
+				templ_7745c5c3_Var138, templ_7745c5c3_Err = templ.JoinStringErrs(T(ctx, "jobs.computed", "when", d.Computed))
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `jobs.templ`, Line: 633, Col: 65}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `jobs.templ`, Line: 659, Col: 65}
 				}
-				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var132))
+				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var138))
 				if templ_7745c5c3_Err != nil {
 					return templ_7745c5c3_Err
 				}
-				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 235, "</p>")
+				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 245, "</p>")
 				if templ_7745c5c3_Err != nil {
 					return templ_7745c5c3_Err
 				}
 				if d.Description != "" {
-					templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 236, "<h2>")
+					templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 246, "<h2>")
 					if templ_7745c5c3_Err != nil {
 						return templ_7745c5c3_Err
 					}
-					var templ_7745c5c3_Var133 string
-					templ_7745c5c3_Var133, templ_7745c5c3_Err = templ.JoinStringErrs(T(ctx, "jobs.description"))
+					var templ_7745c5c3_Var139 string
+					templ_7745c5c3_Var139, templ_7745c5c3_Err = templ.JoinStringErrs(T(ctx, "jobs.description"))
 					if templ_7745c5c3_Err != nil {
-						return templ.Error{Err: templ_7745c5c3_Err, FileName: `jobs.templ`, Line: 635, Col: 36}
+						return templ.Error{Err: templ_7745c5c3_Err, FileName: `jobs.templ`, Line: 661, Col: 36}
 					}
-					_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var133))
-					if templ_7745c5c3_Err != nil {
-						return templ_7745c5c3_Err
-					}
-					templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 237, "</h2><div class=\"description\">")
+					_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var139))
 					if templ_7745c5c3_Err != nil {
 						return templ_7745c5c3_Err
 					}
-					var templ_7745c5c3_Var134 string
-					templ_7745c5c3_Var134, templ_7745c5c3_Err = templ.JoinStringErrs(d.Description)
-					if templ_7745c5c3_Err != nil {
-						return templ.Error{Err: templ_7745c5c3_Err, FileName: `jobs.templ`, Line: 636, Col: 44}
-					}
-					_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var134))
+					templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 247, "</h2><div class=\"description\">")
 					if templ_7745c5c3_Err != nil {
 						return templ_7745c5c3_Err
 					}
-					templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 238, "</div>")
+					var templ_7745c5c3_Var140 string
+					templ_7745c5c3_Var140, templ_7745c5c3_Err = templ.JoinStringErrs(d.Description)
+					if templ_7745c5c3_Err != nil {
+						return templ.Error{Err: templ_7745c5c3_Err, FileName: `jobs.templ`, Line: 662, Col: 44}
+					}
+					_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var140))
+					if templ_7745c5c3_Err != nil {
+						return templ_7745c5c3_Err
+					}
+					templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 248, "</div>")
 					if templ_7745c5c3_Err != nil {
 						return templ_7745c5c3_Err
 					}

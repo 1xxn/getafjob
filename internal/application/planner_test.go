@@ -202,6 +202,26 @@ func (f *fakePlannerStore) UserScreenshots(_ context.Context, _ uuid.UUID) ([]st
 	return nil, nil
 }
 
+func (f *fakePlannerStore) GetNotes(_ context.Context, _, appID uuid.UUID) (application.NoteData, error) {
+	return application.NoteData{ApplicationID: appID}, nil
+}
+
+func (f *fakePlannerStore) SaveNotes(_ context.Context, _, _ uuid.UUID, _, _ string, _, _ *time.Time, _ time.Time) error {
+	return nil
+}
+
+func (f *fakePlannerStore) PipelineApplications(_ context.Context, _ uuid.UUID) ([]application.PipelineApplication, error) {
+	return nil, nil
+}
+
+func (f *fakePlannerStore) BookmarkJob(_ context.Context, _ uuid.UUID, _ int64, _ time.Time) (uuid.UUID, error) {
+	return uuid.New(), nil
+}
+
+func (f *fakePlannerStore) MarkExternalApplied(_ context.Context, _ uuid.UUID, _ int64, _ time.Time) (uuid.UUID, error) {
+	return uuid.New(), nil
+}
+
 func TestPlanner(t *testing.T) {
 	u1 := uuid.New()
 	u2 := uuid.New()

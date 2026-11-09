@@ -50,6 +50,18 @@ type ApplicationEvent struct {
 	At            time.Time
 }
 
+type ApplicationNote struct {
+	ID              uuid.UUID
+	UserID          uuid.UUID
+	ApplicationID   uuid.UUID
+	Notes           string
+	SalaryDiscussed string
+	InterviewAt     *time.Time
+	FollowUpAt      *time.Time
+	CreatedAt       time.Time
+	UpdatedAt       time.Time
+}
+
 type AssistPairing struct {
 	ID        uuid.UUID
 	UserID    uuid.UUID

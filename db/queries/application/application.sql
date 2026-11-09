@@ -150,3 +150,46 @@ ORDER BY a.created_at DESC;
 -- name: UserRunScreenshots :many
 SELECT DISTINCT screenshot FROM run_checkpoints
 WHERE user_id = $1 AND screenshot <> '';
+
+-- name: GetNotes :one
+SELECT id, user_id, application_id, notes, salary_discussed, interview_at, follow_up_at, created_at, updated_at
+FROM application_notes
+WHERE application_id = $1 AND user_id = $2;
+
+-- name: UpsertNotes :one
+INSERT INTO application_notes (id, user_id, application_id, notes, salary_discussed, interview_at, follow_up_at, created_at, updated_at)
+VALUES (uuidv7(), $1, $2, $3, $4, sqlc.narg(interview_at)::timestamptz, sqlc.narg(follow_up_at)::timestamptz, sqlc.arg(now)::timestamptz, sqlc.arg(now)::timestamptz)
+ON CONFLICT (application_id) DO UPDATE SET
+  notes = EXCLUDED.notes,
+  salary_discussed = EXCLUDED.salary_discussed,
+  interview_at = EXCLUDED.interview_at,
+  follow_up_at = EXCLUDED.follow_up_at,
+  updated_at = EXCLUDED.updated_at
+RETURNING id;
+
+-- name: UserApplicationsWithPipeline :many
+SELECT a.id, a.job_id, a.state, a.version, a.created_at, a.updated_at,
+       a.approval_asked_at, a.approval_reasons, a.approved_at, a.cv_document_id,
+       j.company, j.title, j.location, j.workplace, j.url, j.apply_url,
+       COALESCE(m.score, 0)::integer AS score,
+       COALESCE(n.notes, '')::text AS notes,
+       COALESCE(n.salary_discussed, '')::text AS salary_discussed,
+       n.interview_at, n.follow_up_at
+FROM applications a
+JOIN jobs j ON j.id = a.job_id
+LEFT JOIN matches m ON m.job_id = a.job_id AND m.user_id = a.user_id
+LEFT JOIN application_notes n ON n.application_id = a.id AND n.user_id = a.user_id
+WHERE a.user_id = $1
+ORDER BY a.updated_at DESC;
+
+-- name: SaveBookmark :one
+INSERT INTO applications (user_id, job_id, state, created_at, updated_at)
+VALUES ($1, $2, 'matched', sqlc.arg(now)::timestamptz, sqlc.arg(now)::timestamptz)
+ON CONFLICT (user_id, job_id) DO UPDATE SET updated_at = EXCLUDED.updated_at
+RETURNING id, state;
+
+-- name: SetExternalSubmit :one
+INSERT INTO applications (user_id, job_id, state, created_at, updated_at)
+VALUES ($1, $2, 'submitted', sqlc.arg(now)::timestamptz, sqlc.arg(now)::timestamptz)
+ON CONFLICT (user_id, job_id) DO UPDATE SET state = 'submitted', updated_at = EXCLUDED.updated_at
+RETURNING id, state;
