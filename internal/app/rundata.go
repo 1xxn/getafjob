@@ -21,6 +21,10 @@ type jobReader interface {
 	Job(ctx context.Context, id int64) (application.Job, error)
 }
 
+type appReader interface {
+	ByJob(ctx context.Context, userID uuid.UUID, jobID int64) (application.App, error)
+}
+
 type portalProvider interface {
 	CanApply(ctx context.Context, userID uuid.UUID, portal string) (bool, string, error)
 	GetDecryptedCookies(ctx context.Context, userID uuid.UUID, portal string) ([]byte, error)
@@ -34,6 +38,7 @@ type runData struct {
 	docs     *profile.Documents
 	stations *profile.Stations
 	jobs     jobReader
+	apps     appReader
 	portals  portalProvider
 	now      func() time.Time
 }
@@ -120,9 +125,25 @@ func (d runData) RunData(ctx context.Context, userID uuid.UUID, jobID int64) (*r
 			run.Texts = append(run.Texts, &runnerv1.Text{Id: t.ID.String(), Name: t.Name, Language: t.Language, Body: text})
 		}
 	}
-	if cv, ok := profile.ChooseCV(docs, lang, job.Title, job.Description); ok {
-		run.CvDocumentId = cv.ID.String()
-		run.Documents = append(run.Documents, document(cv))
+	var selectedCV profile.Document
+	var cvFound bool
+	if d.apps != nil {
+		if app, err := d.apps.ByJob(ctx, userID, jobID); err == nil && app.CvDocumentID != nil {
+			for _, d := range docs {
+				if d.ID == *app.CvDocumentID && d.Kind == profile.KindCV {
+					selectedCV = d
+					cvFound = true
+					break
+				}
+			}
+		}
+	}
+	if !cvFound {
+		selectedCV, cvFound = profile.ChooseCV(docs, lang, job.Title, job.Description)
+	}
+	if cvFound {
+		run.CvDocumentId = selectedCV.ID.String()
+		run.Documents = append(run.Documents, document(selectedCV))
 	}
 	for _, doc := range docs {
 		if doc.Kind == profile.KindCertificate {

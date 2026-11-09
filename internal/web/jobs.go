@@ -11,9 +11,12 @@ import (
 	"strings"
 	"time"
 
+	"github.com/google/uuid"
+
 	"github.com/1xxn/getafjob/internal/discovery/urlimport"
 	"github.com/1xxn/getafjob/internal/identity"
 	"github.com/1xxn/getafjob/internal/matching"
+	"github.com/1xxn/getafjob/internal/profile"
 	"github.com/1xxn/getafjob/internal/web/views"
 )
 
@@ -222,7 +225,296 @@ func (s *Server) jobPage(w http.ResponseWriter, r *http.Request, u *identity.Use
 	for _, rs := range j.Reasons {
 		d.Reasons = append(d.Reasons, views.Reason{Text: reasonText(r.Context(), rs), Points: rs.Points, Hard: rs.Hard})
 	}
+	var snap profile.Snapshot
+	if s.Profile != nil {
+		snap, _ = s.Profile.Get(r.Context(), u.ID)
+	}
+	c := criteriaFromSnapshot(snap)
+	mj := matchingJob(j)
+	inspection := matching.InspectFit(c, mj, time.Now())
+	d.Fit = buildFitData(r.Context(), j.JobID, inspection, "")
+	d.CV = s.buildCVVariantData(r.Context(), u.ID, j, "")
 	s.render(w, r, http.StatusOK, views.JobPage(d))
+}
+
+func (s *Server) addJobSkill(w http.ResponseWriter, r *http.Request, u *identity.User) {
+	if u == nil {
+		http.Redirect(w, r, "/login", http.StatusSeeOther)
+		return
+	}
+	id, err := strconv.ParseInt(r.PathValue("id"), 10, 64)
+	if err != nil || id <= 0 {
+		s.notFound(w, r, u)
+		return
+	}
+	if err := r.ParseForm(); err != nil {
+		http.Error(w, "bad request", http.StatusBadRequest)
+		return
+	}
+	skill := strings.TrimSpace(r.PostFormValue("skill"))
+	if skill == "" || len(skill) > 100 {
+		http.Error(w, "invalid skill", http.StatusBadRequest)
+		return
+	}
+
+	if s.Profile != nil {
+		for attempts := 0; attempts < 3; attempts++ {
+			snap, err := s.Profile.Get(r.Context(), u.ID)
+			if err != nil {
+				s.failed(w, r, u, err)
+				return
+			}
+			exists := false
+			for _, sk := range snap.Profile.Skills {
+				if strings.EqualFold(sk, skill) {
+					exists = true
+					break
+				}
+			}
+			if !exists {
+				snap.Profile.Skills = append(snap.Profile.Skills, skill)
+				err = s.Profile.SaveProfile(r.Context(), u.ID, snap.Profile, snap.Version)
+				if errors.Is(err, profile.ErrConflict) {
+					continue
+				}
+				if err != nil {
+					s.failed(w, r, u, err)
+					return
+				}
+			}
+			break
+		}
+	}
+
+	if partial(r) {
+		j, err := s.Jobs.Detail(r.Context(), u.ID, id)
+		if err != nil {
+			s.failed(w, r, u, err)
+			return
+		}
+		var snap profile.Snapshot
+		if s.Profile != nil {
+			snap, _ = s.Profile.Get(r.Context(), u.ID)
+		}
+		c := criteriaFromSnapshot(snap)
+		mj := matchingJob(j)
+		inspection := matching.InspectFit(c, mj, time.Now())
+		d := buildFitData(r.Context(), id, inspection, skill)
+		s.render(w, r, http.StatusOK, views.FitInspector(d))
+		return
+	}
+	http.Redirect(w, r, fmt.Sprintf("/jobs/%d", id), http.StatusSeeOther)
+}
+
+func (s *Server) setJobCV(w http.ResponseWriter, r *http.Request, u *identity.User) {
+	if u == nil {
+		http.Redirect(w, r, "/login", http.StatusSeeOther)
+		return
+	}
+	id, err := strconv.ParseInt(r.PathValue("id"), 10, 64)
+	if err != nil || id <= 0 {
+		s.notFound(w, r, u)
+		return
+	}
+	if err := r.ParseForm(); err != nil {
+		http.Error(w, "bad request", http.StatusBadRequest)
+		return
+	}
+	cvIDStr := strings.TrimSpace(r.PostFormValue("cv_id"))
+	var cvDocID *uuid.UUID
+	if cvIDStr != "" {
+		parsed, err := uuid.Parse(cvIDStr)
+		if err != nil {
+			http.Error(w, "invalid cv id", http.StatusBadRequest)
+			return
+		}
+		cvDocID = &parsed
+	}
+
+	if s.Apps != nil {
+		if _, err := s.Apps.SetJobCV(r.Context(), u.ID, id, cvDocID); err != nil {
+			s.failed(w, r, u, err)
+			return
+		}
+	}
+
+	if partial(r) {
+		j, err := s.Jobs.Detail(r.Context(), u.ID, id)
+		if err != nil {
+			s.failed(w, r, u, err)
+			return
+		}
+		notice := views.T(r.Context(), "jobs.cv_switcher.saved")
+		cvData := s.buildCVVariantData(r.Context(), u.ID, j, notice)
+		s.render(w, r, http.StatusOK, views.CVVariantSwitcher(cvData))
+		return
+	}
+	http.Redirect(w, r, fmt.Sprintf("/jobs/%d", id), http.StatusSeeOther)
+}
+
+func criteriaFromSnapshot(snap profile.Snapshot) matching.Criteria {
+	pr, pf := snap.Preferences, snap.Profile
+	c := matching.Criteria{
+		Titles:        pr.Titles,
+		ExcludeTitles: pr.ExcludeTitles,
+		Locations:     pr.Locations,
+		Remote:        pr.Remote,
+		RemoteRegions: pr.RemoteRegions,
+		MinSalary:     pr.MinSalary,
+		Skills:        pf.Skills,
+		YearsTotal:    pf.Work.YearsTotal,
+	}
+	for _, l := range pf.Languages {
+		c.Languages = append(c.Languages, matching.Language{Name: l.Name, Level: l.Level})
+	}
+	return c
+}
+
+func matchingJob(j matching.Detail) matching.Job {
+	return matching.Job{
+		ID:          j.JobID,
+		Company:     j.Company,
+		Title:       j.Title,
+		Location:    j.Location,
+		Workplace:   j.Workplace,
+		Description: j.Description,
+		Posted:      j.Posted,
+		FirstSeen:   j.FirstSeen,
+	}
+}
+
+func buildFitData(ctx context.Context, jobID int64, fit matching.FitInspection, addedSkill string) views.FitData {
+	d := views.FitData{
+		JobID:          jobID,
+		Score:          fit.Score,
+		Decision:       string(fit.Decision),
+		MatchingSkills: fit.MatchingSkills,
+		MissingSkills:  fit.MissingSkills,
+		AddedSkill:     addedSkill,
+	}
+
+	d.Breakdown = append(d.Breakdown, views.FitBreakdownItem{
+		Dimension: "title",
+		Label:     views.T(ctx, "jobs.fit.dim_title"),
+		Points:    fit.TitlePoints,
+		Max:       fit.MaxTitlePoints,
+	})
+
+	skillsDetail := views.T(ctx, "jobs.fit.dim_skills_detail", "matches", len(fit.MatchingSkills), "missing", len(fit.MissingSkills))
+	d.Breakdown = append(d.Breakdown, views.FitBreakdownItem{
+		Dimension: "skills",
+		Label:     views.T(ctx, "jobs.fit.dim_skills"),
+		Points:    fit.SkillPoints,
+		Max:       fit.MaxSkillPoints,
+		Detail:    skillsDetail,
+	})
+
+	candLvl := fit.CandidateLevel
+	if candLvl == "" {
+		candLvl = "–"
+	}
+	jobLvl := fit.JobLevel
+	if jobLvl == "" {
+		jobLvl = "–"
+	}
+	seniorityDetail := views.T(ctx, "jobs.fit.dim_seniority_detail", "candidate", candLvl, "job", jobLvl)
+	d.Breakdown = append(d.Breakdown, views.FitBreakdownItem{
+		Dimension: "seniority",
+		Label:     views.T(ctx, "jobs.fit.dim_seniority"),
+		Points:    fit.SeniorityPoints,
+		Max:       fit.MaxSeniorityPoints,
+		Detail:    seniorityDetail,
+	})
+
+	locDetail := ""
+	if fit.LocationReason != "" {
+		locDetail = views.T(ctx, "match.reason."+fit.LocationReason)
+	}
+	d.Breakdown = append(d.Breakdown, views.FitBreakdownItem{
+		Dimension: "location",
+		Label:     views.T(ctx, "jobs.fit.dim_location"),
+		Points:    fit.LocationPoints,
+		Max:       fit.MaxLocationPoints,
+		Detail:    locDetail,
+	})
+
+	if fit.LanguagePoints != 0 {
+		d.Breakdown = append(d.Breakdown, views.FitBreakdownItem{
+			Dimension: "language",
+			Label:     views.T(ctx, "jobs.fit.dim_language"),
+			Points:    fit.LanguagePoints,
+		})
+	}
+
+	if fit.SalaryPoints != 0 {
+		d.Breakdown = append(d.Breakdown, views.FitBreakdownItem{
+			Dimension: "salary",
+			Label:     views.T(ctx, "jobs.fit.dim_salary"),
+			Points:    fit.SalaryPoints,
+		})
+	}
+
+	if fit.RecencyPoints != 0 {
+		d.Breakdown = append(d.Breakdown, views.FitBreakdownItem{
+			Dimension: "recency",
+			Label:     views.T(ctx, "jobs.fit.dim_recency"),
+			Points:    fit.RecencyPoints,
+		})
+	}
+
+	return d
+}
+
+func (s *Server) buildCVVariantData(ctx context.Context, userID uuid.UUID, j matching.Detail, notice string) views.CVVariantData {
+	data := views.CVVariantData{
+		JobID:  j.JobID,
+		Notice: notice,
+	}
+	if s.Documents == nil {
+		return data
+	}
+	allDocs, err := s.Documents.List(ctx, userID)
+	if err != nil {
+		return data
+	}
+	var cvDocs []profile.Document
+	for _, doc := range allDocs {
+		if doc.Kind == profile.KindCV {
+			cvDocs = append(cvDocs, doc)
+		}
+	}
+	if len(cvDocs) == 0 {
+		return data
+	}
+
+	recCV, hasRec := profile.ChooseCV(cvDocs, "", j.Title, j.Description)
+
+	var selectedID *uuid.UUID
+	if s.Apps != nil {
+		if app, err := s.Apps.ByJob(ctx, userID, j.JobID); err == nil && app.CvDocumentID != nil {
+			selectedID = app.CvDocumentID
+		}
+	}
+
+	for _, doc := range cvDocs {
+		isRec := hasRec && doc.ID == recCV.ID
+		isSelected := (selectedID != nil && *selectedID == doc.ID) || (selectedID == nil && isRec)
+		data.Variants = append(data.Variants, views.CVVariantItem{
+			ID:          doc.ID.String(),
+			Label:       doc.Label,
+			Name:        doc.Name,
+			Language:    doc.Language,
+			Focus:       doc.Focus,
+			Selected:    isSelected,
+			Recommended: isRec,
+		})
+	}
+	if selectedID != nil {
+		data.SelectedID = selectedID.String()
+	} else if hasRec {
+		data.SelectedID = recCV.ID.String()
+	}
+	return data
 }
 
 func (s *Server) addBlocklist(w http.ResponseWriter, r *http.Request, u *identity.User) {

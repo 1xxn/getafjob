@@ -35,6 +35,7 @@ type Application struct {
 	ApprovalAskedAt *time.Time
 	ApprovalReasons []string
 	ApprovedAt      *time.Time
+	CvDocumentID    *uuid.UUID
 }
 
 type ApplicationEvent struct {

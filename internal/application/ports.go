@@ -26,7 +26,8 @@ type App struct {
 	ApprovalAsked   *time.Time
 	ApprovalReasons []Reason
 	// Approved is when the user approved the submit; the next submit of the application needs no green rule.
-	Approved *time.Time
+	Approved     *time.Time
+	CvDocumentID *uuid.UUID
 }
 
 // AwaitingApproval reports an application on the approval list: a run asked for the approval, the user has not
@@ -37,14 +38,15 @@ func (a App) AwaitingApproval() bool {
 
 // Approval is an application on the user's approval list.
 type Approval struct {
-	ID      uuid.UUID
-	JobID   int64
-	State   State
-	Title   string
-	Company string
-	Score   int
-	Reasons []Reason
-	Asked   time.Time
+	ID           uuid.UUID
+	JobID        int64
+	State        State
+	Title        string
+	Company      string
+	Score        int
+	Reasons      []Reason
+	Asked        time.Time
+	CvDocumentID *uuid.UUID
 }
 
 // ApplicationSummary is a concise summary of an application for export or listing.
@@ -187,6 +189,12 @@ type Store interface {
 	// Create returns the application of the user for the job, creating it in state if there is none.
 	Create(ctx context.Context, userID uuid.UUID, jobID int64, state State, at time.Time) (uuid.UUID, error)
 	Get(ctx context.Context, userID, id uuid.UUID) (App, error)
+	// ByJob returns the user's application for a specific job if one exists.
+	ByJob(ctx context.Context, userID uuid.UUID, jobID int64) (App, error)
+	// SetCvDocument sets or clears the chosen CV variant for an application.
+	SetCvDocument(ctx context.Context, userID, appID uuid.UUID, cvID *uuid.UUID, at time.Time) error
+	// SetJobCvDocument sets or creates an application for the job with the chosen CV variant.
+	SetJobCvDocument(ctx context.Context, userID uuid.UUID, jobID int64, cvID *uuid.UUID, at time.Time) (uuid.UUID, error)
 	// Questions returns the questions of the last ask event of an application.
 	Questions(ctx context.Context, userID, id uuid.UUID) ([]Question, error)
 	// Evidence returns the filled fields, screenshots, confirmation page, and timeline of an application.

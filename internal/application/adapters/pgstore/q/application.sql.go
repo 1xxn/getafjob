@@ -275,7 +275,7 @@ func (q *Queries) FinishSubmitAttempt(ctx context.Context, arg FinishSubmitAttem
 }
 
 const getApplication = `-- name: GetApplication :one
-SELECT id, job_id, state, version, updated_at, approval_asked_at, approval_reasons, approved_at
+SELECT id, job_id, state, version, updated_at, approval_asked_at, approval_reasons, approved_at, cv_document_id
 FROM applications WHERE id = $1 AND user_id = $2
 `
 
@@ -293,6 +293,7 @@ type GetApplicationRow struct {
 	ApprovalAskedAt *time.Time
 	ApprovalReasons []string
 	ApprovedAt      *time.Time
+	CvDocumentID    *uuid.UUID
 }
 
 func (q *Queries) GetApplication(ctx context.Context, arg GetApplicationParams) (GetApplicationRow, error) {
@@ -307,6 +308,46 @@ func (q *Queries) GetApplication(ctx context.Context, arg GetApplicationParams) 
 		&i.ApprovalAskedAt,
 		&i.ApprovalReasons,
 		&i.ApprovedAt,
+		&i.CvDocumentID,
+	)
+	return i, err
+}
+
+const getApplicationByJob = `-- name: GetApplicationByJob :one
+SELECT id, job_id, state, version, updated_at, approval_asked_at, approval_reasons, approved_at, cv_document_id
+FROM applications WHERE job_id = $1 AND user_id = $2
+`
+
+type GetApplicationByJobParams struct {
+	JobID  int64
+	UserID uuid.UUID
+}
+
+type GetApplicationByJobRow struct {
+	ID              uuid.UUID
+	JobID           int64
+	State           string
+	Version         int64
+	UpdatedAt       time.Time
+	ApprovalAskedAt *time.Time
+	ApprovalReasons []string
+	ApprovedAt      *time.Time
+	CvDocumentID    *uuid.UUID
+}
+
+func (q *Queries) GetApplicationByJob(ctx context.Context, arg GetApplicationByJobParams) (GetApplicationByJobRow, error) {
+	row := q.db.QueryRow(ctx, getApplicationByJob, arg.JobID, arg.UserID)
+	var i GetApplicationByJobRow
+	err := row.Scan(
+		&i.ID,
+		&i.JobID,
+		&i.State,
+		&i.Version,
+		&i.UpdatedAt,
+		&i.ApprovalAskedAt,
+		&i.ApprovalReasons,
+		&i.ApprovedAt,
+		&i.CvDocumentID,
 	)
 	return i, err
 }
@@ -677,6 +718,57 @@ func (q *Queries) SameJobStates(ctx context.Context, arg SameJobStatesParams) ([
 		return nil, err
 	}
 	return items, nil
+}
+
+const setCvDocument = `-- name: SetCvDocument :execrows
+UPDATE applications SET cv_document_id = $1::uuid, updated_at = $2::timestamptz
+WHERE id = $3 AND user_id = $4
+`
+
+type SetCvDocumentParams struct {
+	CvDocumentID *uuid.UUID
+	Now          time.Time
+	ID           uuid.UUID
+	UserID       uuid.UUID
+}
+
+func (q *Queries) SetCvDocument(ctx context.Context, arg SetCvDocumentParams) (int64, error) {
+	result, err := q.db.Exec(ctx, setCvDocument,
+		arg.CvDocumentID,
+		arg.Now,
+		arg.ID,
+		arg.UserID,
+	)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
+}
+
+const setJobCvDocument = `-- name: SetJobCvDocument :one
+INSERT INTO applications (user_id, job_id, state, cv_document_id, created_at, updated_at)
+VALUES ($1, $2, 'matched', $3::uuid, $4::timestamptz, $4::timestamptz)
+ON CONFLICT (user_id, job_id) DO UPDATE SET cv_document_id = EXCLUDED.cv_document_id, updated_at = EXCLUDED.updated_at
+RETURNING id
+`
+
+type SetJobCvDocumentParams struct {
+	UserID       uuid.UUID
+	JobID        int64
+	CvDocumentID *uuid.UUID
+	Now          time.Time
+}
+
+func (q *Queries) SetJobCvDocument(ctx context.Context, arg SetJobCvDocumentParams) (uuid.UUID, error) {
+	row := q.db.QueryRow(ctx, setJobCvDocument,
+		arg.UserID,
+		arg.JobID,
+		arg.CvDocumentID,
+		arg.Now,
+	)
+	var id uuid.UUID
+	err := row.Scan(&id)
+	return id, err
 }
 
 const setState = `-- name: SetState :execrows

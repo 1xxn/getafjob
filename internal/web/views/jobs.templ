@@ -63,6 +63,45 @@ type Reason struct {
 	Hard   bool
 }
 
+// FitBreakdownItem represents one dimension in the score breakdown.
+type FitBreakdownItem struct {
+	Dimension string
+	Label     string
+	Points    int
+	Max       int
+	Detail    string
+}
+
+// FitData holds the data for the Fit Inspector widget.
+type FitData struct {
+	JobID          int64
+	Score          int
+	Decision       string
+	MatchingSkills []string
+	MissingSkills  []string
+	Breakdown      []FitBreakdownItem
+	AddedSkill     string
+}
+
+// CVVariantItem is one CV variant selectable for a job.
+type CVVariantItem struct {
+	ID          string
+	Label       string
+	Name        string
+	Language    string
+	Focus       []string
+	Selected    bool
+	Recommended bool
+}
+
+// CVVariantData holds the CV variant switcher data.
+type CVVariantData struct {
+	JobID      int64
+	Variants   []CVVariantItem
+	SelectedID string
+	Notice     string
+}
+
 // JobData fills the job detail page.
 type JobData struct {
 	Name        string
@@ -74,6 +113,8 @@ type JobData struct {
 	Open        bool
 	Computed    string
 	Back        string
+	Fit         FitData
+	CV          CVVariantData
 }
 
 templ jobMeta(r JobRow) {
@@ -395,6 +436,152 @@ templ JobResults(d JobsData) {
 	</div>
 }
 
+templ FitInspector(d FitData) {
+	<div id="fit-inspector" class="fit-inspector">
+		<div class="fit-header">
+			<h3>{ T(ctx, "jobs.fit.title") }</h3>
+			<span class={ "decision", "decision-" + d.Decision }>
+				{ T(ctx, "match.decision." + d.Decision) }, { T(ctx, "jobs.score", "score", d.Score) }
+			</span>
+		</div>
+		if d.AddedSkill != "" {
+			@Notice("success", T(ctx, "jobs.fit.skill_added", "skill", d.AddedSkill))
+		}
+		<div class="skills-overlap-section">
+			<h4>{ T(ctx, "jobs.fit.matching_skills") }</h4>
+			if len(d.MatchingSkills) == 0 {
+				<p class="muted">{ T(ctx, "jobs.fit.no_matching_skills") }</p>
+			} else {
+				<div class="badge-list">
+					for _, s := range d.MatchingSkills {
+						<span class="badge badge-match">✓ { s }</span>
+					}
+				</div>
+			}
+			<h4>{ T(ctx, "jobs.fit.missing_skills") }</h4>
+			if len(d.MissingSkills) == 0 {
+				<p class="muted">{ T(ctx, "jobs.fit.no_missing_skills") }</p>
+			} else {
+				<p class="muted text-sm">{ T(ctx, "jobs.fit.missing_skills_hint") }</p>
+				<div class="badge-list">
+					for _, s := range d.MissingSkills {
+						<span class="badge badge-missing">
+							<span class="badge-skill-name">{ s }</span>
+							<form
+								method="post"
+								action={ templ.SafeURL("/jobs/" + i64(d.JobID) + "/skills") }
+								class="skill-add-inline"
+								{ HX(ctx, "hx-post", "/jobs/" + i64(d.JobID) + "/skills", "hx-target", "#fit-inspector", "hx-swap", "outerHTML")... }
+							>
+								<input type="hidden" name="skill" value={ s }/>
+								<button type="submit" class="btn-badge-add" title={ T(ctx, "jobs.fit.add_skill_hint", "skill", s) }>
+									+ { T(ctx, "jobs.fit.add") }
+								</button>
+							</form>
+						</span>
+					}
+				</div>
+			}
+		</div>
+		<div class="fit-breakdown-section">
+			<h4>{ T(ctx, "jobs.fit.breakdown_title") }</h4>
+			<div class="fit-breakdown-table">
+				for _, b := range d.Breakdown {
+					<div class="breakdown-row">
+						<div class="breakdown-info">
+							<span class="breakdown-label">{ b.Label }</span>
+							if b.Detail != "" {
+								<span class="breakdown-detail muted text-sm">{ b.Detail }</span>
+							}
+						</div>
+						<div class="breakdown-score">
+							<span class="breakdown-points">
+								if b.Max > 0 {
+									{ itoa(b.Points) } / { itoa(b.Max) }
+								} else {
+									{ points(b.Points) }
+								}
+							</span>
+							if b.Max > 0 {
+								<div class="progress-bar" role="progressbar" aria-valuenow={ itoa(b.Points) } aria-valuemin="0" aria-valuemax={ itoa(b.Max) }>
+									<div class="progress-fill" style={ "width: " + itoa(min(100, max(0, (b.Points*100)/b.Max))) + "%" }></div>
+								</div>
+							}
+						</div>
+					</div>
+				}
+			</div>
+		</div>
+	</div>
+}
+
+templ CVVariantSwitcher(d CVVariantData) {
+	<div id="cv-switcher" class="cv-switcher">
+		<h3>{ T(ctx, "jobs.cv_switcher.title") }</h3>
+		<p class="muted text-sm">{ T(ctx, "jobs.cv_switcher.hint") }</p>
+		if d.Notice != "" {
+			@Notice("success", d.Notice)
+		}
+		if len(d.Variants) == 0 {
+			<p class="muted">{ T(ctx, "jobs.cv_switcher.empty") }</p>
+		} else {
+			<form
+				method="post"
+				action={ templ.SafeURL("/jobs/" + i64(d.JobID) + "/cv") }
+				class="cv-variants-form"
+				{ HX(ctx, "hx-post", "/jobs/" + i64(d.JobID) + "/cv", "hx-target", "#cv-switcher", "hx-swap", "outerHTML")... }
+			>
+				<div class="cv-variant-cards">
+					for _, v := range d.Variants {
+						<label class={ "cv-variant-card", templ.KV("is-selected", v.Selected) }>
+							<input
+								type="radio"
+								name="cv_id"
+								value={ v.ID }
+								checked?={ v.Selected }
+								onchange="this.form.requestSubmit()"
+							/>
+							<div class="cv-variant-body">
+								<div class="cv-variant-title-row">
+									<strong class="cv-variant-title">
+										if v.Label != "" {
+											{ v.Label }
+										} else {
+											{ v.Name }
+										}
+									</strong>
+									<div class="cv-variant-badges">
+										if v.Selected {
+											<span class="badge badge-selected">{ T(ctx, "jobs.cv_switcher.selected") }</span>
+										}
+										if v.Recommended {
+											<span class="badge badge-recommended">{ T(ctx, "jobs.cv_switcher.recommended") }</span>
+										}
+										if v.Language != "" {
+											<span class="badge badge-lang">{ strings.ToUpper(v.Language) }</span>
+										}
+									</div>
+								</div>
+								<div class="cv-variant-meta muted text-sm">
+									if v.Label != "" && v.Name != "" {
+										<span class="cv-variant-filename">{ v.Name }</span>
+									}
+									if len(v.Focus) > 0 {
+										<span class="cv-variant-focus">{ strings.Join(v.Focus, " · ") }</span>
+									}
+								</div>
+							</div>
+						</label>
+					}
+				</div>
+				<noscript>
+					<button type="submit" class="btn-sm">{ T(ctx, "jobs.cv_switcher.save") }</button>
+				</noscript>
+			</form>
+		}
+	</div>
+}
+
 templ JobPage(d JobData) {
 	@Layout(Page{Title: d.Row.Title, UserName: d.Name}) {
 		@Section(d.Row.Title) {
@@ -427,6 +614,8 @@ templ JobPage(d JobData) {
 					· <a href={ templ.SafeURL(d.ApplyURL) } rel="noopener noreferrer external">{ T(ctx, "jobs.apply_link") }</a>
 				}
 			</p>
+			@FitInspector(d.Fit)
+			@CVVariantSwitcher(d.CV)
 			<h2>{ T(ctx, "jobs.reasons") }</h2>
 			<p>@decision(d.Row)</p>
 			<ul class="reasons">

@@ -118,6 +118,67 @@ func TestApprovalsPageAndApprove(t *testing.T) {
 	}
 }
 
+func TestApprovalCVVariantAndSetCV(t *testing.T) {
+	max := uuid.MustParse("0192f3a4-5b6c-7d8e-9f01-23456789abcd")
+	appID := uuid.MustParse("0192f3a4-5b6c-7d8e-9f01-000000000001")
+	cvID := uuid.MustParse("0192f3a4-5b6c-7d8e-9f01-000000000002")
+	u := &identity.User{ID: max, DisplayName: "Max Mustermann", Email: "max@example.org"}
+
+	st := &fakeAutonomyStore{
+		fakeAppStore: fakeAppStore{
+			userID: max,
+			app: application.App{
+				ID:           appID,
+				JobID:        42,
+				State:        application.NeedsInput,
+				Version:      1,
+				CvDocumentID: &cvID,
+			},
+		},
+		approvals: []application.Approval{
+			{
+				ID:           appID,
+				JobID:        42,
+				State:        application.NeedsInput,
+				Title:        "Site Reliability Engineer",
+				Company:      "CloudCorp",
+				Score:        85,
+				Reasons:      []application.Reason{application.ReasonLevel},
+				Asked:        time.Now().Add(-10 * time.Minute),
+				CvDocumentID: &cvID,
+			},
+		},
+	}
+
+	srv := &Server{
+		Apps:   application.NewService(st),
+		Logger: slog.Default(),
+	}
+
+	// 1. GET /approvals
+	rec := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodGet, "/approvals", nil)
+	srv.approvalsPage(rec, req, u)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("approvalsPage status = %d, want 200", rec.Code)
+	}
+
+	// 2. POST /approvals/{id}/cv changes CV variant
+	newCVID := uuid.MustParse("0192f3a4-5b6c-7d8e-9f01-000000000003")
+	form := url.Values{"cv_id": {newCVID.String()}}
+	rec = httptest.NewRecorder()
+	req = httptest.NewRequest(http.MethodPost, "/approvals/"+appID.String()+"/cv", strings.NewReader(form.Encode()))
+	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	req.SetPathValue("id", appID.String())
+	srv.approvalSetCV(rec, req, u)
+	if rec.Code != http.StatusSeeOther {
+		t.Fatalf("approvalSetCV status = %d, want 303", rec.Code)
+	}
+	if st.app.CvDocumentID == nil || *st.app.CvDocumentID != newCVID {
+		t.Fatalf("st.app.CvDocumentID = %v, want %v", st.app.CvDocumentID, newCVID)
+	}
+}
+
 type fakeProfileStore struct {
 	pref []byte
 }

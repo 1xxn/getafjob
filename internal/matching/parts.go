@@ -84,11 +84,8 @@ func userSkills(list []string) []userSkill {
 	return out
 }
 
-// skillFit compares the weighted skills a job names with the user's. Known skills the user lacks lower the fit;
-// a job that names no known skill is neutral.
-func (m *Matcher) skillFit(text string) Reason {
+func (m *Matcher) skillHitsAndMissing(text string) (hits []string, missing []string, points int, code string) {
 	var have, want int
-	var hits, missing []string
 	for _, s := range m.skills {
 		if _, ok := anyIn(s.terms, text); ok {
 			have += s.weight
@@ -106,15 +103,31 @@ func (m *Matcher) skillFit(text string) Reason {
 		}
 	}
 	if want == 0 {
-		return Reason{Code: "skills.unknown", Points: maxSkills * 2 / 5}
+		return nil, nil, maxSkills * 2 / 5, "skills.unknown"
 	}
-	// Postings list more than anyone has: a dozen weight points make a full fit, fewer than six never do.
-	r := Reason{Code: "skills.fit", Points: min(maxSkills*have/min(max(want, 6), 12), maxSkills),
-		Params: map[string]string{"have": strings.Join(first(hits, 6), ", "), "missing": strings.Join(first(missing, 6), ", ")}}
+	code = "skills.fit"
 	if have == 0 {
-		r.Code = "skills.none"
+		code = "skills.none"
 	}
-	return r
+	points = min(maxSkills*have/min(max(want, 6), 12), maxSkills)
+	return hits, missing, points, code
+}
+
+// skillFit compares the weighted skills a job names with the user's. Known skills the user lacks lower the fit;
+// a job that names no known skill is neutral.
+func (m *Matcher) skillFit(text string) Reason {
+	hits, missing, points, code := m.skillHitsAndMissing(text)
+	if code == "skills.unknown" {
+		return Reason{Code: code, Points: points}
+	}
+	return Reason{
+		Code:   code,
+		Points: points,
+		Params: map[string]string{
+			"have":    strings.Join(first(hits, 6), ", "),
+			"missing": strings.Join(first(missing, 6), ", "),
+		},
+	}
 }
 
 func first(s []string, n int) []string { return s[:min(len(s), n)] }

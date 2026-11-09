@@ -32,7 +32,7 @@ WHERE id = sqlc.arg(id) AND user_id = sqlc.arg(user_id) AND version = sqlc.arg(v
 
 -- name: Approvals :many
 SELECT a.id, a.job_id, a.state, a.approval_reasons, a.approval_asked_at::timestamptz AS asked_at, j.title, j.company,
-  coalesce(m.score, 0)::smallint AS score
+  coalesce(m.score, 0)::smallint AS score, a.cv_document_id
 FROM applications a JOIN jobs j ON j.id = a.job_id
 LEFT JOIN matches m ON m.user_id = a.user_id AND m.job_id = a.job_id
 WHERE a.user_id = $1 AND a.approval_asked_at IS NOT NULL AND a.approved_at IS NULL

@@ -4,14 +4,15 @@ import "time"
 
 // ApprovalRow is one application awaiting human approval.
 type ApprovalRow struct {
-	ID      string
-	JobID   int64
-	State   string
-	Title   string
-	Company string
-	Score   int
-	Reasons []string
-	AskedAt time.Time
+	ID        string
+	JobID     int64
+	State     string
+	Title     string
+	Company   string
+	Score     int
+	CVVariant string
+	Reasons   []string
+	AskedAt   time.Time
 }
 
 // ApprovalsData fills the approval list page.
@@ -39,6 +40,10 @@ templ ApprovalsPage(d ApprovalsData) {
 								<strong>{ r.Company }</strong>
 								<span> • </span>
 								<span>{ T(ctx, "approvals.score", "score", r.Score) }</span>
+								if r.CVVariant != "" {
+									<span> • </span>
+									<span class="badge badge-variant">{ T(ctx, "approvals.cv_variant", "variant", r.CVVariant) }</span>
+								}
 								<span> • </span>
 								<span class="muted">{ T(ctx, "approvals.asked", "when", When(ctx, r.AskedAt)) }</span>
 							</p>

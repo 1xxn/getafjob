@@ -253,6 +253,30 @@ func (f *fakeAppStore) Get(_ context.Context, userID, id uuid.UUID) (application
 	return f.app, nil
 }
 
+func (f *fakeAppStore) ByJob(_ context.Context, userID uuid.UUID, jobID int64) (application.App, error) {
+	if userID != f.userID || jobID != f.app.JobID {
+		return application.App{}, application.ErrNotFound
+	}
+	return f.app, nil
+}
+
+func (f *fakeAppStore) SetCvDocument(_ context.Context, userID, appID uuid.UUID, cvID *uuid.UUID, _ time.Time) error {
+	if userID != f.userID || appID != f.app.ID {
+		return application.ErrNotFound
+	}
+	f.app.CvDocumentID = cvID
+	return nil
+}
+
+func (f *fakeAppStore) SetJobCvDocument(_ context.Context, userID uuid.UUID, jobID int64, cvID *uuid.UUID, _ time.Time) (uuid.UUID, error) {
+	if userID != f.userID {
+		return uuid.Nil, application.ErrNotFound
+	}
+	f.app.CvDocumentID = cvID
+	f.app.JobID = jobID
+	return f.app.ID, nil
+}
+
 func (f *fakeAppStore) Questions(context.Context, uuid.UUID, uuid.UUID) ([]application.Question, error) {
 	return nil, nil
 }
