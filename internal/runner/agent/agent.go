@@ -13,7 +13,7 @@ import (
 	"strings"
 	"time"
 
-	"connectrpc.com/connect"
+	"connectrpc.com/connect/v2"
 	"github.com/go-rod/rod"
 	"github.com/go-rod/rod/lib/proto"
 

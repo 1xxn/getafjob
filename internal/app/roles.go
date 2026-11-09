@@ -9,7 +9,7 @@ import (
 	"strings"
 	"time"
 
-	"connectrpc.com/connect"
+	"connectrpc.com/connect/v2"
 	"github.com/go-rod/rod/lib/proto"
 	"github.com/google/uuid"
 	"github.com/riverqueue/river"

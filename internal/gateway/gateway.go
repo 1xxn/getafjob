@@ -19,7 +19,7 @@ import (
 	"sync"
 	"time"
 
-	"connectrpc.com/connect"
+	"connectrpc.com/connect/v2"
 	"github.com/google/uuid"
 	gotel "go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/attribute"
