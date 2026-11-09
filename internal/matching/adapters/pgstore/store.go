@@ -98,13 +98,13 @@ func (s *Store) ListMatches(ctx context.Context, userID uuid.UUID, f matching.Fi
 			Workplace:     f.Workplace,
 			Location:      f.Location,
 			Source:        f.Source,
-			MinSalary:     int32(min(max(f.MinSalary, 0), 10_000_000)), //nolint:gosec // bounded
-			FreshnessDays: int32(min(max(f.FreshnessDays, 0), 365)),     //nolint:gosec // bounded
+			MinSalary:     int32(min(max(f.MinSalary, 0), 10_000_000)),
+			FreshnessDays: int32(min(max(f.FreshnessDays, 0), 365)),
 			Query:         f.Query,
 			ShowBlocked:   f.Blocked,
 			Sort:          f.Sort,
-			PageOffset:    int32(min(max(offset, 0), 1_000_000)),       //nolint:gosec // bounded
-			PageSize:      int32(min(max(limit, 0), 1000)),             //nolint:gosec // bounded
+			PageOffset:    int32(min(max(offset, 0), 1_000_000)),
+			PageSize:      int32(min(max(limit, 0), 1000)),
 		})
 		if err != nil {
 			return err
