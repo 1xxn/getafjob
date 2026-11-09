@@ -149,6 +149,8 @@ func (s *Server) Register(mux *http.ServeMux) {
 	mux.Handle("GET /jobs/{id}", s.page(s.jobPage))
 	mux.Handle("POST /jobs/{id}/skills", s.page(s.addJobSkill))
 	mux.Handle("POST /jobs/{id}/cv", s.page(s.setJobCV))
+	mux.Handle("GET /jobs/{id}/apply", s.page(s.jobApplyPreview))
+	mux.Handle("POST /jobs/{id}/apply", s.page(s.jobApplySubmit))
 	mux.Handle("POST /jobs/{id}/bookmark", s.page(s.jobBookmark))
 	mux.Handle("POST /jobs/{id}/apply-external", s.page(s.jobApplyExternal))
 	mux.Handle("GET /tracker", s.page(s.trackerPage))

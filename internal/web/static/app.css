@@ -786,7 +786,155 @@
     text-decoration: underline;
   }
 
+  /* Instant Apply Preview */
+  .btn-instant-apply {
+    background: #0284c7;
+    color: #fff;
+    font-weight: 600;
+    transition: background 0.15s ease, transform 0.1s ease;
+  }
+  .btn-instant-apply:hover {
+    background: #0369a1;
+  }
+
+  .apply-preview-panel {
+    border: 2px solid #0284c7;
+    border-radius: var(--radius);
+    padding: var(--space-4);
+    margin-block: var(--space-4);
+    background: var(--raised, #f8fafc);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+  }
+  .apply-preview-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    margin-block-end: var(--space-3);
+    border-block-end: 1px solid var(--line);
+    padding-block-end: var(--space-2);
+  }
+  .apply-preview-titles h3 {
+    margin: 0 0 var(--space-1);
+    font-size: 1.25rem;
+    color: var(--ink);
+  }
+  .apply-guarantee-box {
+    background: #f0fdf4;
+    border: 1px solid #86efac;
+    border-radius: var(--radius);
+    padding: var(--space-3);
+    margin-block-end: var(--space-3);
+    color: #166534;
+  }
+  .apply-guarantee-box strong {
+    display: block;
+    font-size: 0.9375rem;
+    margin-block-end: 0.25rem;
+  }
+  .apply-guarantee-box p {
+    margin: 0;
+    font-size: 0.8125rem;
+    line-height: 1.4;
+  }
+  .apply-guard-pass {
+    margin-block-end: var(--space-3);
+  }
+  .apply-preview-sections {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-3);
+  }
+  .apply-preview-card {
+    border: 1px solid var(--line);
+    border-radius: var(--radius);
+    padding: var(--space-3);
+    background: var(--surface, #ffffff);
+  }
+  .apply-preview-card h4 {
+    margin: 0 0 var(--space-2);
+    font-size: 0.9375rem;
+    color: var(--ink);
+  }
+  .preview-fields-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+    gap: var(--space-2);
+  }
+  .preview-field {
+    display: flex;
+    flex-direction: column;
+    gap: 0.15rem;
+  }
+  .preview-label {
+    font-size: 0.75rem;
+    font-weight: 500;
+    color: var(--ink-3, #64748b);
+    text-transform: uppercase;
+    letter-spacing: 0.03em;
+  }
+  .preview-val {
+    font-size: 0.875rem;
+    color: var(--ink);
+    word-break: break-word;
+  }
+  .preview-cv-info {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-1);
+    align-items: flex-start;
+  }
+  .preview-stations-list {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-2);
+  }
+  .preview-station-item {
+    font-size: 0.875rem;
+    padding-block-end: var(--space-1);
+    border-block-end: 1px solid var(--line);
+  }
+  .preview-station-item:last-child {
+    border-block-end: none;
+    padding-block-end: 0;
+  }
+  .preview-answers-list {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-2);
+  }
+  .preview-answer-item {
+    background: var(--raised, #f8fafc);
+    padding: var(--space-2);
+    border-radius: var(--radius);
+    border-left: 3px solid #0284c7;
+  }
+  .preview-q {
+    font-size: 0.8125rem;
+    font-weight: 600;
+    color: var(--ink);
+    display: block;
+    margin-block-end: 0.25rem;
+  }
+  .preview-a {
+    font-size: 0.8125rem;
+    color: var(--ink-2);
+    margin: 0;
+  }
+  .apply-preview-footer {
+    display: flex;
+    gap: var(--space-2);
+    align-items: center;
+    margin-block-start: var(--space-4);
+    padding-block-start: var(--space-3);
+    border-block-start: 1px solid var(--line);
+  }
+
   @media (prefers-color-scheme: dark) {
+    .btn-instant-apply { background: #0284c7; color: #fff; }
+    .apply-preview-panel { background: #0f172a; border-color: #0284c7; }
+    .apply-guarantee-box { background: #052e16; border-color: #166534; color: #86efac; }
+    .apply-preview-card { background: #1e293b; border-color: #334155; }
+    .preview-answer-item { background: #0f172a; border-left-color: #38bdf8; }
     .tracker-column { background: #1e293b; border-color: #334155; }
     .tracker-column-header { border-bottom-color: #334155; }
     .tracker-column-count { background: #334155; color: #cbd5e1; }

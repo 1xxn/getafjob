@@ -487,6 +487,273 @@ func TestFitInspectorAndCVVariantSwitcher(t *testing.T) {
 	}
 }
 
+func TestJobApply_PreviewAndSubmit(t *testing.T) {
+	a := newApp(t)
+	ctx := t.Context()
+
+	// 1. Unauthenticated access redirects to /login
+	if rec := a.do(http.MethodGet, "/jobs/1/apply", nil, "", nil); rec.Code != http.StatusSeeOther || rec.Header().Get("Location") != "/login" {
+		t.Fatalf("get apply unauthenticated: %d, location: %s", rec.Code, rec.Header().Get("Location"))
+	}
+	if rec := a.do(http.MethodPost, "/jobs/1/apply", nil, "", nil); rec.Code != http.StatusSeeOther || rec.Header().Get("Location") != "/login" {
+		t.Fatalf("post apply unauthenticated: %d, location: %s", rec.Code, rec.Header().Get("Location"))
+	}
+
+	session := signedIn(t, a)
+
+	// 2. Invalid job IDs return 404
+	for _, path := range []string{"/jobs/0/apply", "/jobs/-1/apply", "/jobs/999999/apply"} {
+		if rec := a.do(http.MethodGet, path, nil, session, nil); rec.Code != http.StatusNotFound {
+			t.Errorf("get %s: want 404, got %d", path, rec.Code)
+		}
+		if rec := a.do(http.MethodPost, path, nil, session, nil); rec.Code != http.StatusNotFound {
+			t.Errorf("post %s: want 404, got %d", path, rec.Code)
+		}
+	}
+
+	// 3. Setup user profile data:
+	// a) Profile contact
+	profForm := url.Values{
+		"version":    {"0"},
+		"first_name": {"Max"},
+		"last_name":  {"Mustermann"},
+		"email":      {"max.mustermann@example.com"},
+		"phone":      {"+49 170 1234567"},
+		"city":       {"Berlin"},
+		"country":    {"Germany"},
+		"linkedin":   {"linkedin.com/in/maxmustermann"},
+		"github":     {"github.com/maxmustermann"},
+		"skills":     {"Go", "PostgreSQL"},
+		"languages":  {"English: C1"},
+	}
+	if rec := a.do(http.MethodPost, "/profile", profForm, session, nil); rec.Code != http.StatusSeeOther {
+		t.Fatalf("save profile: %d", rec.Code)
+	}
+
+	// b) Add Work Experience
+	addExpRec := a.do(http.MethodPost, "/profile/experiences", url.Values{
+		"title":          {"Senior Go Engineer"},
+		"company":        {"Acme Software GmbH"},
+		"location":       {"Berlin"},
+		"workplace_type": {"remote"},
+		"start_date":     {"2021-01"},
+		"is_current":     {"on"},
+		"bullets":        {"Built distributed indexing pipelines in Go\nOptimized PostgreSQL queries"},
+	}, session, nil)
+	if addExpRec.Code != http.StatusSeeOther {
+		t.Fatalf("add experience: %d", addExpRec.Code)
+	}
+
+	// c) Add Education
+	addEduRec := a.do(http.MethodPost, "/profile/educations", url.Values{
+		"institution":    {"TU Berlin"},
+		"degree":         {"Master of Science"},
+		"field_of_study": {"Computer Science"},
+		"start_date":     {"2015-10"},
+		"end_date":       {"2019-09"},
+		"grade":          {"1.3"},
+	}, session, nil)
+	if addEduRec.Code != http.StatusSeeOther {
+		t.Fatalf("add education: %d", addEduRec.Code)
+	}
+
+	// d) Add Answer Bank Item
+	saveAnsRec := a.do(http.MethodPost, "/answers", url.Values{
+		"question": {"Earliest start date?"},
+		"answer":   {"Within 2 weeks notice"},
+	}, session, nil)
+	if saveAnsRec.Code != http.StatusSeeOther {
+		t.Fatalf("save answer: %d", saveAnsRec.Code)
+	}
+
+	// e) Upload CV variant
+	pdf := []byte("%PDF-1.7\nCV of Max Mustermann")
+	if rec := a.upload("cv", "cv-lead.pdf", pdf, session); rec.Code != http.StatusSeeOther {
+		t.Fatalf("upload cv: %d", rec.Code)
+	}
+	docPage := a.do(http.MethodGet, "/documents", nil, session, nil).Body.String()
+	idxCV := strings.Index(docPage, `href="/documents/`)
+	if idxCV < 0 {
+		t.Fatal("no cv document found")
+	}
+	cvDocID := docPage[idxCV+len(`href="/documents/`) : idxCV+len(`href="/documents/`)+36]
+	if rec := a.do(http.MethodPost, "/documents/"+cvDocID+"/variant", url.Values{
+		"label-" + cvDocID:    {"Lead Architect CV"},
+		"language-" + cvDocID: {"en"},
+		"focus-" + cvDocID:    {"distributed systems"},
+	}, session, nil); rec.Code != http.StatusOK {
+		t.Fatalf("set variant: %d", rec.Code)
+	}
+
+	// 4. Create Job Posting & Match Run
+	ds := discoverystore.New(a.pool)
+	now := time.Now()
+	run, err := ds.StartRun(ctx, []string{}, now)
+	if err != nil {
+		t.Fatal(err)
+	}
+	p := discovery.Posting{
+		Source:      "arbeitnow",
+		ExternalID:  "apply-test-1",
+		Company:     "Cloud Systems AG",
+		Title:       "Senior Distributed Systems Engineer",
+		Location:    "Berlin",
+		Workplace:   "remote",
+		URL:         "https://example.org/jobs/apply-1",
+		Description: "Looking for an engineer experienced in Go and PostgreSQL.",
+	}
+	if _, _, err := ds.Upsert(ctx, run, p, now); err != nil {
+		t.Fatal(err)
+	}
+	var maxID uuid.UUID
+	var jobID int64
+	if err := db.InSystemTx(ctx, a.pool, func(tx pgx.Tx) error {
+		if err := tx.QueryRow(ctx, "SELECT id FROM users WHERE email = 'max.mustermann@example.com'").Scan(&maxID); err != nil {
+			return err
+		}
+		return tx.QueryRow(ctx, "SELECT id FROM jobs WHERE external_id = 'apply-test-1'").Scan(&jobID)
+	}); err != nil {
+		t.Fatal(err)
+	}
+	ms := matchingstore.New(a.pool)
+	crit := criteria{maxID: {
+		Titles:    []string{"Distributed Systems Engineer"},
+		Locations: []string{"Berlin"},
+		Skills:    []string{"Go", "PostgreSQL"},
+		Languages: []matching.Language{{Name: "English", Level: "C1"}},
+		Remote:    true,
+	}}
+	if _, err := matching.NewService(crit, ms, ms).Run(ctx, nil); err != nil {
+		t.Fatal(err)
+	}
+
+	jobApplyPath := "/jobs/" + strconv.FormatInt(jobID, 10) + "/apply"
+
+	// 5. Test Full Page Preview (GET /jobs/{id}/apply)
+	previewRec := a.do(http.MethodGet, jobApplyPath, nil, session, nil)
+	if previewRec.Code != http.StatusOK {
+		t.Fatalf("get apply preview: %d", previewRec.Code)
+	}
+	checkNonces(t, previewRec)
+	previewHTML := previewRec.Body.String()
+	for _, expected := range []string{
+		"Instant Apply Preview",
+		"Senior Distributed Systems Engineer",
+		"Cloud Systems AG",
+		"Max Mustermann",
+		"max.mustermann@example.com",
+		"+49 170 1234567",
+		"Berlin, Germany",
+		"linkedin.com/in/maxmustermann",
+		"github.com/maxmustermann",
+		"Lead Architect CV",
+		"Zero AI cover letters generated",
+		"Zero fabricated facts",
+		"envelope-encrypted",
+		"Safety guards passed",
+		"Senior Go Engineer",
+		"Acme Software GmbH",
+		"TU Berlin",
+		"Computer Science",
+		"Earliest start date?",
+		"Within 2 weeks notice",
+		"Confirm &amp; Start Application",
+	} {
+		if !strings.Contains(previewHTML, expected) {
+			t.Errorf("preview HTML missing expected substring: %q", expected)
+		}
+	}
+
+	// 6. Test HTMX Partial Preview (GET /jobs/{id}/apply with HX-Request: true)
+	htmxRec := a.do(http.MethodGet, jobApplyPath, nil, session, map[string]string{
+		"HX-Request": "true",
+	})
+	if htmxRec.Code != http.StatusOK {
+		t.Fatalf("htmx preview: %d", htmxRec.Code)
+	}
+	htmxBody := htmxRec.Body.String()
+	if !strings.Contains(htmxBody, `id="apply-preview"`) {
+		t.Fatal("htmx preview missing #apply-preview element")
+	}
+	if strings.Contains(htmxBody, "<html") || strings.Contains(htmxBody, "<!DOCTYPE") {
+		t.Fatal("htmx preview returned full HTML document instead of partial")
+	}
+
+	// 7. Instant Apply Execution (POST /jobs/{id}/apply)
+	submitRec := a.do(http.MethodPost, jobApplyPath, url.Values{
+		"cv_id": {cvDocID},
+	}, session, nil)
+	if submitRec.Code != http.StatusSeeOther {
+		t.Fatalf("apply submit code: got %d, want %d", submitRec.Code, http.StatusSeeOther)
+	}
+	loc := submitRec.Header().Get("Location")
+	if !strings.HasPrefix(loc, "/applications/") {
+		t.Fatalf("apply submit redirect Location = %q, want /applications/{id}", loc)
+	}
+	appIDStr := strings.TrimPrefix(loc, "/applications/")
+	appID, err := uuid.Parse(appIDStr)
+	if err != nil {
+		t.Fatalf("invalid application UUID in Location: %v", err)
+	}
+
+	// Verify database record
+	var appState string
+	var appCvID *uuid.UUID
+	if err := db.InSystemTx(ctx, a.pool, func(tx pgx.Tx) error {
+		return tx.QueryRow(ctx, "SELECT state, cv_document_id FROM applications WHERE id = $1 AND user_id = $2 AND job_id = $3",
+			appID, maxID, jobID).Scan(&appState, &appCvID)
+	}); err != nil {
+		t.Fatalf("query application record: %v", err)
+	}
+	if appState != "queued" {
+		t.Errorf("application state = %q, want queued", appState)
+	}
+	if appCvID == nil || appCvID.String() != cvDocID {
+		t.Errorf("application cv_document_id = %v, want %s", appCvID, cvDocID)
+	}
+
+	// 8. Safety Guard: Duplicate Prevention on Preview & Submit
+	// GET /jobs/{id}/apply now indicates blocked
+	dupPreviewRec := a.do(http.MethodGet, jobApplyPath, nil, session, nil)
+	if dupPreviewRec.Code != http.StatusOK {
+		t.Fatalf("duplicate apply preview: %d", dupPreviewRec.Code)
+	}
+	dupBody := dupPreviewRec.Body.String()
+	if !strings.Contains(dupBody, "You already have an active or submitted application for this job.") {
+		t.Errorf("duplicate preview missing duplicate error message, body:\n%s", dupBody)
+	}
+	if !strings.Contains(dupBody, "Application Blocked by Safety Guard") {
+		t.Error("duplicate preview missing blocked guard button label")
+	}
+
+	// POST /jobs/{id}/apply now redirects back to /jobs/{id} without queueing
+	dupSubmitRec := a.do(http.MethodPost, jobApplyPath, url.Values{"cv_id": {cvDocID}}, session, nil)
+	if dupSubmitRec.Code != http.StatusSeeOther || dupSubmitRec.Header().Get("Location") != "/jobs/"+strconv.FormatInt(jobID, 10) {
+		t.Fatalf("duplicate submit redirect = %s, want /jobs/%d", dupSubmitRec.Header().Get("Location"), jobID)
+	}
+
+	// Verify count of applications in DB for this user/job is still exactly 1
+	var appCount int
+	if err := db.InSystemTx(ctx, a.pool, func(tx pgx.Tx) error {
+		return tx.QueryRow(ctx, "SELECT count(*) FROM applications WHERE user_id = $1 AND job_id = $2", maxID, jobID).Scan(&appCount)
+	}); err != nil {
+		t.Fatal(err)
+	}
+	if appCount != 1 {
+		t.Fatalf("applications count = %d, want 1", appCount)
+	}
+
+	// 9. Verify Job Detail page now displays "View Application" linking to the active application
+	jobDetailRec := a.do(http.MethodGet, "/jobs/"+strconv.FormatInt(jobID, 10), nil, session, nil)
+	if jobDetailRec.Code != http.StatusOK {
+		t.Fatalf("job detail code: %d", jobDetailRec.Code)
+	}
+	jobDetailHTML := jobDetailRec.Body.String()
+	if !strings.Contains(jobDetailHTML, "View Application") || !strings.Contains(jobDetailHTML, "/applications/"+appIDStr) {
+		t.Errorf("job detail missing 'View Application' button linking to %s", appIDStr)
+	}
+}
+
 var (
 	cspNonce = regexp.MustCompile(`script-src 'nonce-([A-Za-z0-9_-]+)'`)
 	tagRx    = regexp.MustCompile(`<[a-z]+\s[^>]*>`)
