@@ -56,3 +56,68 @@ WHERE u.disabled_at IS NULL AND (p.sealed IS NOT NULL OR p.preferences IS NOT NU
 -- System role: the search preferences of enabled users.
 SELECT p.preferences FROM profiles p JOIN users u ON u.id = p.user_id
 WHERE u.disabled_at IS NULL AND p.preferences IS NOT NULL ORDER BY p.user_id;
+
+-- name: ListWorkExperiences :many
+SELECT id, user_id, company, title, location, workplace_type, start_date, end_date, is_current, sealed_bullets, sort_order, created_at, updated_at
+FROM work_experiences
+WHERE user_id = $1
+ORDER BY sort_order ASC, created_at ASC;
+
+-- name: GetWorkExperience :one
+SELECT id, user_id, company, title, location, workplace_type, start_date, end_date, is_current, sealed_bullets, sort_order, created_at, updated_at
+FROM work_experiences
+WHERE id = $1 AND user_id = $2;
+
+-- name: InsertWorkExperience :exec
+INSERT INTO work_experiences (id, user_id, company, title, location, workplace_type, start_date, end_date, is_current, sealed_bullets, sort_order, created_at, updated_at)
+VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13);
+
+-- name: UpdateWorkExperience :execrows
+UPDATE work_experiences
+SET company = $3, title = $4, location = $5, workplace_type = $6, start_date = $7, end_date = $8, is_current = $9, sealed_bullets = $10, sort_order = $11, updated_at = $12
+WHERE id = $1 AND user_id = $2;
+
+-- name: UpdateWorkExperienceOrder :execrows
+UPDATE work_experiences
+SET sort_order = $3, updated_at = $4
+WHERE id = $1 AND user_id = $2;
+
+-- name: DeleteWorkExperience :execrows
+DELETE FROM work_experiences
+WHERE id = $1 AND user_id = $2;
+
+-- name: CountWorkExperiences :one
+SELECT count(*) FROM work_experiences WHERE user_id = $1;
+
+-- name: ListEducations :many
+SELECT id, user_id, institution, degree, field_of_study, start_date, end_date, is_current, grade, sort_order, created_at, updated_at
+FROM educations
+WHERE user_id = $1
+ORDER BY sort_order ASC, created_at ASC;
+
+-- name: GetEducation :one
+SELECT id, user_id, institution, degree, field_of_study, start_date, end_date, is_current, grade, sort_order, created_at, updated_at
+FROM educations
+WHERE id = $1 AND user_id = $2;
+
+-- name: InsertEducation :exec
+INSERT INTO educations (id, user_id, institution, degree, field_of_study, start_date, end_date, is_current, grade, sort_order, created_at, updated_at)
+VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12);
+
+-- name: UpdateEducation :execrows
+UPDATE educations
+SET institution = $3, degree = $4, field_of_study = $5, start_date = $6, end_date = $7, is_current = $8, grade = $9, sort_order = $10, updated_at = $11
+WHERE id = $1 AND user_id = $2;
+
+-- name: UpdateEducationOrder :execrows
+UPDATE educations
+SET sort_order = $3, updated_at = $4
+WHERE id = $1 AND user_id = $2;
+
+-- name: DeleteEducation :execrows
+DELETE FROM educations
+WHERE id = $1 AND user_id = $2;
+
+-- name: CountEducations :one
+SELECT count(*) FROM educations WHERE user_id = $1;
+

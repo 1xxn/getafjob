@@ -68,3 +68,55 @@ type ItemStore interface {
 	UpdateItem(ctx context.Context, userID uuid.UUID, kind string, it StoredItem) (bool, error)
 	DeleteItem(ctx context.Context, userID uuid.UUID, kind string, id uuid.UUID) (bool, error)
 }
+
+// StoredWorkExperience is a work experience database row with sealed bullet points.
+type StoredWorkExperience struct {
+	ID            uuid.UUID
+	UserID        uuid.UUID
+	Company       string
+	Title         string
+	Location      string
+	WorkplaceType string
+	StartDate     string
+	EndDate       string
+	IsCurrent     bool
+	SealedBullets []byte
+	SortOrder     int
+	CreatedAt     time.Time
+	UpdatedAt     time.Time
+}
+
+// StoredEducation is an education database row.
+type StoredEducation struct {
+	ID           uuid.UUID
+	UserID       uuid.UUID
+	Institution  string
+	Degree       string
+	FieldOfStudy string
+	StartDate    string
+	EndDate      string
+	IsCurrent    bool
+	Grade        string
+	SortOrder    int
+	CreatedAt    time.Time
+	UpdatedAt    time.Time
+}
+
+// StationStore persists work experiences and educations per user (row-level security).
+type StationStore interface {
+	ListWorkExperiences(ctx context.Context, userID uuid.UUID) ([]StoredWorkExperience, error)
+	GetWorkExperience(ctx context.Context, userID, id uuid.UUID) (StoredWorkExperience, error)
+	InsertWorkExperience(ctx context.Context, w StoredWorkExperience) error
+	UpdateWorkExperience(ctx context.Context, w StoredWorkExperience) (bool, error)
+	UpdateWorkExperienceOrder(ctx context.Context, userID, id uuid.UUID, sortOrder int, updatedAt time.Time) (bool, error)
+	DeleteWorkExperience(ctx context.Context, userID, id uuid.UUID) (bool, error)
+	CountWorkExperiences(ctx context.Context, userID uuid.UUID) (int, error)
+
+	ListEducations(ctx context.Context, userID uuid.UUID) ([]StoredEducation, error)
+	GetEducation(ctx context.Context, userID, id uuid.UUID) (StoredEducation, error)
+	InsertEducation(ctx context.Context, e StoredEducation) error
+	UpdateEducation(ctx context.Context, e StoredEducation) (bool, error)
+	UpdateEducationOrder(ctx context.Context, userID, id uuid.UUID, sortOrder int, updatedAt time.Time) (bool, error)
+	DeleteEducation(ctx context.Context, userID, id uuid.UUID) (bool, error)
+	CountEducations(ctx context.Context, userID uuid.UUID) (int, error)
+}

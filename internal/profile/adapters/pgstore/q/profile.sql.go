@@ -75,6 +75,17 @@ func (q *Queries) CountDocuments(ctx context.Context, userID uuid.UUID) (int64, 
 	return count, err
 }
 
+const countEducations = `-- name: CountEducations :one
+SELECT count(*) FROM educations WHERE user_id = $1
+`
+
+func (q *Queries) CountEducations(ctx context.Context, userID uuid.UUID) (int64, error) {
+	row := q.db.QueryRow(ctx, countEducations, userID)
+	var count int64
+	err := row.Scan(&count)
+	return count, err
+}
+
 const countItems = `-- name: CountItems :one
 SELECT count(*) FROM profile_items WHERE user_id = $1 AND kind = $2
 `
@@ -86,6 +97,17 @@ type CountItemsParams struct {
 
 func (q *Queries) CountItems(ctx context.Context, arg CountItemsParams) (int64, error) {
 	row := q.db.QueryRow(ctx, countItems, arg.UserID, arg.Kind)
+	var count int64
+	err := row.Scan(&count)
+	return count, err
+}
+
+const countWorkExperiences = `-- name: CountWorkExperiences :one
+SELECT count(*) FROM work_experiences WHERE user_id = $1
+`
+
+func (q *Queries) CountWorkExperiences(ctx context.Context, userID uuid.UUID) (int64, error) {
+	row := q.db.QueryRow(ctx, countWorkExperiences, userID)
 	var count int64
 	err := row.Scan(&count)
 	return count, err
@@ -108,6 +130,24 @@ func (q *Queries) DeleteDocument(ctx context.Context, arg DeleteDocumentParams) 
 	return result.RowsAffected(), nil
 }
 
+const deleteEducation = `-- name: DeleteEducation :execrows
+DELETE FROM educations
+WHERE id = $1 AND user_id = $2
+`
+
+type DeleteEducationParams struct {
+	ID     uuid.UUID
+	UserID uuid.UUID
+}
+
+func (q *Queries) DeleteEducation(ctx context.Context, arg DeleteEducationParams) (int64, error) {
+	result, err := q.db.Exec(ctx, deleteEducation, arg.ID, arg.UserID)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
+}
+
 const deleteItem = `-- name: DeleteItem :execrows
 DELETE FROM profile_items WHERE id = $1 AND user_id = $2 AND kind = $3
 `
@@ -120,6 +160,24 @@ type DeleteItemParams struct {
 
 func (q *Queries) DeleteItem(ctx context.Context, arg DeleteItemParams) (int64, error) {
 	result, err := q.db.Exec(ctx, deleteItem, arg.ID, arg.UserID, arg.Kind)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
+}
+
+const deleteWorkExperience = `-- name: DeleteWorkExperience :execrows
+DELETE FROM work_experiences
+WHERE id = $1 AND user_id = $2
+`
+
+type DeleteWorkExperienceParams struct {
+	ID     uuid.UUID
+	UserID uuid.UUID
+}
+
+func (q *Queries) DeleteWorkExperience(ctx context.Context, arg DeleteWorkExperienceParams) (int64, error) {
+	result, err := q.db.Exec(ctx, deleteWorkExperience, arg.ID, arg.UserID)
 	if err != nil {
 		return 0, err
 	}
@@ -164,6 +222,69 @@ func (q *Queries) GetDocument(ctx context.Context, arg GetDocumentParams) (GetDo
 	return i, err
 }
 
+const getEducation = `-- name: GetEducation :one
+SELECT id, user_id, institution, degree, field_of_study, start_date, end_date, is_current, grade, sort_order, created_at, updated_at
+FROM educations
+WHERE id = $1 AND user_id = $2
+`
+
+type GetEducationParams struct {
+	ID     uuid.UUID
+	UserID uuid.UUID
+}
+
+func (q *Queries) GetEducation(ctx context.Context, arg GetEducationParams) (Education, error) {
+	row := q.db.QueryRow(ctx, getEducation, arg.ID, arg.UserID)
+	var i Education
+	err := row.Scan(
+		&i.ID,
+		&i.UserID,
+		&i.Institution,
+		&i.Degree,
+		&i.FieldOfStudy,
+		&i.StartDate,
+		&i.EndDate,
+		&i.IsCurrent,
+		&i.Grade,
+		&i.SortOrder,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+	)
+	return i, err
+}
+
+const getWorkExperience = `-- name: GetWorkExperience :one
+SELECT id, user_id, company, title, location, workplace_type, start_date, end_date, is_current, sealed_bullets, sort_order, created_at, updated_at
+FROM work_experiences
+WHERE id = $1 AND user_id = $2
+`
+
+type GetWorkExperienceParams struct {
+	ID     uuid.UUID
+	UserID uuid.UUID
+}
+
+func (q *Queries) GetWorkExperience(ctx context.Context, arg GetWorkExperienceParams) (WorkExperience, error) {
+	row := q.db.QueryRow(ctx, getWorkExperience, arg.ID, arg.UserID)
+	var i WorkExperience
+	err := row.Scan(
+		&i.ID,
+		&i.UserID,
+		&i.Company,
+		&i.Title,
+		&i.Location,
+		&i.WorkplaceType,
+		&i.StartDate,
+		&i.EndDate,
+		&i.IsCurrent,
+		&i.SealedBullets,
+		&i.SortOrder,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+	)
+	return i, err
+}
+
 const insertDocument = `-- name: InsertDocument :exec
 INSERT INTO documents (id, user_id, kind, sealed_name, mime, size, label, language, focus, created_at)
 VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
@@ -198,6 +319,44 @@ func (q *Queries) InsertDocument(ctx context.Context, arg InsertDocumentParams) 
 	return err
 }
 
+const insertEducation = `-- name: InsertEducation :exec
+INSERT INTO educations (id, user_id, institution, degree, field_of_study, start_date, end_date, is_current, grade, sort_order, created_at, updated_at)
+VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
+`
+
+type InsertEducationParams struct {
+	ID           uuid.UUID
+	UserID       uuid.UUID
+	Institution  string
+	Degree       string
+	FieldOfStudy string
+	StartDate    string
+	EndDate      string
+	IsCurrent    bool
+	Grade        string
+	SortOrder    int32
+	CreatedAt    time.Time
+	UpdatedAt    time.Time
+}
+
+func (q *Queries) InsertEducation(ctx context.Context, arg InsertEducationParams) error {
+	_, err := q.db.Exec(ctx, insertEducation,
+		arg.ID,
+		arg.UserID,
+		arg.Institution,
+		arg.Degree,
+		arg.FieldOfStudy,
+		arg.StartDate,
+		arg.EndDate,
+		arg.IsCurrent,
+		arg.Grade,
+		arg.SortOrder,
+		arg.CreatedAt,
+		arg.UpdatedAt,
+	)
+	return err
+}
+
 const insertItem = `-- name: InsertItem :exec
 INSERT INTO profile_items (id, user_id, kind, sealed, updated_at) VALUES ($1, $2, $3, $4, $5)
 `
@@ -216,6 +375,46 @@ func (q *Queries) InsertItem(ctx context.Context, arg InsertItemParams) error {
 		arg.UserID,
 		arg.Kind,
 		arg.Sealed,
+		arg.UpdatedAt,
+	)
+	return err
+}
+
+const insertWorkExperience = `-- name: InsertWorkExperience :exec
+INSERT INTO work_experiences (id, user_id, company, title, location, workplace_type, start_date, end_date, is_current, sealed_bullets, sort_order, created_at, updated_at)
+VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)
+`
+
+type InsertWorkExperienceParams struct {
+	ID            uuid.UUID
+	UserID        uuid.UUID
+	Company       string
+	Title         string
+	Location      string
+	WorkplaceType string
+	StartDate     string
+	EndDate       string
+	IsCurrent     bool
+	SealedBullets []byte
+	SortOrder     int32
+	CreatedAt     time.Time
+	UpdatedAt     time.Time
+}
+
+func (q *Queries) InsertWorkExperience(ctx context.Context, arg InsertWorkExperienceParams) error {
+	_, err := q.db.Exec(ctx, insertWorkExperience,
+		arg.ID,
+		arg.UserID,
+		arg.Company,
+		arg.Title,
+		arg.Location,
+		arg.WorkplaceType,
+		arg.StartDate,
+		arg.EndDate,
+		arg.IsCurrent,
+		arg.SealedBullets,
+		arg.SortOrder,
+		arg.CreatedAt,
 		arg.UpdatedAt,
 	)
 	return err
@@ -268,6 +467,46 @@ func (q *Queries) ListDocuments(ctx context.Context, userID uuid.UUID) ([]ListDo
 	return items, nil
 }
 
+const listEducations = `-- name: ListEducations :many
+SELECT id, user_id, institution, degree, field_of_study, start_date, end_date, is_current, grade, sort_order, created_at, updated_at
+FROM educations
+WHERE user_id = $1
+ORDER BY sort_order ASC, created_at ASC
+`
+
+func (q *Queries) ListEducations(ctx context.Context, userID uuid.UUID) ([]Education, error) {
+	rows, err := q.db.Query(ctx, listEducations, userID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []Education{}
+	for rows.Next() {
+		var i Education
+		if err := rows.Scan(
+			&i.ID,
+			&i.UserID,
+			&i.Institution,
+			&i.Degree,
+			&i.FieldOfStudy,
+			&i.StartDate,
+			&i.EndDate,
+			&i.IsCurrent,
+			&i.Grade,
+			&i.SortOrder,
+			&i.CreatedAt,
+			&i.UpdatedAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const listItems = `-- name: ListItems :many
 SELECT id, sealed, updated_at FROM profile_items WHERE user_id = $1 AND kind = $2 ORDER BY id
 `
@@ -293,6 +532,47 @@ func (q *Queries) ListItems(ctx context.Context, arg ListItemsParams) ([]ListIte
 	for rows.Next() {
 		var i ListItemsRow
 		if err := rows.Scan(&i.ID, &i.Sealed, &i.UpdatedAt); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const listWorkExperiences = `-- name: ListWorkExperiences :many
+SELECT id, user_id, company, title, location, workplace_type, start_date, end_date, is_current, sealed_bullets, sort_order, created_at, updated_at
+FROM work_experiences
+WHERE user_id = $1
+ORDER BY sort_order ASC, created_at ASC
+`
+
+func (q *Queries) ListWorkExperiences(ctx context.Context, userID uuid.UUID) ([]WorkExperience, error) {
+	rows, err := q.db.Query(ctx, listWorkExperiences, userID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []WorkExperience{}
+	for rows.Next() {
+		var i WorkExperience
+		if err := rows.Scan(
+			&i.ID,
+			&i.UserID,
+			&i.Company,
+			&i.Title,
+			&i.Location,
+			&i.WorkplaceType,
+			&i.StartDate,
+			&i.EndDate,
+			&i.IsCurrent,
+			&i.SealedBullets,
+			&i.SortOrder,
+			&i.CreatedAt,
+			&i.UpdatedAt,
+		); err != nil {
 			return nil, err
 		}
 		items = append(items, i)
@@ -370,6 +650,72 @@ func (q *Queries) SaveProfile(ctx context.Context, arg SaveProfileParams) (int64
 	return result.RowsAffected(), nil
 }
 
+const updateEducation = `-- name: UpdateEducation :execrows
+UPDATE educations
+SET institution = $3, degree = $4, field_of_study = $5, start_date = $6, end_date = $7, is_current = $8, grade = $9, sort_order = $10, updated_at = $11
+WHERE id = $1 AND user_id = $2
+`
+
+type UpdateEducationParams struct {
+	ID           uuid.UUID
+	UserID       uuid.UUID
+	Institution  string
+	Degree       string
+	FieldOfStudy string
+	StartDate    string
+	EndDate      string
+	IsCurrent    bool
+	Grade        string
+	SortOrder    int32
+	UpdatedAt    time.Time
+}
+
+func (q *Queries) UpdateEducation(ctx context.Context, arg UpdateEducationParams) (int64, error) {
+	result, err := q.db.Exec(ctx, updateEducation,
+		arg.ID,
+		arg.UserID,
+		arg.Institution,
+		arg.Degree,
+		arg.FieldOfStudy,
+		arg.StartDate,
+		arg.EndDate,
+		arg.IsCurrent,
+		arg.Grade,
+		arg.SortOrder,
+		arg.UpdatedAt,
+	)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
+}
+
+const updateEducationOrder = `-- name: UpdateEducationOrder :execrows
+UPDATE educations
+SET sort_order = $3, updated_at = $4
+WHERE id = $1 AND user_id = $2
+`
+
+type UpdateEducationOrderParams struct {
+	ID        uuid.UUID
+	UserID    uuid.UUID
+	SortOrder int32
+	UpdatedAt time.Time
+}
+
+func (q *Queries) UpdateEducationOrder(ctx context.Context, arg UpdateEducationOrderParams) (int64, error) {
+	result, err := q.db.Exec(ctx, updateEducationOrder,
+		arg.ID,
+		arg.UserID,
+		arg.SortOrder,
+		arg.UpdatedAt,
+	)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
+}
+
 const updateItem = `-- name: UpdateItem :execrows
 UPDATE profile_items SET sealed = $4, updated_at = $5 WHERE id = $1 AND user_id = $2 AND kind = $3
 `
@@ -415,6 +761,74 @@ func (q *Queries) UpdateVariant(ctx context.Context, arg UpdateVariantParams) (i
 		arg.Label,
 		arg.Language,
 		arg.Focus,
+	)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
+}
+
+const updateWorkExperience = `-- name: UpdateWorkExperience :execrows
+UPDATE work_experiences
+SET company = $3, title = $4, location = $5, workplace_type = $6, start_date = $7, end_date = $8, is_current = $9, sealed_bullets = $10, sort_order = $11, updated_at = $12
+WHERE id = $1 AND user_id = $2
+`
+
+type UpdateWorkExperienceParams struct {
+	ID            uuid.UUID
+	UserID        uuid.UUID
+	Company       string
+	Title         string
+	Location      string
+	WorkplaceType string
+	StartDate     string
+	EndDate       string
+	IsCurrent     bool
+	SealedBullets []byte
+	SortOrder     int32
+	UpdatedAt     time.Time
+}
+
+func (q *Queries) UpdateWorkExperience(ctx context.Context, arg UpdateWorkExperienceParams) (int64, error) {
+	result, err := q.db.Exec(ctx, updateWorkExperience,
+		arg.ID,
+		arg.UserID,
+		arg.Company,
+		arg.Title,
+		arg.Location,
+		arg.WorkplaceType,
+		arg.StartDate,
+		arg.EndDate,
+		arg.IsCurrent,
+		arg.SealedBullets,
+		arg.SortOrder,
+		arg.UpdatedAt,
+	)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
+}
+
+const updateWorkExperienceOrder = `-- name: UpdateWorkExperienceOrder :execrows
+UPDATE work_experiences
+SET sort_order = $3, updated_at = $4
+WHERE id = $1 AND user_id = $2
+`
+
+type UpdateWorkExperienceOrderParams struct {
+	ID        uuid.UUID
+	UserID    uuid.UUID
+	SortOrder int32
+	UpdatedAt time.Time
+}
+
+func (q *Queries) UpdateWorkExperienceOrder(ctx context.Context, arg UpdateWorkExperienceOrderParams) (int64, error) {
+	result, err := q.db.Exec(ctx, updateWorkExperienceOrder,
+		arg.ID,
+		arg.UserID,
+		arg.SortOrder,
+		arg.UpdatedAt,
 	)
 	if err != nil {
 		return 0, err

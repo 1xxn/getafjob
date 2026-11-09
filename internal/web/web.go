@@ -90,6 +90,7 @@ type Server struct {
 	Profile        *profile.Service
 	Documents      *profile.Documents
 	Items          *profile.Items
+	Stations       *profile.Stations
 	Importer       *cvimport.Importer // nil: no CV import
 	Jobs           *matching.Listings
 	Apps           *application.Service
@@ -140,6 +141,16 @@ func (s *Server) Register(mux *http.ServeMux) {
 	mux.Handle("POST /applications/{id}/suggestions/{sugId}/dismiss", s.page(s.suggestionDismiss))
 	mux.Handle("GET /profile", s.page(s.profilePage))
 	mux.Handle("POST /profile", s.page(s.profileSave))
+	mux.Handle("POST /profile/experiences", s.page(s.experienceAdd))
+	mux.Handle("POST /profile/experiences/{id}", s.page(s.experienceSave))
+	mux.Handle("POST /profile/experiences/{id}/up", s.page(s.experienceMove("up")))
+	mux.Handle("POST /profile/experiences/{id}/down", s.page(s.experienceMove("down")))
+	mux.Handle("POST /profile/experiences/{id}/delete", s.page(s.experienceDelete))
+	mux.Handle("POST /profile/educations", s.page(s.educationAdd))
+	mux.Handle("POST /profile/educations/{id}", s.page(s.educationSave))
+	mux.Handle("POST /profile/educations/{id}/up", s.page(s.educationMove("up")))
+	mux.Handle("POST /profile/educations/{id}/down", s.page(s.educationMove("down")))
+	mux.Handle("POST /profile/educations/{id}/delete", s.page(s.educationDelete))
 	mux.Handle("GET /preferences", s.page(s.preferencesPage))
 	mux.Handle("POST /preferences", s.page(s.preferencesSave))
 	mux.Handle("POST /preferences/notify/test", s.page(s.notifyTest))

@@ -133,6 +133,21 @@ type Document struct {
 	CreatedAt  time.Time
 }
 
+type Education struct {
+	ID           uuid.UUID
+	UserID       uuid.UUID
+	Institution  string
+	Degree       string
+	FieldOfStudy string
+	StartDate    string
+	EndDate      string
+	IsCurrent    bool
+	Grade        string
+	SortOrder    int32
+	CreatedAt    time.Time
+	UpdatedAt    time.Time
+}
+
 type Invitation struct {
 	ID           uuid.UUID
 	Email        string
@@ -381,4 +396,20 @@ type WebauthnChallenge struct {
 	Kind      string
 	Data      []byte
 	ExpiresAt time.Time
+}
+
+type WorkExperience struct {
+	ID            uuid.UUID
+	UserID        uuid.UUID
+	Company       string
+	Title         string
+	Location      string
+	WorkplaceType string
+	StartDate     string
+	EndDate       string
+	IsCurrent     bool
+	SealedBullets []byte
+	SortOrder     int32
+	CreatedAt     time.Time
+	UpdatedAt     time.Time
 }
