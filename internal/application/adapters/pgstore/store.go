@@ -66,10 +66,74 @@ func (s *Store) Get(ctx context.Context, userID, id uuid.UUID) (a application.Ap
 			ApprovalAsked:   r.ApprovalAskedAt,
 			ApprovalReasons: reasons,
 			Approved:        r.ApprovedAt,
+			CvDocumentID:    r.CvDocumentID,
 		}
 		return err
 	})
 	return a, err
+}
+
+// ByJob returns the user's application for a specific job if one exists.
+func (s *Store) ByJob(ctx context.Context, userID uuid.UUID, jobID int64) (a application.App, err error) {
+	err = s.user(ctx, userID, func(qs *q.Queries) error {
+		r, err := qs.GetApplicationByJob(ctx, q.GetApplicationByJobParams{JobID: jobID, UserID: userID})
+		if errors.Is(err, pgx.ErrNoRows) {
+			return application.ErrNotFound
+		}
+		if err != nil {
+			return err
+		}
+		var reasons []application.Reason
+		for _, re := range r.ApprovalReasons {
+			reasons = append(reasons, application.Reason(re))
+		}
+		a = application.App{
+			ID:              r.ID,
+			JobID:           r.JobID,
+			State:           application.State(r.State),
+			Version:         r.Version,
+			UpdatedAt:       r.UpdatedAt,
+			ApprovalAsked:   r.ApprovalAskedAt,
+			ApprovalReasons: reasons,
+			Approved:        r.ApprovedAt,
+			CvDocumentID:    r.CvDocumentID,
+		}
+		return nil
+	})
+	return a, err
+}
+
+// SetCvDocument sets or clears the chosen CV variant for an application.
+func (s *Store) SetCvDocument(ctx context.Context, userID, appID uuid.UUID, cvID *uuid.UUID, at time.Time) error {
+	return s.user(ctx, userID, func(qs *q.Queries) error {
+		n, err := qs.SetCvDocument(ctx, q.SetCvDocumentParams{
+			ID:           appID,
+			UserID:       userID,
+			CvDocumentID: cvID,
+			Now:          at,
+		})
+		if err != nil {
+			return err
+		}
+		if n == 0 {
+			return application.ErrNotFound
+		}
+		return nil
+	})
+}
+
+// SetJobCvDocument sets or creates an application for the job with the chosen CV variant.
+func (s *Store) SetJobCvDocument(ctx context.Context, userID uuid.UUID, jobID int64, cvID *uuid.UUID, at time.Time) (id uuid.UUID, err error) {
+	err = s.user(ctx, userID, func(qs *q.Queries) error {
+		id, err = qs.SetJobCvDocument(ctx, q.SetJobCvDocumentParams{
+			UserID:       userID,
+			JobID:        jobID,
+			CvDocumentID: cvID,
+			Now:          at,
+		})
+		return err
+	})
+	return id, err
 }
 
 // Questions returns the questions from the latest ask event of the application.
@@ -653,14 +717,15 @@ func (s *Store) Approvals(ctx context.Context, userID uuid.UUID) (out []applicat
 				reasons = append(reasons, application.Reason(re))
 			}
 			out = append(out, application.Approval{
-				ID:      r.ID,
-				JobID:   r.JobID,
-				State:   application.State(r.State),
-				Title:   r.Title,
-				Company: r.Company,
-				Score:   int(r.Score),
-				Reasons: reasons,
-				Asked:   r.AskedAt,
+				ID:           r.ID,
+				JobID:        r.JobID,
+				State:        application.State(r.State),
+				Title:        r.Title,
+				Company:      r.Company,
+				Score:        int(r.Score),
+				Reasons:      reasons,
+				Asked:        r.AskedAt,
+				CvDocumentID: r.CvDocumentID,
 			})
 		}
 		return nil

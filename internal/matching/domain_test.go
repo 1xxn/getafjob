@@ -1,6 +1,7 @@
 package matching
 
 import (
+	"slices"
 	"strings"
 	"testing"
 	"time"
@@ -243,6 +244,52 @@ func TestEvaluateDecision(t *testing.T) {
 		if r.Decision != tt.want || r.Score < 0 || r.Score > 100 {
 			t.Errorf("%q: %s %d %+v, want %s", tt.j.Title, r.Decision, r.Score, r.Reasons, tt.want)
 		}
+	}
+}
+
+func TestInspectFit(t *testing.T) {
+	c := Criteria{
+		Titles:     []string{"Senior Go Engineer"},
+		Skills:     []string{"Go", "Kubernetes"},
+		YearsTotal: "6",
+		Locations:  []string{"Berlin"},
+		Remote:     true,
+	}
+	j := Job{
+		ID:          1,
+		Title:       "Senior Go Developer",
+		Location:    "Berlin",
+		Workplace:   "hybrid",
+		Description: "We need strong Go and Kubernetes experience. PostgreSQL and Docker are also required.",
+		Posted:      now,
+	}
+	fit := InspectFit(c, j, now)
+	if fit.Score <= 0 {
+		t.Fatalf("Score = %d, want > 0", fit.Score)
+	}
+	if !slices.Contains(fit.MatchingSkills, "Go") {
+		t.Errorf("MatchingSkills missing Go: %v", fit.MatchingSkills)
+	}
+	if !slices.Contains(fit.MatchingSkills, "Kubernetes") {
+		t.Errorf("MatchingSkills missing Kubernetes: %v", fit.MatchingSkills)
+	}
+	if !slices.Contains(fit.MissingSkills, "PostgreSQL") {
+		t.Errorf("MissingSkills missing PostgreSQL: %v", fit.MissingSkills)
+	}
+	if !slices.Contains(fit.MissingSkills, "Docker") {
+		t.Errorf("MissingSkills missing Docker: %v", fit.MissingSkills)
+	}
+	if fit.CandidateLevel != "senior" {
+		t.Errorf("CandidateLevel = %q, want senior", fit.CandidateLevel)
+	}
+	if fit.JobLevel != "senior" {
+		t.Errorf("JobLevel = %q, want senior", fit.JobLevel)
+	}
+	if fit.SkillPoints <= 0 || fit.MaxSkillPoints != 25 {
+		t.Errorf("SkillPoints = %d / %d", fit.SkillPoints, fit.MaxSkillPoints)
+	}
+	if fit.TitlePoints <= 0 || fit.MaxTitlePoints != 35 {
+		t.Errorf("TitlePoints = %d / %d", fit.TitlePoints, fit.MaxTitlePoints)
 	}
 }
 

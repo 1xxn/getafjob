@@ -294,6 +294,199 @@ func TestJobIngestionAndCrawlControls(t *testing.T) {
 	}
 }
 
+func TestFitInspectorAndCVVariantSwitcher(t *testing.T) {
+	a := newApp(t)
+	ctx := t.Context()
+	session := signedIn(t, a)
+
+	// 1. Upload 2 CV variants
+	pdf := []byte("%PDF-1.7\nCV of Max Mustermann")
+	if rec := a.upload("cv", "cv-backend.pdf", pdf, session); rec.Code != http.StatusSeeOther {
+		t.Fatalf("upload backend cv: %d", rec.Code)
+	}
+	docPage := a.do(http.MethodGet, "/documents", nil, session, nil).Body.String()
+	idx1 := strings.Index(docPage, `href="/documents/`)
+	if idx1 < 0 {
+		t.Fatal("no backend cv found")
+	}
+	cv1ID := docPage[idx1+len(`href="/documents/`) : idx1+len(`href="/documents/`)+36]
+	if rec := a.do(http.MethodPost, "/documents/"+cv1ID+"/variant", url.Values{
+		"label-" + cv1ID:    {"Backend Specialist"},
+		"language-" + cv1ID: {"en"},
+		"focus-" + cv1ID:    {"golang, postgresql"},
+	}, session, nil); rec.Code != http.StatusOK {
+		t.Fatalf("set variant 1: %d", rec.Code)
+	}
+
+	if rec := a.upload("cv", "cv-frontend.pdf", pdf, session); rec.Code != http.StatusSeeOther {
+		t.Fatalf("upload frontend cv: %d", rec.Code)
+	}
+	docPage2 := a.do(http.MethodGet, "/documents", nil, session, nil).Body.String()
+	idx2 := strings.LastIndex(docPage2, `href="/documents/`)
+	if idx2 < 0 || idx2 == idx1 {
+		t.Fatal("no frontend cv found")
+	}
+	cv2ID := docPage2[idx2+len(`href="/documents/`) : idx2+len(`href="/documents/`)+36]
+	if rec := a.do(http.MethodPost, "/documents/"+cv2ID+"/variant", url.Values{
+		"label-" + cv2ID:    {"Frontend Specialist"},
+		"language-" + cv2ID: {"en"},
+		"focus-" + cv2ID:    {"react, typescript"},
+	}, session, nil); rec.Code != http.StatusOK {
+		t.Fatalf("set variant 2: %d", rec.Code)
+	}
+
+	// 2. Set profile initial skills: Go
+	profForm := url.Values{
+		"version":    {"0"},
+		"first_name": {"Max"},
+		"last_name":  {"Mustermann"},
+		"email":      {"max.mustermann@example.com"},
+		"skills":     {"Go"},
+		"languages":  {"English: C1"},
+	}
+	if rec := a.do(http.MethodPost, "/profile", profForm, session, nil); rec.Code != http.StatusSeeOther {
+		t.Fatalf("save profile: %d", rec.Code)
+	}
+
+	// 3. Insert job requiring Go, PostgreSQL, Docker
+	ds := discoverystore.New(a.pool)
+	now := time.Now()
+	run, err := ds.StartRun(ctx, []string{}, now)
+	if err != nil {
+		t.Fatal(err)
+	}
+	p := discovery.Posting{
+		Source:      "arbeitnow",
+		ExternalID:  "100",
+		Company:     "Acme Backend Tech",
+		Title:       "Senior Go Developer",
+		Location:    "Berlin",
+		Workplace:   "remote",
+		URL:         "https://example.org/jobs/100",
+		Description: "We are seeking a Senior Go Developer. You will build distributed systems using Go, PostgreSQL, and Docker.",
+	}
+	if _, _, err := ds.Upsert(ctx, run, p, now); err != nil {
+		t.Fatal(err)
+	}
+
+	var maxID uuid.UUID
+	var jobID int64
+	if err := db.InSystemTx(ctx, a.pool, func(tx pgx.Tx) error {
+		if err := tx.QueryRow(ctx, "SELECT id FROM users WHERE email = 'max.mustermann@example.com'").Scan(&maxID); err != nil {
+			return err
+		}
+		return tx.QueryRow(ctx, "SELECT id FROM jobs WHERE external_id = '100'").Scan(&jobID)
+	}); err != nil {
+		t.Fatal(err)
+	}
+
+	ms := matchingstore.New(a.pool)
+	crit := criteria{maxID: {
+		Titles:     []string{"Go Developer"},
+		Locations:  []string{"Berlin"},
+		Skills:     []string{"Go"},
+		Languages:  []matching.Language{{Name: "English", Level: "C1"}},
+		Remote:     true,
+		YearsTotal: "5+",
+	}}
+	if _, err := matching.NewService(crit, ms, ms).Run(ctx, nil); err != nil {
+		t.Fatal(err)
+	}
+
+	// 4. GET /jobs/{id}
+	jobPath := "/jobs/" + strconv.FormatInt(jobID, 10)
+	detailRec := a.do(http.MethodGet, jobPath, nil, session, nil)
+	if detailRec.Code != http.StatusOK {
+		t.Fatalf("job detail %d", detailRec.Code)
+	}
+	body := detailRec.Body.String()
+
+	// Check Fit Inspector
+	if !strings.Contains(body, `id="fit-inspector"`) {
+		t.Fatal("fit inspector missing")
+	}
+	if !strings.Contains(body, "Matching Skills") || !strings.Contains(body, "Go") {
+		t.Fatalf("matching skills missing in body:\n%s", body)
+	}
+	if !strings.Contains(body, "Missing Keywords &amp; Skills") {
+		t.Fatalf("missing skills title not found")
+	}
+	if !strings.Contains(body, "PostgreSQL") || !strings.Contains(body, "Docker") {
+		t.Fatalf("missing skills PostgreSQL / Docker not found")
+	}
+	if !strings.Contains(body, "Score Breakdown") {
+		t.Fatal("score breakdown title not found")
+	}
+	if !strings.Contains(body, "Skills Overlap") || !strings.Contains(body, "Seniority Level") {
+		t.Fatal("breakdown dimensions missing")
+	}
+
+	// Check CV Variant Switcher
+	if !strings.Contains(body, `id="cv-switcher"`) {
+		t.Fatal("cv switcher missing")
+	}
+	if !strings.Contains(body, "Backend Specialist") || !strings.Contains(body, "Frontend Specialist") {
+		t.Fatal("cv variants not listed")
+	}
+	if !strings.Contains(body, "Recommended") {
+		t.Fatal("recommended badge missing")
+	}
+
+	// 5. 1-Click Skill Addition: POST /jobs/{id}/skills (HTMX partial)
+	addSkillRec := a.do(http.MethodPost, jobPath+"/skills", url.Values{"skill": {"Docker"}}, session, map[string]string{
+		"HX-Request": "true",
+	})
+	if addSkillRec.Code != http.StatusOK {
+		t.Fatalf("add skill status: %d", addSkillRec.Code)
+	}
+	addSkillBody := addSkillRec.Body.String()
+	if !strings.Contains(addSkillBody, `id="fit-inspector"`) {
+		t.Fatal("add skill response missing fit-inspector")
+	}
+	if !strings.Contains(addSkillBody, "Added &#34;Docker&#34; to your profile") {
+		t.Fatalf("add skill success notice missing in body:\n%s", addSkillBody)
+	}
+	if !strings.Contains(addSkillBody, "✓ Docker") {
+		t.Fatalf("Docker not in matching skills badge list:\n%s", addSkillBody)
+	}
+
+	// 6. CV Variant Switcher: POST /jobs/{id}/cv (HTMX partial)
+	setCVRec := a.do(http.MethodPost, jobPath+"/cv", url.Values{"cv_id": {cv2ID}}, session, map[string]string{
+		"HX-Request": "true",
+	})
+	if setCVRec.Code != http.StatusOK {
+		t.Fatalf("set cv status: %d", setCVRec.Code)
+	}
+	setCVBody := setCVRec.Body.String()
+	if !strings.Contains(setCVBody, `id="cv-switcher"`) {
+		t.Fatal("set cv response missing cv-switcher")
+	}
+	if !strings.Contains(setCVBody, "CV variant choice saved.") {
+		t.Fatalf("set cv success notice missing in body:\n%s", setCVBody)
+	}
+
+	// Verify application record in database has selected cv_document_id == cv2ID
+	var storedCvID *uuid.UUID
+	if err := db.InSystemTx(ctx, a.pool, func(tx pgx.Tx) error {
+		return tx.QueryRow(ctx, "SELECT cv_document_id FROM applications WHERE user_id = $1 AND job_id = $2", maxID, jobID).Scan(&storedCvID)
+	}); err != nil {
+		t.Fatal(err)
+	}
+	if storedCvID == nil || storedCvID.String() != cv2ID {
+		t.Fatalf("stored cv_document_id = %v, want %s", storedCvID, cv2ID)
+	}
+
+	// 7. Non-HTMX fallback for /jobs/{id}/skills and /jobs/{id}/cv redirects to /jobs/{id}
+	redirectRec := a.do(http.MethodPost, jobPath+"/skills", url.Values{"skill": {"Kubernetes"}}, session, nil)
+	if redirectRec.Code != http.StatusSeeOther || redirectRec.Header().Get("Location") != jobPath {
+		t.Fatalf("non-htmx add skill redirect: %d, location: %s", redirectRec.Code, redirectRec.Header().Get("Location"))
+	}
+	redirectCVRec := a.do(http.MethodPost, jobPath+"/cv", url.Values{"cv_id": {cv1ID}}, session, nil)
+	if redirectCVRec.Code != http.StatusSeeOther || redirectCVRec.Header().Get("Location") != jobPath {
+		t.Fatalf("non-htmx set cv redirect: %d, location: %s", redirectCVRec.Code, redirectCVRec.Header().Get("Location"))
+	}
+}
+
 var (
 	cspNonce = regexp.MustCompile(`script-src 'nonce-([A-Za-z0-9_-]+)'`)
 	tagRx    = regexp.MustCompile(`<[a-z]+\s[^>]*>`)

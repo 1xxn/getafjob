@@ -374,3 +374,67 @@ func TestEvidenceAndScreenshotRetention(t *testing.T) {
 		t.Fatalf("purged screenshot should be ErrNotFound, got %v", err)
 	}
 }
+
+func TestApplicationCVVariant(t *testing.T) {
+	pool, _, svc, _ := setup(t)
+	ctx := t.Context()
+	max := user(t, pool, "max@muster.example")
+	other := user(t, pool, "other@muster.example")
+	jID := job(t, pool, "greenhouse:acme", "Acme Corp", "mk-cv")
+
+	// Insert a dummy document for max
+	var docID uuid.UUID
+	if err := db.InSystemTx(ctx, pool, func(tx pgx.Tx) error {
+		return tx.QueryRow(ctx, `INSERT INTO documents (user_id, kind, sealed_name, mime, size, label, language, created_at)
+			VALUES ($1, 'cv', '\x00', 'application/pdf', 1024, 'Backend Specialist', 'en', now())
+			RETURNING id`, max).Scan(&docID)
+	}); err != nil {
+		t.Fatal(err)
+	}
+
+	// 1. ByJob when no application exists
+	if _, err := svc.ByJob(ctx, max, jID); !errors.Is(err, application.ErrNotFound) {
+		t.Fatalf("ByJob before create: got %v, want ErrNotFound", err)
+	}
+
+	// 2. SetJobCV creates the application with cv_document_id
+	appID, err := svc.SetJobCV(ctx, max, jID, &docID)
+	if err != nil {
+		t.Fatalf("SetJobCV err = %v", err)
+	}
+
+	// 3. ByJob returns the created application with cv_document_id
+	app, err := svc.ByJob(ctx, max, jID)
+	if err != nil {
+		t.Fatalf("ByJob err = %v", err)
+	}
+	if app.ID != appID || app.CvDocumentID == nil || *app.CvDocumentID != docID {
+		t.Fatalf("app = %+v, want docID = %v", app, docID)
+	}
+
+	// 4. Update CV via SetCV
+	var docID2 uuid.UUID
+	if err := db.InSystemTx(ctx, pool, func(tx pgx.Tx) error {
+		return tx.QueryRow(ctx, `INSERT INTO documents (user_id, kind, sealed_name, mime, size, label, language, created_at)
+			VALUES ($1, 'cv', '\x00', 'application/pdf', 1024, 'Generalist', 'de', now())
+			RETURNING id`, max).Scan(&docID2)
+	}); err != nil {
+		t.Fatal(err)
+	}
+
+	if err := svc.SetCV(ctx, max, appID, &docID2); err != nil {
+		t.Fatalf("SetCV err = %v", err)
+	}
+	app, err = svc.Get(ctx, max, appID)
+	if err != nil || app.CvDocumentID == nil || *app.CvDocumentID != docID2 {
+		t.Fatalf("app after SetCV = %+v, want docID2 = %v", app, docID2)
+	}
+
+	// 5. Tenant isolation: other user cannot access or update max's application
+	if _, err := svc.ByJob(ctx, other, jID); !errors.Is(err, application.ErrNotFound) {
+		t.Fatalf("other user ByJob: got %v, want ErrNotFound", err)
+	}
+	if err := svc.SetCV(ctx, other, appID, &docID); !errors.Is(err, application.ErrNotFound) {
+		t.Fatalf("other user SetCV: got %v, want ErrNotFound", err)
+	}
+}

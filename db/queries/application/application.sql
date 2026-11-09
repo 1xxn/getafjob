@@ -4,8 +4,22 @@ ON CONFLICT (user_id, job_id) DO UPDATE SET user_id = EXCLUDED.user_id
 RETURNING id;
 
 -- name: GetApplication :one
-SELECT id, job_id, state, version, updated_at, approval_asked_at, approval_reasons, approved_at
+SELECT id, job_id, state, version, updated_at, approval_asked_at, approval_reasons, approved_at, cv_document_id
 FROM applications WHERE id = $1 AND user_id = $2;
+
+-- name: GetApplicationByJob :one
+SELECT id, job_id, state, version, updated_at, approval_asked_at, approval_reasons, approved_at, cv_document_id
+FROM applications WHERE job_id = $1 AND user_id = $2;
+
+-- name: SetCvDocument :execrows
+UPDATE applications SET cv_document_id = sqlc.narg(cv_document_id)::uuid, updated_at = sqlc.arg(now)::timestamptz
+WHERE id = sqlc.arg(id) AND user_id = sqlc.arg(user_id);
+
+-- name: SetJobCvDocument :one
+INSERT INTO applications (user_id, job_id, state, cv_document_id, created_at, updated_at)
+VALUES ($1, $2, 'matched', sqlc.narg(cv_document_id)::uuid, sqlc.arg(now)::timestamptz, sqlc.arg(now)::timestamptz)
+ON CONFLICT (user_id, job_id) DO UPDATE SET cv_document_id = EXCLUDED.cv_document_id, updated_at = EXCLUDED.updated_at
+RETURNING id;
 
 -- name: SetState :execrows
 UPDATE applications SET state = sqlc.arg(to_state), version = version + 1, updated_at = sqlc.arg(at),

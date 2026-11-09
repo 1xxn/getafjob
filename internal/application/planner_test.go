@@ -186,6 +186,18 @@ func (f *fakePlannerStore) UserApplications(_ context.Context, _ uuid.UUID) ([]a
 	return nil, nil
 }
 
+func (f *fakePlannerStore) ByJob(_ context.Context, _ uuid.UUID, _ int64) (application.App, error) {
+	return application.App{}, application.ErrNotFound
+}
+
+func (f *fakePlannerStore) SetCvDocument(_ context.Context, _, _ uuid.UUID, _ *uuid.UUID, _ time.Time) error {
+	return nil
+}
+
+func (f *fakePlannerStore) SetJobCvDocument(_ context.Context, _ uuid.UUID, _ int64, _ *uuid.UUID, _ time.Time) (uuid.UUID, error) {
+	return uuid.New(), nil
+}
+
 func (f *fakePlannerStore) UserScreenshots(_ context.Context, _ uuid.UUID) ([]string, error) {
 	return nil, nil
 }

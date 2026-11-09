@@ -103,6 +103,21 @@ func (s *Service) Create(ctx context.Context, userID uuid.UUID, jobID int64) (uu
 	return s.store.Create(ctx, userID, jobID, Matched, s.now())
 }
 
+// ByJob returns the user's application for a job if one exists.
+func (s *Service) ByJob(ctx context.Context, userID uuid.UUID, jobID int64) (App, error) {
+	return s.store.ByJob(ctx, userID, jobID)
+}
+
+// SetCV sets or clears the chosen CV variant for an existing application.
+func (s *Service) SetCV(ctx context.Context, userID, appID uuid.UUID, cvID *uuid.UUID) error {
+	return s.store.SetCvDocument(ctx, userID, appID, cvID, s.now())
+}
+
+// SetJobCV sets or creates an application for a job with the chosen CV variant.
+func (s *Service) SetJobCV(ctx context.Context, userID uuid.UUID, jobID int64, cvID *uuid.UUID) (uuid.UUID, error) {
+	return s.store.SetJobCvDocument(ctx, userID, jobID, cvID, s.now())
+}
+
 // outcomes finishes the submit attempt for transitions out of submitting and submit_unknown.
 func outcome(from State, ev Event) string {
 	switch {
