@@ -234,6 +234,11 @@ func (s *Server) jobPage(w http.ResponseWriter, r *http.Request, u *identity.Use
 	inspection := matching.InspectFit(c, mj, time.Now())
 	d.Fit = buildFitData(r.Context(), j.JobID, inspection, "")
 	d.CV = s.buildCVVariantData(r.Context(), u.ID, j, "")
+	if s.Apps != nil {
+		if app, err := s.Apps.ByJob(r.Context(), u.ID, j.JobID); err == nil {
+			d.ApplicationState = string(app.State)
+		}
+	}
 	s.render(w, r, http.StatusOK, views.JobPage(d))
 }
 

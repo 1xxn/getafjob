@@ -60,18 +60,20 @@ const (
 // transitions is the complete state machine; anything not listed is refused.
 var transitions = map[State]map[Event]State{
 	Discovered: {EvMatch: Matched, EvSkip: Skipped},
-	Matched:    {EvQueue: Queued, EvSkip: Skipped, EvPark: Parked},
+	Matched:    {EvQueue: Queued, EvSkip: Skipped, EvPark: Parked, EvSubmitted: Submitted},
 	Queued:     {EvStart: Running, EvSkip: Skipped, EvPark: Parked},
 	Running: {EvAsk: NeedsInput, EvBeginSubmit: Submitting, EvPark: Parked, EvFail: Failed, EvSkip: Skipped,
 		EvSubmitted: Submitted}, // EvSubmitted only for flows whose last step is not ours (e.g. a portal)
-	NeedsInput:    {EvAnswer: Running, EvPark: Parked, EvSkip: Skipped, EvFail: Failed},
+	NeedsInput:    {EvAnswer: Running, EvPark: Parked, EvSkip: Skipped, EvFail: Failed, EvSubmitted: Submitted},
 	Submitting:    {EvSubmitted: Submitted, EvCrash: SubmitUnknown, EvPark: Parked, EvFail: SubmitUnknown},
 	Submitted:     {EvConfirm: Confirmed, EvReject: Rejected, EvInterview: Interview, EvOffer: Offer, EvWithdraw: Withdrawn},
 	Confirmed:     {EvInterview: Interview, EvReject: Rejected, EvOffer: Offer, EvWithdraw: Withdrawn},
-	Interview:     {EvReject: Rejected, EvOffer: Offer, EvWithdraw: Withdrawn},
-	Offer:         {EvWithdraw: Withdrawn},
-	Parked:        {EvRequeue: Queued, EvSkip: Skipped},
-	Failed:        {EvRequeue: Queued, EvSkip: Skipped},
+	Interview:     {EvReject: Rejected, EvOffer: Offer, EvWithdraw: Withdrawn, EvInterview: Interview, EvSubmitted: Submitted},
+	Offer:         {EvWithdraw: Withdrawn, EvReject: Rejected, EvInterview: Interview},
+	Rejected:      {EvInterview: Interview, EvWithdraw: Withdrawn, EvSubmitted: Submitted},
+	Withdrawn:     {EvSubmitted: Submitted, EvInterview: Interview},
+	Parked:        {EvRequeue: Queued, EvSkip: Skipped, EvSubmitted: Submitted},
+	Failed:        {EvRequeue: Queued, EvSkip: Skipped, EvSubmitted: Submitted},
 	SubmitUnknown: {EvReconciled: Submitted, EvNotSent: Parked, EvConfirm: Confirmed},
 }
 

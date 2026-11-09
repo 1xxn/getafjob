@@ -383,6 +383,34 @@ func (q *Queries) GetJob(ctx context.Context, id int64) (GetJobRow, error) {
 	return i, err
 }
 
+const getNotes = `-- name: GetNotes :one
+SELECT id, user_id, application_id, notes, salary_discussed, interview_at, follow_up_at, created_at, updated_at
+FROM application_notes
+WHERE application_id = $1 AND user_id = $2
+`
+
+type GetNotesParams struct {
+	ApplicationID uuid.UUID
+	UserID        uuid.UUID
+}
+
+func (q *Queries) GetNotes(ctx context.Context, arg GetNotesParams) (ApplicationNote, error) {
+	row := q.db.QueryRow(ctx, getNotes, arg.ApplicationID, arg.UserID)
+	var i ApplicationNote
+	err := row.Scan(
+		&i.ID,
+		&i.UserID,
+		&i.ApplicationID,
+		&i.Notes,
+		&i.SalaryDiscussed,
+		&i.InterviewAt,
+		&i.FollowUpAt,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+	)
+	return i, err
+}
+
 const handoffsDue = `-- name: HandoffsDue :many
 SELECT id, user_id, handoff_until, handoff_warned FROM applications
 WHERE state = 'needs_input' AND handoff_until IS NOT NULL AND handoff_until < $1 ORDER BY handoff_until LIMIT 500
@@ -720,6 +748,31 @@ func (q *Queries) SameJobStates(ctx context.Context, arg SameJobStatesParams) ([
 	return items, nil
 }
 
+const saveBookmark = `-- name: SaveBookmark :one
+INSERT INTO applications (user_id, job_id, state, created_at, updated_at)
+VALUES ($1, $2, 'matched', $3::timestamptz, $3::timestamptz)
+ON CONFLICT (user_id, job_id) DO UPDATE SET updated_at = EXCLUDED.updated_at
+RETURNING id, state
+`
+
+type SaveBookmarkParams struct {
+	UserID uuid.UUID
+	JobID  int64
+	Now    time.Time
+}
+
+type SaveBookmarkRow struct {
+	ID    uuid.UUID
+	State string
+}
+
+func (q *Queries) SaveBookmark(ctx context.Context, arg SaveBookmarkParams) (SaveBookmarkRow, error) {
+	row := q.db.QueryRow(ctx, saveBookmark, arg.UserID, arg.JobID, arg.Now)
+	var i SaveBookmarkRow
+	err := row.Scan(&i.ID, &i.State)
+	return i, err
+}
+
 const setCvDocument = `-- name: SetCvDocument :execrows
 UPDATE applications SET cv_document_id = $1::uuid, updated_at = $2::timestamptz
 WHERE id = $3 AND user_id = $4
@@ -743,6 +796,31 @@ func (q *Queries) SetCvDocument(ctx context.Context, arg SetCvDocumentParams) (i
 		return 0, err
 	}
 	return result.RowsAffected(), nil
+}
+
+const setExternalSubmit = `-- name: SetExternalSubmit :one
+INSERT INTO applications (user_id, job_id, state, created_at, updated_at)
+VALUES ($1, $2, 'submitted', $3::timestamptz, $3::timestamptz)
+ON CONFLICT (user_id, job_id) DO UPDATE SET state = 'submitted', updated_at = EXCLUDED.updated_at
+RETURNING id, state
+`
+
+type SetExternalSubmitParams struct {
+	UserID uuid.UUID
+	JobID  int64
+	Now    time.Time
+}
+
+type SetExternalSubmitRow struct {
+	ID    uuid.UUID
+	State string
+}
+
+func (q *Queries) SetExternalSubmit(ctx context.Context, arg SetExternalSubmitParams) (SetExternalSubmitRow, error) {
+	row := q.db.QueryRow(ctx, setExternalSubmit, arg.UserID, arg.JobID, arg.Now)
+	var i SetExternalSubmitRow
+	err := row.Scan(&i.ID, &i.State)
+	return i, err
 }
 
 const setJobCvDocument = `-- name: SetJobCvDocument :one
@@ -833,6 +911,43 @@ func (q *Queries) StaleSubmitting(ctx context.Context, updatedAt time.Time) ([]S
 	return items, nil
 }
 
+const upsertNotes = `-- name: UpsertNotes :one
+INSERT INTO application_notes (id, user_id, application_id, notes, salary_discussed, interview_at, follow_up_at, created_at, updated_at)
+VALUES (uuidv7(), $1, $2, $3, $4, $5::timestamptz, $6::timestamptz, $7::timestamptz, $7::timestamptz)
+ON CONFLICT (application_id) DO UPDATE SET
+  notes = EXCLUDED.notes,
+  salary_discussed = EXCLUDED.salary_discussed,
+  interview_at = EXCLUDED.interview_at,
+  follow_up_at = EXCLUDED.follow_up_at,
+  updated_at = EXCLUDED.updated_at
+RETURNING id
+`
+
+type UpsertNotesParams struct {
+	UserID          uuid.UUID
+	ApplicationID   uuid.UUID
+	Notes           string
+	SalaryDiscussed string
+	InterviewAt     *time.Time
+	FollowUpAt      *time.Time
+	Now             time.Time
+}
+
+func (q *Queries) UpsertNotes(ctx context.Context, arg UpsertNotesParams) (uuid.UUID, error) {
+	row := q.db.QueryRow(ctx, upsertNotes,
+		arg.UserID,
+		arg.ApplicationID,
+		arg.Notes,
+		arg.SalaryDiscussed,
+		arg.InterviewAt,
+		arg.FollowUpAt,
+		arg.Now,
+	)
+	var id uuid.UUID
+	err := row.Scan(&id)
+	return id, err
+}
+
 const userApplications = `-- name: UserApplications :many
 SELECT a.id, a.job_id, a.state, a.version, a.created_at, a.updated_at,
        a.approval_asked_at, a.approval_reasons, a.approved_at,
@@ -884,6 +999,88 @@ func (q *Queries) UserApplications(ctx context.Context, userID uuid.UUID) ([]Use
 			&i.Location,
 			&i.Url,
 			&i.ApplyUrl,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const userApplicationsWithPipeline = `-- name: UserApplicationsWithPipeline :many
+SELECT a.id, a.job_id, a.state, a.version, a.created_at, a.updated_at,
+       a.approval_asked_at, a.approval_reasons, a.approved_at, a.cv_document_id,
+       j.company, j.title, j.location, j.workplace, j.url, j.apply_url,
+       COALESCE(m.score, 0)::integer AS score,
+       COALESCE(n.notes, '')::text AS notes,
+       COALESCE(n.salary_discussed, '')::text AS salary_discussed,
+       n.interview_at, n.follow_up_at
+FROM applications a
+JOIN jobs j ON j.id = a.job_id
+LEFT JOIN matches m ON m.job_id = a.job_id AND m.user_id = a.user_id
+LEFT JOIN application_notes n ON n.application_id = a.id AND n.user_id = a.user_id
+WHERE a.user_id = $1
+ORDER BY a.updated_at DESC
+`
+
+type UserApplicationsWithPipelineRow struct {
+	ID              uuid.UUID
+	JobID           int64
+	State           string
+	Version         int64
+	CreatedAt       time.Time
+	UpdatedAt       time.Time
+	ApprovalAskedAt *time.Time
+	ApprovalReasons []string
+	ApprovedAt      *time.Time
+	CvDocumentID    *uuid.UUID
+	Company         string
+	Title           string
+	Location        string
+	Workplace       string
+	Url             string
+	ApplyUrl        string
+	Score           int32
+	Notes           string
+	SalaryDiscussed string
+	InterviewAt     *time.Time
+	FollowUpAt      *time.Time
+}
+
+func (q *Queries) UserApplicationsWithPipeline(ctx context.Context, userID uuid.UUID) ([]UserApplicationsWithPipelineRow, error) {
+	rows, err := q.db.Query(ctx, userApplicationsWithPipeline, userID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []UserApplicationsWithPipelineRow{}
+	for rows.Next() {
+		var i UserApplicationsWithPipelineRow
+		if err := rows.Scan(
+			&i.ID,
+			&i.JobID,
+			&i.State,
+			&i.Version,
+			&i.CreatedAt,
+			&i.UpdatedAt,
+			&i.ApprovalAskedAt,
+			&i.ApprovalReasons,
+			&i.ApprovedAt,
+			&i.CvDocumentID,
+			&i.Company,
+			&i.Title,
+			&i.Location,
+			&i.Workplace,
+			&i.Url,
+			&i.ApplyUrl,
+			&i.Score,
+			&i.Notes,
+			&i.SalaryDiscussed,
+			&i.InterviewAt,
+			&i.FollowUpAt,
 		); err != nil {
 			return nil, err
 		}

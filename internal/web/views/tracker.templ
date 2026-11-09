@@ -1,0 +1,254 @@
+package views
+
+// TrackerCardData represents one job application card on the Kanban board.
+type TrackerCardData struct {
+	ID                 string
+	JobID              int64
+	Title              string
+	Company            string
+	Location           string
+	Workplace          string
+	State              string
+	Score              int
+	URL                string
+	ApplyURL           string
+	UpdatedAt          string
+	Notes              string
+	SalaryDiscussed    string
+	InterviewAt        string
+	InterviewAtDisplay string
+	FollowUpAt         string
+	FollowUpAtDisplay  string
+	EmailActivity      string
+	Notice             string
+}
+
+// TrackerColumnData represents one column in the Kanban funnel.
+type TrackerColumnData struct {
+	Key   string
+	Title string
+	Cards []TrackerCardData
+}
+
+// TrackerData holds the entire board state.
+type TrackerData struct {
+	Name       string
+	Columns    []TrackerColumnData
+	TotalCount int
+	Notice     string
+}
+
+templ TrackerPage(d TrackerData) {
+	@Layout(Page{Title: T(ctx, "tracker.title"), UserName: d.Name}) {
+		@Section(T(ctx, "tracker.title")) {
+			<div class="tracker-toolbar">
+				<p class="muted tracker-subtitle">
+					{ T(ctx, "tracker.subtitle", "count", d.TotalCount) }
+				</p>
+				<div class="tracker-quick-actions">
+					<form
+						method="post"
+						action="/tracker/external"
+						class="tracker-external-form"
+						{ HX(ctx, "hx-post", "/tracker/external", "hx-target", "#tracker-board", "hx-swap", "outerHTML")... }
+					>
+						<input
+							type="url"
+							name="url"
+							placeholder={ T(ctx, "tracker.add_external_placeholder") }
+							required
+							maxlength="500"
+						/>
+						<button type="submit" class="btn-sm">
+							{ T(ctx, "tracker.add_external_button") }
+						</button>
+					</form>
+					<a href="/jobs" class="button secondary btn-sm">
+						{ T(ctx, "tracker.browse_jobs") }
+					</a>
+				</div>
+			</div>
+			if d.Notice != "" {
+				@Notice("info", d.Notice)
+			}
+			@TrackerBoard(d)
+		}
+	}
+}
+
+templ TrackerBoard(d TrackerData) {
+	<div id="tracker-board" class="tracker-board">
+		<div class="tracker-columns">
+			for _, col := range d.Columns {
+				<div class={ "tracker-column", "tracker-column-" + col.Key } data-col={ col.Key }>
+					<div class="tracker-column-header">
+						<h3 class="tracker-column-title">{ col.Title }</h3>
+						<span class="badge tracker-column-count">{ itoa(len(col.Cards)) }</span>
+					</div>
+					<div class="tracker-column-cards">
+						if len(col.Cards) == 0 {
+							<div class="tracker-empty-card muted text-sm">
+								{ T(ctx, "tracker.empty_column") }
+							</div>
+						}
+						for _, card := range col.Cards {
+							@TrackerCard(card)
+						}
+					</div>
+				</div>
+			}
+		</div>
+	</div>
+}
+
+templ TrackerCard(c TrackerCardData) {
+	<div id={ "tracker-card-" + c.ID } class="tracker-card" data-app-id={ c.ID } data-state={ c.State }>
+		<div class="tracker-card-head">
+			<h4 class="tracker-card-title">
+				<a href={ templ.SafeURL("/jobs/" + i64(c.JobID)) }>{ c.Title }</a>
+			</h4>
+			if c.Score > 0 {
+				<span class="badge badge-score" title={ T(ctx, "jobs.score", "score", c.Score) }>
+					{ itoa(c.Score) }%
+				</span>
+			}
+		</div>
+		<div class="tracker-card-meta">
+			<span class="tracker-card-company">{ c.Company }</span>
+			if c.Location != "" {
+				<span class="muted"> • </span>
+				<span class="tracker-card-location">{ c.Location }</span>
+			}
+			if c.Workplace != "" {
+				<span class="muted"> • </span>
+				<span class="badge badge-workplace">{ c.Workplace }</span>
+			}
+		</div>
+		<div class="tracker-card-state-row">
+			<span class={ "badge", "badge-state-" + c.State }>
+				{ T(ctx, "tracker.state." + c.State) }
+			</span>
+			if c.EmailActivity != "" {
+				<span class="badge badge-email-activity" title={ c.EmailActivity }>
+					✉️ { c.EmailActivity }
+				</span>
+			}
+		</div>
+
+		<div class="tracker-stage-selector">
+			<form
+				method="post"
+				action={ templ.SafeURL("/tracker/" + c.ID + "/stage") }
+				class="tracker-stage-form"
+				{ HX(ctx, "hx-post", "/tracker/" + c.ID + "/stage", "hx-target", "#tracker-board", "hx-swap", "outerHTML")... }
+			>
+				<label class="visually-hidden" for={ "stage-select-" + c.ID }>{ T(ctx, "tracker.move_to") }</label>
+				<select
+					id={ "stage-select-" + c.ID }
+					name="stage"
+					class="tracker-stage-select"
+					onchange="this.form.requestSubmit()"
+				>
+					<option value="" disabled selected>{ T(ctx, "tracker.move_stage") }</option>
+					<option value="matched">{ T(ctx, "tracker.stage.matched") }</option>
+					<option value="needs_input">{ T(ctx, "tracker.stage.needs_input") }</option>
+					<option value="submitted">{ T(ctx, "tracker.stage.submitted") }</option>
+					<option value="interview">{ T(ctx, "tracker.stage.interview") }</option>
+					<option value="offer">{ T(ctx, "tracker.stage.offer") }</option>
+					<option value="rejected">{ T(ctx, "tracker.stage.rejected") }</option>
+					<option value="withdrawn">{ T(ctx, "tracker.stage.withdrawn") }</option>
+				</select>
+				<noscript>
+					<button type="submit" class="btn-sm">{ T(ctx, "tracker.move") }</button>
+				</noscript>
+			</form>
+		</div>
+
+		<details class="tracker-notes-details" open?={ c.Notice != "" }>
+			<summary class="tracker-notes-summary">
+				<span class="tracker-notes-label">📝 { T(ctx, "tracker.notes_title") }</span>
+				if c.SalaryDiscussed != "" {
+					<span class="tracker-salary-pill" title={ T(ctx, "tracker.salary.label") }>
+						💰 { c.SalaryDiscussed }
+					</span>
+				}
+				if c.InterviewAtDisplay != "" {
+					<span class="tracker-interview-pill" title={ T(ctx, "tracker.interview.label") }>
+						📅 { c.InterviewAtDisplay }
+					</span>
+				}
+			</summary>
+			<div class="tracker-notes-body">
+				if c.Notice != "" {
+					@Notice("success", c.Notice)
+				}
+				<form
+					method="post"
+					action={ templ.SafeURL("/tracker/" + c.ID + "/notes") }
+					class="tracker-notes-form"
+					{ HX(ctx, "hx-post", "/tracker/" + c.ID + "/notes", "hx-target", "#tracker-card-" + c.ID, "hx-swap", "outerHTML")... }
+				>
+					<div class="tracker-field">
+						<label for={ "notes-" + c.ID }>{ T(ctx, "tracker.notes.label") }</label>
+						<textarea
+							id={ "notes-" + c.ID }
+							name="notes"
+							rows="3"
+							placeholder={ T(ctx, "tracker.notes.placeholder") }
+						>{ c.Notes }</textarea>
+					</div>
+					<div class="tracker-field">
+						<label for={ "salary-" + c.ID }>{ T(ctx, "tracker.salary.label") }</label>
+						<input
+							id={ "salary-" + c.ID }
+							type="text"
+							name="salary"
+							value={ c.SalaryDiscussed }
+							placeholder={ T(ctx, "tracker.salary.placeholder") }
+							maxlength="100"
+						/>
+					</div>
+					<div class="tracker-field-row">
+						<div class="tracker-field">
+							<label for={ "interview-" + c.ID }>{ T(ctx, "tracker.interview.label") }</label>
+							<input
+								id={ "interview-" + c.ID }
+								type="datetime-local"
+								name="interview_at"
+								value={ c.InterviewAt }
+							/>
+						</div>
+						<div class="tracker-field">
+							<label for={ "follow-up-" + c.ID }>{ T(ctx, "tracker.follow_up.label") }</label>
+							<input
+								id={ "follow-up-" + c.ID }
+								type="date"
+								name="follow_up_at"
+								value={ c.FollowUpAt }
+							/>
+						</div>
+					</div>
+					<div class="tracker-notes-actions">
+						<button type="submit" class="btn-sm primary">
+							{ T(ctx, "tracker.notes.save") }
+						</button>
+					</div>
+				</form>
+			</div>
+		</details>
+
+		<div class="tracker-card-footer muted text-sm">
+			<span class="tracker-card-date">{ c.UpdatedAt }</span>
+			<div class="tracker-card-links">
+				if c.URL != "" {
+					<a href={ templ.SafeURL(c.URL) } target="_blank" rel="noopener noreferrer external" class="tracker-card-ext-link">
+						{ T(ctx, "tracker.job_posting") }
+					</a>
+				}
+				<a href={ templ.SafeURL("/applications/" + c.ID) } class="tracker-card-app-link">
+					{ T(ctx, "tracker.view_application") }
+				</a>
+			</div>
+		</div>
+	</div>
+}

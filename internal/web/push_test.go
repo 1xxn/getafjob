@@ -383,6 +383,26 @@ func (f *fakeAppStore) UserScreenshots(context.Context, uuid.UUID) ([]string, er
 	return nil, nil
 }
 
+func (f *fakeAppStore) GetNotes(_ context.Context, _, appID uuid.UUID) (application.NoteData, error) {
+	return application.NoteData{ApplicationID: appID}, nil
+}
+
+func (f *fakeAppStore) SaveNotes(_ context.Context, _, _ uuid.UUID, _, _ string, _, _ *time.Time, _ time.Time) error {
+	return nil
+}
+
+func (f *fakeAppStore) PipelineApplications(_ context.Context, _ uuid.UUID) ([]application.PipelineApplication, error) {
+	return nil, nil
+}
+
+func (f *fakeAppStore) BookmarkJob(_ context.Context, _ uuid.UUID, _ int64, _ time.Time) (uuid.UUID, error) {
+	return uuid.New(), nil
+}
+
+func (f *fakeAppStore) MarkExternalApplied(_ context.Context, _ uuid.UUID, _ int64, _ time.Time) (uuid.UUID, error) {
+	return uuid.New(), nil
+}
+
 type fakeShots map[string][]byte
 
 func (s fakeShots) Get(_ context.Context, _ uuid.UUID, key string) ([]byte, error) {
