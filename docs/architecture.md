@@ -195,7 +195,7 @@ internal `edge` (caddy and serve), `backend` (serve, worker, migrate, postgres),
 
 | Scenario | Target |
 |---|---|
-| Dashboard page | p95 < 200 ms on the demo data (`TestJobListLatency`, 2000 postings) |
+| Dashboard page | p95 < 200 ms on the demo data (`TestJobListLatency`, `TestConcurrentLoadSLO`, 2000 postings; [runbook](runbooks/load-test.md)) |
 | Crash during submit | `submit_unknown`, no second click |
 | Value without source | refused by the executor |
 | Another user's row | invisible (RLS) |

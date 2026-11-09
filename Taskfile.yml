@@ -64,6 +64,11 @@ tasks:
     cmds:
       - go test -short -shuffle=on ./...
 
+  test:load:
+    desc: Run the concurrent load test (SLO: p95 < 200 ms on 2000 postings)
+    cmds:
+      - go test -v -run TestConcurrentLoadSLO ./internal/web/...
+
   test:browser:
     desc: Browser fixture suite inside the runner image (real Chromium with sandbox and seccomp profile)
     cmds:
@@ -185,6 +190,11 @@ tasks:
     desc: Tail logs including the observability profile
     cmds:
       - '{{.COMPOSE}} --profile dev --profile observability logs -f {{.CLI_ARGS}}'
+
+  obs:load:
+    desc: Generate concurrent load on the local stack to populate Grafana dashboards (SLO p95 < 200 ms)
+    cmds:
+      - go run ./cmd/getafjob admin load-test -url https://localhost:8443 -insecure -users 10 -duration 15s
 
   release:snapshot:
     desc: goreleaser dry run (no publishing)

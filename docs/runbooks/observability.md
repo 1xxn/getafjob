@@ -51,7 +51,7 @@ The pre-provisioned dashboard (`getafjob / Overview`) tracks the 4 core business
 
 1. **Service SLO (< 200 ms p95)**:
    - Query: `histogram_quantile(0.95, sum by (le) (rate(http_server_request_duration_seconds_bucket[5m]))) * 1000`
-   - Target: p95 latency under 200 ms.
+   - Target: p95 latency under 200 ms (see [load-test.md](load-test.md) for generating traffic and verifying SLO).
 2. **ATS Application Success Rate**:
    - `getafjob_ats_maturity`: Measured submission success rate per ATS adapter [0, 1].
    - `getafjob_ats_runs_total`: Run counts by adapter and outcome (`submitted`, `asked`, `parked`, `guard`, `expired`).
