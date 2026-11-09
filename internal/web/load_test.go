@@ -79,7 +79,7 @@ func TestConcurrentLoadSLO(t *testing.T) {
 		{Path: "/jobs?decision=all&workplace=remote", Weight: 15},
 		{Path: "/jobs/" + strconv.FormatInt(jobID, 10), Weight: 10},
 		{Path: "/profile", Weight: 5},
-		{Path: "/healthz", Weight: 5},
+		{Path: "/preferences", Weight: 5},
 	}
 
 	cfg := loadtest.Config{

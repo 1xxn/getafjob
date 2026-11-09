@@ -67,7 +67,7 @@ func adminLoadTest(ctx context.Context, args []string, env Env) int {
 
 	// If a direct cookie was passed, use it
 	if cookie != "" {
-		sessionCookie = &http.Cookie{Name: web.SessionCookie, Value: cookie}
+		sessionCookie = &http.Cookie{Name: web.SessionCookie, Value: cookie, Path: "/", Secure: true, HttpOnly: true, SameSite: http.SameSiteLaxMode}
 	} else if cfg.DatabaseURL != "" {
 		// Attempt to create a valid session from the database for the demo/target user
 		targetEmail := email
@@ -96,7 +96,7 @@ func adminLoadTest(ctx context.Context, args []string, env Env) int {
 					if err != nil {
 						return err
 					}
-					sessionCookie = &http.Cookie{Name: web.SessionCookie, Value: string(st)}
+					sessionCookie = &http.Cookie{Name: web.SessionCookie, Value: string(st), Path: "/", Secure: true, HttpOnly: true, SameSite: http.SameSiteLaxMode}
 					return nil
 				})
 				if err != nil && !errors.Is(err, pgx.ErrNoRows) {

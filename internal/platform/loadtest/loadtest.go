@@ -3,11 +3,12 @@ package loadtest
 
 import (
 	"context"
+	"crypto/rand"
 	"crypto/tls"
 	"errors"
 	"fmt"
 	"io"
-	"math/rand/v2"
+	"math/big"
 	"net/http"
 	"net/url"
 	"slices"
@@ -144,7 +145,11 @@ func Run(ctx context.Context, cfg Config) (*Stats, error) {
 	}
 
 	selectPath := func() WeightedPath {
-		r := rand.IntN(totalWeight)
+		n, err := rand.Int(rand.Reader, big.NewInt(int64(totalWeight)))
+		if err != nil {
+			return cfg.Paths[0]
+		}
+		r := int(n.Int64())
 		cum := 0
 		for _, p := range cfg.Paths {
 			w := p.Weight
@@ -248,7 +253,7 @@ func Run(ctx context.Context, cfg Config) (*Stats, error) {
 				resp, err := client.Do(req)
 				took := time.Since(reqStart)
 
-				// If the request was cancelled because the test duration expired, ignore this truncated sample
+				// If the request was canceled because the test duration expired, ignore this truncated sample
 				if runCtx.Err() != nil && (errors.Is(err, context.Canceled) || errors.Is(err, context.DeadlineExceeded)) {
 					continue
 				}
