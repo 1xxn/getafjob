@@ -49,11 +49,17 @@ WHERE t.token_hash = $1 AND s.family = t.family;
 
 -- name: DeleteExpired :exec
 WITH s AS (DELETE FROM sessions WHERE sessions.expires_at < $1 OR sessions.replaced_at < $1 - interval '5 minutes'),
-     m AS (DELETE FROM magic_links WHERE magic_links.expires_at < $1)
+     m AS (DELETE FROM magic_links WHERE magic_links.expires_at < $1),
+     r AS (DELETE FROM recoveries WHERE recoveries.expires_at < $1),
+     i AS (DELETE FROM invitations WHERE invitations.expires_at < $1 AND invitations.accepted_at IS NULL)
 DELETE FROM webauthn_challenges WHERE webauthn_challenges.expires_at < $1;
 
 -- name: InsertAuditEvent :exec
 INSERT INTO audit_events (user_id, actor, code, params) VALUES ($1, $2, $3, $4);
+
+-- name: UserAuditEvents :many
+SELECT id, actor, code, params, created_at FROM audit_events
+WHERE user_id = $1 ORDER BY id ASC;
 
 -- name: ReplaceSession :one
 -- Only one request rotates a session; a concurrent one finds it replaced already.
@@ -74,6 +80,9 @@ DELETE FROM sessions o WHERE o.user_id = $1
 
 -- name: DeleteUserSessions :execrows
 DELETE FROM sessions WHERE user_id = $1;
+
+-- name: DeleteUser :execrows
+DELETE FROM users WHERE id = $1;
 
 -- name: CreateChallenge :one
 INSERT INTO webauthn_challenges (user_id, kind, data, expires_at) VALUES ($1, $2, $3, $4) RETURNING id;

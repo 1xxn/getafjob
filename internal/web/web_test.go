@@ -20,6 +20,8 @@ import (
 
 	"github.com/jackc/pgx/v5/pgxpool"
 
+	"github.com/1xxn/getafjob/internal/application"
+	applicationstore "github.com/1xxn/getafjob/internal/application/adapters/pgstore"
 	"github.com/1xxn/getafjob/internal/identity"
 	"github.com/1xxn/getafjob/internal/identity/adapters/pgstore"
 	"github.com/1xxn/getafjob/internal/identity/softauthn"
@@ -30,6 +32,7 @@ import (
 	"github.com/1xxn/getafjob/internal/platform/crypto"
 	"github.com/1xxn/getafjob/internal/platform/db/dbtest"
 	"github.com/1xxn/getafjob/internal/platform/httpx"
+	"github.com/1xxn/getafjob/internal/privacy"
 	"github.com/1xxn/getafjob/internal/profile"
 	profilestore "github.com/1xxn/getafjob/internal/profile/adapters/pgstore"
 	"github.com/1xxn/getafjob/internal/profile/cvimport"
@@ -79,14 +82,19 @@ func newApp(t *testing.T) *app {
 	t.Cleanup(func() { _ = dir.Close() })
 	pstore := profilestore.New(pool)
 	profiles := profile.NewService(pstore, env)
-	docs := profile.NewDocuments(pstore, blob.NewSealed(dir, env), env)
+	sealedFiles := blob.NewSealed(dir, env)
+	docs := profile.NewDocuments(pstore, sealedFiles, env)
+	items := profile.NewItems(pstore, env)
+	listings := matching.NewListings(matchingstore.New(pool))
+	apps := application.NewService(applicationstore.New(pool))
+	privacySvc := privacy.NewService(ids, profiles, items, docs, apps, listings, env, sealedFiles)
 	exe, err := os.Executable()
 	if err != nil {
 		t.Fatal(err)
 	}
 	importer := cvimport.NewImporter(docs, profiles, cvimport.NewExtractorFor(exe, 20*time.Second))
-	(&web.Server{Identity: ids, Profile: profiles, Documents: docs, Items: profile.NewItems(pstore, env), Importer: importer,
-		Jobs: matching.NewListings(matchingstore.New(pool)), Logger: slog.New(slog.NewTextHandler(io.Discard, nil))}).Register(mux)
+	(&web.Server{Identity: ids, Profile: profiles, Documents: docs, Items: items, Importer: importer,
+		Jobs: listings, Apps: apps, Privacy: privacySvc, Logger: slog.New(slog.NewTextHandler(io.Discard, nil))}).Register(mux)
 	return &app{t: t, h: httpx.Protect(mux, 1<<20, true, httpx.Upload{Path: "/documents", Max: web.MaxUpload},
 		httpx.Upload{Path: "/setup/cv", Max: web.MaxUpload}), ids: ids, mail: mb, pool: pool}
 }
@@ -826,5 +834,89 @@ func TestSetupAssistant(t *testing.T) {
 	}
 	if rec := a.do(http.MethodGet, "/setup/nonsense", nil, session, nil); rec.Code != http.StatusNotFound {
 		t.Errorf("unknown step %d", rec.Code)
+	}
+}
+
+func TestPrivacyExportAndDelete(t *testing.T) {
+	a := newApp(t)
+
+	// 1. GET /privacy is public and rendered in German and English
+	enPage := a.do(http.MethodGet, "/privacy", nil, "", map[string]string{"Accept-Language": "en"}).Body.String()
+	if !strings.Contains(enPage, "Privacy Notice") || !strings.Contains(enPage, "Envelope Encryption") {
+		t.Errorf("privacy page EN missing expected headings: %s", enPage)
+	}
+	dePage := a.do(http.MethodGet, "/privacy", nil, "", map[string]string{"Accept-Language": "de"}).Body.String()
+	if !strings.Contains(dePage, "Datenschutzerklärung") || !strings.Contains(dePage, "Envelope-Verschlüsselung") {
+		t.Errorf("privacy page DE missing expected headings: %s", dePage)
+	}
+
+	// 2. Unauthenticated access to /account/export and /account/delete redirects to login
+	if rec := a.do(http.MethodGet, "/account/export", nil, "", nil); rec.Code != http.StatusSeeOther || rec.Header().Get("Location") != "/login" {
+		t.Fatalf("export unauthenticated = %d, want 303 to /login", rec.Code)
+	}
+	if rec := a.do(http.MethodPost, "/account/delete", nil, "", nil); rec.Code != http.StatusSeeOther || rec.Header().Get("Location") != "/login" {
+		t.Fatalf("delete unauthenticated = %d, want 303 to /login", rec.Code)
+	}
+
+	// 3. Sign in a user via invitation
+	link, _, err := a.ids.Invite(t.Context(), identity.InviteRequest{Email: "privacy-user@example.com", Role: identity.RoleUser})
+	if err != nil {
+		t.Fatal(err)
+	}
+	path := strings.TrimPrefix(link, "https://jobs.example.org")
+	rec := a.do(http.MethodPost, path, url.Values{"name": {"Privacy Tester"}, "locale": {"en"}}, "", nil)
+	if rec.Code != http.StatusSeeOther {
+		t.Fatalf("invite accept: %d", rec.Code)
+	}
+	session := sessionFrom(t, rec)
+
+	// 4. View account page and verify privacy section is present
+	accPage := a.do(http.MethodGet, "/account", nil, session, nil).Body.String()
+	if !strings.Contains(accPage, "Privacy &amp; your data") && !strings.Contains(accPage, "Privacy & your data") {
+		t.Errorf("account page lacks privacy section: %s", accPage)
+	}
+
+	// 5. GET /account/export returns a valid ZIP archive
+	exportRec := a.do(http.MethodGet, "/account/export", nil, session, nil)
+	if exportRec.Code != http.StatusOK {
+		t.Fatalf("export = %d, want 200", exportRec.Code)
+	}
+	if ct := exportRec.Header().Get("Content-Type"); ct != "application/zip" {
+		t.Errorf("export Content-Type = %q, want application/zip", ct)
+	}
+	bodyBytes := exportRec.Body.Bytes()
+	zr, err := zip.NewReader(bytes.NewReader(bodyBytes), int64(len(bodyBytes)))
+	if err != nil {
+		t.Fatalf("zip reader failed: %v", err)
+	}
+	foundFiles := map[string]bool{}
+	for _, f := range zr.File {
+		foundFiles[f.Name] = true
+	}
+	for _, expected := range []string{"profile.json", "applications.json", "matches.json", "settings.json", "audit_events.json"} {
+		if !foundFiles[expected] {
+			t.Errorf("export archive missing expected file: %s", expected)
+		}
+	}
+
+	// 6. POST /account/delete removes user, clears cookie, redirects to /login?deleted=1
+	delRec := a.do(http.MethodPost, "/account/delete", nil, session, nil)
+	if delRec.Code != http.StatusSeeOther || delRec.Header().Get("Location") != "/login?deleted=1" {
+		t.Fatalf("delete account = %d, loc = %q", delRec.Code, delRec.Header().Get("Location"))
+	}
+	var cleared bool
+	for _, c := range delRec.Result().Cookies() {
+		if c.Name == web.SessionCookie && c.MaxAge < 0 {
+			cleared = true
+		}
+	}
+	if !cleared {
+		t.Errorf("session cookie was not cleared on deletion")
+	}
+
+	// 7. Login page with ?deleted=1 shows deletion notice
+	loginPage := a.do(http.MethodGet, "/login?deleted=1", nil, "", nil).Body.String()
+	if !strings.Contains(loginPage, "permanently deleted") {
+		t.Errorf("login page lacks deletion notice: %s", loginPage)
 	}
 }

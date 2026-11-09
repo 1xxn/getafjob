@@ -123,3 +123,16 @@ LIMIT 500;
 
 -- name: ClearCheckpointScreenshot :exec
 UPDATE run_checkpoints SET screenshot = '' WHERE id = $1 AND user_id = $2;
+
+-- name: UserApplications :many
+SELECT a.id, a.job_id, a.state, a.version, a.created_at, a.updated_at,
+       a.approval_asked_at, a.approval_reasons, a.approved_at,
+       j.company, j.title, j.location, j.url, j.apply_url
+FROM applications a
+JOIN jobs j ON j.id = a.job_id
+WHERE a.user_id = $1
+ORDER BY a.created_at DESC;
+
+-- name: UserRunScreenshots :many
+SELECT DISTINCT screenshot FROM run_checkpoints
+WHERE user_id = $1 AND screenshot <> '';

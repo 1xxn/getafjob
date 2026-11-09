@@ -246,3 +246,52 @@ func (q *Queries) SaveMatches(ctx context.Context, arg SaveMatchesParams) error 
 	)
 	return err
 }
+
+const userMatches = `-- name: UserMatches :many
+SELECT j.id, j.title, j.company, j.location, j.workplace, m.score, m.decision, m.reasons, m.computed_at
+FROM matches m JOIN jobs j ON j.id = m.job_id
+WHERE m.user_id = $1
+ORDER BY m.score DESC, j.id DESC
+`
+
+type UserMatchesRow struct {
+	ID         int64
+	Title      string
+	Company    string
+	Location   string
+	Workplace  string
+	Score      int16
+	Decision   string
+	Reasons    []byte
+	ComputedAt time.Time
+}
+
+func (q *Queries) UserMatches(ctx context.Context, userID uuid.UUID) ([]UserMatchesRow, error) {
+	rows, err := q.db.Query(ctx, userMatches, userID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []UserMatchesRow{}
+	for rows.Next() {
+		var i UserMatchesRow
+		if err := rows.Scan(
+			&i.ID,
+			&i.Title,
+			&i.Company,
+			&i.Location,
+			&i.Workplace,
+			&i.Score,
+			&i.Decision,
+			&i.Reasons,
+			&i.ComputedAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}

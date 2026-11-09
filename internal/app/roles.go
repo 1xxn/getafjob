@@ -41,6 +41,7 @@ import (
 	"github.com/1xxn/getafjob/internal/portals"
 	portalscrypto "github.com/1xxn/getafjob/internal/portals/adapters/crypto"
 	portalsstore "github.com/1xxn/getafjob/internal/portals/adapters/pgstore"
+	"github.com/1xxn/getafjob/internal/privacy"
 	"github.com/1xxn/getafjob/internal/profile"
 	profilestore "github.com/1xxn/getafjob/internal/profile/adapters/pgstore"
 	"github.com/1xxn/getafjob/internal/profile/cvimport"
@@ -138,9 +139,11 @@ func serve(ctx context.Context, cfg config.Config, logger *slog.Logger) error {
 	assistSvc := newAssistService(pool, profiles, items, docs, apps, logger)
 	apiv1.Mount(mux, assistSvc)
 
+	listings := matching.NewListings(matchingstore.New(pool))
+	privacySvc := privacy.NewService(ids, profiles, items, docs, apps, listings, env, sealedFiles)
 	(&web.Server{Identity: ids, Logger: logger, Profile: profiles, Documents: docs, Items: items,
-		Importer: cvimport.NewImporter(docs, profiles, extractor), Jobs: matching.NewListings(matchingstore.New(pool)),
-		PushStore: webpush.NewStore(pool), VAPIDPublicKey: vapidPub, Apps: apps, Tracking: trackingSvc, Notify: notifySvc, Assist: assistSvc, Portals: portalsSvc, AI: aiSvc, Shots: sealedFiles, Handoffs: gw}).Register(mux)
+		Importer: cvimport.NewImporter(docs, profiles, extractor), Jobs: listings,
+		PushStore: webpush.NewStore(pool), VAPIDPublicKey: vapidPub, Apps: apps, Tracking: trackingSvc, Notify: notifySvc, Assist: assistSvc, Portals: portalsSvc, AI: aiSvc, Privacy: privacySvc, Shots: sealedFiles, Handoffs: gw}).Register(mux)
 
 	h := httpx.Instrument(httpx.Protect(httpx.Routes(mux), maxBody, cfg.PublicURL.Scheme == "https",
 		httpx.Upload{Path: "/documents", Max: web.MaxUpload}, httpx.Upload{Path: "/setup/cv", Max: web.MaxUpload}))
@@ -186,13 +189,13 @@ func worker(ctx context.Context, cfg config.Config, logger *slog.Logger) error {
 		return fmt.Errorf("GETAFJOB_MASTER_KEY: %w", err)
 	}
 	env := crypto.NewEnvelope(ring, pool)
-	var sealedFiles application.ScreenshotDeleter
+	var sealed *blob.Sealed
 	if cfg.BlobURL != "" {
 		files, err := blob.Open(cfg.BlobURL, blob.S3Credentials{AccessKey: cfg.BlobAccessKey, SecretKey: cfg.BlobSecretKey})
 		if err != nil {
 			return err
 		}
-		sealedFiles = blob.NewSealed(files, env)
+		sealed = blob.NewSealed(files, env)
 	}
 	pstore := profilestore.New(pool)
 	mstore := matchingstore.New(pool)
@@ -203,8 +206,11 @@ func worker(ctx context.Context, cfg config.Config, logger *slog.Logger) error {
 	river.AddWorker(workers, &boardDiscoveryWorker{
 		discovery: discovery.NewBoardDiscovery(store, store, sources.NewFinder(client)), logger: logger, metrics: metrics})
 	apps := application.NewService(applicationstore.New(pool))
-	river.AddWorker(workers, &cleanupWorker{ids: identity.NewService(pgstore.New(pool), nil, cfg.PublicURL),
-		apps: apps, blobs: sealedFiles})
+	ids := identity.NewService(pgstore.New(pool), nil, cfg.PublicURL)
+	docs := profile.NewDocuments(pstore, sealed, env)
+	items := profile.NewItems(pstore, env)
+	privacySvc := privacy.NewService(ids, profile.NewService(pstore, env), items, docs, apps, nil, env, sealed)
+	river.AddWorker(workers, &cleanupWorker{privacy: privacySvc})
 	river.AddWorker(workers, &recoverWorker{svc: apps, logger: logger})
 	notifySvc, _, _ := newNotifyService(pool, cfg, logger)
 	appNotifier := newNotifyAppNotifier(notifySvc)

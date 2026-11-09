@@ -46,6 +46,9 @@ templ Layout(p Page) {
 			<main id="main" tabindex="-1">
 				{ children... }
 			</main>
+			<footer class="footer">
+				<p class="muted"><a href="/privacy">{ T(ctx, "nav.privacy") }</a> · getafjob</p>
+			</footer>
 		</body>
 	</html>
 }
