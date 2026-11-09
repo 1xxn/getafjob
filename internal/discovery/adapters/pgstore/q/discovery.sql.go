@@ -12,6 +12,27 @@ import (
 	"github.com/jackc/pgx/v5/pgtype"
 )
 
+const activeCrawlRun = `-- name: ActiveCrawlRun :one
+SELECT id, started_at, sources
+FROM crawl_runs
+WHERE finished_at IS NULL AND started_at > $1::timestamptz
+ORDER BY id DESC
+LIMIT 1
+`
+
+type ActiveCrawlRunRow struct {
+	ID        int64
+	StartedAt time.Time
+	Sources   []string
+}
+
+func (q *Queries) ActiveCrawlRun(ctx context.Context, since time.Time) (ActiveCrawlRunRow, error) {
+	row := q.db.QueryRow(ctx, activeCrawlRun, since)
+	var i ActiveCrawlRunRow
+	err := row.Scan(&i.ID, &i.StartedAt, &i.Sources)
+	return i, err
+}
+
 const boardBySlug = `-- name: BoardBySlug :one
 SELECT id FROM boards WHERE ats = $1 AND lower(slug) = lower($2::text) ORDER BY id LIMIT 1
 `
@@ -219,26 +240,32 @@ func (q *Queries) InsertDiscoveredBoard(ctx context.Context, arg InsertDiscovere
 
 const insertJob = `-- name: InsertJob :one
 INSERT INTO jobs (fingerprint, match_key, source, external_id, company, title, location, workplace, url, apply_url,
-                  description, posted, content_hash, first_seen, last_seen)
-VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $14)
+                  description, posted, salary_min, salary_max, salary_currency, content_hash, first_seen, last_seen)
+VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12,
+        $15::integer, $16::integer,
+        coalesce(nullif($17::text, ''), 'EUR'),
+        $13, $14, $14)
 RETURNING id
 `
 
 type InsertJobParams struct {
-	Fingerprint string
-	MatchKey    string
-	Source      string
-	ExternalID  string
-	Company     string
-	Title       string
-	Location    string
-	Workplace   string
-	Url         string
-	ApplyUrl    string
-	Description string
-	Posted      pgtype.Date
-	ContentHash string
-	FirstSeen   time.Time
+	Fingerprint    string
+	MatchKey       string
+	Source         string
+	ExternalID     string
+	Company        string
+	Title          string
+	Location       string
+	Workplace      string
+	Url            string
+	ApplyUrl       string
+	Description    string
+	Posted         pgtype.Date
+	ContentHash    string
+	FirstSeen      time.Time
+	SalaryMin      *int32
+	SalaryMax      *int32
+	SalaryCurrency *string
 }
 
 func (q *Queries) InsertJob(ctx context.Context, arg InsertJobParams) (int64, error) {
@@ -257,6 +284,9 @@ func (q *Queries) InsertJob(ctx context.Context, arg InsertJobParams) (int64, er
 		arg.Posted,
 		arg.ContentHash,
 		arg.FirstSeen,
+		arg.SalaryMin,
+		arg.SalaryMax,
+		arg.SalaryCurrency,
 	)
 	var id int64
 	err := row.Scan(&id)
@@ -320,6 +350,28 @@ func (q *Queries) JobByFingerprint(ctx context.Context, fingerprint string) (Job
 		&i.Status,
 		&i.Url,
 		&i.AltUrls,
+	)
+	return i, err
+}
+
+const latestCrawlRun = `-- name: LatestCrawlRun :one
+SELECT id, started_at, finished_at, sources, stats, errors
+FROM crawl_runs
+WHERE finished_at IS NOT NULL
+ORDER BY id DESC
+LIMIT 1
+`
+
+func (q *Queries) LatestCrawlRun(ctx context.Context) (CrawlRun, error) {
+	row := q.db.QueryRow(ctx, latestCrawlRun)
+	var i CrawlRun
+	err := row.Scan(
+		&i.ID,
+		&i.StartedAt,
+		&i.FinishedAt,
+		&i.Sources,
+		&i.Stats,
+		&i.Errors,
 	)
 	return i, err
 }
@@ -524,31 +576,37 @@ SET fingerprint  = $1,
     alt_urls     = $12::text[],
     description  = coalesce(nullif($13::text, ''), description),
     posted       = coalesce($14::date, posted),
-    content_hash = $15,
-    last_seen    = $16,
+    salary_min   = coalesce($15::integer, salary_min),
+    salary_max   = coalesce($16::integer, salary_max),
+    salary_currency = coalesce(nullif($17::text, ''), salary_currency, 'EUR'),
+    content_hash = $18,
+    last_seen    = $19,
     status       = 'open',
     closed_at    = NULL
-WHERE id = $17
+WHERE id = $20
 `
 
 type UpdateJobParams struct {
-	Fingerprint string
-	MatchKey    string
-	Source      string
-	ExternalID  string
-	Company     string
-	Title       string
-	Location    string
-	Workplace   string
-	Url         string
-	Merge       bool
-	ApplyUrl    string
-	AltUrls     []string
-	Description string
-	Posted      pgtype.Date
-	ContentHash string
-	LastSeen    time.Time
-	ID          int64
+	Fingerprint    string
+	MatchKey       string
+	Source         string
+	ExternalID     string
+	Company        string
+	Title          string
+	Location       string
+	Workplace      string
+	Url            string
+	Merge          bool
+	ApplyUrl       string
+	AltUrls        []string
+	Description    string
+	Posted         pgtype.Date
+	SalaryMin      *int32
+	SalaryMax      *int32
+	SalaryCurrency string
+	ContentHash    string
+	LastSeen       time.Time
+	ID             int64
 }
 
 // Empty fields keep the stored value, except apply_url on a merge (the job-board link would be wrong).
@@ -568,6 +626,9 @@ func (q *Queries) UpdateJob(ctx context.Context, arg UpdateJobParams) error {
 		arg.AltUrls,
 		arg.Description,
 		arg.Posted,
+		arg.SalaryMin,
+		arg.SalaryMax,
+		arg.SalaryCurrency,
 		arg.ContentHash,
 		arg.LastSeen,
 		arg.ID,

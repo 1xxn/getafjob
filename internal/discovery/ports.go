@@ -48,12 +48,31 @@ type Stats struct {
 	Closed        int            `json:"closed"`
 }
 
+// CrawlRun records one crawl's metadata and statistics.
+type CrawlRun struct {
+	ID         int64
+	StartedAt  time.Time
+	FinishedAt *time.Time
+	Sources    []string
+	Stats      Stats
+	Errors     map[string]string
+}
+
+// ActiveRun records an ongoing crawl.
+type ActiveRun struct {
+	ID        int64
+	StartedAt time.Time
+	Sources   []string
+}
+
 // Store persists the global job index.
 type Store interface {
 	StartRun(ctx context.Context, sources []string, at time.Time) (int64, error)
 	// Upsert records one posting; duplicate reports a job-board copy of a job already in the index. An empty
 	// description keeps the stored one.
 	Upsert(ctx context.Context, runID int64, p Posting, at time.Time) (change Change, duplicate bool, err error)
+	// UpsertPosting records one posting directly (e.g. from single URL ingestion) and returns its ID.
+	UpsertPosting(ctx context.Context, p Posting, at time.Time) (id int64, change Change, err error)
 	OpenJobs(ctx context.Context, sources []string) ([]OpenJob, error)
 	// Seen marks open jobs as seen at, by fingerprint, and returns the fingerprints it found.
 	Seen(ctx context.Context, fingerprints []string, at time.Time) (map[string]bool, error)
@@ -61,6 +80,8 @@ type Store interface {
 	Described(ctx context.Context, fingerprints []string) (map[string]bool, error)
 	Close(ctx context.Context, runID int64, ids []int64, at time.Time) error
 	FinishRun(ctx context.Context, runID int64, s Stats, errs map[string]string, at time.Time) error
+	LatestCrawlRun(ctx context.Context) (*CrawlRun, error)
+	ActiveCrawlRun(ctx context.Context, since time.Time) (*ActiveRun, error)
 }
 
 // Board is a company board of an applicant tracking system; Config holds system-specific JSON (Workday host and

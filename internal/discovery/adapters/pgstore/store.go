@@ -67,24 +67,37 @@ func (s *Store) FinishRun(ctx context.Context, runID int64, st discovery.Stats, 
 // Upsert inserts, updates, reopens or merges one posting and records a snapshot of every change.
 func (s *Store) Upsert(ctx context.Context, runID int64, p discovery.Posting, at time.Time) (change discovery.Change, dup bool, err error) {
 	err = s.system(ctx, func(qs *q.Queries) error {
-		change, dup, err = upsert(ctx, qs, runID, p, at)
+		_, change, dup, err = upsert(ctx, qs, runID, p, at)
 		return err
 	})
 	return change, dup, err
 }
 
-func upsert(ctx context.Context, qs *q.Queries, runID int64, p discovery.Posting, at time.Time) (discovery.Change, bool, error) {
+// UpsertPosting records one posting directly (e.g. from single URL ingestion) and returns its ID.
+func (s *Store) UpsertPosting(ctx context.Context, p discovery.Posting, at time.Time) (id int64, change discovery.Change, err error) {
+	err = s.system(ctx, func(qs *q.Queries) error {
+		var dup bool
+		id, change, dup, err = upsert(ctx, qs, 0, p, at)
+		if dup {
+			return nil
+		}
+		return err
+	})
+	return id, change, err
+}
+
+func upsert(ctx context.Context, qs *q.Queries, runID int64, p discovery.Posting, at time.Time) (int64, discovery.Change, bool, error) {
 	fp := discovery.Fingerprint(p.Source, p.ExternalID)
 	mk := discovery.MatchKey(p.Company, p.Title)
 	hash := discovery.ContentHash(p.Title, p.Location, p.Description)
 	if err := qs.LockMatchKey(ctx, mk); err != nil {
-		return "", false, err
+		return 0, "", false, err
 	}
 
 	job, err := qs.JobByFingerprint(ctx, fp)
 	found := err == nil
 	if err != nil && !errors.Is(err, pgx.ErrNoRows) {
-		return "", false, err
+		return 0, "", false, err
 	}
 	if found && p.Description == "" {
 		hash = discovery.ContentHash(p.Title, p.Location, job.Description) // details not loaded this time
@@ -93,11 +106,11 @@ func upsert(ctx context.Context, qs *q.Queries, runID int64, p discovery.Posting
 	if !found {
 		other, err := sameJob(ctx, qs, p, mk)
 		if err != nil {
-			return "", false, err
+			return 0, "", false, err
 		}
 		switch {
 		case other != nil && discovery.IsAggregator(p.Source):
-			return "", true, nil
+			return 0, "", true, nil
 		case other != nil && discovery.IsAggregator(other.Source):
 			// The company board replaces the job-board entry (direct link, complete data).
 			alt := other.AltUrls
@@ -105,19 +118,33 @@ func upsert(ctx context.Context, qs *q.Queries, runID int64, p discovery.Posting
 				alt = append(alt, other.Url)
 			}
 			if err := qs.UpdateJob(ctx, updateParams(other.ID, fp, mk, hash, p, alt, true, at)); err != nil {
-				return "", false, err
+				return 0, "", false, err
 			}
-			return discovery.ChangeMerged, false, snapshot(ctx, qs, other.ID, runID, discovery.ChangeMerged, p, hash, nil, at)
+			return other.ID, discovery.ChangeMerged, false, snapshot(ctx, qs, other.ID, runID, discovery.ChangeMerged, p, hash, nil, at)
+		}
+		var salMin, salMax *int32
+		if p.SalaryMin > 0 {
+			v := int32(min(max(p.SalaryMin, 0), 10_000_000))
+			salMin = &v
+		}
+		if p.SalaryMax > 0 {
+			v := int32(min(max(p.SalaryMax, 0), 10_000_000))
+			salMax = &v
+		}
+		salCurr := "EUR"
+		if p.SalaryCurrency != "" {
+			salCurr = p.SalaryCurrency
 		}
 		id, err := qs.InsertJob(ctx, q.InsertJobParams{
 			Fingerprint: fp, MatchKey: mk, Source: p.Source, ExternalID: p.ExternalID, Company: p.Company,
 			Title: p.Title, Location: p.Location, Workplace: string(p.Workplace), Url: p.URL, ApplyUrl: p.ApplyURL,
 			Description: p.Description, Posted: date(p.Posted), ContentHash: hash, FirstSeen: at,
+			SalaryMin: salMin, SalaryMax: salMax, SalaryCurrency: &salCurr,
 		})
 		if err != nil {
-			return "", false, err
+			return 0, "", false, err
 		}
-		return discovery.ChangeNew, false, snapshot(ctx, qs, id, runID, discovery.ChangeNew, p, hash, nil, at)
+		return id, discovery.ChangeNew, false, snapshot(ctx, qs, id, runID, discovery.ChangeNew, p, hash, nil, at)
 	}
 
 	change := discovery.ChangeUnchanged
@@ -138,12 +165,12 @@ func upsert(ctx context.Context, qs *q.Queries, runID int64, p discovery.Posting
 		change = discovery.ChangeReopened
 	}
 	if err := qs.UpdateJob(ctx, updateParams(job.ID, fp, mk, hash, p, job.AltUrls, false, at)); err != nil {
-		return "", false, err
+		return 0, "", false, err
 	}
 	if change == discovery.ChangeUnchanged {
-		return change, false, nil
+		return job.ID, change, false, nil
 	}
-	return change, false, snapshot(ctx, qs, job.ID, runID, change, p, hash, diff, at)
+	return job.ID, change, false, snapshot(ctx, qs, job.ID, runID, change, p, hash, diff, at)
 }
 
 // sameJob finds the open job another source already lists under the same match key. A job board that lists a job
@@ -176,10 +203,24 @@ func updateParams(id int64, fp, mk, hash string, p discovery.Posting, alt []stri
 	if alt == nil {
 		alt = []string{}
 	}
+	var salMin, salMax *int32
+	if p.SalaryMin > 0 {
+		v := int32(min(max(p.SalaryMin, 0), 10_000_000))
+		salMin = &v
+	}
+	if p.SalaryMax > 0 {
+		v := int32(min(max(p.SalaryMax, 0), 10_000_000))
+		salMax = &v
+	}
+	salCurr := "EUR"
+	if p.SalaryCurrency != "" {
+		salCurr = p.SalaryCurrency
+	}
 	return q.UpdateJobParams{
 		ID: id, Fingerprint: fp, MatchKey: mk, Source: p.Source, ExternalID: p.ExternalID, Company: p.Company,
 		Title: p.Title, Location: p.Location, Workplace: string(p.Workplace), Url: p.URL, Merge: merge,
 		ApplyUrl: p.ApplyURL, AltUrls: alt, Description: p.Description, Posted: date(p.Posted), ContentHash: hash,
+		SalaryMin: salMin, SalaryMax: salMax, SalaryCurrency: salCurr,
 		LastSeen: at,
 	}
 }
@@ -192,8 +233,12 @@ func snapshot(ctx context.Context, qs *q.Queries, jobID, runID int64, c discover
 	if err != nil {
 		return err
 	}
+	var runPtr *int64
+	if runID > 0 {
+		runPtr = &runID
+	}
 	return qs.InsertSnapshot(ctx, q.InsertSnapshotParams{
-		JobID: jobID, CrawlRun: &runID, Change: string(c), Title: p.Title, Location: p.Location,
+		JobID: jobID, CrawlRun: runPtr, Change: string(c), Title: p.Title, Location: p.Location,
 		ContentHash: hash, Diff: b, CreatedAt: at,
 	})
 }
@@ -390,4 +435,57 @@ func (s *Store) SaveBoardStates(ctx context.Context, states []discovery.BoardSta
 		}
 		return nil
 	})
+}
+
+// LatestCrawlRun returns the most recent completed crawl run.
+func (s *Store) LatestCrawlRun(ctx context.Context) (*discovery.CrawlRun, error) {
+	var out *discovery.CrawlRun
+	err := s.system(ctx, func(qs *q.Queries) error {
+		row, err := qs.LatestCrawlRun(ctx)
+		if err != nil {
+			if errors.Is(err, pgx.ErrNoRows) {
+				return nil
+			}
+			return err
+		}
+		var stats discovery.Stats
+		if len(row.Stats) > 0 {
+			_ = json.Unmarshal(row.Stats, &stats)
+		}
+		var errs map[string]string
+		if len(row.Errors) > 0 {
+			_ = json.Unmarshal(row.Errors, &errs)
+		}
+		out = &discovery.CrawlRun{
+			ID:         row.ID,
+			StartedAt:  row.StartedAt,
+			FinishedAt: row.FinishedAt,
+			Sources:    row.Sources,
+			Stats:      stats,
+			Errors:     errs,
+		}
+		return nil
+	})
+	return out, err
+}
+
+// ActiveCrawlRun returns an ongoing crawl run started after since.
+func (s *Store) ActiveCrawlRun(ctx context.Context, since time.Time) (*discovery.ActiveRun, error) {
+	var out *discovery.ActiveRun
+	err := s.system(ctx, func(qs *q.Queries) error {
+		row, err := qs.ActiveCrawlRun(ctx, since)
+		if err != nil {
+			if errors.Is(err, pgx.ErrNoRows) {
+				return nil
+			}
+			return err
+		}
+		out = &discovery.ActiveRun{
+			ID:        row.ID,
+			StartedAt: row.StartedAt,
+			Sources:   row.Sources,
+		}
+		return nil
+	})
+	return out, err
 }

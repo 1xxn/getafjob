@@ -4,6 +4,20 @@ INSERT INTO crawl_runs (started_at, sources) VALUES ($1, $2) RETURNING id;
 -- name: FinishRun :exec
 UPDATE crawl_runs SET finished_at = $2, stats = $3, errors = $4 WHERE id = $1;
 
+-- name: LatestCrawlRun :one
+SELECT id, started_at, finished_at, sources, stats, errors
+FROM crawl_runs
+WHERE finished_at IS NOT NULL
+ORDER BY id DESC
+LIMIT 1;
+
+-- name: ActiveCrawlRun :one
+SELECT id, started_at, sources
+FROM crawl_runs
+WHERE finished_at IS NULL AND started_at > sqlc.arg(since)::timestamptz
+ORDER BY id DESC
+LIMIT 1;
+
 -- name: JobByFingerprint :one
 SELECT id, title, location, description, content_hash, status, url, alt_urls FROM jobs WHERE fingerprint = $1 FOR UPDATE;
 
@@ -12,8 +26,11 @@ SELECT id, source, location, url, alt_urls FROM jobs WHERE match_key = $1 AND st
 
 -- name: InsertJob :one
 INSERT INTO jobs (fingerprint, match_key, source, external_id, company, title, location, workplace, url, apply_url,
-                  description, posted, content_hash, first_seen, last_seen)
-VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $14)
+                  description, posted, salary_min, salary_max, salary_currency, content_hash, first_seen, last_seen)
+VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12,
+        sqlc.narg(salary_min)::integer, sqlc.narg(salary_max)::integer,
+        coalesce(nullif(sqlc.narg(salary_currency)::text, ''), 'EUR'),
+        $13, $14, $14)
 RETURNING id;
 
 -- name: UpdateJob :exec
@@ -33,6 +50,9 @@ SET fingerprint  = sqlc.arg(fingerprint),
     alt_urls     = sqlc.arg(alt_urls)::text[],
     description  = coalesce(nullif(sqlc.arg(description)::text, ''), description),
     posted       = coalesce(sqlc.narg(posted)::date, posted),
+    salary_min   = coalesce(sqlc.narg(salary_min)::integer, salary_min),
+    salary_max   = coalesce(sqlc.narg(salary_max)::integer, salary_max),
+    salary_currency = coalesce(nullif(sqlc.arg(salary_currency)::text, ''), salary_currency, 'EUR'),
     content_hash = sqlc.arg(content_hash),
     last_seen    = sqlc.arg(last_seen),
     status       = 'open',
