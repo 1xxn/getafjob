@@ -4,6 +4,7 @@ import (
 	"context"
 	"net/http"
 	"net/http/httptest"
+	"net/url"
 	"regexp"
 	"strconv"
 	"strings"
@@ -132,6 +133,56 @@ func TestJobPages(t *testing.T) {
 		if rec := a.do(http.MethodGet, path, nil, session, nil); rec.Code != http.StatusNotFound {
 			t.Errorf("%s: %d", path, rec.Code)
 		}
+	}
+
+	// Filter pills: location, workplace, source, min_salary, freshness, sort
+	if body := a.do(http.MethodGet, "/jobs?location=Berlin", nil, session, nil).Body.String(); !strings.Contains(body, "Go Developer") {
+		t.Fatal("filter by location Berlin failed")
+	}
+	if body := a.do(http.MethodGet, "/jobs?location=Munich", nil, session, nil).Body.String(); !strings.Contains(body, "No jobs fit this filter.") {
+		t.Fatal("filter by location Munich should have 0 results")
+	}
+	if body := a.do(http.MethodGet, "/jobs?freshness=24h&sort=newest", nil, session, nil).Body.String(); !strings.Contains(body, "Go Developer") {
+		t.Fatal("filter by freshness and sort failed")
+	}
+
+	// Employer & keyword blocklist: add Acme GmbH to blocklist
+	blkRec := a.do(http.MethodPost, "/jobs/blocklist", url.Values{"kind": {"company"}, "pattern": {"Acme GmbH"}}, session, nil)
+	if blkRec.Code != http.StatusSeeOther {
+		t.Fatalf("add blocklist: expected redirect, got %d", blkRec.Code)
+	}
+
+	// Now Acme GmbH ("Go Developer") must be hidden from normal discovery!
+	normList := a.do(http.MethodGet, "/jobs", nil, session, nil).Body.String()
+	if strings.Contains(normList, "Go Developer") {
+		t.Fatal("blocked company Acme GmbH still visible in discovery list")
+	}
+	if !strings.Contains(normList, "Blocked") {
+		t.Fatal("expected Blocked indicator in discovery counts")
+	}
+
+	// Blocked tab displays blocked job
+	blkList := a.do(http.MethodGet, "/jobs?decision=blocked", nil, session, nil).Body.String()
+	if !strings.Contains(blkList, "Go Developer") || !strings.Contains(blkList, "Unblock") {
+		t.Fatal("blocked job not displayed in decision=blocked view")
+	}
+
+	// Unblock via delete
+	delRec := a.do(http.MethodPost, "/jobs/blocklist/delete", url.Values{"kind": {"company"}, "pattern": {"Acme GmbH"}}, session, nil)
+	if delRec.Code != http.StatusSeeOther {
+		t.Fatalf("delete blocklist: expected redirect, got %d", delRec.Code)
+	}
+
+	// Acme GmbH visible again
+	unblkList := a.do(http.MethodGet, "/jobs", nil, session, nil).Body.String()
+	if !strings.Contains(unblkList, "Go Developer") {
+		t.Fatal("unblocked company Acme GmbH not visible in discovery list")
+	}
+
+	// HTMX partial addition to blocklist
+	htmxRec := a.do(http.MethodPost, "/jobs/blocklist", url.Values{"kind": {"keyword"}, "pattern": {"PostgreSQL"}}, session, map[string]string{"HX-Request": "true"})
+	if htmxRec.Code != http.StatusOK || !strings.Contains(htmxRec.Body.String(), `id="results"`) {
+		t.Fatalf("htmx blocklist response: %d, body: %s", htmxRec.Code, htmxRec.Body.String())
 	}
 }
 

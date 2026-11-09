@@ -92,17 +92,41 @@ func (s *Store) ListMatches(ctx context.Context, userID uuid.UUID, f matching.Fi
 		ds[i] = string(d)
 	}
 	err = db.InUserTx(ctx, s.pool, userID, func(tx pgx.Tx) error {
-		rows, err := q.New(tx).ListMatches(ctx, q.ListMatchesParams{UserID: userID, Decisions: ds,
-			Workplace: f.Workplace, Query: f.Query, PageOffset: int32(min(offset, 1_000_000)), //nolint:gosec // bounded
-			PageSize: int32(min(limit, 1000))}) //nolint:gosec // bounded
+		rows, err := q.New(tx).ListMatches(ctx, q.ListMatchesParams{
+			UserID:        userID,
+			Decisions:     ds,
+			Workplace:     f.Workplace,
+			Location:      f.Location,
+			Source:        f.Source,
+			MinSalary:     int32(min(f.MinSalary, 10_000_000)), //nolint:gosec // bounded
+			FreshnessDays: int32(f.FreshnessDays),              //nolint:gosec // bounded
+			Query:         f.Query,
+			ShowBlocked:   f.Blocked,
+			Sort:          f.Sort,
+			PageOffset:    int32(min(offset, 1_000_000)), //nolint:gosec // bounded
+			PageSize:      int32(min(limit, 1000)),       //nolint:gosec // bounded
+		})
 		if err != nil {
 			return err
 		}
 		items = make([]matching.Item, len(rows))
 		for i, r := range rows {
-			items[i] = matching.Item{JobID: r.ID, Title: r.Title, Company: r.Company, Location: r.Location,
-				Workplace: r.Workplace, Posted: date(r.Posted), FirstSeen: r.FirstSeen, Score: int(r.Score),
-				Decision: matching.Decision(r.Decision)}
+			items[i] = matching.Item{
+				JobID:          r.ID,
+				Title:          r.Title,
+				Company:        r.Company,
+				Location:       r.Location,
+				Workplace:      r.Workplace,
+				Posted:         date(r.Posted),
+				FirstSeen:      r.FirstSeen,
+				Score:          int(r.Score),
+				Decision:       matching.Decision(r.Decision),
+				SalaryMin:      int(r.SalaryMin),
+				SalaryMax:      int(r.SalaryMax),
+				SalaryCurrency: r.SalaryCurrency,
+				Source:         r.Source,
+				Blocked:        r.Blocked,
+			}
 			total = int(r.Total)
 		}
 		return nil
@@ -110,17 +134,23 @@ func (s *Store) ListMatches(ctx context.Context, userID uuid.UUID, f matching.Fi
 	return items, total, err
 }
 
-// MatchCounts counts the user's open jobs per decision.
-func (s *Store) MatchCounts(ctx context.Context, userID uuid.UUID) (map[matching.Decision]int, error) {
+// MatchCounts counts the user's open jobs per decision and the number of blocked jobs.
+func (s *Store) MatchCounts(ctx context.Context, userID uuid.UUID) (map[matching.Decision]int, int, error) {
 	out := map[matching.Decision]int{}
+	var blockedCount int64
 	err := db.InUserTx(ctx, s.pool, userID, func(tx pgx.Tx) error {
-		rows, err := q.New(tx).MatchCounts(ctx, userID)
+		queries := q.New(tx)
+		rows, err := queries.MatchCounts(ctx, userID)
+		if err != nil {
+			return err
+		}
 		for _, r := range rows {
 			out[matching.Decision(r.Decision)] = int(r.N)
 		}
+		blockedCount, err = queries.BlockedCount(ctx, userID)
 		return err
 	})
-	return out, err
+	return out, int(blockedCount), err
 }
 
 // Match returns one job with the user's result.
@@ -133,10 +163,29 @@ func (s *Store) Match(ctx context.Context, userID uuid.UUID, jobID int64) (d mat
 		if err != nil {
 			return err
 		}
-		d = matching.Detail{Item: matching.Item{JobID: r.ID, Title: r.Title, Company: r.Company, Location: r.Location,
-			Workplace: r.Workplace, Posted: date(r.Posted), FirstSeen: r.FirstSeen, Score: int(r.Score),
-			Decision: matching.Decision(r.Decision)}, Description: r.Description, URL: r.Url, ApplyURL: r.ApplyUrl,
-			Open: r.Status == "open", ComputedAt: r.ComputedAt}
+		d = matching.Detail{
+			Item: matching.Item{
+				JobID:          r.ID,
+				Title:          r.Title,
+				Company:        r.Company,
+				Location:       r.Location,
+				Workplace:      r.Workplace,
+				Posted:         date(r.Posted),
+				FirstSeen:      r.FirstSeen,
+				Score:          int(r.Score),
+				Decision:       matching.Decision(r.Decision),
+				SalaryMin:      int(r.SalaryMin),
+				SalaryMax:      int(r.SalaryMax),
+				SalaryCurrency: r.SalaryCurrency,
+				Source:         r.Source,
+				Blocked:        r.Blocked,
+			},
+			Description: r.Description,
+			URL:         r.Url,
+			ApplyURL:    r.ApplyUrl,
+			Open:        r.Status == "open",
+			ComputedAt:  r.ComputedAt,
+		}
 		return json.Unmarshal(r.Reasons, &d.Reasons)
 	})
 	return d, err
@@ -170,4 +219,59 @@ func (s *Store) UserMatches(ctx context.Context, userID uuid.UUID) (out []matchi
 		return nil
 	})
 	return out, err
+}
+
+// ListBlocklist returns all blocked employers and keywords for the user.
+func (s *Store) ListBlocklist(ctx context.Context, userID uuid.UUID) ([]matching.BlocklistItem, error) {
+	var out []matching.BlocklistItem
+	err := db.InUserTx(ctx, s.pool, userID, func(tx pgx.Tx) error {
+		rows, err := q.New(tx).ListBlocklist(ctx, userID)
+		if err != nil {
+			return err
+		}
+		out = make([]matching.BlocklistItem, len(rows))
+		for i, r := range rows {
+			out[i] = matching.BlocklistItem{
+				ID:        r.ID,
+				UserID:    r.UserID,
+				Kind:      r.Kind,
+				Pattern:   r.Pattern,
+				CreatedAt: r.CreatedAt,
+			}
+		}
+		return nil
+	})
+	return out, err
+}
+
+// AddBlocklist adds an employer or keyword to the candidate's blocklist.
+func (s *Store) AddBlocklist(ctx context.Context, userID uuid.UUID, kind, pattern string) error {
+	return db.InUserTx(ctx, s.pool, userID, func(tx pgx.Tx) error {
+		return q.New(tx).InsertBlocklist(ctx, q.InsertBlocklistParams{
+			UserID:  userID,
+			Kind:    kind,
+			Pattern: pattern,
+		})
+	})
+}
+
+// RemoveBlocklist removes a blocklist item by ID.
+func (s *Store) RemoveBlocklist(ctx context.Context, userID uuid.UUID, id int64) error {
+	return db.InUserTx(ctx, s.pool, userID, func(tx pgx.Tx) error {
+		return q.New(tx).DeleteBlocklist(ctx, q.DeleteBlocklistParams{
+			UserID: userID,
+			ID:     id,
+		})
+	})
+}
+
+// RemoveBlocklistByPattern removes a blocklist item by kind and pattern.
+func (s *Store) RemoveBlocklistByPattern(ctx context.Context, userID uuid.UUID, kind, pattern string) error {
+	return db.InUserTx(ctx, s.pool, userID, func(tx pgx.Tx) error {
+		return q.New(tx).DeleteBlocklistByPattern(ctx, q.DeleteBlocklistByPatternParams{
+			UserID: userID,
+			Kind:   kind,
+			Lower:  pattern,
+		})
+	})
 }

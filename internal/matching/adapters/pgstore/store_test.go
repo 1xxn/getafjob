@@ -139,3 +139,218 @@ func TestRunStoresResultsPerUser(t *testing.T) {
 		t.Fatalf("erika's detail: %v", err)
 	}
 }
+
+func TestAdvancedDiscoveryFiltersSortingAndBlocklist(t *testing.T) {
+	pool := dbtest.AppPool(t)
+	ctx := t.Context()
+	now := time.Now().Truncate(time.Hour)
+	uID := user(t, pool, "discovery-tester@example.com")
+	st := pgstore.New(pool)
+	ls := matching.NewListings(st)
+
+	insert := func(fp, comp, title, loc, wp, src string, minSal, maxSal int, daysAgo int) int64 {
+		var id int64
+		postedDate := now.Add(-time.Duration(daysAgo) * 24 * time.Hour)
+		err := db.InSystemTx(ctx, pool, func(tx pgx.Tx) error {
+			return tx.QueryRow(ctx, `
+				INSERT INTO jobs (fingerprint, match_key, source, external_id, company, title, location, workplace, url, description, posted, content_hash, first_seen, last_seen, salary_min, salary_max)
+				VALUES ($1, $1, $2, $1, $3, $4, $5, $6, 'https://example.org/' || $1, 'Specialized role for ' || $4, $7, 'h', $8, $8, $9, $10)
+				RETURNING id`,
+				fp, src, comp, title, loc, wp, postedDate, postedDate, minSal, maxSal,
+			).Scan(&id)
+		})
+		if err != nil {
+			t.Fatal(err)
+		}
+		return id
+	}
+
+	j1 := insert("job-1", "Zeta Tech", "DevOps Engineer", "Berlin", "remote", "greenhouse", 70000, 85000, 0)        // 0d, score 90
+	j2 := insert("job-2", "Alpha Corp", "Site Reliability Engineer", "Munich", "hybrid", "lever", 80000, 95000, 2)  // 2d, score 80
+	j3 := insert("job-3", "Beta Cloud", "Platform Architect", "Hamburg", "onsite", "ashby", 100000, 120000, 5)      // 5d, score 85
+	j4 := insert("job-4", "Recruitment Pro", "Staff Engineer", "Berlin", "remote", "greenhouse", 60000, 75000, 10)  // 10d, score 70
+	j5 := insert("job-5", "Delta Consulting", "Lead Engineer", "Frankfurt", "hybrid", "workday", 90000, 110000, 25) // 25d, score 60
+
+	err := st.SaveMatches(ctx, uID, []matching.Result{
+		{JobID: j1, Score: 90, Decision: matching.Match},
+		{JobID: j2, Score: 80, Decision: matching.Match},
+		{JobID: j3, Score: 85, Decision: matching.Match},
+		{JobID: j4, Score: 70, Decision: matching.Maybe},
+		{JobID: j5, Score: 60, Decision: matching.Maybe},
+	}, now)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// 1. Freshness filter
+	t.Run("freshness", func(t *testing.T) {
+		// Past 24h (1 day): only j1
+		l, err := ls.List(ctx, uID, matching.Filter{FreshnessDays: 1, Decisions: []matching.Decision{matching.Match, matching.Maybe}})
+		if err != nil || len(l.Items) != 1 || l.Items[0].JobID != j1 {
+			t.Fatalf("24h freshness: got %v items, want j1; err=%v", len(l.Items), err)
+		}
+		// Past 3 days: j1, j2
+		l, err = ls.List(ctx, uID, matching.Filter{FreshnessDays: 3, Decisions: []matching.Decision{matching.Match, matching.Maybe}})
+		if err != nil || len(l.Items) != 2 {
+			t.Fatalf("3d freshness: got %v items, want 2; err=%v", len(l.Items), err)
+		}
+		// Past 7 days: j1, j2, j3
+		l, err = ls.List(ctx, uID, matching.Filter{FreshnessDays: 7, Decisions: []matching.Decision{matching.Match, matching.Maybe}})
+		if err != nil || len(l.Items) != 3 {
+			t.Fatalf("7d freshness: got %v items, want 3; err=%v", len(l.Items), err)
+		}
+		// Past 14 days: j1, j2, j3, j4
+		l, err = ls.List(ctx, uID, matching.Filter{FreshnessDays: 14, Decisions: []matching.Decision{matching.Match, matching.Maybe}})
+		if err != nil || len(l.Items) != 4 {
+			t.Fatalf("14d freshness: got %v items, want 4; err=%v", len(l.Items), err)
+		}
+		// Past 30 days: all 5
+		l, err = ls.List(ctx, uID, matching.Filter{FreshnessDays: 30, Decisions: []matching.Decision{matching.Match, matching.Maybe}})
+		if err != nil || len(l.Items) != 5 {
+			t.Fatalf("30d freshness: got %v items, want 5; err=%v", len(l.Items), err)
+		}
+	})
+
+	// 2. Sorting
+	t.Run("sorting", func(t *testing.T) {
+		// Best match (default): j1 (90), j3 (85), j2 (80), j4 (70), j5 (60)
+		l, err := ls.List(ctx, uID, matching.Filter{Sort: "match", Decisions: []matching.Decision{matching.Match, matching.Maybe}})
+		if err != nil || len(l.Items) != 5 || l.Items[0].JobID != j1 || l.Items[1].JobID != j3 || l.Items[2].JobID != j2 {
+			t.Fatalf("sort match: got order [%d, %d, %d...], want [j1=%d, j3=%d, j2=%d...]", l.Items[0].JobID, l.Items[1].JobID, l.Items[2].JobID, j1, j3, j2)
+		}
+
+		// Newest first: j1 (0d), j2 (2d), j3 (5d), j4 (10d), j5 (25d)
+		l, err = ls.List(ctx, uID, matching.Filter{Sort: "newest", Decisions: []matching.Decision{matching.Match, matching.Maybe}})
+		if err != nil || len(l.Items) != 5 || l.Items[0].JobID != j1 || l.Items[1].JobID != j2 || l.Items[2].JobID != j3 {
+			t.Fatalf("sort newest: got order [%d, %d, %d...], want [j1=%d, j2=%d, j3=%d...]", l.Items[0].JobID, l.Items[1].JobID, l.Items[2].JobID, j1, j2, j3)
+		}
+
+		// Highest salary: j3 (120k), j5 (110k), j2 (95k), j1 (85k), j4 (75k)
+		l, err = ls.List(ctx, uID, matching.Filter{Sort: "salary", Decisions: []matching.Decision{matching.Match, matching.Maybe}})
+		if err != nil || len(l.Items) != 5 || l.Items[0].JobID != j3 || l.Items[1].JobID != j5 || l.Items[2].JobID != j2 {
+			t.Fatalf("sort salary: got order [%d, %d, %d...], want [j3=%d, j5=%d, j2=%d...]", l.Items[0].JobID, l.Items[1].JobID, l.Items[2].JobID, j3, j5, j2)
+		}
+
+		// Company name A-Z: Alpha Corp (j2), Beta Cloud (j3), Delta Consulting (j5), Recruitment Pro (j4), Zeta Tech (j1)
+		l, err = ls.List(ctx, uID, matching.Filter{Sort: "company", Decisions: []matching.Decision{matching.Match, matching.Maybe}})
+		if err != nil || len(l.Items) != 5 || l.Items[0].JobID != j2 || l.Items[1].JobID != j3 || l.Items[2].JobID != j5 {
+			t.Fatalf("sort company: got order [%s, %s, %s...], want [Alpha, Beta, Delta...]", l.Items[0].Company, l.Items[1].Company, l.Items[2].Company)
+		}
+	})
+
+	// 3. Filter pills
+	t.Run("filter_pills", func(t *testing.T) {
+		// Location filter: "Munich" -> only j2
+		l, err := ls.List(ctx, uID, matching.Filter{Location: "Munich", Decisions: []matching.Decision{matching.Match, matching.Maybe}})
+		if err != nil || len(l.Items) != 1 || l.Items[0].JobID != j2 {
+			t.Fatalf("location Munich: got %d items, want j2", len(l.Items))
+		}
+
+		// Workplace: "remote" -> j1, j4
+		l, err = ls.List(ctx, uID, matching.Filter{Workplace: "remote", Decisions: []matching.Decision{matching.Match, matching.Maybe}})
+		if err != nil || len(l.Items) != 2 {
+			t.Fatalf("workplace remote: got %d items, want 2", len(l.Items))
+		}
+
+		// ATS source: "greenhouse" -> j1, j4
+		l, err = ls.List(ctx, uID, matching.Filter{Source: "greenhouse", Decisions: []matching.Decision{matching.Match, matching.Maybe}})
+		if err != nil || len(l.Items) != 2 {
+			t.Fatalf("source greenhouse: got %d items, want 2", len(l.Items))
+		}
+
+		// Minimum salary: 90000 -> j2 (95k max), j3 (120k max), j5 (110k max)
+		l, err = ls.List(ctx, uID, matching.Filter{MinSalary: 90000, Decisions: []matching.Decision{matching.Match, matching.Maybe}})
+		if err != nil || len(l.Items) != 3 {
+			t.Fatalf("min salary 90000: got %d items, want 3", len(l.Items))
+		}
+	})
+
+	// 4. Blocklist
+	t.Run("blocklist", func(t *testing.T) {
+		// Add "Recruitment Pro" (company) to blocklist
+		err := ls.AddBlocklist(ctx, uID, "company", "Recruitment Pro")
+		if err != nil {
+			t.Fatalf("AddBlocklist company: %v", err)
+		}
+
+		// Add "consulting" (keyword) to blocklist
+		err = ls.AddBlocklist(ctx, uID, "keyword", "consulting")
+		if err != nil {
+			t.Fatalf("AddBlocklist keyword: %v", err)
+		}
+
+		// Check active blocklist items
+		bl, err := ls.Blocklist(ctx, uID)
+		if err != nil || len(bl) != 2 {
+			t.Fatalf("Blocklist items: got %d items, want 2; err=%v", len(bl), err)
+		}
+
+		// List jobs: j4 (Recruitment Pro) and j5 (Delta Consulting) should be excluded!
+		// Normal list has only 3 jobs remaining: j1, j2, j3
+		l, err := ls.List(ctx, uID, matching.Filter{Decisions: []matching.Decision{matching.Match, matching.Maybe}})
+		if err != nil || len(l.Items) != 3 {
+			t.Fatalf("active list after blocklist: got %d items, want 3", len(l.Items))
+		}
+		if l.BlockedCount != 2 {
+			t.Fatalf("BlockedCount: got %d, want 2", l.BlockedCount)
+		}
+
+		// Detail on blocked job reports Blocked == true
+		d4, err := ls.Detail(ctx, uID, j4)
+		if err != nil || !d4.Blocked {
+			t.Fatalf("Detail on blocked job: blocked=%v, want true; err=%v", d4.Blocked, err)
+		}
+
+		// View blocked jobs (Blocked: true)
+		lblk, err := ls.List(ctx, uID, matching.Filter{Blocked: true})
+		if err != nil || len(lblk.Items) != 2 {
+			t.Fatalf("blocked list: got %d items, want 2; err=%v", len(lblk.Items), err)
+		}
+
+		// Remove "Recruitment Pro" by pattern
+		err = ls.RemoveBlocklistByPattern(ctx, uID, "company", "Recruitment Pro")
+		if err != nil {
+			t.Fatalf("RemoveBlocklistByPattern: %v", err)
+		}
+
+		// Now only 1 job (j5) is blocked
+		l, err = ls.List(ctx, uID, matching.Filter{Decisions: []matching.Decision{matching.Match, matching.Maybe}})
+		if err != nil || len(l.Items) != 4 || l.BlockedCount != 1 {
+			t.Fatalf("list after unblocking Recruitment Pro: items=%d (want 4), blocked=%d (want 1)", len(l.Items), l.BlockedCount)
+		}
+
+		// Remove remaining blocklist item by ID
+		bl, _ = ls.Blocklist(ctx, uID)
+		if len(bl) != 1 {
+			t.Fatalf("remaining blocklist items: got %d, want 1", len(bl))
+		}
+		err = ls.RemoveBlocklist(ctx, uID, bl[0].ID)
+		if err != nil {
+			t.Fatalf("RemoveBlocklist by ID: %v", err)
+		}
+
+		// Blocklist is now empty
+		bl, _ = ls.Blocklist(ctx, uID)
+		if len(bl) != 0 {
+			t.Fatalf("blocklist not empty: got %d", len(bl))
+		}
+	})
+
+	// 5. Query performance verification (< 100ms)
+	t.Run("query_performance", func(t *testing.T) {
+		start := time.Now()
+		_, err := ls.List(ctx, uID, matching.Filter{
+			FreshnessDays: 7,
+			Sort:          "newest",
+			MinSalary:     70000,
+			Workplace:     "remote",
+		})
+		elapsed := time.Since(start)
+		if err != nil {
+			t.Fatalf("performance query failed: %v", err)
+		}
+		if elapsed > 100*time.Millisecond {
+			t.Fatalf("query took %v, want sub-100ms", elapsed)
+		}
+	})
+}

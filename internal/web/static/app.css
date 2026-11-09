@@ -307,6 +307,16 @@
     & h2 { font-size: 1.1rem; margin: 0 0 var(--space-1); }
   }
   .job-meta { margin: 0 0 var(--space-1); }
+  .job-header { display: flex; justify-content: space-between; align-items: baseline; gap: var(--space-3); }
+  .btn-link { background: none; border: none; padding: 0; color: inherit; text-decoration: underline; cursor: pointer; font: inherit; font-size: 0.875rem; }
+  .btn-link.danger { color: #b91c1c; }
+  .badge-blocked { background: #fee2e2; color: #991b1b; }
+  .blocklist-panel { margin-block-end: var(--space-4); padding: var(--space-3); border: 1px solid var(--line); border-radius: 6px; }
+  .blocklist-summary { cursor: pointer; font-weight: 600; display: inline-flex; align-items: center; gap: var(--space-2); }
+  .blocklist-body { margin-block-start: var(--space-3); }
+  .blocklist-add-form { display: flex; gap: var(--space-2); align-items: center; flex-wrap: wrap; margin-block-end: var(--space-3); }
+  .blocklist-items { list-style: none; padding: 0; display: flex; flex-direction: column; gap: var(--space-2); }
+  .blocklist-items li { display: flex; align-items: center; gap: var(--space-3); }
   .decision { font-weight: 600; color: var(--ink-2); }
   .decision-match { color: var(--ink-1); }
   .reasons {

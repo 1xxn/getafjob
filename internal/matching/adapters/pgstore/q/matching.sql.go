@@ -13,9 +13,71 @@ import (
 	"github.com/jackc/pgx/v5/pgtype"
 )
 
+const blockedCount = `-- name: BlockedCount :one
+SELECT count(*)::bigint AS n FROM matches m JOIN jobs j ON j.id = m.job_id
+WHERE m.user_id = $1 AND j.status = 'open'
+  AND EXISTS (
+    SELECT 1 FROM user_blocklist b
+    WHERE b.user_id = m.user_id
+      AND (
+        (b.kind = 'company' AND j.company ILIKE '%' || b.pattern || '%')
+        OR (b.kind = 'keyword' AND (j.company ILIKE '%' || b.pattern || '%' OR j.title ILIKE '%' || b.pattern || '%' OR j.description ILIKE '%' || b.pattern || '%'))
+      )
+  )
+`
+
+func (q *Queries) BlockedCount(ctx context.Context, userID uuid.UUID) (int64, error) {
+	row := q.db.QueryRow(ctx, blockedCount, userID)
+	var n int64
+	err := row.Scan(&n)
+	return n, err
+}
+
+const deleteBlocklist = `-- name: DeleteBlocklist :exec
+DELETE FROM user_blocklist
+WHERE user_id = $1 AND id = $2
+`
+
+type DeleteBlocklistParams struct {
+	UserID uuid.UUID
+	ID     int64
+}
+
+func (q *Queries) DeleteBlocklist(ctx context.Context, arg DeleteBlocklistParams) error {
+	_, err := q.db.Exec(ctx, deleteBlocklist, arg.UserID, arg.ID)
+	return err
+}
+
+const deleteBlocklistByPattern = `-- name: DeleteBlocklistByPattern :exec
+DELETE FROM user_blocklist
+WHERE user_id = $1 AND kind = $2 AND lower(pattern) = lower($3)
+`
+
+type DeleteBlocklistByPatternParams struct {
+	UserID uuid.UUID
+	Kind   string
+	Lower  string
+}
+
+func (q *Queries) DeleteBlocklistByPattern(ctx context.Context, arg DeleteBlocklistByPatternParams) error {
+	_, err := q.db.Exec(ctx, deleteBlocklistByPattern, arg.UserID, arg.Kind, arg.Lower)
+	return err
+}
+
 const getMatch = `-- name: GetMatch :one
 SELECT j.id, j.title, j.company, j.location, j.workplace, j.posted, j.first_seen, j.description, j.url,
-  j.apply_url, j.status, m.score, m.decision, m.reasons, m.computed_at
+  j.apply_url, j.status,
+  coalesce(j.salary_min, 0)::integer AS salary_min,
+  coalesce(j.salary_max, 0)::integer AS salary_max,
+  j.salary_currency, j.source, m.score, m.decision, m.reasons, m.computed_at,
+  EXISTS (
+    SELECT 1 FROM user_blocklist b
+    WHERE b.user_id = m.user_id
+      AND (
+        (b.kind = 'company' AND j.company ILIKE '%' || b.pattern || '%')
+        OR (b.kind = 'keyword' AND (j.company ILIKE '%' || b.pattern || '%' OR j.title ILIKE '%' || b.pattern || '%' OR j.description ILIKE '%' || b.pattern || '%'))
+      )
+  ) AS blocked
 FROM matches m JOIN jobs j ON j.id = m.job_id WHERE m.user_id = $1 AND j.id = $2
 `
 
@@ -25,21 +87,26 @@ type GetMatchParams struct {
 }
 
 type GetMatchRow struct {
-	ID          int64
-	Title       string
-	Company     string
-	Location    string
-	Workplace   string
-	Posted      pgtype.Date
-	FirstSeen   time.Time
-	Description string
-	Url         string
-	ApplyUrl    string
-	Status      string
-	Score       int16
-	Decision    string
-	Reasons     []byte
-	ComputedAt  time.Time
+	ID             int64
+	Title          string
+	Company        string
+	Location       string
+	Workplace      string
+	Posted         pgtype.Date
+	FirstSeen      time.Time
+	Description    string
+	Url            string
+	ApplyUrl       string
+	Status         string
+	SalaryMin      int32
+	SalaryMax      int32
+	SalaryCurrency string
+	Source         string
+	Score          int16
+	Decision       string
+	Reasons        []byte
+	ComputedAt     time.Time
+	Blocked        bool
 }
 
 func (q *Queries) GetMatch(ctx context.Context, arg GetMatchParams) (GetMatchRow, error) {
@@ -57,56 +124,169 @@ func (q *Queries) GetMatch(ctx context.Context, arg GetMatchParams) (GetMatchRow
 		&i.Url,
 		&i.ApplyUrl,
 		&i.Status,
+		&i.SalaryMin,
+		&i.SalaryMax,
+		&i.SalaryCurrency,
+		&i.Source,
 		&i.Score,
 		&i.Decision,
 		&i.Reasons,
 		&i.ComputedAt,
+		&i.Blocked,
 	)
 	return i, err
 }
 
+const insertBlocklist = `-- name: InsertBlocklist :exec
+INSERT INTO user_blocklist (user_id, kind, pattern)
+VALUES ($1, $2, $3)
+ON CONFLICT (user_id, kind, pattern) DO NOTHING
+`
+
+type InsertBlocklistParams struct {
+	UserID  uuid.UUID
+	Kind    string
+	Pattern string
+}
+
+func (q *Queries) InsertBlocklist(ctx context.Context, arg InsertBlocklistParams) error {
+	_, err := q.db.Exec(ctx, insertBlocklist, arg.UserID, arg.Kind, arg.Pattern)
+	return err
+}
+
+const listBlocklist = `-- name: ListBlocklist :many
+SELECT id, user_id, kind, pattern, created_at
+FROM user_blocklist
+WHERE user_id = $1
+ORDER BY created_at DESC, id DESC
+`
+
+func (q *Queries) ListBlocklist(ctx context.Context, userID uuid.UUID) ([]UserBlocklist, error) {
+	rows, err := q.db.Query(ctx, listBlocklist, userID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []UserBlocklist{}
+	for rows.Next() {
+		var i UserBlocklist
+		if err := rows.Scan(
+			&i.ID,
+			&i.UserID,
+			&i.Kind,
+			&i.Pattern,
+			&i.CreatedAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const listMatches = `-- name: ListMatches :many
-SELECT j.id, j.title, j.company, j.location, j.workplace, j.posted, j.first_seen, m.score, m.decision,
+SELECT j.id, j.title, j.company, j.location, j.workplace, j.posted, j.first_seen,
+  coalesce(j.salary_min, 0)::integer AS salary_min,
+  coalesce(j.salary_max, 0)::integer AS salary_max,
+  j.salary_currency, j.source, m.score, m.decision,
+  EXISTS (
+    SELECT 1 FROM user_blocklist b
+    WHERE b.user_id = m.user_id
+      AND (
+        (b.kind = 'company' AND j.company ILIKE '%' || b.pattern || '%')
+        OR (b.kind = 'keyword' AND (j.company ILIKE '%' || b.pattern || '%' OR j.title ILIKE '%' || b.pattern || '%' OR j.description ILIKE '%' || b.pattern || '%'))
+      )
+  ) AS blocked,
   count(*) OVER () AS total
 FROM matches m JOIN jobs j ON j.id = m.job_id
 WHERE m.user_id = $1 AND j.status = 'open'
   AND (cardinality($2::text[]) = 0 OR m.decision = ANY ($2::text[]))
   AND ($3::text = '' OR j.workplace = $3::text)
-  AND ($4::text = '' OR j.search @@ (websearch_to_tsquery('simple', $4::text)
-    || websearch_to_tsquery('english', $4::text) || websearch_to_tsquery('german', $4::text)))
-ORDER BY m.score DESC, j.id DESC
-LIMIT $6::integer OFFSET $5::integer
+  AND ($4::text = '' OR j.location ILIKE '%' || $4::text || '%')
+  AND ($5::text = '' OR j.source = $5::text)
+  AND ($6::integer = 0 OR coalesce(j.salary_max, j.salary_min, 0) >= $6::integer)
+  AND ($7::integer = 0 OR coalesce(j.posted::timestamptz, j.first_seen) >= (now() - ($7::text || ' days')::interval))
+  AND ($8::text = '' OR j.search @@ (websearch_to_tsquery('simple', $8::text)
+    || websearch_to_tsquery('english', $8::text) || websearch_to_tsquery('german', $8::text)))
+  AND (
+    CASE WHEN $9::boolean THEN
+      EXISTS (
+        SELECT 1 FROM user_blocklist b
+        WHERE b.user_id = m.user_id
+          AND (
+            (b.kind = 'company' AND j.company ILIKE '%' || b.pattern || '%')
+            OR (b.kind = 'keyword' AND (j.company ILIKE '%' || b.pattern || '%' OR j.title ILIKE '%' || b.pattern || '%' OR j.description ILIKE '%' || b.pattern || '%'))
+          )
+      )
+    ELSE
+      NOT EXISTS (
+        SELECT 1 FROM user_blocklist b
+        WHERE b.user_id = m.user_id
+          AND (
+            (b.kind = 'company' AND j.company ILIKE '%' || b.pattern || '%')
+            OR (b.kind = 'keyword' AND (j.company ILIKE '%' || b.pattern || '%' OR j.title ILIKE '%' || b.pattern || '%' OR j.description ILIKE '%' || b.pattern || '%'))
+          )
+      )
+    END
+  )
+ORDER BY
+  CASE WHEN $10::text = 'newest' THEN coalesce(j.posted::timestamptz, j.first_seen) END DESC NULLS LAST,
+  CASE WHEN $10::text = 'salary' THEN coalesce(j.salary_max, j.salary_min, 0) END DESC NULLS LAST,
+  CASE WHEN $10::text = 'company' THEN lower(j.company) END ASC,
+  CASE WHEN $10::text = 'match' OR $10::text = '' THEN m.score END DESC,
+  j.id DESC
+LIMIT $12::integer OFFSET $11::integer
 `
 
 type ListMatchesParams struct {
-	UserID     uuid.UUID
-	Decisions  []string
-	Workplace  string
-	Query      string
-	PageOffset int32
-	PageSize   int32
+	UserID        uuid.UUID
+	Decisions     []string
+	Workplace     string
+	Location      string
+	Source        string
+	MinSalary     int32
+	FreshnessDays int32
+	Query         string
+	ShowBlocked   bool
+	Sort          string
+	PageOffset    int32
+	PageSize      int32
 }
 
 type ListMatchesRow struct {
-	ID        int64
-	Title     string
-	Company   string
-	Location  string
-	Workplace string
-	Posted    pgtype.Date
-	FirstSeen time.Time
-	Score     int16
-	Decision  string
-	Total     int64
+	ID             int64
+	Title          string
+	Company        string
+	Location       string
+	Workplace      string
+	Posted         pgtype.Date
+	FirstSeen      time.Time
+	SalaryMin      int32
+	SalaryMax      int32
+	SalaryCurrency string
+	Source         string
+	Score          int16
+	Decision       string
+	Blocked        bool
+	Total          int64
 }
 
-// One page of the user's open jobs, best first; total counts all hits of the filter.
+// One page of the user's open jobs, ordered by criteria; total counts all hits of the filter.
 func (q *Queries) ListMatches(ctx context.Context, arg ListMatchesParams) ([]ListMatchesRow, error) {
 	rows, err := q.db.Query(ctx, listMatches,
 		arg.UserID,
 		arg.Decisions,
 		arg.Workplace,
+		arg.Location,
+		arg.Source,
+		arg.MinSalary,
+		arg.FreshnessDays,
 		arg.Query,
+		arg.ShowBlocked,
+		arg.Sort,
 		arg.PageOffset,
 		arg.PageSize,
 	)
@@ -125,8 +305,13 @@ func (q *Queries) ListMatches(ctx context.Context, arg ListMatchesParams) ([]Lis
 			&i.Workplace,
 			&i.Posted,
 			&i.FirstSeen,
+			&i.SalaryMin,
+			&i.SalaryMax,
+			&i.SalaryCurrency,
+			&i.Source,
 			&i.Score,
 			&i.Decision,
+			&i.Blocked,
 			&i.Total,
 		); err != nil {
 			return nil, err
@@ -141,7 +326,16 @@ func (q *Queries) ListMatches(ctx context.Context, arg ListMatchesParams) ([]Lis
 
 const matchCounts = `-- name: MatchCounts :many
 SELECT m.decision, count(*)::bigint AS n FROM matches m JOIN jobs j ON j.id = m.job_id
-WHERE m.user_id = $1 AND j.status = 'open' GROUP BY m.decision
+WHERE m.user_id = $1 AND j.status = 'open'
+  AND NOT EXISTS (
+    SELECT 1 FROM user_blocklist b
+    WHERE b.user_id = m.user_id
+      AND (
+        (b.kind = 'company' AND j.company ILIKE '%' || b.pattern || '%')
+        OR (b.kind = 'keyword' AND (j.company ILIKE '%' || b.pattern || '%' OR j.title ILIKE '%' || b.pattern || '%' OR j.description ILIKE '%' || b.pattern || '%'))
+      )
+  )
+GROUP BY m.decision
 `
 
 type MatchCountsRow struct {
