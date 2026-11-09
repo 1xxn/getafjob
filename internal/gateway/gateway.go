@@ -120,6 +120,18 @@ func (s *Server) SessionFor(appID uuid.UUID) (*HandoffSession, bool) {
 	return v.(*HandoffSession), true
 }
 
+// ActiveSessions returns the application IDs of all active handoff sessions (#157).
+func (s *Server) ActiveSessions() []uuid.UUID {
+	var ids []uuid.UUID
+	s.handoffs.Range(func(key, value any) bool {
+		if id, ok := key.(uuid.UUID); ok {
+			ids = append(ids, id)
+		}
+		return true
+	})
+	return ids
+}
+
 var _ runnerv1connect.RunnerServiceHandler = (*Server)(nil)
 
 // Mount mounts the service onto mux.

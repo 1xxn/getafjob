@@ -24,11 +24,16 @@ import (
 )
 
 type fakeHub struct {
-	sess *gateway.HandoffSession
+	sess   *gateway.HandoffSession
+	active []uuid.UUID
 }
 
 func (f fakeHub) SessionFor(uuid.UUID) (*gateway.HandoffSession, bool) {
 	return f.sess, f.sess != nil
+}
+
+func (f fakeHub) ActiveSessions() []uuid.UUID {
+	return f.active
 }
 
 type memPushStore struct {
@@ -444,9 +449,10 @@ func TestEvidencePageAndScreenshotEndpoint(t *testing.T) {
 	}
 	pngBytes := []byte("\x89PNG\r\n\x1a\ntest-png")
 	srv := &Server{
-		Apps:   application.NewService(st),
-		Shots:  fakeShots{"runs/1/submit.png": pngBytes, "runs/1/confirm.png": pngBytes},
-		Logger: slog.Default(),
+		Apps:     application.NewService(st),
+		Shots:    fakeShots{"runs/1/submit.png": pngBytes, "runs/1/confirm.png": pngBytes},
+		Handoffs: fakeHub{active: []uuid.UUID{appID}},
+		Logger:   slog.Default(),
 	}
 
 	rec := httptest.NewRecorder()
@@ -466,6 +472,8 @@ func TestEvidencePageAndScreenshotEndpoint(t *testing.T) {
 		"/applications/" + appID.String() + "/screenshots/11",
 		"https://jobs.example.org/apply/thanks",
 		"submitted -&gt; confirmed",
+		"active-runners-banner",
+		"active-runner-pill current",
 	} {
 		if !strings.Contains(body, want) {
 			t.Fatalf("evidence page missing %q in body:\n%s", want, body)

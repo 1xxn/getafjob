@@ -51,6 +51,11 @@ func (s *shots) Put(_ context.Context, _ uuid.UUID, key string, _ []byte) error 
 }
 
 func setup(t *testing.T) (*pgxpool.Pool, *application.Service, runnerv1connect.RunnerServiceClient, *shots) {
+	p, a, c, s, _ := setupWithServer(t)
+	return p, a, c, s
+}
+
+func setupWithServer(t *testing.T) (*pgxpool.Pool, *application.Service, runnerv1connect.RunnerServiceClient, *shots, *gateway.Server) {
 	pool := dbtest.AppPool(t)
 	st := pgstore.New(pool)
 	apps := application.NewService(st)
@@ -62,7 +67,7 @@ func setup(t *testing.T) (*pgxpool.Pool, *application.Service, runnerv1connect.R
 	hs := httptest.NewServer(mux)
 	t.Cleanup(hs.Close)
 	client := connect.NewClient(connecthttp.NewTransport(hs.Client(), hs.URL))
-	return pool, apps, runnerv1connect.NewRunnerServiceClient(client), sh
+	return pool, apps, runnerv1connect.NewRunnerServiceClient(client), sh, srv
 }
 
 func with(ctx context.Context, token string) context.Context {
@@ -177,7 +182,7 @@ func TestGateway(t *testing.T) {
 }
 
 func TestGatewayAskQuestionsSurviveRestartAndStreamHandoff(t *testing.T) {
-	pool, apps, c, _ := setup(t)
+	pool, apps, c, _, srv := setupWithServer(t)
 	ctx := t.Context()
 	reg, err := c.Register(with(ctx, secret), &runnerv1.RegisterRequest{Version: "test"})
 	if err != nil {
@@ -208,12 +213,24 @@ func TestGatewayAskQuestionsSurviveRestartAndStreamHandoff(t *testing.T) {
 		t.Fatalf("questions after restart = %+v, %v", qs, err)
 	}
 
+	// ActiveSessions is initially empty.
+	if active := srv.ActiveSessions(); len(active) != 0 {
+		t.Fatalf("active sessions before handoff = %v, want empty", active)
+	}
+
 	// Handoff stays authorized while in needs_input.
 	if _, err := c.Handoff(with(ctx, tok), &runnerv1.HandoffRequest{Frame: []byte{0xff, 0xd8, 0xff, 0xd9}}); err != nil {
 		t.Fatalf("handoff frame: %v", err)
 	}
+	if active := srv.ActiveSessions(); len(active) != 1 || active[0] != appID {
+		t.Fatalf("active sessions after handoff frame = %v, want [%s]", active, appID)
+	}
+
 	if _, err := c.Handoff(with(ctx, tok), &runnerv1.HandoffRequest{Done: true}); err != nil {
 		t.Fatalf("handoff done: %v", err)
+	}
+	if active := srv.ActiveSessions(); len(active) != 0 {
+		t.Fatalf("active sessions after handoff done = %v, want empty", active)
 	}
 }
 

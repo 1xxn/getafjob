@@ -484,6 +484,7 @@
   "texts.text": "Wiederverwendbare Texte für Anschreiben und Freitextfelder. getafjob füllt Platzhalter aus deinem Profil und der Stelle und verschickt nie einen Text mit leerem Platzhalter.",
   "texts.title": "Textbausteine",
   "handoff.title": "Remote-Browser",
+  "handoff.active_sessions": "Aktive Live-Läufe",
   "handoff.approval_reasons": "Diese Bewerbung erfordert vor dem Absenden deine Freigabe:",
   "handoff.approve": "Bewerbung freigeben",
   "handoff.connecting": "Verbinde mit dem Remote-Browser...",
