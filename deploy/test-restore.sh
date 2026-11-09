@@ -12,7 +12,7 @@ test_repo="$test_dir/repo"
 test_password="rehearsal-password-$(date +%s)"
 
 cleanup() {
-  rm -rf "$test_dir"
+  rm -rf "$test_dir" 2>/dev/null || docker run --rm -v "$(cd "$(dirname "$test_dir")" && pwd):/cleanup" alpine rm -rf "/cleanup/$(basename "$test_dir")" 2>/dev/null || true
 }
 trap cleanup EXIT
 
