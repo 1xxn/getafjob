@@ -1,6 +1,6 @@
 # 0025. Boosted navigation with a preserved live dock
 
-- Status: proposed
+- Status: accepted
 - Date: 2026-11-11
 - Deciders: maintainer
 

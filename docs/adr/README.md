@@ -30,4 +30,4 @@ rewritten once accepted: a changed decision gets a new ADR that supersedes the o
 | [0022](0022-mail-link-as-delayed-recovery.md) | Mail link only as delayed recovery once a passkey exists | accepted |
 | [0023](0023-rule-based-matching.md) | Rule-based matching with stored reasons | accepted |
 | [0024](0024-htmx-4-with-hx-csp.md) | htmx 4 with hx-csp under a nonce CSP and Trusted Types | accepted |
-| [0025](0025-boosted-navigation-and-live-dock.md) | Boosted navigation with a preserved live dock | proposed |
+| [0025](0025-boosted-navigation-and-live-dock.md) | Boosted navigation with a preserved live dock | accepted |
