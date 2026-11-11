@@ -670,5 +670,8 @@
   "live.unavailable": "The live view is not reachable. Reload the page to try again.",
   "live.canvas_label": "Live view of the application browser",
   "handoff.choose": "Choose",
-  "handoff.file_hint": "This form needs a file. Add it to your documents, then press Continue:"
+  "handoff.file_hint": "This form needs a file. Add it to your documents, then press Continue:",
+  "jobs.import_error.invalid": "This is not a public web address. Paste the full link of the posting, starting with https://.",
+  "jobs.import_error.no_job": "The page loaded, but it holds no job posting getafjob can read. Try the link of the single posting, not a list.",
+  "jobs.import_error.fetch": "The page could not be loaded. It may be down or block automatic access; try again later or use another link."
 }

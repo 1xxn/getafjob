@@ -22,6 +22,13 @@ var (
 	ErrFetchFailed = errors.New("failed to fetch URL")
 	// ErrNoJobFound reports that no job title or company could be extracted.
 	ErrNoJobFound = errors.New("could not extract job posting from URL")
+)
+
+// maxPage is how much of a page is read; career sites often embed megabytes of scripts after the posting data,
+// so a longer page is cut, not refused (#213).
+const maxPage = 8 << 20
+
+var (
 	// ErrUnsupportedBoard reports that no ATS or career site could be detected.
 	ErrUnsupportedBoard = errors.New("could not detect a supported job board at this URL")
 )
@@ -120,7 +127,7 @@ func (s *Service) ImportJob(ctx context.Context, userID uuid.UUID, rawURL string
 		return 0, ErrFetchFailed
 	}
 
-	body, err := netguard.ReadLimited(resp.Body, 2<<20) // max 2MB
+	body, err := netguard.ReadPrefix(resp.Body, maxPage)
 	if err != nil {
 		return 0, errors.Join(ErrFetchFailed, err)
 	}
@@ -225,7 +232,7 @@ func (s *Service) AddBoard(ctx context.Context, rawURL string) (discovery.Board,
 		return discovery.Board{}, ErrFetchFailed
 	}
 
-	body, err := netguard.ReadLimited(resp.Body, 2<<20)
+	body, err := netguard.ReadPrefix(resp.Body, maxPage)
 	if err != nil {
 		return discovery.Board{}, errors.Join(ErrFetchFailed, err)
 	}

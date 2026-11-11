@@ -868,7 +868,7 @@ func (s *Server) importJob(w http.ResponseWriter, r *http.Request, u *identity.U
 		if partial(r) {
 			w.Header().Set("HX-Reswap", "innerHTML")
 			w.Header().Set("HX-Retarget", "#import-result")
-			s.render(w, r, http.StatusOK, views.Notice("error", views.T(r.Context(), "jobs.import_error")))
+			s.render(w, r, http.StatusOK, views.Notice("error", views.T(r.Context(), importErrorKey(err))))
 			return
 		}
 		http.Redirect(w, r, "/jobs", http.StatusSeeOther)
@@ -942,5 +942,19 @@ func toCrawlStatusData(ctx context.Context, st urlimport.CrawlStatus) views.Craw
 		Running: st.Running,
 		Queued:  st.Queued,
 		LastRun: lastRun,
+	}
+}
+
+// importErrorKey names what went wrong with a URL import, so the user knows whether to fix the link or try another.
+func importErrorKey(err error) string {
+	switch {
+	case errors.Is(err, urlimport.ErrInvalidURL):
+		return "jobs.import_error.invalid"
+	case errors.Is(err, urlimport.ErrNoJobFound):
+		return "jobs.import_error.no_job"
+	case errors.Is(err, urlimport.ErrFetchFailed):
+		return "jobs.import_error.fetch"
+	default:
+		return "jobs.import_error"
 	}
 }

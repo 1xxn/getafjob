@@ -86,6 +86,12 @@ func Get(ctx context.Context, c *http.Client, raw string, allowPrivate bool) (*h
 	return c.Do(req)
 }
 
+// ReadPrefix reads at most limit bytes and drops the rest: for HTML whose useful part sits early (head, JSON-LD), a
+// cut page is better than none.
+func ReadPrefix(r io.Reader, limit int64) ([]byte, error) {
+	return io.ReadAll(io.LimitReader(r, limit))
+}
+
 // ErrTooLarge reports a body above the limit.
 var ErrTooLarge = errors.New("response body too large")
 

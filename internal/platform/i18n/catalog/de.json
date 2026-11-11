@@ -670,5 +670,8 @@
   "live.unavailable": "Die Live-Ansicht ist nicht erreichbar. Lade die Seite neu, um es noch einmal zu versuchen.",
   "live.canvas_label": "Live-Ansicht des Bewerbungsbrowsers",
   "handoff.choose": "Bitte wählen",
-  "handoff.file_hint": "Dieses Formular braucht eine Datei. Lege sie bei deinen Dokumenten ab und drücke dann Weiter:"
+  "handoff.file_hint": "Dieses Formular braucht eine Datei. Lege sie bei deinen Dokumenten ab und drücke dann Weiter:",
+  "jobs.import_error.invalid": "Das ist keine öffentliche Webadresse. Füge den vollständigen Link der Anzeige ein, beginnend mit https://.",
+  "jobs.import_error.no_job": "Die Seite wurde geladen, enthält aber keine Stellenanzeige, die getafjob lesen kann. Nimm den Link der einzelnen Anzeige, nicht einer Liste.",
+  "jobs.import_error.fetch": "Die Seite konnte nicht geladen werden. Sie ist vielleicht nicht erreichbar oder sperrt automatische Zugriffe; versuch es später oder mit einem anderen Link."
 }
