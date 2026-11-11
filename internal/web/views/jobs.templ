@@ -583,9 +583,7 @@ templ FitInspector(d FitData) {
 								}
 							</span>
 							if b.Max > 0 {
-								<div class="progress-bar" role="progressbar" aria-valuenow={ itoa(b.Points) } aria-valuemin="0" aria-valuemax={ itoa(b.Max) }>
-									<div class="progress-fill" style={ "width: " + itoa(min(100, max(0, (b.Points*100)/b.Max))) + "%" }></div>
-								</div>
+								<meter class="fit-meter" min="0" max={ itoa(b.Max) } value={ itoa(max(0, b.Points)) }>{ itoa(b.Points) } / { itoa(b.Max) }</meter>
 							}
 						</div>
 					</div>

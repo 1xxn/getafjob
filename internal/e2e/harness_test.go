@@ -145,6 +145,9 @@ func signIn(invite string) error {
 	return nil
 }
 
+// actionTimeout bounds one step of a journey (navigation, element lookup, script).
+const actionTimeout = 30 * time.Second
+
 // Tab is one browser tab of a journey with the problems it saw.
 type Tab struct {
 	t    *testing.T
@@ -155,21 +158,37 @@ type Tab struct {
 	status   int
 }
 
-// Open starts a journey tab at a viewport size and color scheme; problems fail the test at its end.
+// Open starts a journey tab of the invited user at a viewport size and color scheme; problems fail the test at
+// its end.
 func Open(t *testing.T, width, height int, scheme string) *Tab {
 	t.Helper()
-	p, err := shared.Page(proto.TargetCreateTarget{})
+	return OpenIn(t, shared.Browser, width, height, scheme)
+}
+
+// OpenIn starts a journey tab in a browser context, e.g. the demo user's (Demo).
+func OpenIn(t *testing.T, b *rod.Browser, width, height int, scheme string) *Tab {
+	t.Helper()
+	p, err := b.Page(proto.TargetCreateTarget{})
 	if err != nil {
 		t.Fatal(err)
 	}
-	tab := &Tab{t: t, Page: p.Timeout(30 * time.Second)}
+	tab := &Tab{t: t, Page: p}
 	must(t, proto.RuntimeEnable{}.Call(p))
 	must(t, proto.LogEnable{}.Call(p))
 	must(t, proto.NetworkEnable{}.Call(p))
+	// CSP reports in the log name no element; this one does (test only, added by the harness).
+	_, err = proto.PageAddScriptToEvaluateOnNewDocument{Source: `document.addEventListener('securitypolicyviolation', e => {
+		const el = e.target && e.target.outerHTML ? e.target.outerHTML.slice(0, 160) : String(e.target);
+		console.warn('csp-detail', e.violatedDirective, e.sourceFile + ':' + e.lineNumber, 'sample=' + e.sample, el);
+	});`}.Call(p)
+	must(t, err)
 	go p.EachEvent(
 		func(e *proto.RuntimeConsoleAPICalled) {
-			if e.Type == proto.RuntimeConsoleAPICalledTypeError {
+			switch {
+			case e.Type == proto.RuntimeConsoleAPICalledTypeError:
 				tab.problem("console: " + consoleText(e))
+			case e.Type == proto.RuntimeConsoleAPICalledTypeWarning && strings.HasPrefix(consoleText(e), "csp-detail"):
+				tab.problem(consoleText(e))
 			}
 		},
 		func(e *proto.LogEntryAdded) {
@@ -214,9 +233,14 @@ func (tab *Tab) problem(s string) {
 // Go opens a path with a full page load and checks the document status.
 func (tab *Tab) Go(path string) {
 	tab.t.Helper()
-	wait := tab.Page.WaitNavigation(proto.PageLifecycleEventNameNetworkAlmostIdle)
-	must(tab.t, tab.Page.Navigate(base+path))
+	p := tab.Page.Timeout(actionTimeout)
+	wait := p.WaitNavigation(proto.PageLifecycleEventNameNetworkAlmostIdle)
+	must(tab.t, p.Navigate(base+path))
 	wait()
+	// A cross-document view transition covers 100vw for a moment; measure layout after it.
+	if _, err := p.Eval(`() => document.activeViewTransition?.finished.catch(() => {})`); err != nil {
+		tab.t.Fatalf("%s: %v", path, err)
+	}
 	tab.mu.Lock()
 	st := tab.status
 	tab.mu.Unlock()
@@ -228,7 +252,7 @@ func (tab *Tab) Go(path string) {
 // El waits for an element.
 func (tab *Tab) El(selector string) *rod.Element {
 	tab.t.Helper()
-	el, err := tab.Page.Element(selector)
+	el, err := tab.Page.Timeout(actionTimeout).Element(selector)
 	if err != nil {
 		tab.t.Fatalf("%s: %v", selector, err)
 	}
@@ -238,7 +262,7 @@ func (tab *Tab) El(selector string) *rod.Element {
 // Eval runs a JavaScript expression (a function body returning a value) and returns its JSON result as text.
 func (tab *Tab) Eval(js string) string {
 	tab.t.Helper()
-	res, err := tab.Page.Eval("() => JSON.stringify((() => { " + js + " })())")
+	res, err := tab.Page.Timeout(actionTimeout).Eval("() => JSON.stringify((() => { " + js + " })())")
 	if err != nil {
 		tab.t.Fatalf("eval: %v", err)
 	}
@@ -248,7 +272,7 @@ func (tab *Tab) Eval(js string) string {
 // Shot saves a screenshot of the viewport under the test's name.
 func (tab *Tab) Shot(name string) {
 	tab.t.Helper()
-	img, err := tab.Page.Screenshot(false, &proto.PageCaptureScreenshot{Format: proto.PageCaptureScreenshotFormatPng})
+	img, err := tab.Page.Timeout(actionTimeout).Screenshot(false, &proto.PageCaptureScreenshot{Format: proto.PageCaptureScreenshotFormatPng})
 	if err != nil {
 		tab.t.Errorf("screenshot %s: %v", name, err)
 		return
