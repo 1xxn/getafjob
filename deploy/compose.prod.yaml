@@ -28,7 +28,7 @@ services:
     build: !reset null
     deploy:
       replicas: ${GETAFJOB_RUNNERS:-1}
-      resources: { limits: { memory: 2g, pids: 512 } }
+      resources: { limits: { memory: 4g, pids: 2048 } } # up to 6 browsers with GETAFJOB_RUNNER_PARALLEL=3
   egress:
     image: ${GETAFJOB_EGRESS_IMAGE:-ghcr.io/1xxn/getafjob-egress}:${GETAFJOB_VERSION:?set GETAFJOB_VERSION}
     build: !reset null

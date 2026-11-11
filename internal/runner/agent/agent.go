@@ -38,6 +38,51 @@ type Agent struct {
 	Poll        time.Duration       // between leases when there is nothing to do; 0: 15 s
 	Wait        time.Duration       // per click; 0: the engine's default
 	HandoffHold time.Duration       // how long a handoff keeps the browser open; 0: 15 min
+	Parallel    int                 // runs that work at the same time; runs waiting for the user do not count; 0: 1
+}
+
+// slots counts the runs of an agent. A run waiting for the user keeps its browser but frees its slot, so other
+// applications go on; open browsers stay below twice the slots to bound memory.
+type slots struct {
+	mu       sync.Mutex
+	parallel int
+	open     int // browsers, working or waiting
+	waiting  int
+	changed  chan struct{}
+}
+
+func newSlots(parallel int) *slots {
+	return &slots{parallel: max(parallel, 1), changed: make(chan struct{}, 1)}
+}
+
+func (s *slots) free() bool {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return s.open-s.waiting < s.parallel && s.open < 2*s.parallel
+}
+
+func (s *slots) update(open, waiting int) {
+	s.mu.Lock()
+	s.open += open
+	s.waiting += waiting
+	s.mu.Unlock()
+	select {
+	case s.changed <- struct{}{}:
+	default:
+	}
+}
+
+type waitKey struct{}
+
+// markWaiting tells the agent's slots that the run waits for the user (true) or works again (false).
+func markWaiting(ctx context.Context, waiting bool) {
+	if s, ok := ctx.Value(waitKey{}).(*slots); ok {
+		if waiting {
+			s.update(0, 1)
+		} else {
+			s.update(0, -1)
+		}
+	}
 }
 
 func auth(ctx context.Context, token string) context.Context {
@@ -59,7 +104,7 @@ func (a *Agent) Run(ctx context.Context) error {
 	var id string
 	for id == "" { // the gateway may start after the runner
 		reg, err := a.Client.Register(auth(ctx, a.Secret), &runnerv1.RegisterRequest{Version: buildinfo.Version,
-			Kind: kind, MaxParallel: 1})
+			Kind: kind, MaxParallel: int32(max(min(a.Parallel, 64), 1))}) //nolint:gosec // bounded to 1..64
 		if err == nil {
 			id = reg.GetRunnerId()
 			break
@@ -74,23 +119,41 @@ func (a *Agent) Run(ctx context.Context) error {
 		case <-time.After(poll):
 		}
 	}
-	a.Logger.InfoContext(ctx, "runner registered", "runner", id)
+	a.Logger.InfoContext(ctx, "runner registered", "runner", id, "parallel", max(a.Parallel, 1))
+	sl := newSlots(a.Parallel)
+	var wg sync.WaitGroup
+	defer wg.Wait()
+	runCtx := context.WithValue(ctx, waitKey{}, sl)
 	for {
+		if !sl.free() {
+			select {
+			case <-ctx.Done():
+				return nil
+			case <-sl.changed:
+			}
+			continue
+		}
 		l, err := a.Client.Lease(auth(ctx, a.Secret), &runnerv1.LeaseRequest{RunnerId: id})
 		switch {
 		case ctx.Err() != nil:
-			return ctx.Err()
+			return nil
 		case err != nil:
 			a.Logger.WarnContext(ctx, "lease failed", "err", err)
 		case l.GetRun() != nil:
-			if err := a.RunOne(ctx, l.GetRun()); err != nil {
-				a.Logger.WarnContext(ctx, "run ended with an error", "run", l.GetRun().GetRunId(), "err", err)
-			}
+			run := l.GetRun()
+			sl.update(1, 0)
+			wg.Go(func() {
+				defer sl.update(-1, 0)
+				if err := a.RunOne(runCtx, run); err != nil {
+					a.Logger.WarnContext(ctx, "run ended with an error", "run", run.GetRunId(), "err", err)
+				}
+			})
 			continue // ask for the next run at once
 		}
 		select {
 		case <-ctx.Done():
 			return nil
+		case <-sl.changed:
 		case <-time.After(poll):
 		}
 	}
@@ -278,6 +341,8 @@ func (a *Agent) handoff(ctx context.Context, p *rod.Page, c *coordinator, run *r
 	}
 	hctx, cancel := context.WithTimeout(ctx, hold)
 	defer cancel()
+	markWaiting(ctx, true)
+	defer markWaiting(ctx, false)
 
 	tok := run.GetToken()
 	if _, err := a.Client.Handoff(auth(hctx, tok), &runnerv1.HandoffRequest{}); err != nil {

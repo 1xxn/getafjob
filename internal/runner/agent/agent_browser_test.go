@@ -255,3 +255,106 @@ func TestRunStreamsFramesWithoutHandoff(t *testing.T) {
 	}
 	t.Logf("%d frames during the run", frames)
 }
+
+// leasing lets the fake gateway hand out queued runs to Agent.Run.
+type leasing struct {
+	*gateway
+	mu     sync.Mutex
+	queue  []*runnerv1.Run
+	leased int
+}
+
+func (l *leasing) Register(context.Context, *runnerv1.RegisterRequest) (*runnerv1.RegisterResponse, error) {
+	return &runnerv1.RegisterResponse{RunnerId: "runner-test"}, nil
+}
+
+func (l *leasing) Lease(context.Context, *runnerv1.LeaseRequest) (*runnerv1.LeaseResponse, error) {
+	l.mu.Lock()
+	defer l.mu.Unlock()
+	if len(l.queue) == 0 {
+		return &runnerv1.LeaseResponse{}, nil
+	}
+	r := l.queue[0]
+	l.queue = l.queue[1:]
+	l.leased++
+	return &runnerv1.LeaseResponse{Run: r}, nil
+}
+
+// A run waiting for the user frees its slot; open browsers stay below twice the slots (#165).
+func TestWaitingRunsDoNotBlockOthers(t *testing.T) {
+	g, a, site, subs := setup(t)
+	release := make(chan struct{})
+	g.handoff = func(req *runnerv1.HandoffRequest) (*runnerv1.HandoffResponse, error) {
+		if !req.GetWait() {
+			return &runnerv1.HandoffResponse{}, nil
+		}
+		select {
+		case <-release:
+			return &runnerv1.HandoffResponse{Events: []*runnerv1.HandoffEvent{{
+				Msg: &runnerv1.HandoffEvent_Resume{Resume: true},
+				Answers: []*runnerv1.Answer{{Id: "0192f3a4-5b6c-7d8e-9f01-000000000003",
+					Question: "Ich willige in die Verarbeitung meiner Daten gemäß Datenschutzerklärung ein*", Answer: "Ja"}},
+			}}}, nil
+		case <-time.After(time.Second):
+			return &runnerv1.HandoffResponse{}, nil
+		}
+	}
+	l := &leasing{gateway: g}
+	for i := range 3 {
+		r := run(site)
+		r.RunId = "r" + string(rune('1'+i))
+		l.queue = append(l.queue, r)
+	}
+	srv := connect.NewServer()
+	runnerv1connect.RegisterRunnerServiceHandler(srv, l)
+	mux := http.NewServeMux()
+	connecthttp.Mount(mux, srv)
+	gs := httptest.NewServer(mux)
+	t.Cleanup(gs.Close)
+	a.Client = runnerv1connect.NewRunnerServiceClient(connect.NewClient(connecthttp.NewTransport(gs.Client(), gs.URL)))
+	a.Parallel, a.Poll = 1, 100*time.Millisecond
+
+	ctx, cancel := context.WithTimeout(t.Context(), 2*time.Minute)
+	defer cancel()
+	done := make(chan error, 1)
+	go func() { done <- a.Run(ctx) }()
+
+	asks := func() int {
+		g.mu.Lock()
+		defer g.mu.Unlock()
+		return countCalls(g.calls, "ask")
+	}
+	waitFor(t, 60*time.Second, func() bool { return asks() == 2 })
+	time.Sleep(2 * time.Second)
+	l.mu.Lock()
+	leased := l.leased
+	l.mu.Unlock()
+	if leased != 2 || asks() != 2 {
+		t.Fatalf("with one slot, two runs wait for the user (cap 2 browsers): leased %d, asks %d", leased, asks())
+	}
+	close(release)
+	waitFor(t, 90*time.Second, func() bool { return len(subs()) == 3 })
+	cancel()
+	<-done
+}
+
+func countCalls(calls []string, name string) int {
+	n := 0
+	for _, c := range calls {
+		if c == name {
+			n++
+		}
+	}
+	return n
+}
+
+func waitFor(t *testing.T, d time.Duration, ok func() bool) {
+	t.Helper()
+	deadline := time.Now().Add(d)
+	for !ok() {
+		if time.Now().After(deadline) {
+			t.Fatal("condition not reached in time")
+		}
+		time.Sleep(100 * time.Millisecond)
+	}
+}

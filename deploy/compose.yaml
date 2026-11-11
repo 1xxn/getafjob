@@ -138,8 +138,8 @@ services:
       - no-new-privileges:true
       - seccomp=./seccomp/chromium.json
     tmpfs:
-      - /tmp:rw,size=512m,mode=1777
-    shm_size: 256mb
+      - /tmp:rw,size=1536m,mode=1777 # profiles and documents of up to 2 x GETAFJOB_RUNNER_PARALLEL browsers
+    shm_size: 1gb
     depends_on:
       egress: { condition: service_healthy }
     healthcheck:
