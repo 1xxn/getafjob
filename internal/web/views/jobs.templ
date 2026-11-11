@@ -718,11 +718,13 @@ templ JobPage(d JobData) {
 						}
 					</button>
 				</form>
-				<form method="post" action={ templ.SafeURL("/jobs/" + i64(d.Row.ID) + "/apply-external") } style="display:inline">
-					<button type="submit" class="btn-sm">
-						{ T(ctx, "jobs.apply_external") }
-					</button>
-				</form>
+				if d.ApplyMode != "portal" && d.ApplyMode != "email" {
+					<form method="post" action={ templ.SafeURL("/jobs/" + i64(d.Row.ID) + "/apply-external") } style="display:inline">
+						<button type="submit" class="btn-sm">
+							{ T(ctx, "jobs.apply_external") }
+						</button>
+					</form>
+				}
 				if d.ApplicationState != "" {
 					<a href="/tracker" class="button secondary btn-sm">
 						{ T(ctx, "jobs.view_in_tracker") }
@@ -731,7 +733,7 @@ templ JobPage(d JobData) {
 			</div>
 			<div id="apply-preview-container"></div>
 			<p>
-				if d.URL != "" {
+				if d.URL != "" && d.ApplyMode != "portal" && d.ApplyMode != "email" {
 					<a href={ templ.SafeURL(d.URL) } rel="noopener noreferrer external">{ T(ctx, "jobs.open_posting") }</a>
 				}
 				if d.ApplyURL != "" && d.ApplyURL != d.URL {
