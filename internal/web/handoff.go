@@ -244,7 +244,7 @@ func (s *Server) liveIndicator(w http.ResponseWriter, r *http.Request, u *identi
 func formAnswer(input string, values []string) string {
 	var vs []string
 	for _, v := range values {
-		if v = strings.TrimSpace(v); v != "" {
+		if v = strings.TrimSpace(strings.ToValidUTF8(v, "")); v != "" {
 			vs = append(vs, v)
 		}
 	}
@@ -281,7 +281,7 @@ func (s *Server) applicationAnswer(w http.ResponseWriter, r *http.Request, u *id
 		if _, ok := r.Form["question-"+key]; !ok {
 			break
 		}
-		q := strings.TrimSpace(r.Form.Get("question-" + key))
+		q := strings.TrimSpace(strings.ToValidUTF8(r.Form.Get("question-"+key), ""))
 		a := formAnswer(r.Form.Get("input-"+key), r.Form["answer-"+key])
 		if q == "" || a == "" {
 			continue
