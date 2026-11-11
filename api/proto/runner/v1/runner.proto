@@ -179,6 +179,11 @@ message Question {
   string label = 2;
   // An AI suggestion, used only after the user approved it.
   string draft = 3;
+  // The field's kind as extracted (text, textarea, checkbox, checkbox_group, radio, select, combobox, date, file);
+  // the web form renders a matching input.
+  string input = 4;
+  // Choices of a radio, select or checkbox group, by label.
+  repeated string options = 5;
 }
 
 message AskRequest {

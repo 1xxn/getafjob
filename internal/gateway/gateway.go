@@ -494,9 +494,17 @@ func (s *Server) Ask(ctx context.Context, req *runnerv1.AskRequest) (*runnerv1.A
 	if len(qs) == 0 || len(qs) > 50 {
 		return nil, connect.NewError(connect.CodeInvalidArgument, "between 1 and 50 questions")
 	}
-	out := make([]map[string]string, len(qs))
+	out := make([]application.Question, len(qs))
 	for i, q := range qs {
-		out[i] = map[string]string{"kind": clip(q.GetKind(), 20), "label": clip(q.GetLabel(), 300), "draft": clip(q.GetDraft(), 5000)}
+		var opts []string
+		for _, o := range q.GetOptions() {
+			if len(opts) == 100 {
+				break
+			}
+			opts = append(opts, clip(o, 200))
+		}
+		out[i] = application.Question{Kind: clip(q.GetKind(), 20), Label: clip(q.GetLabel(), 300),
+			Draft: clip(q.GetDraft(), 5000), Input: clip(q.GetInput(), 20), Options: opts}
 	}
 	if err := s.Runs.Ask(ctx, ref, out); err != nil {
 		return nil, code(err)

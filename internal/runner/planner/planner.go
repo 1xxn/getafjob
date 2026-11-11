@@ -97,7 +97,12 @@ func (p *Planner) Plan(ctx context.Context, st *browser.State) (executor.Plan, [
 		if !f.Required {
 			continue
 		}
-		q := engine.Question{Kind: "field", FieldID: f.ID, Label: f.Label}
+		q := engine.Question{Kind: "field", FieldID: f.ID, Label: f.Label, Input: f.Kind}
+		for _, o := range f.Options {
+			if l := strings.TrimSpace(o.Label); l != "" {
+				q.Options = append(q.Options, l)
+			}
+		}
 		if p.Drafter != nil {
 			if d, err := p.Drafter.Draft(ctx, f); err == nil {
 				q.Draft = d

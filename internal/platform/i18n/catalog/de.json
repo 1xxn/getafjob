@@ -668,5 +668,7 @@
   "live.ended": "Der Lauf ist beendet.",
   "live.reconnecting": "Verbindung verloren, verbinde neu",
   "live.unavailable": "Die Live-Ansicht ist nicht erreichbar. Lade die Seite neu, um es noch einmal zu versuchen.",
-  "live.canvas_label": "Live-Ansicht des Bewerbungsbrowsers"
+  "live.canvas_label": "Live-Ansicht des Bewerbungsbrowsers",
+  "handoff.choose": "Bitte wählen",
+  "handoff.file_hint": "Dieses Formular braucht eine Datei. Lege sie bei deinen Dokumenten ab und drücke dann Weiter:"
 }

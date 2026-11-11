@@ -239,6 +239,25 @@ func (s *Server) liveIndicator(w http.ResponseWriter, r *http.Request, u *identi
 	s.render(w, r, http.StatusOK, views.LiveIndicator(s.activeRuns(r.Context(), u.ID, uuid.Nil)))
 }
 
+// formAnswer turns the posted values of one question into the answer text: a single checkbox posts "No" from a
+// hidden input and "Yes" when ticked (the last wins), a checkbox group joins the ticked choices.
+func formAnswer(input string, values []string) string {
+	var vs []string
+	for _, v := range values {
+		if v = strings.TrimSpace(v); v != "" {
+			vs = append(vs, v)
+		}
+	}
+	switch {
+	case len(vs) == 0:
+		return ""
+	case input == "checkbox_group":
+		return strings.Join(vs, "; ")
+	default:
+		return vs[len(vs)-1]
+	}
+}
+
 // applicationAnswer saves answers provided during a handoff to the answer bank and resumes the application.
 func (s *Server) applicationAnswer(w http.ResponseWriter, r *http.Request, u *identity.User) {
 	if u == nil {
@@ -256,16 +275,15 @@ func (s *Server) applicationAnswer(w http.ResponseWriter, r *http.Request, u *id
 		return
 	}
 
-	questions := r.Form["question"]
-	answers := r.Form["answer"]
 	var saved []*runnerv1.Answer
-	for i := range questions {
-		q := strings.TrimSpace(questions[i])
-		if i >= len(answers) || q == "" {
-			continue
+	for i := 0; i < 50; i++ {
+		key := strconv.Itoa(i)
+		if _, ok := r.Form["question-"+key]; !ok {
+			break
 		}
-		a := strings.TrimSpace(answers[i])
-		if a == "" {
+		q := strings.TrimSpace(r.Form.Get("question-" + key))
+		a := formAnswer(r.Form.Get("input-"+key), r.Form["answer-"+key])
+		if q == "" || a == "" {
 			continue
 		}
 		id := uuid.New()
@@ -350,7 +368,8 @@ func (s *Server) applicationPage(w http.ResponseWriter, r *http.Request, u *iden
 			if asked, err := s.Apps.Questions(r.Context(), u.ID, appID); err == nil {
 				for _, q := range asked {
 					if q.Kind != "captcha" && q.Label != "" {
-						d.Questions = append(d.Questions, views.HandoffQuestion{Kind: q.Kind, Question: q.Label, Draft: q.Draft})
+						d.Questions = append(d.Questions, views.HandoffQuestion{Kind: q.Kind, Question: q.Label, Draft: q.Draft,
+							Input: q.Input, Options: q.Options})
 					}
 				}
 			}

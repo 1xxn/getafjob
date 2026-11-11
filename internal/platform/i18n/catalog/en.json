@@ -668,5 +668,7 @@
   "live.ended": "The run has ended.",
   "live.reconnecting": "Connection lost, reconnecting",
   "live.unavailable": "The live view is not reachable. Reload the page to try again.",
-  "live.canvas_label": "Live view of the application browser"
+  "live.canvas_label": "Live view of the application browser",
+  "handoff.choose": "Choose",
+  "handoff.file_hint": "This form needs a file. Add it to your documents, then press Continue:"
 }

@@ -118,9 +118,11 @@ type Ref struct {
 
 // Question is an open question or checkpoint asked during a run.
 type Question struct {
-	Kind  string `json:"kind"`
-	Label string `json:"label"`
-	Draft string `json:"draft,omitempty"`
+	Kind    string   `json:"kind"`
+	Label   string   `json:"label"`
+	Draft   string   `json:"draft,omitempty"`
+	Input   string   `json:"input,omitempty"`   // field kind, so the form shows a matching control
+	Options []string `json:"options,omitempty"` // choices of radio, select and checkbox groups
 }
 
 // ScreenshotRetention is how long encrypted run screenshots are kept in the blob store.
