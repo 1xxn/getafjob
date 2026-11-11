@@ -585,6 +585,7 @@ func TestFormAnswerPerControl(t *testing.T) {
 		{"select", []string{""}, ""},
 		{"radio", []string{"Berlin"}, "Berlin"},
 		{"text", []string{"  Max  "}, "Max"},
+		{"text", []string{string([]byte{'g', 'e', 'm', 0xe4, 0xdf})}, "gem"}, // invalid UTF-8 never reaches the runner
 	}
 	for _, c := range cases {
 		if got := formAnswer(c.input, c.values); got != c.want {
