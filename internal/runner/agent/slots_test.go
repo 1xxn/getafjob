@@ -47,3 +47,13 @@ func TestFormAnswerableQuestionsOnly(t *testing.T) {
 		t.Fatal("only plain field questions free the browser early")
 	}
 }
+
+func TestNoFormReason(t *testing.T) {
+	if r := noFormReason("https://www.arbeitsagentur.de/jobsuche/jobdetail/1", engine.ErrNoForm); r !=
+		"external: www.arbeitsagentur.de shows the posting but no application form; apply there or mark it as applied" {
+		t.Errorf("portal: %q", r)
+	}
+	if r := noFormReason("https://acme.example/careers/1", engine.ErrNoForm); r != "no application form found on acme.example" {
+		t.Errorf("other: %q", r)
+	}
+}

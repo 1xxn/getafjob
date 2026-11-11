@@ -670,5 +670,11 @@
   "live.unavailable": "The live view is not reachable. Reload the page to try again.",
   "live.canvas_label": "Live view of the application browser",
   "handoff.choose": "Choose",
-  "handoff.file_hint": "This form needs a file. Add it to your documents, then press Continue:"
+  "handoff.file_hint": "This form needs a file. Add it to your documents, then press Continue:",
+  "apply.portal.title": "Apply on {host}.",
+  "apply.portal.text": "This posting is on a job board. A run tries to follow its link to the employer's form; if there is none, apply there and mark the job as applied.",
+  "apply.email.title": "Application by email.",
+  "apply.email.text": "This employer takes applications by mail, which getafjob does not send. Write to them and mark the job as applied.",
+  "apply.open_external": "Open the posting",
+  "apply.mark_applied": "Mark as applied"
 }
