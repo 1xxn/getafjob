@@ -196,3 +196,12 @@ INSERT INTO applications (user_id, job_id, state, created_at, updated_at)
 VALUES ($1, $2, 'submitted', sqlc.arg(now)::timestamptz, sqlc.arg(now)::timestamptz)
 ON CONFLICT (user_id, job_id) DO UPDATE SET state = 'submitted', updated_at = EXCLUDED.updated_at
 RETURNING id, state;
+
+-- name: UnfinishedRuns :many
+-- System role: runs without a finish whose application still waits on a runner (running or needs_input).
+SELECT r.id, r.application_id, r.user_id, r.leased_at
+FROM runs r
+JOIN applications a ON a.id = r.application_id
+WHERE r.finished_at IS NULL AND a.state IN ('running', 'needs_input')
+ORDER BY r.leased_at
+LIMIT 500;

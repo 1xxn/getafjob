@@ -73,6 +73,43 @@ type Server struct {
 	runners      sync.Map // map[string]runnerSession
 	runSteps     sync.Map // map[uuid.UUID]runStepState
 	frameAuth    sync.Map // map[string]frameGrant, token -> run for screencast frames
+	seen         sync.Map // map[uuid.UUID]time.Time, run -> last call of its runner
+}
+
+// Lost runs: a runner calls at least every keepalive interval (agent: 20 s); after reapIdle without a call the
+// run's browser is gone and its application is parked.
+const (
+	reapIdle  = 2 * time.Minute
+	reapEvery = 30 * time.Second
+)
+
+// ReapLost parks, every reapEvery until ctx ends, the applications of runs whose runner stopped calling (#160).
+// After a server restart every unfinished run gets reapIdle from the start to call again.
+func (s *Server) ReapLost(ctx context.Context) {
+	since := time.Now()
+	lastSeen := func(id uuid.UUID) (time.Time, bool) {
+		v, ok := s.seen.Load(id)
+		if !ok {
+			return time.Time{}, false
+		}
+		return v.(time.Time), true
+	}
+	t := time.NewTicker(reapEvery)
+	defer t.Stop()
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		case <-t.C:
+		}
+		n, err := s.Runs.ReapLost(ctx, lastSeen, since, reapIdle)
+		if n > 0 && s.Logger != nil {
+			s.Logger.WarnContext(ctx, "parked runs whose runner stopped", "count", n)
+		}
+		if err != nil && s.Logger != nil {
+			s.Logger.WarnContext(ctx, "reap lost runs", "err", err)
+		}
+	}
 }
 
 // frameGrantTTL bounds how long a frame call trusts an earlier token check; frames only publish to viewers.
@@ -261,6 +298,9 @@ func (s *Server) run(ctx context.Context) (application.RunRef, error) {
 	if errors.Is(err, application.ErrNoRun) {
 		return ref, connect.NewError(connect.CodeUnauthenticated, err.Error())
 	}
+	if err == nil {
+		s.seen.Store(ref.RunID, time.Now())
+	}
 	return ref, err
 }
 
@@ -273,6 +313,7 @@ func (s *Server) frameRun(ctx context.Context) (application.RunRef, error) {
 	}
 	key := bearer(h)
 	if v, ok := s.frameAuth.Load(key); ok && time.Now().Before(v.(frameGrant).expires) {
+		s.seen.Store(v.(frameGrant).ref.RunID, time.Now())
 		return v.(frameGrant).ref, nil
 	}
 	ref, err := s.run(ctx)
@@ -553,6 +594,7 @@ func (s *Server) Handoff(ctx context.Context, req *runnerv1.HandoffRequest) (*ru
 		if v, ok := s.handoffs.LoadAndDelete(ref.AppID); ok {
 			v.(*HandoffSession).closeDone()
 		}
+		s.seen.Delete(ref.RunID)
 		s.frameAuth.Range(func(k, v any) bool {
 			if v.(frameGrant).ref.AppID == ref.AppID {
 				s.frameAuth.Delete(k)

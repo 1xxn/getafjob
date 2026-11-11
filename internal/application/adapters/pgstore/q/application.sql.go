@@ -916,6 +916,48 @@ func (q *Queries) StaleSubmitting(ctx context.Context, updatedAt time.Time) ([]S
 	return items, nil
 }
 
+const unfinishedRuns = `-- name: UnfinishedRuns :many
+SELECT r.id, r.application_id, r.user_id, r.leased_at
+FROM runs r
+JOIN applications a ON a.id = r.application_id
+WHERE r.finished_at IS NULL AND a.state IN ('running', 'needs_input')
+ORDER BY r.leased_at
+LIMIT 500
+`
+
+type UnfinishedRunsRow struct {
+	ID            uuid.UUID
+	ApplicationID uuid.UUID
+	UserID        uuid.UUID
+	LeasedAt      time.Time
+}
+
+// System role: runs without a finish whose application still waits on a runner (running or needs_input).
+func (q *Queries) UnfinishedRuns(ctx context.Context) ([]UnfinishedRunsRow, error) {
+	rows, err := q.db.Query(ctx, unfinishedRuns)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []UnfinishedRunsRow{}
+	for rows.Next() {
+		var i UnfinishedRunsRow
+		if err := rows.Scan(
+			&i.ID,
+			&i.ApplicationID,
+			&i.UserID,
+			&i.LeasedAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const upsertNotes = `-- name: UpsertNotes :one
 INSERT INTO application_notes (id, user_id, application_id, notes, salary_discussed, interview_at, follow_up_at, created_at, updated_at)
 VALUES (uuidv7(), $1, $2, $3, $4, $5::timestamptz, $6::timestamptz, $7::timestamptz, $7::timestamptz)

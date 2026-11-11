@@ -141,6 +141,7 @@ func serve(ctx context.Context, cfg config.Config, logger *slog.Logger) error {
 			Portals: portalsSvc,
 			Data: runData{profiles: profiles, items: profile.NewItems(pstore, env), docs: docs, stations: profile.NewStations(pstore, env), jobs: astore, apps: astore, portals: portalsSvc, now: time.Now,
 				fixture: devFixtureHost(cfg, logger)}}
+		go gw.ReapLost(ctx)
 	}
 
 	tstore := trackingstore.New(pool)
