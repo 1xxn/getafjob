@@ -288,7 +288,7 @@ func runner(ctx context.Context, cfg config.Config, logger *slog.Logger) error {
 		kind = runnerv1.RunnerKind_RUNNER_KIND_HOME
 	}
 	a := &agent.Agent{Client: client, Secret: cfg.RunnerSecret.Reveal(), Logger: logger,
-		Kind: kind, Parallel: cfg.RunnerParallel, Browser: browser.Options{Bin: cfg.BrowserBin, Proxy: cfg.EgressProxy}}
+		Kind: kind, Parallel: cfg.RunnerParallel, QuestionHold: cfg.QuestionHold, Browser: browser.Options{Bin: cfg.BrowserBin, Proxy: cfg.EgressProxy}}
 	ctx, stop := context.WithCancel(ctx)
 	defer stop()
 	done := make(chan error, 1)

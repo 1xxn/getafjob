@@ -135,6 +135,7 @@ func TestLoadErrors(t *testing.T) {
 		{"bad proxy", map[string]string{"GETAFJOB_EGRESS_PROXY": "socks5://x:1"}, nil, "http(s) URL"},
 		{"bad limits", map[string]string{"GETAFJOB_LIMITS": "maybe"}, nil, "on or off"},
 		{"bad runner parallel", map[string]string{"GETAFJOB_RUNNER_PARALLEL": "0"}, nil, "1 to 16"},
+		{"bad question hold", map[string]string{"GETAFJOB_QUESTION_HOLD": "1h"}, nil, "between 30s and 15m"},
 		{"bad timeout", map[string]string{"GETAFJOB_SHUTDOWN_TIMEOUT": "10m"}, nil, "between 1s and 5m"},
 	}
 	for _, tc := range cases {

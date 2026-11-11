@@ -38,7 +38,10 @@ type Agent struct {
 	Poll        time.Duration       // between leases when there is nothing to do; 0: 15 s
 	Wait        time.Duration       // per click; 0: the engine's default
 	HandoffHold time.Duration       // how long a handoff keeps the browser open; 0: 15 min
-	Parallel    int                 // runs that work at the same time; runs waiting for the user do not count; 0: 1
+	// QuestionHold is the hold when every question can be answered in the form (no captcha, code or sign-in); the
+	// browser is then closed to free the runner and the answer starts a new run (#201). 0: 2 min.
+	QuestionHold time.Duration
+	Parallel     int // runs that work at the same time; runs waiting for the user do not count; 0: 1
 }
 
 // slots counts the runs of an agent. A run waiting for the user keeps its browser but frees its slot, so other
@@ -340,9 +343,15 @@ func (a *Agent) startLiveScreencast(ctx context.Context, p *rod.Page, tok string
 // handoff holds the browser session for the user (default 15 min) and dispatches user input back to Chromium
 // without ever logging or storing the input; the run's live stream keeps running meanwhile.
 func (a *Agent) handoff(ctx context.Context, p *rod.Page, c *coordinator, run *runnerv1.Run) ([]*runnerv1.Answer, bool, error) {
-	hold := a.HandoffHold
+	hold, reason := a.HandoffHold, "handoff window closed"
 	if hold <= 0 {
 		hold = 15 * time.Minute
+	}
+	if formAnswerable(c.asked) {
+		hold, reason = a.QuestionHold, "waiting for your answers; the browser was closed to free the runner"
+		if hold <= 0 {
+			hold = 2 * time.Minute
+		}
 	}
 	hctx, cancel := context.WithTimeout(ctx, hold)
 	defer cancel()
@@ -365,7 +374,7 @@ func (a *Agent) handoff(ctx context.Context, p *rod.Page, c *coordinator, run *r
 			}
 			if hctx.Err() != nil {
 				shot, _ := p.Screenshot(false, nil)
-				return nil, false, c.Park(ctx, "handoff window closed", shot)
+				return nil, false, c.Park(ctx, reason, shot)
 			}
 			return nil, false, err
 		}
@@ -470,6 +479,17 @@ type coordinator struct {
 	client     runnerv1connect.RunnerServiceClient
 	token      string
 	submitting bool
+	asked      []engine.Question // the last questions, to pick the handoff hold
+}
+
+// formAnswerable reports whether the user can answer every asked question in the web form, without the browser.
+func formAnswerable(qs []engine.Question) bool {
+	for _, q := range qs {
+		if q.Kind != "field" {
+			return false
+		}
+	}
+	return len(qs) > 0
 }
 
 var _ engine.Coordinator = (*coordinator)(nil)
@@ -507,6 +527,7 @@ func (c *coordinator) CheckpointWithCookies(ctx context.Context, cp engine.Check
 }
 
 func (c *coordinator) Ask(ctx context.Context, qs []engine.Question) error {
+	c.asked = qs
 	req := &runnerv1.AskRequest{}
 	for _, q := range qs {
 		req.Questions = append(req.Questions, &runnerv1.Question{Kind: q.Kind, Label: q.Label, Draft: q.Draft,
