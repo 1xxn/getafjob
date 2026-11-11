@@ -141,6 +141,9 @@ type HandoffData struct {
 	State               string
 	Status              string
 	Live                bool // the run may stream a live view now
+	ApplyMode           string // form, portal or email (applymode)
+	ApplyHost           string
+	ExternalURL         string // where to apply outside getafjob
 	ActiveRuns          []ActiveRunItem
 	ApprovalAsked       bool
 	ApprovalReasons     []string
@@ -193,6 +196,9 @@ templ HandoffPage(d HandoffData) {
 					· @StatusLabel(d.Status)
 				}
 			</p>
+			if d.State == "parked" && (d.ApplyMode == "portal" || d.ApplyMode == "email") {
+				@ExternalApply(d.ApplyMode, d.ApplyHost, d.ExternalURL, d.JobID)
+			}
 			if d.Live {
 				<div
 					class="remote-browser-box"

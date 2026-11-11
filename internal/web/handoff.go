@@ -1,6 +1,7 @@
 package web
 
 import (
+	"cmp"
 	"context"
 	"encoding/json"
 	"errors"
@@ -16,6 +17,7 @@ import (
 	"github.com/1xxn/getafjob/internal/gateway"
 	runnerv1 "github.com/1xxn/getafjob/internal/gen/proto/runner/v1"
 	"github.com/1xxn/getafjob/internal/identity"
+	"github.com/1xxn/getafjob/internal/platform/applymode"
 	"github.com/1xxn/getafjob/internal/platform/blob"
 	"github.com/1xxn/getafjob/internal/profile"
 	"github.com/1xxn/getafjob/internal/tracking"
@@ -362,6 +364,9 @@ func (s *Server) applicationPage(w http.ResponseWriter, r *http.Request, u *iden
 			if j, err := s.Jobs.Detail(r.Context(), u.ID, app.JobID); err == nil {
 				d.JobTitle = j.Title
 				d.Company = j.Company
+				d.ApplyMode = string(applymode.Of(j.URL, j.ApplyURL))
+				d.ApplyHost = applymode.Host(cmp.Or(j.ApplyURL, j.URL))
+				d.ExternalURL = webLink(cmp.Or(j.ApplyURL, j.URL))
 			}
 		}
 		if app.State == application.NeedsInput || app.State == application.Parked {

@@ -20,6 +20,7 @@ import (
 
 	runnerv1 "github.com/1xxn/getafjob/internal/gen/proto/runner/v1"
 	"github.com/1xxn/getafjob/internal/gen/proto/runner/v1/runnerv1connect"
+	"github.com/1xxn/getafjob/internal/platform/applymode"
 	"github.com/1xxn/getafjob/internal/platform/buildinfo"
 	"github.com/1xxn/getafjob/internal/runner/ats"
 	"github.com/1xxn/getafjob/internal/runner/browser"
@@ -245,7 +246,7 @@ func (a *Agent) RunOne(ctx context.Context, run *runnerv1.Run) error {
 	form, err := e.Prepare(ctx, p)
 	if err != nil {
 		shot, _ := p.Screenshot(false, nil)
-		return c.Park(ctx, "find the form: "+err.Error(), shot)
+		return c.Park(ctx, noFormReason(run.GetStartUrl(), err), shot)
 	}
 	if form != nil && form != p {
 		stopStream()
@@ -536,4 +537,17 @@ func (c *coordinator) Submitted(ctx context.Context, confirmed bool, eff browser
 func (c *coordinator) Park(ctx context.Context, reason string, screenshot []byte) error {
 	_, err := c.client.Park(auth(ctx, c.token), &runnerv1.ParkRequest{Reason: reason, Screenshot: screenshot})
 	return err
+}
+
+// noFormReason explains a run that found no form: on a job portal the application happens elsewhere (#159).
+func noFormReason(startURL string, err error) string {
+	host := applymode.Host(startURL)
+	switch {
+	case errors.Is(err, engine.ErrNoForm) && applymode.IsPortal(host):
+		return "external: " + host + " shows the posting but no application form; apply there or mark it as applied"
+	case errors.Is(err, engine.ErrNoForm):
+		return "no application form found on " + host
+	default:
+		return "find the form: " + err.Error()
+	}
 }
