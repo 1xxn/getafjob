@@ -7,6 +7,23 @@ type Counts = Record<string, number>;
 const html = document.documentElement;
 let lastMain: Element | null = null;
 
+// htmx wraps swaps in view transitions; when the browser skips one (another transition is running, e.g. the
+// cross-document one of a page load) its promises reject with an AbortError nobody handles. The swap itself still
+// happens, so a skipped transition is not an error.
+const startViewTransition = document.startViewTransition?.bind(document);
+if (startViewTransition) {
+  document.startViewTransition = ((arg?: ViewTransitionUpdateCallback) => {
+    const vt = startViewTransition(arg);
+    const skipped = (err: unknown) => {
+      if (!(err instanceof DOMException && err.name === 'AbortError')) throw err;
+    };
+    vt.ready.catch(skipped);
+    vt.finished.catch(skipped);
+    vt.updateCallbackDone.catch(skipped);
+    return vt;
+  }) as typeof document.startViewTransition;
+}
+
 // --- navigation progress, focus and announcement ---
 
 function isPageSwap(e: Event): boolean {

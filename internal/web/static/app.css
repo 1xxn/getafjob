@@ -540,11 +540,13 @@
   }
   .tracker-external-form {
     display: flex;
+    flex-wrap: wrap;
     gap: var(--space-2);
     align-items: center;
+    max-width: 100%;
   }
   .tracker-external-form input[type="url"] {
-    width: 280px;
+    width: min(280px, 100%);
     padding: var(--space-1) var(--space-2);
     font-size: 0.875rem;
   }

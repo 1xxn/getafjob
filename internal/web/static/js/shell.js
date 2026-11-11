@@ -1,6 +1,19 @@
 // ts/shell.ts
 var html = document.documentElement;
 var lastMain = null;
+var startViewTransition = document.startViewTransition?.bind(document);
+if (startViewTransition) {
+  document.startViewTransition = ((arg) => {
+    const vt = startViewTransition(arg);
+    const skipped = (err) => {
+      if (!(err instanceof DOMException && err.name === "AbortError")) throw err;
+    };
+    vt.ready.catch(skipped);
+    vt.finished.catch(skipped);
+    vt.updateCallbackDone.catch(skipped);
+    return vt;
+  });
+}
 function isPageSwap(e) {
   const ctx = e.detail?.ctx;
   return ctx?.target === document.body;
