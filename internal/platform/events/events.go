@@ -49,13 +49,12 @@ func (h *Hub) Publish(e Event) {
 	h.mu.Lock()
 	defer h.mu.Unlock()
 	// IDs grow across restarts (micro seconds), so a page's Last-Event-ID never skips new events.
-	h.seq = max(h.seq+1, uint64(time.Now().UnixMicro())) //nolint:gosec // the clock is after 1970
+	h.seq = max(h.seq+1, uint64(time.Now().UnixMicro()))
 	e.ID = h.seq
-	r := append(h.recent[e.User], e)
-	if len(r) > replay {
-		r = r[len(r)-replay:]
+	h.recent[e.User] = append(h.recent[e.User], e)
+	if r := h.recent[e.User]; len(r) > replay {
+		h.recent[e.User] = r[len(r)-replay:]
 	}
-	h.recent[e.User] = r
 	for ch := range h.subs[e.User] {
 		select {
 		case ch <- e:
