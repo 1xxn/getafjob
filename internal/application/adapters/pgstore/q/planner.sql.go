@@ -66,6 +66,8 @@ WHERE m.user_id = $1
   AND m.score >= $2::smallint
   AND m.decision = 'match'
   AND j.status = 'open'
+  -- Email applications are never run (#159); the user applies by mail and marks the job.
+  AND coalesce(j.apply_url, '') NOT ILIKE 'mailto:%'
   AND NOT EXISTS (
     SELECT 1 FROM applications a
     WHERE a.user_id = $1

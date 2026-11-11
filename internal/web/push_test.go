@@ -618,3 +618,18 @@ func TestQuestionsRenderMatchingControls(t *testing.T) {
 		t.Error("no question here is free text")
 	}
 }
+
+func TestExternalApplyNotice(t *testing.T) {
+	var b strings.Builder
+	if err := views.ExternalApply("portal", "www.arbeitsagentur.de", "https://www.arbeitsagentur.de/jobsuche/jobdetail/1", 42).
+		Render(t.Context(), &b); err != nil {
+		t.Fatal(err)
+	}
+	html := b.String()
+	for _, want := range []string{"www.arbeitsagentur.de", `href="https://www.arbeitsagentur.de/jobsuche/jobdetail/1"`,
+		`action="/jobs/42/apply-external"`, `rel="noopener noreferrer external"`} {
+		if !strings.Contains(html, want) {
+			t.Errorf("missing %s in %s", want, html)
+		}
+	}
+}
