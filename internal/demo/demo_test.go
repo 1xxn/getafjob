@@ -1,6 +1,7 @@
 package demo
 
 import (
+	"net/url"
 	"slices"
 	"strings"
 	"testing"
@@ -36,5 +37,22 @@ func TestPostingsAreStableAndInvented(t *testing.T) {
 		if !strings.HasPrefix(p.URL, "https://jobs.example.org/") || p.Title == "" || p.Description == "" || p.Source != Source {
 			t.Fatalf("posting %+v", p)
 		}
+	}
+}
+
+func TestPointAtUsesOnlyTheFixtureSite(t *testing.T) {
+	base, _ := url.Parse("http://fixtures:8080")
+	ps := Postings(20, 1, time.Now())
+	PointAt(ps, base)
+	seen := map[string]bool{}
+	for _, p := range ps {
+		u, err := url.Parse(p.URL)
+		if err != nil || u.Host != "fixtures:8080" {
+			t.Fatalf("url %q", p.URL)
+		}
+		seen[p.URL] = true
+	}
+	if len(seen) != len(ps) {
+		t.Fatalf("urls must stay unique: %d of %d", len(seen), len(ps))
 	}
 }

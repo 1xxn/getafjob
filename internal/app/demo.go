@@ -37,8 +37,9 @@ func adminDemo(ctx context.Context, args []string, env Env) int {
 	jobs := fs.Int("jobs", 2000, fmt.Sprintf("number of invented postings (at most %d)", maxDemoJobs))
 	seed := fs.Uint64("seed", 1, "seed; the same seed gives the same postings")
 	force := fs.Bool("force", false, "also run when GETAFJOB_PUBLIC_URL is not a local address")
+	fixtures := fs.String("fixtures", "", "point the postings at this fixture site (development stack: http://fixtures:8080)")
 	if err := fs.Parse(args); err != nil || fs.NArg() != 0 || *jobs < 0 || *jobs > maxDemoJobs {
-		_, _ = fmt.Fprintln(env.Stderr, "usage: getafjob admin demo [-jobs 2000] [-seed 1] [-force]")
+		_, _ = fmt.Fprintln(env.Stderr, "usage: getafjob admin demo [-jobs 2000] [-seed 1] [-fixtures URL] [-force]")
 		return ExitUsage
 	}
 	cfg, err := config.Load(env.Config)
@@ -61,7 +62,14 @@ func adminDemo(ctx context.Context, args []string, env Env) int {
 		return ExitError
 	}
 	defer pool.Close()
-	st, err := seedDemo(ctx, pool, crypto.NewEnvelope(ring, pool), cfg.PublicURL, *jobs, *seed, time.Now(), env.Stdout)
+	var site *url.URL
+	if *fixtures != "" {
+		if site, err = url.Parse(*fixtures); err != nil || (site.Scheme != "http" && site.Scheme != "https") || site.Host == "" {
+			_, _ = fmt.Fprintln(env.Stderr, "-fixtures needs an http(s) URL")
+			return ExitUsage
+		}
+	}
+	st, err := seedDemo(ctx, pool, crypto.NewEnvelope(ring, pool), cfg.PublicURL, *jobs, *seed, time.Now(), site, env.Stdout)
 	if err != nil {
 		_, _ = fmt.Fprintln(env.Stderr, "demo failed:", err)
 		return ExitError
@@ -83,7 +91,7 @@ func localURL(u *url.URL) bool {
 
 // seedDemo creates the demo users (or reuses them), saves their profiles, upserts the postings and matches them.
 func seedDemo(ctx context.Context, pool *pgxpool.Pool, sealer profile.Sealer, public *url.URL, jobs int, seed uint64,
-	now time.Time, out io.Writer,
+	now time.Time, fixtures *url.URL, out io.Writer,
 ) (matching.Stats, error) {
 	ids := identity.NewService(pgstore.New(pool), nil, public)
 	pstore := profilestore.New(pool)
@@ -114,7 +122,11 @@ func seedDemo(ctx context.Context, pool *pgxpool.Pool, sealer profile.Sealer, pu
 		return matching.Stats{}, err
 	}
 	stats := discovery.Stats{Changes: map[discovery.Change]int{}}
-	for _, p := range demo.Postings(jobs, seed, now) {
+	postings := demo.Postings(jobs, seed, now)
+	if fixtures != nil {
+		demo.PointAt(postings, fixtures)
+	}
+	for _, p := range postings {
 		change, _, err := ds.Upsert(ctx, run, p, now)
 		if err != nil {
 			return matching.Stats{}, err
