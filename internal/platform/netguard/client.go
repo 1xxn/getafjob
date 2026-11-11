@@ -9,6 +9,7 @@ import (
 	"net/http"
 	"net/netip"
 	"net/url"
+	"regexp"
 	"syscall"
 	"time"
 )
@@ -66,7 +67,11 @@ func NewClient(opts ClientOptions) *http.Client {
 			if len(via) >= opts.MaxRedirects {
 				return fmt.Errorf("stopped after %d redirects", opts.MaxRedirects)
 			}
-			if !opts.AllowPrivate && !PublicURL(req.URL.String()) {
+			if opts.AllowPrivate {
+				return nil
+			}
+			// A redirect must have the same shape as the first request: public host, default port.
+			if u, err := CanonicalURL(req.URL.String()); err != nil || !canonicalURL.MatchString(u) {
 				return fmt.Errorf("%w: redirect", ErrBlocked)
 			}
 			return nil
@@ -74,12 +79,34 @@ func NewClient(opts ClientOptions) *http.Client {
 	}
 }
 
-// Get fetches a public URL (checked before connecting) with ctx.
+// canonicalURL is the only shape a request to a foreign URL may have (see CanonicalURL): http(s), an ASCII host
+// name or dotted IPv4 address, no port, user info or fragment.
+var canonicalURL = regexp.MustCompile(`^https?://[a-z0-9](?:[a-z0-9-]*[a-z0-9])?(?:\.[a-z0-9](?:[a-z0-9-]*[a-z0-9])?)*(?:/[^\s#]*)?(?:\?[^\s#]*)?$`)
+
+// loopbackURL is what tests with local servers (allowPrivate) may fetch.
+var loopbackURL = regexp.MustCompile(`^http://127\.0\.0\.1:[0-9]{1,5}(?:/[^\s#]*)?(?:\?[^\s#]*)?$`)
+
+// Get fetches a public URL with ctx: it requests the canonical form of raw (CanonicalURL) and nothing else; the
+// client checks every connection and redirect again. allowPrivate is for tests and admits only loopback servers.
 func Get(ctx context.Context, c *http.Client, raw string, allowPrivate bool) (*http.Response, error) {
-	if !allowPrivate && !PublicURL(raw) {
+	if allowPrivate {
+		if u := browserURL(raw); loopbackURL.MatchString(u) {
+			return get(ctx, c, u)
+		}
 		return nil, ErrBlocked
 	}
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, browserURL(raw), nil)
+	u, err := CanonicalURL(raw)
+	if err != nil {
+		return nil, err
+	}
+	if canonicalURL.MatchString(u) {
+		return get(ctx, c, u)
+	}
+	return nil, ErrBlocked
+}
+
+func get(ctx context.Context, c *http.Client, u string) (*http.Response, error) {
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, u, nil)
 	if err != nil {
 		return nil, err
 	}

@@ -10,7 +10,8 @@ import (
 func FuzzPublicURL(f *testing.F) {
 	for _, s := range []string{
 		"https://jobs.example.com/x", "http://127.0.0.1/", "http://0x7f.1/", "http://[::ffff:127.0.0.1]/",
-		"http://x.ⓛocalhost/", "http://１２７.０.０.１/", "http://127.0.0.1:1\\@a.b/", "https://user@a.b:443/x?y#z",
+		"http://x.ⓛocalhost/", "http://１２７.０.０.１/", "http://127.0.0.1:1\\@a.b/", "https://user@a.b:443/x?y#z", "https://a.b:8443/",
+		"https://[2606:4700::1]/", "http://0x08080808/", "https://bücher.example/jobs?q=1",
 	} {
 		f.Add(s)
 	}
@@ -30,6 +31,17 @@ func FuzzPublicURL(f *testing.F) {
 		}
 		if ip, kind := browserIPv4(host); kind == ipV4 && !PublicIP(ip) {
 			t.Fatalf("public URL with private IPv4 %q", host)
+		}
+		// The canonical form is what a request uses: it keeps the shape and stays public.
+		c, err := CanonicalURL(raw)
+		if err != nil {
+			return
+		}
+		if !canonicalURL.MatchString(c) || !PublicURL(c) {
+			t.Fatalf("canonical %q of %q", c, raw)
+		}
+		if again, err := CanonicalURL(c); err != nil || again != c {
+			t.Fatalf("canonical %q is not stable: %q %v", c, again, err)
 		}
 	})
 }

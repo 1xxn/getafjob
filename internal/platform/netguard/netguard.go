@@ -249,3 +249,32 @@ func Host(raw string) (string, bool) {
 	h, _ := browserHost(host)
 	return strings.TrimSuffix(h, "."), true
 }
+
+// CanonicalURL returns the URL a request for raw uses: a public http(s) URL (PublicURL) rebuilt from its parts, with
+// the host as ASCII (IDNA) or dotted IPv4, the scheme's default port only, no user info and no fragment. IPv6
+// literals and other ports are refused: job pages do not need them, and they would reach services next to a
+// public web server.
+func CanonicalURL(raw string) (string, error) {
+	u, err := url.Parse(browserURL(raw))
+	if err != nil {
+		return "", ErrBlocked
+	}
+	scheme := strings.ToLower(u.Scheme)
+	host, ok := Host(raw)
+	if !ok || (scheme != "http" && scheme != "https") || strings.Contains(host, ":") {
+		return "", ErrBlocked
+	}
+	if ip, kind := browserIPv4(host); kind == ipV4 {
+		host = ip.String()
+	}
+	switch port := u.Port(); {
+	case port == "", scheme == "http" && port == "80", scheme == "https" && port == "443":
+	default:
+		return "", ErrBlocked
+	}
+	c := (&url.URL{Scheme: scheme, Host: host, Path: u.Path, RawPath: u.RawPath, RawQuery: u.RawQuery}).String()
+	if !canonicalURL.MatchString(c) {
+		return "", ErrBlocked // e.g. empty labels ("http://.a"): not a host name a request should go to
+	}
+	return c, nil
+}
