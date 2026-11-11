@@ -20,12 +20,39 @@ func (tab *Tab) WaitFor(cond string) {
 		}
 		time.Sleep(100 * time.Millisecond)
 	}
+	tab.Shot("timeout")
 	tab.t.Fatalf("timed out waiting for %s", cond)
 }
 
+// Click waits until the element is visible, no view transition runs and the element itself is under its middle
+// (its own ::after counts as itself, unlike in rod's covered check), then clicks there with the mouse, like a user.
 func (tab *Tab) Click(selector string) {
 	tab.t.Helper()
-	must(tab.t, tab.El(selector).Click(proto.InputMouseButtonLeft, 1))
+	el := tab.El(selector)
+	must(tab.t, el.Timeout(actionTimeout).WaitVisible())
+	must(tab.t, el.ScrollIntoView())
+	deadline := time.Now().Add(10 * time.Second)
+	for {
+		res, err := el.Timeout(actionTimeout).Eval(`function () {
+			if (document.activeViewTransition) return null;
+			const r = this.getBoundingClientRect();
+			const x = r.left + r.width / 2, y = r.top + r.height / 2;
+			const top = document.elementFromPoint(x, y);
+			return top && (top === this || this.contains(top)) ? {x, y} : null;
+		}`)
+		must(tab.t, err)
+		if !res.Value.Nil() {
+			pt := proto.Point{X: res.Value.Get("x").Num(), Y: res.Value.Get("y").Num()}
+			mouse := tab.Page.Timeout(actionTimeout).Mouse
+			must(tab.t, mouse.MoveTo(pt))
+			must(tab.t, mouse.Click(proto.InputMouseButtonLeft, 1))
+			return
+		}
+		if time.Now().After(deadline) {
+			tab.t.Fatalf("%s: covered or in a view transition", selector)
+		}
+		time.Sleep(100 * time.Millisecond)
+	}
 }
 
 var pages = []string{"/", "/jobs", "/approvals", "/tracker", "/profile", "/documents", "/answers", "/texts",

@@ -42,3 +42,22 @@ func TestTemplatesHaveNoInlineHandlers(t *testing.T) {
 		}
 	}
 }
+
+// Inline styles are blocked by the CSP (style-src 'self'); use classes or native elements (meter, progress).
+func TestTemplatesHaveNoInlineStyles(t *testing.T) {
+	files, _ := filepath.Glob("*.templ")
+	more, _ := filepath.Glob("ui/*.templ")
+	rx := regexp.MustCompile(`\sstyle=`)
+	for _, f := range append(files, more...) {
+		if f == "cvreview.templ" { // rebuilt in #181
+			continue
+		}
+		b, err := os.ReadFile(f)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if loc := rx.FindIndex(b); loc != nil {
+			t.Errorf("%s: inline style near %q", f, b[loc[0]:min(loc[1]+30, len(b))])
+		}
+	}
+}
