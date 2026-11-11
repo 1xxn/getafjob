@@ -36,6 +36,7 @@ import (
 	"github.com/1xxn/getafjob/internal/platform/config"
 	"github.com/1xxn/getafjob/internal/platform/crypto"
 	"github.com/1xxn/getafjob/internal/platform/db"
+	"github.com/1xxn/getafjob/internal/platform/events"
 	"github.com/1xxn/getafjob/internal/platform/httpx"
 	"github.com/1xxn/getafjob/internal/platform/netguard"
 	"github.com/1xxn/getafjob/internal/platform/queue"
@@ -127,6 +128,8 @@ func serve(ctx context.Context, cfg config.Config, logger *slog.Logger) error {
 		aiClient = aianthropic.NewClient()
 	}
 	aiSvc := ai.NewService(aiStore, aiCipher, aiClient, cfg.AIEnabled, cfg.AnthropicAPIKey.Reveal(), cfg.AnthropicModel, cfg.AIBudgetPerUserCents)
+	liveEvents := events.NewHub()
+	go events.Listen(ctx, pool, liveEvents, logger)
 	var gw *gateway.Server
 	if cfg.RunnerSecret != "" {
 		atsMetrics, err := ats.NewTracker()
@@ -166,7 +169,7 @@ func serve(ctx context.Context, cfg config.Config, logger *slog.Logger) error {
 	})
 	(&web.Server{Identity: ids, Logger: logger, Profile: profiles, Documents: docs, Items: items, Stations: stations,
 		Importer: cvimport.NewImporter(docs, profiles, stations, extractor), Jobs: listings, Discovery: discoverySvc,
-		PushStore: webpush.NewStore(pool), VAPIDPublicKey: vapidPub, Apps: apps, Tracking: trackingSvc, Notify: notifySvc, Assist: assistSvc, Portals: portalsSvc, AI: aiSvc, Privacy: privacySvc, Shots: sealedFiles, Handoffs: gw}).Register(mux)
+		PushStore: webpush.NewStore(pool), VAPIDPublicKey: vapidPub, Apps: apps, Tracking: trackingSvc, Notify: notifySvc, Assist: assistSvc, Portals: portalsSvc, AI: aiSvc, Privacy: privacySvc, Shots: sealedFiles, Handoffs: gw, Events: liveEvents}).Register(mux)
 
 	h := httpx.Instrument(httpx.Protect(httpx.Routes(mux), maxBody, cfg.PublicURL.Scheme == "https",
 		httpx.Upload{Path: "/documents", Max: web.MaxUpload}, httpx.Upload{Path: "/setup/cv", Max: web.MaxUpload}))

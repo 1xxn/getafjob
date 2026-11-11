@@ -11,7 +11,7 @@ import (
 
 func main() {
 	res := api.Build(api.BuildOptions{
-		EntryPoints:   []string{"ts/passkey.ts", "ts/handoff.ts"},
+		EntryPoints:   []string{"ts/passkey.ts", "ts/handoff.ts", "ts/events.ts"},
 		Outdir:        "static/js",
 		Bundle:        true,
 		Format:        api.FormatESModule,
