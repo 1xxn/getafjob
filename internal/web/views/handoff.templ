@@ -116,6 +116,7 @@ templ HandoffPage(d HandoffData) {
 			</div>
 		}
 		@Section(d.Company + " · " + d.JobTitle) {
+			<div hidden data-watch-app={ d.AppID } data-watch-state={ d.State }></div>
 			<p>
 				<a href="/jobs">{ T(ctx, "jobs.back") }</a>
 				if d.JobID > 0 {
