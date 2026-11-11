@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"io"
 	"log/slog"
 	"net/http"
 	"net/http/httptest"
@@ -17,7 +18,6 @@ import (
 
 	"github.com/1xxn/getafjob/internal/application"
 	"github.com/1xxn/getafjob/internal/gateway"
-	runnerv1 "github.com/1xxn/getafjob/internal/gen/proto/runner/v1"
 	"github.com/1xxn/getafjob/internal/identity"
 	"github.com/1xxn/getafjob/internal/platform/blob"
 	"github.com/1xxn/getafjob/internal/platform/webpush"
@@ -32,7 +32,7 @@ func (f fakeHub) SessionFor(uuid.UUID) (*gateway.HandoffSession, bool) {
 	return f.sess, f.sess != nil
 }
 
-func (f fakeHub) ActiveSessions() []uuid.UUID {
+func (f fakeHub) ActiveRuns(uuid.UUID) []uuid.UUID {
 	return f.active
 }
 
@@ -133,69 +133,139 @@ func TestPushEndpoints(t *testing.T) {
 	}
 }
 
-func TestScreenWebSocketStreamsFramesAndNeverLogsInput(t *testing.T) {
-	var logs bytes.Buffer
-	sess := &gateway.HandoffSession{
-		Frames: make(chan []byte, 4),
-		Input:  make(chan *runnerv1.HandoffEvent, 10),
-		Done:   make(chan struct{}),
-	}
+// liveServer serves the live view socket of one application in the given state.
+func liveServer(t *testing.T, state application.State, sess *gateway.HandoffSession, logs io.Writer) (*identity.User, string) {
+	t.Helper()
 	u := &identity.User{ID: uuid.New(), DisplayName: "Max"}
 	appID := uuid.New()
-	srv := &Server{
-		Handoffs: fakeHub{sess: sess},
-		Logger:   slog.New(slog.NewTextHandler(&logs, nil)),
-	}
+	st := &fakeAppStore{userID: u.ID, app: application.App{ID: appID, JobID: 42, State: state, Version: 1}}
+	srv := &Server{Apps: application.NewService(st), Handoffs: fakeHub{sess: sess},
+		Logger: slog.New(slog.NewTextHandler(logs, nil))}
 	mux := http.NewServeMux()
 	mux.HandleFunc("GET /applications/{id}/screen", func(w http.ResponseWriter, r *http.Request) {
 		srv.screenWebSocket(w, r, u)
 	})
 	hs := httptest.NewServer(mux)
-	defer hs.Close()
+	t.Cleanup(hs.Close)
+	return u, "ws" + strings.TrimPrefix(hs.URL, "http") + "/applications/" + appID.String() + "/screen"
+}
 
-	ctx, cancel := context.WithTimeout(t.Context(), 5*time.Second)
-	defer cancel()
-	wsURL := "ws" + strings.TrimPrefix(hs.URL, "http") + "/applications/" + appID.String() + "/screen"
-	ws, _, err := websocket.Dial(ctx, wsURL, &websocket.DialOptions{Subprotocols: []string{"getafjob-screencast"}})
+func dialLive(ctx context.Context, t *testing.T, url string) *websocket.Conn {
+	t.Helper()
+	ws, _, err := websocket.Dial(ctx, url, &websocket.DialOptions{Subprotocols: []string{"getafjob-screencast"}})
 	if err != nil {
 		t.Fatalf("dial: %v", err)
 	}
-	defer func() { _ = ws.CloseNow() }()
+	t.Cleanup(func() { _ = ws.CloseNow() })
+	return ws
+}
 
-	sess.Frames <- []byte{0xff, 0xd8, 0xff, 0xd9}
-	typ, frame, err := ws.Read(ctx)
-	if err != nil || typ != websocket.MessageBinary || !bytes.Equal(frame, []byte{0xff, 0xd8, 0xff, 0xd9}) {
-		t.Fatalf("frame = %v, %v, %v", typ, frame, err)
+// readStatus reads messages until a status message arrives and returns its interactive flag.
+func readStatus(ctx context.Context, t *testing.T, ws *websocket.Conn) bool {
+	t.Helper()
+	for {
+		typ, data, err := ws.Read(ctx)
+		if err != nil {
+			t.Fatalf("read status: %v", err)
+		}
+		if typ == websocket.MessageText {
+			var st screenStatus
+			if err := json.Unmarshal(data, &st); err != nil || st.Type != "status" {
+				t.Fatalf("status = %s, %v", data, err)
+			}
+			return st.Interactive
+		}
 	}
+}
 
-	if err := ws.Write(ctx, websocket.MessageText, []byte(`{"type":"key","action":"keyDown","key":"s","code":"KeyS","text":"secret-code-123","windowsVirtualKeyCode":83}`)); err != nil {
+func readFrame(ctx context.Context, t *testing.T, ws *websocket.Conn) []byte {
+	t.Helper()
+	for {
+		typ, data, err := ws.Read(ctx)
+		if err != nil {
+			t.Fatalf("read frame: %v", err)
+		}
+		if typ == websocket.MessageBinary {
+			return data
+		}
+	}
+}
+
+func TestScreenWebSocketStreamsToEveryViewer(t *testing.T) {
+	sess := gateway.NewHandoffSession(uuid.Nil)
+	_, url := liveServer(t, application.Running, sess, io.Discard)
+	ctx, cancel := context.WithTimeout(t.Context(), 5*time.Second)
+	defer cancel()
+	a, b := dialLive(ctx, t, url), dialLive(ctx, t, url)
+	if readStatus(ctx, t, a) || readStatus(ctx, t, b) {
+		t.Fatal("a running run must be view only")
+	}
+	frame := []byte{0xff, 0xd8, 0xff, 0xd9}
+	sess.Publish(frame)
+	if !bytes.Equal(readFrame(ctx, t, a), frame) || !bytes.Equal(readFrame(ctx, t, b), frame) {
+		t.Fatal("both viewers must get the frame")
+	}
+}
+
+func TestScreenWebSocketPassesInputOnlyWhileTheRunWaits(t *testing.T) {
+	var logs bytes.Buffer
+	sess := gateway.NewHandoffSession(uuid.Nil)
+	_, url := liveServer(t, application.NeedsInput, sess, &logs)
+	ctx, cancel := context.WithTimeout(t.Context(), 5*time.Second)
+	defer cancel()
+	ws := dialLive(ctx, t, url)
+	_ = readStatus(ctx, t, ws)
+
+	click := []byte(`{"type":"mouse","action":"mousePressed","x":120,"y":240,"button":"left","clickCount":1}`)
+	if err := ws.Write(ctx, websocket.MessageText, click); err != nil {
 		t.Fatal(err)
 	}
-	if err := ws.Write(ctx, websocket.MessageText, []byte(`{"type":"mouse","action":"mousePressed","x":120,"y":240,"button":"left","clickCount":1}`)); err != nil {
-		t.Fatal(err)
+	time.Sleep(200 * time.Millisecond)
+	select {
+	case ev := <-sess.Input:
+		t.Fatalf("input while the runner does not wait: %+v", ev)
+	default:
 	}
-	msg1 := <-sess.Input
-	if msg1.GetKey().GetText() != "secret-code-123" {
-		t.Fatalf("key = %+v", msg1)
+
+	sess.MarkWaiting()
+	if !readStatus(ctx, t, ws) {
+		t.Fatal("status must turn interactive")
 	}
-	msg2 := <-sess.Input
-	if msg2.GetMouse().GetX() != 120 || msg2.GetMouse().GetY() != 240 {
-		t.Fatalf("mouse = %+v", msg2)
+	key := []byte(`{"type":"key","action":"keyDown","key":"s","code":"KeyS","text":"secret-code-123","windowsVirtualKeyCode":83}`)
+	for _, m := range [][]byte{key, click} {
+		if err := ws.Write(ctx, websocket.MessageText, m); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if ev := <-sess.Input; ev.GetKey().GetText() != "secret-code-123" {
+		t.Fatalf("key = %+v", ev)
+	}
+	if ev := <-sess.Input; ev.GetMouse().GetX() != 120 || ev.GetMouse().GetY() != 240 {
+		t.Fatalf("mouse = %+v", ev)
 	}
 	if strings.Contains(logs.String(), "secret-code-123") {
 		t.Fatalf("input leaked to logs: %s", logs.String())
 	}
 }
 
-func TestHandoffPageAnswerAndPark(t *testing.T) {
-	sess := &gateway.HandoffSession{
-		Frames: make(chan []byte, 4),
-		Input:  make(chan *runnerv1.HandoffEvent, 10),
-		Done:   make(chan struct{}),
+func TestScreenWebSocketClosesForFinishedRuns(t *testing.T) {
+	_, url := liveServer(t, application.Confirmed, nil, io.Discard)
+	ctx, cancel := context.WithTimeout(t.Context(), 5*time.Second)
+	defer cancel()
+	ws := dialLive(ctx, t, url)
+	_, _, err := ws.Read(ctx)
+	if websocket.CloseStatus(err) != screenNotLive {
+		t.Fatalf("close = %v, want %d", err, screenNotLive)
 	}
+}
+
+func TestHandoffPageAnswerAndPark(t *testing.T) {
 	u := &identity.User{ID: uuid.New(), DisplayName: "Max"}
 	appID := uuid.New()
+	sess := gateway.NewHandoffSession(u.ID)
+	st := &fakeAppStore{userID: u.ID, app: application.App{ID: appID, JobID: 42, State: application.NeedsInput, Version: 1}}
 	srv := &Server{
+		Apps:     application.NewService(st),
 		Handoffs: fakeHub{sess: sess},
 	}
 

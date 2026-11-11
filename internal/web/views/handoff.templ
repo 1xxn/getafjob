@@ -51,6 +51,17 @@ type ActiveRunItem struct {
 	JobTitle string
 	Company  string
 	Current  bool
+	Waiting  bool // the run waits for the user
+}
+
+// LiveIndicator is the top bar pill with the user's live runs; empty when nothing runs.
+templ LiveIndicator(runs []ActiveRunItem) {
+	if len(runs) > 0 {
+		<a class={ "live-indicator", templ.KV("waiting", anyWaiting(runs)) } href={ templ.SafeURL("/applications/" + firstLive(runs)) }>
+			<span class="live-dot pulse"></span>
+			{ T(ctx, "live.indicator", "count", len(runs)) }
+		</a>
+	}
 }
 
 // HandoffData fills the application evidence and remote browser page.
@@ -62,6 +73,7 @@ type HandoffData struct {
 	Company             string
 	State               string
 	Status              string
+	Live                bool // the run may stream a live view now
 	ActiveRuns          []ActiveRunItem
 	ApprovalAsked       bool
 	ApprovalReasons     []string
@@ -89,7 +101,7 @@ templ HandoffPage(d HandoffData) {
 							href={ templ.SafeURL("/applications/" + ar.AppID) }
 							class={ "active-runner-pill", templ.KV("current", ar.Current) }
 						>
-							<span class="live-dot mini"></span>
+							<span class={ "live-dot", "mini", templ.KV("waiting", ar.Waiting) }></span>
 							if ar.Company != "" {
 								<span class="runner-company">{ ar.Company }</span>
 							}
@@ -112,34 +124,40 @@ templ HandoffPage(d HandoffData) {
 				if d.Status != "" {
 					· @StatusLabel(d.Status)
 				}
-				if d.State != "" {
-					· <span class="muted">{ d.State }</span>
-				}
 			</p>
-			<p class="muted" id="screen-status">{ T(ctx, "handoff.connecting") }</p>
-
-			<div class="remote-browser-box">
-				<canvas
-					id="screencast"
-					class="screencast"
+			if d.Live {
+				<div
+					class="remote-browser-box"
+					id="live-view"
 					data-app={ d.AppID }
-					if d.BeforeSubmitURL != "" {
-						data-fallback={ d.BeforeSubmitURL }
-					} else if d.ConfirmationShotURL != "" {
-						data-fallback={ d.ConfirmationShotURL }
-					}
-					width="1280"
-					height="800"
-					tabindex="0"
-				></canvas>
-				<div class="actions">
-					<button type="button" id="btn-resume">{ T(ctx, "handoff.continue") }</button>
-					<form method="post" action={ templ.SafeURL("/applications/" + d.AppID + "/park") }>
-						<button type="submit" id="btn-park" class="secondary">{ T(ctx, "handoff.park") }</button>
-					</form>
-					<button type="button" id="btn-push" class="secondary">{ T(ctx, "handoff.push") }</button>
+					data-t-connecting={ T(ctx, "live.connecting") }
+					data-t-waiting={ T(ctx, "live.waiting") }
+					data-t-view-only={ T(ctx, "live.view_only") }
+					data-t-your-turn={ T(ctx, "live.your_turn") }
+					data-t-ended={ T(ctx, "live.ended") }
+					data-t-reconnecting={ T(ctx, "live.reconnecting") }
+					data-t-unavailable={ T(ctx, "live.unavailable") }
+				>
+					<p class="live-status" id="screen-status" role="status" aria-live="polite">{ T(ctx, "live.connecting") }</p>
+					<div class="screen-frame">
+						<canvas
+							id="screencast"
+							class="screencast"
+							width="1280"
+							height="800"
+							tabindex="0"
+							aria-label={ T(ctx, "live.canvas_label") }
+						></canvas>
+					</div>
+					<div class="actions">
+						<button type="button" id="btn-resume" class="primary" hidden>{ T(ctx, "handoff.continue") }</button>
+						<form method="post" action={ templ.SafeURL("/applications/" + d.AppID + "/park") }>
+							<button type="submit" id="btn-park" class="secondary">{ T(ctx, "handoff.park") }</button>
+						</form>
+						<button type="button" id="btn-push" class="secondary">{ T(ctx, "handoff.push") }</button>
+					</div>
 				</div>
-			</div>
+			}
 
 			if d.Suggestion != nil {
 				<div class="form-section stack notice notice-info">

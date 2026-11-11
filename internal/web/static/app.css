@@ -111,6 +111,8 @@
     margin: 0 auto;
     padding: var(--space-8) var(--space-6);
 
+    &.wide { max-width: 90rem; }
+
     &:focus {
       outline: none;
     }
@@ -343,7 +345,7 @@
   .screencast { max-inline-size: 100%; block-size: auto; border: 1px solid var(--line); display: block; background: #000; }
   .actions { display: flex; flex-wrap: wrap; gap: var(--space-3); margin-block-start: var(--space-3); }
 
-  /* Active Runner Switcher (#157) */
+  /* Live view */
   .active-runners-banner {
     display: flex;
     flex-wrap: wrap;
@@ -355,63 +357,37 @@
     border: 1px solid var(--line);
     border-radius: var(--radius);
   }
-  .active-runners-label {
-    display: inline-flex;
-    align-items: center;
-    gap: var(--space-2);
-    font-weight: 600;
-    font-size: 0.9rem;
-    color: var(--ink-1);
-  }
-  .active-runners-list {
-    display: flex;
-    flex-wrap: wrap;
-    gap: var(--space-2);
-  }
-  .active-runner-pill {
+  .active-runners-label { display: inline-flex; align-items: center; gap: var(--space-2); font-weight: 600; }
+  .active-runners-list { display: flex; flex-wrap: wrap; gap: var(--space-2); }
+  .active-runner-pill, .live-indicator {
     display: inline-flex;
     align-items: center;
     gap: var(--space-2);
     padding: var(--space-1) var(--space-3);
-    background: var(--surface);
+    background: var(--sunken);
     border: 1px solid var(--line);
-    border-radius: 9999px;
-    font-size: 0.85rem;
+    border-radius: 999px;
+    font-size: 0.875rem;
     text-decoration: none;
     color: var(--ink-2);
-    transition: all 0.15s ease-in-out;
   }
-  .active-runner-pill:hover {
-    border-color: var(--brand);
-    color: var(--ink-1);
-  }
-  .active-runner-pill.current {
-    background: #ecfdf5;
-    border-color: #10b981;
-    color: #065f46;
-    font-weight: 600;
-  }
-  .live-dot {
-    inline-size: 8px;
-    block-size: 8px;
-    border-radius: 50%;
-    background-color: #ef4444;
-    display: inline-block;
-  }
-  .live-dot.pulse {
-    animation: live-pulse 1.5s cubic-bezier(0.4, 0, 0.6, 1) infinite;
-  }
-  .live-dot.mini {
-    inline-size: 6px;
-    block-size: 6px;
-    background-color: #10b981;
-  }
-  @keyframes live-pulse {
-    0%, 100% { opacity: 1; transform: scale(1); }
-    50% { opacity: 0.4; transform: scale(1.2); }
-  }
+  .active-runner-pill:hover, .live-indicator:hover { border-color: var(--accent); color: var(--ink-1); }
+  .active-runner-pill.current { border-color: var(--accent); color: var(--ink-1); font-weight: 600; }
+  .live-indicator { font-weight: 600; color: var(--ink-1); }
+  .live-indicator.waiting { border-color: var(--danger); }
+  .live-dot { inline-size: 0.5rem; block-size: 0.5rem; border-radius: 50%; background: var(--accent); display: inline-block; }
+  .live-dot.waiting, .live-indicator.waiting .live-dot { background: var(--danger); }
+  .live-dot.pulse { animation: live-pulse 1.5s ease-in-out infinite; }
+  .live-dot.mini { inline-size: 0.4rem; block-size: 0.4rem; }
+  @keyframes live-pulse { 50% { opacity: 0.35; } }
+  @media (prefers-reduced-motion: reduce) { .live-dot.pulse { animation: none; } }
   .runner-company { font-weight: 600; }
-  .runner-title { opacity: 0.9; }
+  .remote-browser-box { margin-block: var(--space-4); }
+  .live-status { color: var(--ink-2); margin-block: 0 var(--space-2); }
+  .remote-browser-box[data-mode="interactive"] .live-status { color: var(--ink-1); font-weight: 600; }
+  .remote-browser-box[data-mode="interactive"] .screencast { outline: 3px solid var(--accent); cursor: crosshair; }
+  .remote-browser-box[data-mode="view"] .screencast { cursor: default; }
+  .screen-frame { inline-size: min(100%, 80rem); }
 
   /* Fit Inspector */
   .fit-inspector {

@@ -213,8 +213,8 @@ func TestGatewayAskQuestionsSurviveRestartAndStreamHandoff(t *testing.T) {
 		t.Fatalf("questions after restart = %+v, %v", qs, err)
 	}
 
-	// ActiveSessions is initially empty.
-	if active := srv.ActiveSessions(); len(active) != 0 {
+	// ActiveRuns is initially empty.
+	if active := srv.ActiveRuns(u); len(active) != 0 {
 		t.Fatalf("active sessions before handoff = %v, want empty", active)
 	}
 
@@ -222,14 +222,27 @@ func TestGatewayAskQuestionsSurviveRestartAndStreamHandoff(t *testing.T) {
 	if _, err := c.Handoff(with(ctx, tok), &runnerv1.HandoffRequest{Frame: []byte{0xff, 0xd8, 0xff, 0xd9}}); err != nil {
 		t.Fatalf("handoff frame: %v", err)
 	}
-	if active := srv.ActiveSessions(); len(active) != 1 || active[0] != appID {
+	if active := srv.ActiveRuns(u); len(active) != 1 || active[0] != appID {
 		t.Fatalf("active sessions after handoff frame = %v, want [%s]", active, appID)
+	}
+
+	// Viewer input waits for the runner's wait call; frame calls never take it.
+	sess, _ := srv.SessionFor(appID)
+	sess.Input <- &runnerv1.HandoffEvent{Msg: &runnerv1.HandoffEvent_Resume{Resume: true}}
+	if res, err := c.Handoff(with(ctx, tok), &runnerv1.HandoffRequest{Frame: []byte{0xff, 0xd8}}); err != nil || len(res.GetEvents()) != 0 {
+		t.Fatalf("frame call = %v, %v; want no events", res.GetEvents(), err)
+	}
+	if res, err := c.Handoff(with(ctx, tok), &runnerv1.HandoffRequest{Wait: true}); err != nil || len(res.GetEvents()) != 1 {
+		t.Fatalf("wait call = %v, %v; want the resume", res.GetEvents(), err)
+	}
+	if !sess.Interactive() {
+		t.Fatal("session must be interactive after a wait call")
 	}
 
 	if _, err := c.Handoff(with(ctx, tok), &runnerv1.HandoffRequest{Done: true}); err != nil {
 		t.Fatalf("handoff done: %v", err)
 	}
-	if active := srv.ActiveSessions(); len(active) != 0 {
+	if active := srv.ActiveRuns(u); len(active) != 0 {
 		t.Fatalf("active sessions after handoff done = %v, want empty", active)
 	}
 }

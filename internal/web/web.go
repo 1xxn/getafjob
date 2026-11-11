@@ -163,6 +163,7 @@ func (s *Server) Register(mux *http.ServeMux) {
 	mux.Handle("GET /applications/{id}", s.page(s.applicationPage))
 	mux.Handle("GET /applications/{id}/screenshots/{checkpoint}", s.page(s.applicationScreenshot))
 	mux.Handle("GET /applications/{id}/screen", s.page(s.screenWebSocket))
+	mux.Handle("GET /live/indicator", s.page(s.liveIndicator))
 	mux.Handle("POST /applications/{id}/answer", s.page(s.applicationAnswer))
 	mux.Handle("POST /applications/{id}/park", s.page(s.applicationPark))
 	mux.Handle("POST /applications/{id}/suggestions/{sugId}/accept", s.page(s.suggestionAccept))
