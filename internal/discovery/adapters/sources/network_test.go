@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"net/http"
 	"os"
 	"strings"
 	"testing"
@@ -75,6 +76,10 @@ func TestNetwork(t *testing.T) {
 			defer cancel()
 			src := mk(t)
 			b, err := src.Fetch(ctx)
+			if sources.Status(err) == http.StatusTooManyRequests {
+				// Some career APIs rate-limit CI addresses; that says nothing about the adapter.
+				t.Skipf("rate limited upstream: %v", err)
+			}
 			if err != nil {
 				t.Fatalf("fetch: %v", err)
 			}
@@ -160,6 +165,8 @@ func TestCatalog(t *testing.T) {
 		switch {
 		case curate != "":
 			fmt.Printf("CANDIDATE %-16s %-28s %-24q err=%v total=%d relevant=%d\n", b.ATS, b.Slug, b.Company, err, len(batch.Postings), relevant)
+		case sources.Status(err) == http.StatusTooManyRequests:
+			t.Logf("%s (%s): rate limited upstream: %v", key, b.Company, err)
 		case err != nil:
 			t.Errorf("%s (%s): %v", key, b.Company, err)
 		case relevant == 0:

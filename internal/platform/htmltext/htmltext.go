@@ -31,9 +31,11 @@ func Text(raw string) string {
 	if len(raw) > MaxInput {
 		raw = raw[:MaxInput]
 	}
-	// Some APIs deliver escaped HTML ("&lt;p&gt;").
-	if strings.Contains(raw, "&lt;") && !strings.Contains(raw, "<") {
-		raw = html.UnescapeString(raw)
+	// Some APIs deliver escaped HTML ("&lt;p&gt;", "&#60;p&#62;", "&LT;p&GT;").
+	if !strings.Contains(raw, "<") {
+		if u := html.UnescapeString(raw); strings.Contains(u, "<") {
+			raw = u
+		}
 	}
 	z := xhtml.NewTokenizer(strings.NewReader(raw))
 	var b strings.Builder
