@@ -314,3 +314,11 @@ func TestPlanner(t *testing.T) {
 func (f *fakePlannerStore) NavCounts(context.Context, uuid.UUID) (application.NavCounts, error) {
 	return application.NavCounts{}, nil
 }
+
+func (f *fakePlannerStore) ParkReasons(context.Context, uuid.UUID) (map[uuid.UUID]string, error) {
+	return nil, nil
+}
+
+func (f *fakePlannerStore) SubmitsPerDay(context.Context, uuid.UUID, time.Time) (map[time.Time]int, error) {
+	return nil, nil
+}

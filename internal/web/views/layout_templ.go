@@ -425,7 +425,7 @@ func Layout(p Page) templ.Component {
 				}
 				return nil
 			})
-			templ_7745c5c3_Err = AppShell(shellFor(ctx, p), p.Handoff || p.StyleGuide).Render(templ.WithChildren(ctx, templ_7745c5c3_Var27), templ_7745c5c3_Buffer)
+			templ_7745c5c3_Err = AppShell(shellFor(ctx, p), p.Handoff || p.StyleGuide || p.Wide).Render(templ.WithChildren(ctx, templ_7745c5c3_Var27), templ_7745c5c3_Buffer)
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}

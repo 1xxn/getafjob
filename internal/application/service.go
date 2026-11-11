@@ -409,3 +409,30 @@ func (s *Service) CheckGuard(ctx context.Context, userID uuid.UUID, jobID int64)
 	}
 	return Guard(c, s.now())
 }
+
+// Overview is what the dashboard shows of the user's applications: all of them with their pipeline data, why
+// parked ones stopped, and the submits per day of the last 30 days.
+type Overview struct {
+	Apps         []PipelineApplication
+	ParkReasons  map[uuid.UUID]string
+	SubmitsByDay map[time.Time]int // UTC midnight -> count
+	Since        time.Time
+}
+
+// Overview collects the dashboard data in three queries.
+func (s *Service) Overview(ctx context.Context, userID uuid.UUID) (Overview, error) {
+	apps, err := s.store.PipelineApplications(ctx, userID)
+	if err != nil {
+		return Overview{}, err
+	}
+	reasons, err := s.store.ParkReasons(ctx, userID)
+	if err != nil {
+		return Overview{}, err
+	}
+	since := s.now().UTC().Truncate(24*time.Hour).AddDate(0, 0, -29)
+	days, err := s.store.SubmitsPerDay(ctx, userID, since)
+	if err != nil {
+		return Overview{}, err
+	}
+	return Overview{Apps: apps, ParkReasons: reasons, SubmitsByDay: days, Since: since}, nil
+}

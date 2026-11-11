@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/jackc/pgx/v5/pgtype"
 )
 
 const applicationCheckpoints = `-- name: ApplicationCheckpoints :many
@@ -659,6 +660,39 @@ func (q *Queries) MarkHandoffWarned(ctx context.Context, arg MarkHandoffWarnedPa
 	return result.RowsAffected(), nil
 }
 
+const parkReasons = `-- name: ParkReasons :many
+SELECT DISTINCT ON (e.application_id) e.application_id, coalesce(e.detail->>'reason', '')::text AS reason
+FROM application_events e
+JOIN applications a ON a.id = e.application_id
+WHERE a.user_id = $1 AND a.state = 'parked' AND e.to_state = 'parked'
+ORDER BY e.application_id, e.id DESC
+`
+
+type ParkReasonsRow struct {
+	ApplicationID uuid.UUID
+	Reason        string
+}
+
+func (q *Queries) ParkReasons(ctx context.Context, userID uuid.UUID) ([]ParkReasonsRow, error) {
+	rows, err := q.db.Query(ctx, parkReasons, userID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []ParkReasonsRow{}
+	for rows.Next() {
+		var i ParkReasonsRow
+		if err := rows.Scan(&i.ApplicationID, &i.Reason); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const runByToken = `-- name: RunByToken :one
 SELECT id, application_id, user_id, expires_at, finished_at FROM runs WHERE token_hash = $1
 `
@@ -906,6 +940,44 @@ func (q *Queries) StaleSubmitting(ctx context.Context, updatedAt time.Time) ([]S
 	for rows.Next() {
 		var i StaleSubmittingRow
 		if err := rows.Scan(&i.ID, &i.UserID); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const submitsPerDay = `-- name: SubmitsPerDay :many
+SELECT (e.at AT TIME ZONE 'UTC')::date AS day, count(*)::integer AS n
+FROM application_events e
+WHERE e.user_id = $1 AND e.to_state = 'submitted' AND e.at >= $2
+GROUP BY 1
+ORDER BY 1
+`
+
+type SubmitsPerDayParams struct {
+	UserID uuid.UUID
+	At     time.Time
+}
+
+type SubmitsPerDayRow struct {
+	Day pgtype.Date
+	N   int32
+}
+
+func (q *Queries) SubmitsPerDay(ctx context.Context, arg SubmitsPerDayParams) ([]SubmitsPerDayRow, error) {
+	rows, err := q.db.Query(ctx, submitsPerDay, arg.UserID, arg.At)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []SubmitsPerDayRow{}
+	for rows.Next() {
+		var i SubmitsPerDayRow
+		if err := rows.Scan(&i.Day, &i.N); err != nil {
 			return nil, err
 		}
 		items = append(items, i)

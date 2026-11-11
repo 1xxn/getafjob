@@ -39,7 +39,7 @@ templ Layout(p Page) {
 				data-events="1"
 				{ HX(ctx, "hx-boost:inherited", "true")... }
 			>
-				@AppShell(shellFor(ctx, p), p.Handoff || p.StyleGuide) {
+				@AppShell(shellFor(ctx, p), p.Handoff || p.StyleGuide || p.Wide) {
 					{ children... }
 				}
 			</body>

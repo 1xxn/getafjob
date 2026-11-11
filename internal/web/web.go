@@ -227,6 +227,7 @@ func (s *Server) Register(mux *http.ServeMux) {
 	mux.Handle("GET /privacy", s.page(s.privacyPage))
 	mux.Handle("POST /login/passkey/options", s.limited(s.page(s.passkeyLoginOptions)))
 	mux.Handle("POST /login/passkey", s.limited(s.page(s.passkeyLogin)))
+	mux.Handle("GET /dashboard", s.page(s.dashboardBody))
 	mux.Handle("GET /shell/counts", s.page(s.shellCounts))
 	mux.Handle("POST /settings/theme", s.page(s.setTheme))
 	mux.Handle("POST /settings/language", s.page(s.setLanguage))
@@ -291,28 +292,6 @@ func (s *Server) failed(w http.ResponseWriter, r *http.Request, u *identity.User
 
 func (s *Server) notFound(w http.ResponseWriter, r *http.Request, u *identity.User) {
 	s.problem(w, r, u, http.StatusNotFound, "error.not_found.title", views.T(r.Context(), "error.not_found.text"))
-}
-
-func (s *Server) home(w http.ResponseWriter, r *http.Request, u *identity.User) {
-	if u == nil {
-		http.Redirect(w, r, "/login", http.StatusSeeOther)
-		return
-	}
-	nudge := false
-	if s.Identity.PasskeysEnabled() {
-		keys, err := s.Identity.Passkeys(r.Context(), u.ID)
-		if err != nil {
-			s.failed(w, r, u, err)
-			return
-		}
-		nudge = len(keys) == 0
-	}
-	snap, err := s.Profile.Get(r.Context(), u.ID)
-	if err != nil {
-		s.failed(w, r, u, err)
-		return
-	}
-	s.render(w, r, http.StatusOK, views.Home(u.DisplayName, nudge, len(snap.Profile.Missing()) > 0))
 }
 
 // limiter is a token bucket per client address.

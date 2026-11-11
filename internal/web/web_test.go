@@ -1018,7 +1018,7 @@ func (a *app) uploadTo(path, name string, data []byte, cookie string) *httptest.
 func TestSetupAssistant(t *testing.T) {
 	a := newApp(t)
 	session := signedIn(t, a)
-	if home := a.do(http.MethodGet, "/", nil, session, nil).Body.String(); !strings.Contains(home, "Continue the setup") {
+	if home := a.do(http.MethodGet, "/", nil, session, nil).Body.String(); !strings.Contains(home, `href="/setup"`) {
 		t.Fatal("no setup link on an empty profile")
 	}
 	if rec := a.do(http.MethodGet, "/setup", nil, session, nil); rec.Header().Get("Location") != "/setup/cv" {

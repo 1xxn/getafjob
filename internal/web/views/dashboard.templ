@@ -1,0 +1,268 @@
+package views
+
+import (
+	"context"
+	"time"
+
+	"github.com/1xxn/getafjob/internal/web/views/ui"
+)
+
+// DashAction is one entry of the dashboard's action list.
+type DashAction struct {
+	Kind      string // answer, approve, parked, profile
+	Title     string
+	Company   string
+	Href      string
+	ReasonKey string // parked: catalog key of the reason
+	Count     int    // profile: missing fields
+	At        time.Time
+}
+
+// DashJob is a new good match.
+type DashJob struct {
+	ID      int64
+	Title   string
+	Company string
+	Score   int
+}
+
+// DashDay is one bar of the 30 day trend.
+type DashDay struct {
+	Day   time.Time
+	Count int
+}
+
+// DashPipeline counts applications by tracker stage.
+type DashPipeline struct {
+	Applied, Interview, Offer, Closed int
+}
+
+// DashboardData fills the start page.
+type DashboardData struct {
+	Name            string
+	PasskeyNudge    bool
+	ProfileMissing  int
+	HasApplications bool
+	NeedsYou        int
+	Answers         int
+	Approvals       int
+	Parked          int
+	Queued          int
+	Actions         []DashAction
+	Running         []ActiveRunItem
+	NewMatches      int
+	TopMatches      []DashJob
+	Crawl           CrawlStatusData
+	Pipeline        DashPipeline
+	Trend           []DashDay
+	TrendMax        int
+	Sent30          int
+}
+
+func (d DashboardData) fresh() bool {
+	return !d.HasApplications && d.NewMatches == 0 && len(d.Running) == 0
+}
+
+// dayLabel is a short date for the reader's locale: "Nov 12" or "12.11.".
+func dayLabel(ctx context.Context, t time.Time) string {
+	if Locale(ctx) == "de" {
+		return t.UTC().Format("02.01.")
+	}
+	return t.UTC().Format("Jan 2")
+}
+
+func queuedHint(ctx context.Context, n int) string {
+	if n == 0 {
+		return ""
+	}
+	return T(ctx, "dash.kpi.queued", "n", n)
+}
+
+func barHeight(n, maxN int) int {
+	if n == 0 || maxN == 0 {
+		return 2
+	}
+	return max(4, n*44/maxN)
+}
+
+func actionIcon(kind string) string {
+	switch kind {
+	case "answer":
+		return "message"
+	case "approve":
+		return "check-circle"
+	case "parked":
+		return "pause"
+	default:
+		return "user"
+	}
+}
+
+func actionTone(kind string) ui.Tone {
+	switch kind {
+	case "answer", "approve":
+		return ui.Warning
+	case "parked":
+		return ui.Neutral
+	default:
+		return ui.Info
+	}
+}
+
+// Dashboard is the start page of signed-in users.
+templ Dashboard(d DashboardData) {
+	@Layout(Page{Title: T(ctx, "home.title"), UserName: d.Name, Wide: true}) {
+		<div class="dash-head">
+			<h1>{ T(ctx, "home.greeting", "name", d.Name) }</h1>
+			@ui.Button(ui.ButtonProps{Label: T(ctx, "dash.find_jobs"), Href: "/jobs", Variant: "primary", Icon: "search"})
+		</div>
+		if d.PasskeyNudge {
+			@ui.Alert(ui.AlertProps{Tone: ui.Info, Text: T(ctx, "passkey.nudge")}) {
+				<p><a href="/account">{ T(ctx, "passkey.nudge_link") }</a></p>
+			}
+		}
+		@DashboardBody(d)
+	}
+}
+
+// DashboardBody is the live part of the dashboard; it morphs on live events, so running pictures keep playing.
+templ DashboardBody(d DashboardData) {
+	<div id="dashboard" class="dash" { HX(ctx, "hx-get", "/dashboard", "hx-trigger", "getafjob:app from:body delay:700ms", "hx-swap", "outerMorph transition:false")... }>
+		if d.fresh() {
+			@ui.EmptyState(ui.EmptyProps{Icon: "briefcase", Title: T(ctx, "dash.start.title"), Text: T(ctx, "dash.start.text")}) {
+				if d.ProfileMissing > 0 {
+					@ui.Button(ui.ButtonProps{Label: T(ctx, "dash.start.setup"), Href: "/setup", Variant: "primary"})
+				} else {
+					@ui.Button(ui.ButtonProps{Label: T(ctx, "dash.find_jobs"), Href: "/jobs", Variant: "primary"})
+				}
+			}
+		} else {
+			<section class="dash-kpis" aria-label={ T(ctx, "dash.kpis") }>
+				@ui.KPI(ui.KPIProps{Label: T(ctx, "dash.kpi.needs_you"), Value: itoa(d.NeedsYou), Icon: "inbox", Tone: ui.Warning,
+					Href: "#dash-actions", LinkLabel: T(ctx, "dash.kpi.needs_you_link")})
+				@ui.KPI(ui.KPIProps{Label: T(ctx, "dash.kpi.running"), Value: itoa(len(d.Running)), Icon: "live", Tone: ui.Accent,
+					Hint: queuedHint(ctx, d.Queued), Href: "/live", LinkLabel: T(ctx, "dash.kpi.running_link")})
+				@ui.KPI(ui.KPIProps{Label: T(ctx, "dash.kpi.new"), Value: itoa(d.NewMatches), Icon: "briefcase", Tone: ui.Info,
+					Hint: T(ctx, "dash.kpi.new_hint"), Href: "/jobs?freshness=7d&sort=newest", LinkLabel: T(ctx, "dash.kpi.new_link")})
+				@ui.KPI(ui.KPIProps{Label: T(ctx, "dash.kpi.sent"), Value: itoa(d.Sent30), Icon: "send", Tone: ui.Success,
+					Hint: T(ctx, "dash.kpi.sent_hint"), Href: "/tracker", LinkLabel: T(ctx, "dash.kpi.sent_link")})
+			</section>
+			<div class="dash-grid">
+				<section class="dash-panel" id="dash-actions" aria-labelledby="dash-actions-title">
+					<h2 id="dash-actions-title">{ T(ctx, "dash.actions") }</h2>
+					if len(d.Actions) == 0 {
+						<p class="dash-quiet">{ T(ctx, "dash.actions.none") }</p>
+					} else {
+						<ul class="dash-list">
+							for _, a := range d.Actions {
+								<li>
+									<a href={ templ.SafeURL(a.Href) } class="dash-item">
+										<span class={ "dash-item-icon", "ui-tone-" + string(actionTone(a.Kind)) }>
+											@ui.Icon(actionIcon(a.Kind))
+										</span>
+										<span class="dash-item-body">
+											if a.Kind == "profile" {
+												<span class="dash-item-title">{ T(ctx, "dash.action.profile", "n", a.Count) }</span>
+												<span class="dash-item-meta">{ T(ctx, "dash.action.profile_hint") }</span>
+											} else {
+												<span class="dash-item-title">{ a.Title }</span>
+												<span class="dash-item-meta">
+													{ a.Company } ·
+													if a.Kind == "parked" {
+														{ T(ctx, a.ReasonKey) }
+													} else {
+														{ T(ctx, "dash.action." + a.Kind) }
+													}
+												</span>
+											}
+										</span>
+										@ui.Icon("chevron-right")
+									</a>
+								</li>
+							}
+						</ul>
+						if d.Parked > 5 {
+							<p class="dash-more"><a href="/tracker">{ T(ctx, "dash.parked_more", "n", d.Parked-5) }</a></p>
+						}
+					}
+				</section>
+				<section class="dash-panel" aria-labelledby="dash-running-title">
+					<h2 id="dash-running-title">{ T(ctx, "dash.running") }</h2>
+					if len(d.Running) == 0 {
+						<p class="dash-quiet">
+							if d.Queued > 0 {
+								{ T(ctx, "dash.running.queued", "n", d.Queued) }
+							} else {
+								{ T(ctx, "dash.running.none") }
+							}
+						</p>
+					} else {
+						<ul class="dash-runs">
+							for i, r := range d.Running {
+								if i < 3 {
+									<li id={ "dash-run-" + r.AppID } class="live-card">
+										@LiveScreen(LiveScreenProps{AppID: r.AppID, Size: "thumb", FPS: 1})
+										<div class="live-card-body">
+											<h3 class="live-card-title"><a href={ templ.SafeURL("/live?run=" + r.AppID) }>{ runLabel(r) }</a></h3>
+											@runState(r)
+										</div>
+									</li>
+								}
+							}
+						</ul>
+						<p class="dash-more"><a href="/live">{ T(ctx, "dash.running.all") }</a></p>
+					}
+				</section>
+				<section class="dash-panel" aria-labelledby="dash-new-title">
+					<h2 id="dash-new-title">{ T(ctx, "dash.new") }</h2>
+					if len(d.TopMatches) == 0 {
+						<p class="dash-quiet">{ T(ctx, "dash.new.none") }</p>
+					} else {
+						<ul class="dash-list">
+							for _, j := range d.TopMatches {
+								<li>
+									<a href={ templ.SafeURL("/jobs/" + i64(j.ID)) } class="dash-item">
+										<span class="dash-item-body">
+											<span class="dash-item-title">{ j.Title }</span>
+											<span class="dash-item-meta">{ j.Company }</span>
+										</span>
+										@ui.Badge(itoa(j.Score), ui.Success)
+									</a>
+								</li>
+							}
+						</ul>
+					}
+					<p class="dash-crawl">
+						@ui.Icon("refresh")
+						if d.Crawl.Running {
+							{ T(ctx, "dash.crawl.running") }
+						} else if d.Crawl.LastRun != "" {
+							{ T(ctx, "dash.crawl.last", "when", d.Crawl.LastRun) }
+						} else {
+							{ T(ctx, "dash.crawl.never") }
+						}
+					</p>
+				</section>
+				<section class="dash-panel" aria-labelledby="dash-pipeline-title">
+					<h2 id="dash-pipeline-title">{ T(ctx, "dash.pipeline") }</h2>
+					<dl class="dash-stages">
+						<div><dt>{ T(ctx, "dash.stage.applied") }</dt><dd>{ itoa(d.Pipeline.Applied) }</dd></div>
+						<div><dt>{ T(ctx, "dash.stage.interview") }</dt><dd>{ itoa(d.Pipeline.Interview) }</dd></div>
+						<div><dt>{ T(ctx, "dash.stage.offer") }</dt><dd>{ itoa(d.Pipeline.Offer) }</dd></div>
+						<div><dt>{ T(ctx, "dash.stage.closed") }</dt><dd>{ itoa(d.Pipeline.Closed) }</dd></div>
+					</dl>
+					<figure class="dash-trend">
+						<svg viewBox="0 0 300 48" role="img" aria-labelledby="dash-trend-cap" preserveAspectRatio="none">
+							for i, day := range d.Trend {
+								<rect x={ itoa(i * 10) } y={ itoa(48 - barHeight(day.Count, d.TrendMax)) } width="8" height={ itoa(barHeight(day.Count, d.TrendMax)) } rx="1" class={ templ.KV("dash-bar-on", day.Count > 0), "dash-bar" }>
+									<title>{ dayLabel(ctx, day.Day) }: { itoa(day.Count) }</title>
+								</rect>
+							}
+						</svg>
+						<figcaption id="dash-trend-cap">{ T(ctx, "dash.trend", "n", d.Sent30) }</figcaption>
+					</figure>
+				</section>
+			</div>
+		}
+	</div>
+}
