@@ -1,0 +1,99 @@
+package ui
+
+// Overlays use native elements and need no script: <dialog> opened with invoker commands (commandfor/command),
+// menus with the popover attribute, tooltips with CSS.
+
+// OpenDialog returns the attributes that make a button open the dialog or drawer with this id.
+func OpenDialog(id string) templ.Attributes {
+	return templ.Attributes{"commandfor": id, "command": "show-modal", "aria-haspopup": "dialog"}
+}
+
+// CloseDialog returns the attributes that make a button close the dialog or drawer with this id.
+func CloseDialog(id string) templ.Attributes {
+	return templ.Attributes{"commandfor": id, "command": "close"}
+}
+
+// DialogProps describe a modal dialog; Esc, the close button and a click outside close it.
+type DialogProps struct {
+	ID         string
+	Title      string
+	CloseLabel string
+	Drawer     bool // slides in from the side instead of centered
+}
+
+templ Dialog(p DialogProps) {
+	<dialog id={ p.ID } class={ "ui-dialog", templ.KV("ui-drawer", p.Drawer) } aria-labelledby={ p.ID + "-title" } closedby="any">
+		<header class="ui-dialog-head">
+			<h2 id={ p.ID + "-title" }>{ p.Title }</h2>
+			<button type="button" class="ui-btn ui-btn-ghost ui-btn-icon" aria-label={ p.CloseLabel } title={ p.CloseLabel } { CloseDialog(p.ID)... }>
+				@Icon("x")
+			</button>
+		</header>
+		<div class="ui-dialog-body">
+			{ children... }
+		</div>
+	</dialog>
+}
+
+// MenuProps describe a dropdown menu: a button that toggles a popover list of links or buttons.
+type MenuProps struct {
+	ID       string
+	Label    string // button text, or its accessible name with IconOnly
+	Icon     string
+	IconOnly bool
+	AlignEnd bool // open towards the start edge (menus at the right end of a bar)
+}
+
+templ Menu(p MenuProps) {
+	<div class="ui-menu">
+		if p.IconOnly {
+			<button type="button" class="ui-btn ui-btn-ghost ui-btn-icon" popovertarget={ p.ID } aria-label={ p.Label } title={ p.Label }>
+				@Icon(p.Icon)
+			</button>
+		} else {
+			<button type="button" class="ui-btn ui-btn-ghost" popovertarget={ p.ID }>
+				if p.Icon != "" {
+					@Icon(p.Icon)
+				}
+				<span>{ p.Label }</span>
+				@Icon("chevron-down")
+			</button>
+		}
+		<div id={ p.ID } popover class={ "ui-menu-list", templ.KV("ui-menu-end", p.AlignEnd) }>
+			{ children... }
+		</div>
+	</div>
+}
+
+// MenuItem is a link in a menu; for actions that post, put a form with a button.ui-menu-item in the menu.
+templ MenuItem(label, href, icon string) {
+	<a href={ templ.URL(href) } class="ui-menu-item">
+		if icon != "" {
+			@Icon(icon)
+		}
+		<span>{ label }</span>
+	</a>
+}
+
+// Tooltip wraps a trigger and shows Text on hover and focus; the trigger must reference ID in aria-describedby.
+templ Tooltip(id, text string) {
+	<span class="ui-tip">
+		{ children... }
+		<span role="tooltip" id={ id } class="ui-tip-text">{ text }</span>
+	</span>
+}
+
+// ToastRegion holds toasts; it is a polite live region, so new toasts are read out.
+templ ToastRegion() {
+	<div id="toasts" class="ui-toasts" aria-live="polite">
+		{ children... }
+	</div>
+}
+
+// Toast is the result of an action; success and info fade out, danger stays.
+templ Toast(tone Tone, text string) {
+	<div class={ "ui-toast", "ui-tone-" + string(tone.or(Info)) } role={ alertRole(tone) }>
+		@Icon(alertIcon(tone.or(Info)))
+		<p>{ text }</p>
+	</div>
+}

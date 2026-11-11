@@ -1,0 +1,334 @@
+package ui
+
+// Badge is a short label, e.g. a source or a count.
+templ Badge(text string, tone Tone) {
+	<span class={ "ui-badge", "ui-tone-" + string(tone.or(Neutral)) }>{ text }</span>
+}
+
+// StatusProps describe a status pill; the dot repeats the tone, the text carries the meaning.
+type StatusProps struct {
+	Label string
+	Tone  Tone
+	Live  bool // pulsing dot for something running right now (off with reduced motion)
+}
+
+templ StatusPill(p StatusProps) {
+	<span class={ "ui-pill", "ui-tone-" + string(p.Tone.or(Neutral)), templ.KV("ui-pill-live", p.Live) }>
+		<span class="ui-pill-dot" aria-hidden="true"></span>
+		{ p.Label }
+	</span>
+}
+
+// AlertProps describe an inline message; errors are announced at once, the rest politely.
+type AlertProps struct {
+	Tone  Tone // info (default), success, warning, danger
+	Title string
+	Text  string
+}
+
+func alertIcon(t Tone) string {
+	switch t {
+	case Success:
+		return "check-circle"
+	case Warning, Danger:
+		return "alert"
+	default:
+		return "info"
+	}
+}
+
+func alertRole(t Tone) string {
+	if t == Danger {
+		return "alert"
+	}
+	return "status"
+}
+
+templ Alert(p AlertProps) {
+	<div class={ "ui-alert", "ui-tone-" + string(p.Tone.or(Info)) } role={ alertRole(p.Tone) }>
+		@Icon(alertIcon(p.Tone.or(Info)))
+		<div>
+			if p.Title != "" {
+				<p class="ui-alert-title">{ p.Title }</p>
+			}
+			if p.Text != "" {
+				<p>{ p.Text }</p>
+			}
+			{ children... }
+		</div>
+	</div>
+}
+
+// CardProps describe a surface with an optional heading; Href makes the heading a link covering the card.
+type CardProps struct {
+	Title    string
+	Subtitle string
+	Href     string
+	Attrs    templ.Attributes
+}
+
+templ Card(p CardProps) {
+	<article class={ "ui-card", templ.KV("ui-card-link", p.Href != "") } { p.Attrs... }>
+		if p.Title != "" {
+			<header class="ui-card-head">
+				<h2 class="ui-card-title">
+					if p.Href != "" {
+						<a href={ templ.URL(p.Href) }>{ p.Title }</a>
+					} else {
+						{ p.Title }
+					}
+				</h2>
+				if p.Subtitle != "" {
+					<p class="ui-card-sub">{ p.Subtitle }</p>
+				}
+			</header>
+		}
+		{ children... }
+	</article>
+}
+
+// Column is one table header; SortHref makes it a sort link, Sort marks the active direction.
+type Column struct {
+	Label    string
+	SortHref string
+	Sort     string // asc, desc or empty
+	Align    string // end for numbers
+	Narrow   bool   // hidden below 640 px
+}
+
+func ariaSort(c Column) string {
+	switch c.Sort {
+	case "asc":
+		return "ascending"
+	case "desc":
+		return "descending"
+	default:
+		return "none"
+	}
+}
+
+func sortIcon(c Column) string {
+	switch c.Sort {
+	case "asc":
+		return "arrow-up"
+	case "desc":
+		return "arrow-down"
+	default:
+		return "arrow-up-down"
+	}
+}
+
+// TableProps describe a data table; rows come as children (<tr> with <td>).
+type TableProps struct {
+	Caption       string
+	CaptionHidden bool
+	Columns       []Column
+	Attrs         templ.Attributes
+}
+
+templ Table(p TableProps) {
+	<div class="ui-table-wrap">
+		<table class="ui-table" { p.Attrs... }>
+			<caption class={ templ.KV("ui-sr", p.CaptionHidden) }>{ p.Caption }</caption>
+			<thead>
+				<tr>
+					for _, c := range p.Columns {
+						<th
+							scope="col"
+							class={ templ.KV("ui-end", c.Align == "end"), templ.KV("ui-narrow", c.Narrow) }
+							if c.SortHref != "" {
+								aria-sort={ ariaSort(c) }
+							}
+						>
+							if c.SortHref != "" {
+								<a href={ templ.URL(c.SortHref) } class="ui-sort">
+									{ c.Label }
+									@Icon(sortIcon(c))
+								</a>
+							} else {
+								{ c.Label }
+							}
+						</th>
+					}
+				</tr>
+			</thead>
+			<tbody>
+				{ children... }
+			</tbody>
+		</table>
+	</div>
+}
+
+// Tab is one entry of a tab bar; tabs are links to server rendered views (?tab=).
+type Tab struct {
+	Label  string
+	Href   string
+	Active bool
+	Count  int // shown when above zero
+}
+
+templ Tabs(label string, tabs []Tab) {
+	<nav class="ui-tabs" aria-label={ label }>
+		for _, t := range tabs {
+			<a
+				href={ templ.URL(t.Href) }
+				class="ui-tab"
+				if t.Active {
+					aria-current="page"
+				}
+			>
+				{ t.Label }
+				if t.Count > 0 {
+					<span class="ui-count">{ itoa(t.Count) }</span>
+				}
+			</a>
+		}
+	</nav>
+}
+
+// EmptyProps describe what a list shows when it has nothing; the action comes as children.
+type EmptyProps struct {
+	Icon  string
+	Title string
+	Text  string
+}
+
+templ EmptyState(p EmptyProps) {
+	<div class="ui-empty">
+		if p.Icon != "" {
+			<span class="ui-empty-icon">
+				@Icon(p.Icon)
+			</span>
+		}
+		<p class="ui-empty-title">{ p.Title }</p>
+		if p.Text != "" {
+			<p class="ui-empty-text">{ p.Text }</p>
+		}
+		{ children... }
+	</div>
+}
+
+// Skeleton stands in for content that is loading; Label is announced instead of the grey bars.
+templ Skeleton(label string, lines int) {
+	<div class="ui-skeleton" role="status">
+		<span class="ui-sr">{ label }</span>
+		for i := 0; i < max(lines, 1); i++ {
+			<span class="ui-skeleton-line" aria-hidden="true"></span>
+		}
+	</div>
+}
+
+// PageLink is one page of a pagination.
+type PageLink struct {
+	Label   string
+	Href    string
+	Current bool
+}
+
+// PaginationProps describe a pager; empty Prev or Next hides that link.
+type PaginationProps struct {
+	Label     string
+	PrevLabel string
+	NextLabel string
+	PrevHref  string
+	NextHref  string
+	Pages     []PageLink
+	Attrs     templ.Attributes // e.g. hx-boost target for the list region
+}
+
+templ Pagination(p PaginationProps) {
+	<nav class="ui-pager" aria-label={ p.Label } { p.Attrs... }>
+		if p.PrevHref != "" {
+			<a href={ templ.URL(p.PrevHref) } class="ui-btn ui-btn-ghost ui-btn-sm" rel="prev">
+				@Icon("chevron-left")
+				<span>{ p.PrevLabel }</span>
+			</a>
+		}
+		<ul>
+			for _, pg := range p.Pages {
+				<li>
+					if pg.Current {
+						<a href={ templ.URL(pg.Href) } class="ui-page" aria-current="page">{ pg.Label }</a>
+					} else if pg.Href == "" {
+						<span class="ui-page-gap">{ pg.Label }</span>
+					} else {
+						<a href={ templ.URL(pg.Href) } class="ui-page">{ pg.Label }</a>
+					}
+				</li>
+			}
+		</ul>
+		if p.NextHref != "" {
+			<a href={ templ.URL(p.NextHref) } class="ui-btn ui-btn-ghost ui-btn-sm" rel="next">
+				<span>{ p.NextLabel }</span>
+				@Icon("chevron-right")
+			</a>
+		}
+	</nav>
+}
+
+// Avatar shows the initials of a name; the name itself is next to it or in the label of the control around it.
+templ Avatar(name string) {
+	<span class={ "ui-avatar", avatarHue(name) } aria-hidden="true">{ Initials(name) }</span>
+}
+
+// ProgressProps describe a labelled progress bar; ValueText is the visible reading, e.g. "4 of 9".
+type ProgressProps struct {
+	ID        string
+	Label     string
+	Value     int
+	Max       int
+	ValueText string
+	Tone      Tone
+}
+
+templ ProgressBar(p ProgressProps) {
+	<div class={ "ui-progress", "ui-tone-" + string(p.Tone.or(Accent)) }>
+		<div class="ui-progress-head">
+			<label for={ p.ID }>{ p.Label }</label>
+			if p.ValueText != "" {
+				<span>{ p.ValueText }</span>
+			}
+		</div>
+		<progress
+			id={ p.ID }
+			max={ itoa(max(p.Max, 1)) }
+			value={ itoa(p.Value) }
+			if p.ValueText != "" {
+				aria-valuetext={ p.ValueText }
+			}
+		>{ itoa(percent(p.Value, p.Max)) }%</progress>
+	</div>
+}
+
+// KPIProps describe a dashboard tile: a number, what it counts and where to act on it.
+type KPIProps struct {
+	Label     string
+	Value     string
+	Hint      string
+	Href      string
+	LinkLabel string
+	Icon      string
+	Tone      Tone
+	Attrs     templ.Attributes // e.g. hx-get with a getafjob:app trigger to stay live
+}
+
+templ KPI(p KPIProps) {
+	<div class={ "ui-kpi", "ui-tone-" + string(p.Tone.or(Neutral)) } { p.Attrs... }>
+		<p class="ui-kpi-label">
+			if p.Icon != "" {
+				@Icon(p.Icon)
+			}
+			{ p.Label }
+		</p>
+		<p class="ui-kpi-value">{ p.Value }</p>
+		if p.Hint != "" {
+			<p class="ui-kpi-hint">{ p.Hint }</p>
+		}
+		if p.Href != "" {
+			<a href={ templ.URL(p.Href) } class="ui-kpi-link">
+				{ p.LinkLabel }
+				@Icon("chevron-right")
+			</a>
+		}
+	</div>
+}

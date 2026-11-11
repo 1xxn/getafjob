@@ -26,6 +26,8 @@ func TestAmount(t *testing.T) {
 // Inline event handlers never run under the nonce CSP; every interaction goes through htmx or plain links.
 func TestTemplatesHaveNoInlineHandlers(t *testing.T) {
 	files, err := filepath.Glob("*.templ")
+	more, _ := filepath.Glob("ui/*.templ")
+	files = append(files, more...)
 	if err != nil || len(files) == 0 {
 		t.Fatalf("templates: %v", err)
 	}

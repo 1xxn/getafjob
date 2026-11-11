@@ -1,82 +1,16 @@
-@layer tokens, base, layout, components, utilities;
-
+/* Page styles of the proof of concept views. Tokens and components live in ui.css (loaded first); this file
+   shrinks as each page is rebuilt with internal/web/views/ui. Old token names are aliases of the new ones. */
 @layer tokens {
   :root {
-    color-scheme: light dark;
-    --paper: #fbfaf8;
-    --raised: #ffffff;
-    --sunken: #f1efeb;
-    --line: #dcd8d1;
-    --ink-1: #1d1b18;
-    --ink-2: #4a4640;
-    --ink-3: #6b665e;
-    --accent: #0b6e72;
-    --accent-ink: #ffffff;
-    --danger: #a3261d;
-    --focus: #0b6e72;
-    --radius: 6px;
-    --space-1: 0.25rem;
-    --space-2: 0.5rem;
-    --space-3: 0.75rem;
-    --space-4: 1rem;
-    --space-6: 1.5rem;
-    --space-8: 2rem;
+    --paper: var(--bg);
+    --raised: var(--surface);
+    --line: var(--border);
+    --ink-1: var(--text);
+    --ink-2: var(--text-2);
+    --ink-3: var(--text-3);
+    --accent-ink: var(--on-accent);
+    --radius: var(--radius-md);
     --measure: 40rem;
-    --font: system-ui, -apple-system, "Segoe UI", Roboto, "Noto Sans", sans-serif;
-  }
-
-  @media (prefers-color-scheme: dark) {
-    :root {
-      --paper: #161513;
-      --raised: #1e1c1a;
-      --sunken: #0f0e0d;
-      --line: #3a3733;
-      --ink-1: #f2efea;
-      --ink-2: #cfcac2;
-      --ink-3: #a7a198;
-      --accent: #5cc2c6;
-      --accent-ink: #0b1414;
-      --danger: #ff8a7f;
-      --focus: #5cc2c6;
-    }
-  }
-}
-
-@layer base {
-  *,
-  *::before,
-  *::after {
-    box-sizing: border-box;
-  }
-
-  body {
-    margin: 0;
-    background: var(--paper);
-    color: var(--ink-1);
-    font: 400 1rem/1.55 var(--font);
-    font-variant-numeric: tabular-nums;
-  }
-
-  h1 {
-    font-size: 1.5rem;
-    font-weight: 600;
-    line-height: 1.25;
-    margin: 0 0 var(--space-4);
-  }
-
-  a {
-    color: var(--accent);
-  }
-
-  :focus-visible {
-    outline: 3px solid var(--focus);
-    outline-offset: 2px;
-  }
-
-  input,
-  select,
-  button {
-    font: inherit;
   }
 }
 

@@ -115,6 +115,7 @@ type Server struct {
 	Shots          Screenshots
 	Handoffs       HandoffHub
 	Events         *events.Hub // live application changes; nil turns /events off
+	StyleGuide     bool        // serve /dev/styleguide (development builds only)
 	PushStore      webpush.Store
 	VAPIDPublicKey string
 	Logger         *slog.Logger
@@ -223,6 +224,9 @@ func (s *Server) Register(mux *http.ServeMux) {
 	mux.Handle("GET /privacy", s.page(s.privacyPage))
 	mux.Handle("POST /login/passkey/options", s.limited(s.page(s.passkeyLoginOptions)))
 	mux.Handle("POST /login/passkey", s.limited(s.page(s.passkeyLogin)))
+	if s.StyleGuide {
+		mux.Handle("GET /dev/styleguide", s.page(s.styleGuide))
+	}
 	mux.Handle("/", s.page(s.notFound))
 }
 
@@ -389,4 +393,18 @@ func staticCache(next http.Handler) http.Handler {
 		}
 		next.ServeHTTP(w, r)
 	})
+}
+
+// styleGuide shows every design system component; registered only in development builds.
+func (s *Server) styleGuide(w http.ResponseWriter, r *http.Request, u *identity.User) {
+	if u == nil {
+		http.Redirect(w, r, "/login", http.StatusSeeOther)
+		return
+	}
+	s.render(w, r, http.StatusOK, views.StyleGuide(views.Page{
+		Title:      views.T(r.Context(), "styleguide.title"),
+		UserName:   u.DisplayName,
+		Theme:      views.ParseTheme(r.URL.Query().Get("theme")),
+		StyleGuide: true,
+	}))
 }

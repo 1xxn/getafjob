@@ -88,6 +88,8 @@ type Config struct {
 	// DevFixtureHost is the host:port of the development fixture site whose plain http origin may take form values;
 	// honored only when PublicURL is local.
 	DevFixtureHost string
+	// DevStyleGuide serves the design system style guide at /dev/styleguide (development builds).
+	DevStyleGuide bool
 	// Limits keeps the throughput limits (daily quota, per-host gap). Default off: a self-hosted instance for a
 	// few people applies as fast as its runners allow; guard rails stay on either way.
 	Limits bool
@@ -171,6 +173,7 @@ var specs = []spec{
 	{"CRAWL_INTERVAL", "6h", setCrawlInterval},
 	{"EASY_APPLY_ENABLED", "false", func(c *Config, v string) error { return setBool(&c.EasyApplyEnabled, v) }},
 	{"DEV_FIXTURE_HOST", "", func(c *Config, v string) error { c.DevFixtureHost = strings.ToLower(strings.TrimSpace(v)); return nil }},
+	{"DEV_STYLEGUIDE", "false", func(c *Config, v string) error { return setBool(&c.DevStyleGuide, v) }},
 	{"LIMITS", "off", setLimits},
 	{"AI_ENABLED", "false", func(c *Config, v string) error { return setBool(&c.AIEnabled, v) }},
 	{"ANTHROPIC_API_KEY", "", func(c *Config, v string) error { c.AnthropicAPIKey = Secret(v); return nil }},

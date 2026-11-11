@@ -170,7 +170,7 @@ func serve(ctx context.Context, cfg config.Config, logger *slog.Logger) error {
 	})
 	(&web.Server{Identity: ids, Logger: logger, Profile: profiles, Documents: docs, Items: items, Stations: stations,
 		Importer: cvimport.NewImporter(docs, profiles, stations, extractor), Jobs: listings, Discovery: discoverySvc,
-		PushStore: webpush.NewStore(pool), VAPIDPublicKey: vapidPub, Apps: apps, Tracking: trackingSvc, Notify: notifySvc, Assist: assistSvc, Portals: portalsSvc, AI: aiSvc, Privacy: privacySvc, Shots: sealedFiles, Handoffs: gw, Events: liveEvents}).Register(mux)
+		PushStore: webpush.NewStore(pool), VAPIDPublicKey: vapidPub, Apps: apps, Tracking: trackingSvc, Notify: notifySvc, Assist: assistSvc, Portals: portalsSvc, AI: aiSvc, Privacy: privacySvc, Shots: sealedFiles, Handoffs: gw, Events: liveEvents, StyleGuide: cfg.DevStyleGuide}).Register(mux)
 
 	h := httpx.Instrument(httpx.Protect(httpx.Routes(mux), maxBody, cfg.PublicURL.Scheme == "https",
 		httpx.Upload{Path: "/documents", Max: web.MaxUpload}, httpx.Upload{Path: "/setup/cv", Max: web.MaxUpload}))

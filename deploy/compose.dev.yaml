@@ -44,6 +44,7 @@ services:
   serve:
     environment:
       GETAFJOB_DEV_FIXTURE_HOST: fixtures:8080
+      GETAFJOB_DEV_STYLEGUIDE: "true"
 
   runner:
     environment:
