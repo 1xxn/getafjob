@@ -111,3 +111,52 @@ func TestReadLimited(t *testing.T) {
 		t.Fatalf("b = %q, err = %v", b, err)
 	}
 }
+
+func TestCanonicalURL(t *testing.T) {
+	for _, tc := range [][2]string{
+		{"https://Jobs.Example.com/a?b=1#top", "https://jobs.example.com/a?b=1"},
+		{"https://user:pw@jobs.example.com/x", "https://jobs.example.com/x"},
+		{"http://jobs.example.com:80/x", "http://jobs.example.com/x"},
+		{"https://jobs.example.com:443", "https://jobs.example.com"},
+		{"https://bücher.example/jobs", "https://xn--bcher-kva.example/jobs"},
+		{"http://0x08080808/", "http://8.8.8.8/"},
+		{" https://jobs.example.org/a b ", "https://jobs.example.org/a%20b"},
+		{`https://jobs.example.com/a\b?next=x`, "https://jobs.example.com/a/b?next=x"},
+	} {
+		raw, want := tc[0], tc[1]
+		got, err := CanonicalURL(raw)
+		if err != nil || got != want {
+			t.Errorf("%q: %q %v, want %q", raw, got, err, want)
+		}
+		if !canonicalURL.MatchString(got) {
+			t.Errorf("%q: canonical form %q does not match the request pattern", raw, got)
+		}
+	}
+	for _, raw := range []string{
+		"https://jobs.example.com:8443/", "http://jobs.example.com:443/", "https://jobs.example.com:22/",
+		"https://[2606:4700:4700::1111]/", "ftp://jobs.example.com/", "http://127.0.0.1/", "http://localhost/",
+		"http://169.254.169.254/latest/meta-data/", "http://2130706433/", "https://jobs.example.com:0/",
+	} {
+		if got, err := CanonicalURL(raw); !errors.Is(err, ErrBlocked) {
+			t.Errorf("%q: %q %v, want ErrBlocked", raw, got, err)
+		}
+	}
+}
+
+func TestGetRefusesOtherPortsAndRedirectsThere(t *testing.T) {
+	if _, err := Get(t.Context(), NewClient(ClientOptions{}), "https://jobs.example.com:8443/", false); !errors.Is(err, ErrBlocked) {
+		t.Fatalf("other port: %v", err)
+	}
+	if _, err := Get(t.Context(), NewClient(ClientOptions{AllowPrivate: true}), "http://10.0.0.1:8080/", true); !errors.Is(err, ErrBlocked) {
+		t.Fatalf("test mode admits only loopback: %v", err)
+	}
+	check := NewClient(ClientOptions{}).CheckRedirect
+	for target, blocked := range map[string]bool{
+		"https://jobs.example.com:8443/": true, "https://jobs.example.com/careers": false, "http://10.0.0.1/": true,
+	} {
+		req := httptest.NewRequest(http.MethodGet, target, nil)
+		if err := check(req, nil); errors.Is(err, ErrBlocked) != blocked {
+			t.Errorf("redirect to %s: %v", target, err)
+		}
+	}
+}
