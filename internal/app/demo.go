@@ -20,6 +20,7 @@ import (
 	"github.com/1xxn/getafjob/internal/identity/adapters/pgstore"
 	"github.com/1xxn/getafjob/internal/matching"
 	matchingstore "github.com/1xxn/getafjob/internal/matching/adapters/pgstore"
+	"github.com/1xxn/getafjob/internal/platform/blob"
 	"github.com/1xxn/getafjob/internal/platform/config"
 	"github.com/1xxn/getafjob/internal/platform/crypto"
 	"github.com/1xxn/getafjob/internal/platform/db"
@@ -69,7 +70,17 @@ func adminDemo(ctx context.Context, args []string, env Env) int {
 			return ExitUsage
 		}
 	}
-	st, err := seedDemo(ctx, pool, crypto.NewEnvelope(ring, pool), cfg.PublicURL, *jobs, *seed, time.Now(), site, env.Stdout)
+	envelope := crypto.NewEnvelope(ring, pool)
+	var docs *profile.Documents
+	if cfg.BlobURL != "" {
+		files, err := blob.Open(cfg.BlobURL, blob.S3Credentials{AccessKey: cfg.BlobAccessKey, SecretKey: cfg.BlobSecretKey})
+		if err != nil {
+			_, _ = fmt.Fprintln(env.Stderr, "open blob store:", err)
+			return ExitError
+		}
+		docs = profile.NewDocuments(profilestore.New(pool), blob.NewSealed(files, envelope), envelope)
+	}
+	st, err := seedDemo(ctx, pool, envelope, cfg.PublicURL, *jobs, *seed, time.Now(), site, docs, env.Stdout)
 	if err != nil {
 		_, _ = fmt.Fprintln(env.Stderr, "demo failed:", err)
 		return ExitError
@@ -91,7 +102,7 @@ func localURL(u *url.URL) bool {
 
 // seedDemo creates the demo users (or reuses them), saves their profiles, upserts the postings and matches them.
 func seedDemo(ctx context.Context, pool *pgxpool.Pool, sealer profile.Sealer, public *url.URL, jobs int, seed uint64,
-	now time.Time, fixtures *url.URL, out io.Writer,
+	now time.Time, fixtures *url.URL, docs *profile.Documents, out io.Writer,
 ) (matching.Stats, error) {
 	ids := identity.NewService(pgstore.New(pool), nil, public)
 	pstore := profilestore.New(pool)
@@ -111,6 +122,9 @@ func seedDemo(ctx context.Context, pool *pgxpool.Pool, sealer profile.Sealer, pu
 		}
 		if err := profiles.SavePreferences(ctx, id, p.Preferences); err != nil {
 			return matching.Stats{}, err
+		}
+		if err := demoCV(ctx, docs, id, p); err != nil {
+			return matching.Stats{}, fmt.Errorf("%s cv: %w", p.Email, err)
 		}
 		users = append(users, id)
 		_, _ = fmt.Fprintf(out, "user %s (sign in with a mail link)\n", p.Email)
@@ -141,6 +155,25 @@ func seedDemo(ctx context.Context, pool *pgxpool.Pool, sealer profile.Sealer, pu
 
 	ms := matchingstore.New(pool)
 	return matching.NewService(profileCriteria{svc: profiles, store: pstore}, ms, ms).Run(ctx, users)
+}
+
+// demoCV uploads the invented CV of p unless the user has a CV already; without a blob store it does nothing.
+func demoCV(ctx context.Context, docs *profile.Documents, userID uuid.UUID, p demo.Person) error {
+	if docs == nil {
+		return nil
+	}
+	list, err := docs.List(ctx, userID)
+	if err != nil {
+		return err
+	}
+	for _, d := range list {
+		if d.Kind == profile.KindCV {
+			return nil
+		}
+	}
+	name := strings.ReplaceAll(p.Profile.Personal.FirstName+"_"+p.Profile.Personal.LastName, " ", "_") + "_CV.pdf"
+	_, err = docs.Upload(ctx, userID, profile.KindCV, name, demo.CV(p))
+	return err
 }
 
 // demoUser returns the account of p, creating it through an invitation when it does not exist yet.
