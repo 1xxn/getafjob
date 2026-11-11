@@ -9,13 +9,37 @@ import (
 // CV returns a small one-page PDF CV of the invented person, so runs on fixture forms can upload a document.
 func CV(p Person) []byte {
 	pr := p.Profile
+	name := pr.Personal.FirstName + " " + pr.Personal.LastName
+	years := pr.Work.YearsTotal
 	lines := []string{
-		pr.Personal.FirstName + " " + pr.Personal.LastName,
+		name,
 		pr.Work.CurrentTitle,
-		pr.Personal.Email + " / " + pr.Personal.Phone,
-		pr.Personal.City,
+		pr.Personal.Email + " | " + pr.Personal.Phone + " | " + pr.Personal.City + ", " + pr.Personal.Country,
 		"",
-		"Invented demo person for getafjob development. Not a real CV.",
+		"Profile",
+		pr.Work.CurrentTitle + " with " + years + " years of experience in building and running software for",
+		"small and mid-sized companies. Invented demo person for getafjob development, not a real CV.",
+		"",
+		"Experience",
+		pr.Work.CurrentTitle + ", Muster Software GmbH, " + pr.Personal.City,
+		"01/2022 - today",
+		"- Built and ran services used by customers every day",
+		"- Worked in a team of six with reviews, tests and on-call duty",
+		"Junior " + pr.Work.CurrentTitle + ", Beispiel Systems AG, " + pr.Personal.City,
+		"09/2019 - 12/2021",
+		"- Maintained internal tools and automated recurring work",
+		"",
+		"Education",
+		"B.Sc. Computer Science, Hochschule Musterstadt",
+		"10/2015 - 08/2019",
+		"",
+		"Skills",
+		strings.Join(pr.Skills, ", "),
+		"",
+		"Languages",
+	}
+	for _, l := range pr.Languages {
+		lines = append(lines, l.Name+": "+l.Level)
 	}
 	var text strings.Builder
 	text.WriteString("BT /F1 12 Tf 72 760 Td 16 TL\n")
