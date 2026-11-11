@@ -104,7 +104,7 @@ func (a *Agent) Run(ctx context.Context) error {
 	var id string
 	for id == "" { // the gateway may start after the runner
 		reg, err := a.Client.Register(auth(ctx, a.Secret), &runnerv1.RegisterRequest{Version: buildinfo.Version,
-			Kind: kind, MaxParallel: int32(max(min(a.Parallel, 64), 1))}) //nolint:gosec // bounded to 1..64
+			Kind: kind, MaxParallel: int32(max(min(a.Parallel, 64), 1))})
 		if err == nil {
 			id = reg.GetRunnerId()
 			break

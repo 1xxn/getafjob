@@ -335,7 +335,9 @@ func TestWaitingRunsDoNotBlockOthers(t *testing.T) {
 	close(release)
 	waitFor(t, 90*time.Second, func() bool { return len(subs()) == 3 })
 	cancel()
-	<-done
+	if err := <-done; err != nil {
+		t.Fatalf("agent: %v", err)
+	}
 }
 
 func countCalls(calls []string, name string) int {
