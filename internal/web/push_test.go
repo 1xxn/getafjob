@@ -633,3 +633,7 @@ func TestExternalApplyNotice(t *testing.T) {
 		}
 	}
 }
+
+func (f *fakeAppStore) NavCounts(context.Context, uuid.UUID) (application.NavCounts, error) {
+	return application.NavCounts{}, nil
+}

@@ -441,7 +441,7 @@ templ JobResults(d JobsData) {
 									<form
 										method="post"
 										action="/jobs/blocklist/delete"
-										style="display:inline"
+										class="inline"
 										{ HX(ctx, "hx-post", "/jobs/blocklist/delete", "hx-target", "#results", "hx-swap", "outerHTML")... }
 									>
 										<input type="hidden" name="id" value={ i64(b.ID) }/>
@@ -475,7 +475,7 @@ templ JobResults(d JobsData) {
 									<form
 										method="post"
 										action="/jobs/blocklist/delete"
-										style="display:inline"
+										class="inline"
 										{ HX(ctx, "hx-post", "/jobs/blocklist/delete", "hx-target", "#results", "hx-swap", "outerHTML")... }
 									>
 										<input type="hidden" name="kind" value="company"/>
@@ -486,7 +486,7 @@ templ JobResults(d JobsData) {
 									<form
 										method="post"
 										action="/jobs/blocklist"
-										style="display:inline"
+										class="inline"
 										{ HX(ctx, "hx-post", "/jobs/blocklist", "hx-target", "#results", "hx-swap", "outerHTML")... }
 									>
 										<input type="hidden" name="kind" value="company"/>
@@ -669,13 +669,13 @@ templ JobPage(d JobData) {
 			<div class="job-actions">
 				if d.Row.Blocked {
 					<span class="badge badge-blocked">{ T(ctx, "jobs.blocked_badge") }</span>
-					<form method="post" action="/jobs/blocklist/delete" style="display:inline">
+					<form method="post" action="/jobs/blocklist/delete" class="inline">
 						<input type="hidden" name="kind" value="company"/>
 						<input type="hidden" name="pattern" value={ d.Row.Company }/>
 						<button type="submit" class="btn-link">{ T(ctx, "jobs.unblock") }</button>
 					</form>
 				} else {
-					<form method="post" action="/jobs/blocklist" style="display:inline">
+					<form method="post" action="/jobs/blocklist" class="inline">
 						<input type="hidden" name="kind" value="company"/>
 						<input type="hidden" name="pattern" value={ d.Row.Company }/>
 						<button type="submit" class="btn-link muted">{ T(ctx, "jobs.block_company") }</button>
@@ -709,7 +709,7 @@ templ JobPage(d JobData) {
 						⚡ { T(ctx, "jobs.apply_now") }
 					</a>
 				}
-				<form method="post" action={ templ.SafeURL("/jobs/" + i64(d.Row.ID) + "/bookmark") } style="display:inline">
+				<form method="post" action={ templ.SafeURL("/jobs/" + i64(d.Row.ID) + "/bookmark") } class="inline">
 					<button type="submit" class="btn-sm secondary">
 						if d.ApplicationState != "" {
 							★ { T(ctx, "jobs.saved_to_tracker") }
@@ -719,7 +719,7 @@ templ JobPage(d JobData) {
 					</button>
 				</form>
 				if d.ApplyMode != "portal" && d.ApplyMode != "email" {
-					<form method="post" action={ templ.SafeURL("/jobs/" + i64(d.Row.ID) + "/apply-external") } style="display:inline">
+					<form method="post" action={ templ.SafeURL("/jobs/" + i64(d.Row.ID) + "/apply-external") } class="inline">
 						<button type="submit" class="btn-sm">
 							{ T(ctx, "jobs.apply_external") }
 						</button>
@@ -781,14 +781,12 @@ templ ApplyPreview(d ApplyPreviewData) {
 				✕
 			</a>
 		</div>
-
 		<div class="apply-guarantee-box">
 			<strong>🛡️ { T(ctx, "jobs.apply_preview.guarantee_title") }</strong>
 			<p class="text-sm">
 				{ T(ctx, "jobs.apply_preview.guarantee_desc") }
 			</p>
 		</div>
-
 		if !d.Guard.Allowed {
 			@Notice("error", d.Guard.Reason)
 		} else {
@@ -796,7 +794,6 @@ templ ApplyPreview(d ApplyPreviewData) {
 				<span class="badge badge-match">✓ { T(ctx, "jobs.apply_preview.guards_passed") }</span>
 			</div>
 		}
-
 		<div class="apply-preview-sections">
 			<div class="apply-preview-card">
 				<h4>1. { T(ctx, "jobs.apply_preview.contact_section") }</h4>
@@ -835,7 +832,6 @@ templ ApplyPreview(d ApplyPreviewData) {
 					}
 				</div>
 			</div>
-
 			<div class="apply-preview-card">
 				<h4>2. { T(ctx, "jobs.apply_preview.cv_section") }</h4>
 				if len(d.CV.Variants) == 0 {
@@ -847,7 +843,6 @@ templ ApplyPreview(d ApplyPreviewData) {
 					</div>
 				}
 			</div>
-
 			<div class="apply-preview-card">
 				<h4>3. { T(ctx, "jobs.apply_preview.stations_section") } ({ itoa(len(d.WorkExperiences)) } Work, { itoa(len(d.Educations)) } Education)</h4>
 				if len(d.WorkExperiences) == 0 && len(d.Educations) == 0 {
@@ -857,19 +852,18 @@ templ ApplyPreview(d ApplyPreviewData) {
 						for _, exp := range d.WorkExperiences {
 							<div class="preview-station-item">
 								<strong>{ exp.Title }</strong>{ " @ " }{ exp.Company }
-								<span class="muted text-sm"> ({ exp.Dates })</span>
+								<span class="muted text-sm">({ exp.Dates })</span>
 							</div>
 						}
 						for _, edu := range d.Educations {
 							<div class="preview-station-item">
 								<strong>{ edu.Degree }{ " in " }{ edu.Field }</strong>{ " @ " }{ edu.Institution }
-								<span class="muted text-sm"> ({ edu.Dates })</span>
+								<span class="muted text-sm">({ edu.Dates })</span>
 							</div>
 						}
 					</div>
 				}
 			</div>
-
 			if len(d.Answers) > 0 {
 				<div class="apply-preview-card">
 					<h4>4. { T(ctx, "jobs.apply_preview.answers_section") } ({ itoa(len(d.Answers)) })</h4>
@@ -884,7 +878,6 @@ templ ApplyPreview(d ApplyPreviewData) {
 				</div>
 			}
 		</div>
-
 		<div class="apply-preview-footer">
 			<form method="post" action={ templ.SafeURL("/jobs/" + i64(d.JobID) + "/apply") }>
 				if d.Guard.Allowed {

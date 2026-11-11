@@ -37,17 +37,12 @@ const MAX_FAILURES = 8;
 
 type Mode = 'connecting' | 'waiting' | 'view' | 'interactive' | 'ended' | 'reconnecting' | 'unavailable';
 
-function initLiveView(): void {
-  const pushBtn = document.getElementById('btn-push');
-  pushBtn?.addEventListener('click', () => {
-    void enablePush();
-  });
-
-  const box = document.getElementById('live-view');
-  const canvas = document.getElementById('screencast') as HTMLCanvasElement | null;
-  const statusEl = document.getElementById('screen-status');
-  const resumeBtn = document.getElementById('btn-resume') as HTMLButtonElement | null;
-  if (!box || !canvas || !box.dataset.app) return;
+// initLiveView connects the live view in box and returns a function that closes it.
+function initLiveView(box: HTMLElement): () => void {
+  const canvas = box.querySelector<HTMLCanvasElement>('#screencast');
+  const statusEl = box.querySelector<HTMLElement>('#screen-status');
+  const resumeBtn = box.querySelector<HTMLButtonElement>('#btn-resume');
+  if (!canvas || !box.dataset.app) return () => {};
   const appId = box.dataset.app;
   const ctx2d = canvas.getContext('2d');
 
@@ -126,7 +121,9 @@ function initLiveView(): void {
         stopped = true;
         setMode('ended');
         // The run finished or parked: reload once so the page shows the result and evidence.
-        window.setTimeout(() => location.reload(), 1500);
+        window.setTimeout(() => {
+          if (box!.isConnected) location.reload();
+        }, 1500);
         return;
       }
       retry(ev.code === WAITING ? 'waiting' : 'reconnecting');
@@ -184,17 +181,42 @@ function initLiveView(): void {
 
   resumeBtn?.addEventListener('click', () => send({ type: 'resume' }));
 
-  window.addEventListener('pagehide', () => {
+  const stop = (): void => {
     stopped = true;
     ws?.close();
-  });
+  };
+  window.addEventListener('pagehide', stop);
 
   setMode('connecting');
   connect();
+  return stop;
 }
 
+// With boosted navigation the page body is swapped: bind the live view and the push button of the new page,
+// close the connection of a live view that left the page.
+let current: { box: HTMLElement; stop: () => void } | null = null;
+
+function bind(): void {
+  const push = document.getElementById('btn-push');
+  if (push && !push.dataset.bound) {
+    push.dataset.bound = '1';
+    push.addEventListener('click', () => {
+      void enablePush();
+    });
+  }
+  const box = document.getElementById('live-view');
+  if (current && current.box !== box) {
+    current.stop();
+    current = null;
+  }
+  if (box && !current) {
+    current = { box, stop: initLiveView(box) };
+  }
+}
+
+document.addEventListener('htmx:after:settle', bind);
 if (document.readyState === 'loading') {
-  document.addEventListener('DOMContentLoaded', initLiveView);
+  document.addEventListener('DOMContentLoaded', bind);
 } else {
-  initLiveView();
+  bind();
 }

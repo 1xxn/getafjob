@@ -224,6 +224,9 @@ func (s *Server) Register(mux *http.ServeMux) {
 	mux.Handle("GET /privacy", s.page(s.privacyPage))
 	mux.Handle("POST /login/passkey/options", s.limited(s.page(s.passkeyLoginOptions)))
 	mux.Handle("POST /login/passkey", s.limited(s.page(s.passkeyLogin)))
+	mux.Handle("GET /shell/counts", s.page(s.shellCounts))
+	mux.Handle("POST /settings/theme", s.page(s.setTheme))
+	mux.Handle("POST /settings/language", s.page(s.setLanguage))
 	if s.StyleGuide {
 		mux.Handle("GET /dev/styleguide", s.page(s.styleGuide))
 	}
@@ -243,7 +246,8 @@ func (s *Server) page(h func(http.ResponseWriter, *http.Request, *identity.User)
 		}
 		ctx := context.WithValue(views.WithLocale(r.Context(), l), tokenKey{}, token)
 		ctx = templ.WithNonce(ctx, httpx.Nonce(ctx))
-		h(w, r.WithContext(ctx), u)
+		r = r.WithContext(ctx)
+		h(w, r.WithContext(views.WithShell(ctx, s.shell(w, r, u))), u)
 	})
 }
 

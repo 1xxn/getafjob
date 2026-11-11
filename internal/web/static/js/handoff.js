@@ -29,16 +29,12 @@ async function enablePush() {
 var NOT_LIVE = 4e3;
 var WAITING = 4001;
 var MAX_FAILURES = 8;
-function initLiveView() {
-  const pushBtn = document.getElementById("btn-push");
-  pushBtn?.addEventListener("click", () => {
-    void enablePush();
-  });
-  const box = document.getElementById("live-view");
-  const canvas = document.getElementById("screencast");
-  const statusEl = document.getElementById("screen-status");
-  const resumeBtn = document.getElementById("btn-resume");
-  if (!box || !canvas || !box.dataset.app) return;
+function initLiveView(box) {
+  const canvas = box.querySelector("#screencast");
+  const statusEl = box.querySelector("#screen-status");
+  const resumeBtn = box.querySelector("#btn-resume");
+  if (!canvas || !box.dataset.app) return () => {
+  };
   const appId = box.dataset.app;
   const ctx2d = canvas.getContext("2d");
   const texts = {
@@ -107,7 +103,9 @@ function initLiveView() {
       if (ev.code === NOT_LIVE || ev.code === 1e3 && ev.reason === "session ended") {
         stopped = true;
         setMode("ended");
-        window.setTimeout(() => location.reload(), 1500);
+        window.setTimeout(() => {
+          if (box.isConnected) location.reload();
+        }, 1500);
         return;
       }
       retry(ev.code === WAITING ? "waiting" : "reconnecting");
@@ -158,15 +156,36 @@ function initLiveView() {
   canvas.addEventListener("keydown", (e) => key("keyDown", e));
   canvas.addEventListener("keyup", (e) => key("keyUp", e));
   resumeBtn?.addEventListener("click", () => send({ type: "resume" }));
-  window.addEventListener("pagehide", () => {
+  const stop = () => {
     stopped = true;
     ws?.close();
-  });
+  };
+  window.addEventListener("pagehide", stop);
   setMode("connecting");
   connect();
+  return stop;
 }
+var current = null;
+function bind() {
+  const push = document.getElementById("btn-push");
+  if (push && !push.dataset.bound) {
+    push.dataset.bound = "1";
+    push.addEventListener("click", () => {
+      void enablePush();
+    });
+  }
+  const box = document.getElementById("live-view");
+  if (current && current.box !== box) {
+    current.stop();
+    current = null;
+  }
+  if (box && !current) {
+    current = { box, stop: initLiveView(box) };
+  }
+}
+document.addEventListener("htmx:after:settle", bind);
 if (document.readyState === "loading") {
-  document.addEventListener("DOMContentLoaded", initLiveView);
+  document.addEventListener("DOMContentLoaded", bind);
 } else {
-  initLiveView();
+  bind();
 }

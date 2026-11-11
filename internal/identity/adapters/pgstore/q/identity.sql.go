@@ -526,6 +526,23 @@ func (q *Queries) ReplaceSession(ctx context.Context, arg ReplaceSessionParams) 
 	return i, err
 }
 
+const setUserLocale = `-- name: SetUserLocale :execrows
+UPDATE users SET locale = $2 WHERE id = $1
+`
+
+type SetUserLocaleParams struct {
+	ID     uuid.UUID
+	Locale string
+}
+
+func (q *Queries) SetUserLocale(ctx context.Context, arg SetUserLocaleParams) (int64, error) {
+	result, err := q.db.Exec(ctx, setUserLocale, arg.ID, arg.Locale)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
+}
+
 const startRecovery = `-- name: StartRecovery :one
 INSERT INTO recoveries (user_id, requested_at, ready_at, expires_at) VALUES ($1, $2, $3, $4)
 ON CONFLICT (user_id) DO UPDATE

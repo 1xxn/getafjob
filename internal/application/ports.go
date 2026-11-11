@@ -232,6 +232,8 @@ type Store interface {
 	Approve(ctx context.Context, userID uuid.UUID, app App, at time.Time) error
 	// Approvals lists the applications on the user's approval list, oldest request first.
 	Approvals(ctx context.Context, userID uuid.UUID) ([]Approval, error)
+	// NavCounts counts what the navigation shows: applications waiting for an answer or for approval, and runs.
+	NavCounts(ctx context.Context, userID uuid.UUID) (NavCounts, error)
 
 	// PlanUsers lists active users whose autonomy level enables auto-planning and who have daily quota > 0 (system role).
 	PlanUsers(ctx context.Context, unlimited bool) ([]uuid.UUID, error)

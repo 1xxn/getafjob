@@ -54,12 +54,12 @@ templ DocumentsPage(name, notice string, failed bool, docs []DocumentRow) {
 					<tbody>
 						for _, d := range docs {
 							<tr>
-								<td><a href={ templ.SafeURL("/documents/" + d.ID) }>{ d.Name }</a></td>
+								<td><a href={ templ.SafeURL("/documents/" + d.ID) } download>{ d.Name }</a></td>
 								<td>{ T(ctx, "documents.kind." + d.Kind) }</td>
 								<td>{ d.Size }</td>
 								<td>{ d.Created }</td>
 								<td>
-									<form method="post" action={ templ.SafeURL("/documents/" + d.ID + "/delete") }>
+									<form method="post" action={ templ.SafeURL("/documents/" + d.ID + "/delete") } data-confirm={ T(ctx, "documents.delete_confirm", "name", d.Name) }>
 										<button type="submit" class="link">{ T(ctx, "passkey.remove") }</button>
 									</form>
 								</td>
@@ -85,8 +85,8 @@ templ DocumentsPage(name, notice string, failed bool, docs []DocumentRow) {
 								Hint: T(ctx, "documents.focus_hint"), MaxLength: 2000})
 							<button type="submit">{ T(ctx, "profile.save") }</button>
 							if d.Import {
-								<a href={ templ.SafeURL("/documents/" + d.ID + "/review") } class="button secondary" style="margin-left: 0.5rem;">{ T(ctx, "documents.review") }</a>
-								<button type="submit" class="link" formaction={ templ.SafeURL("/documents/" + d.ID + "/import") } style="margin-left: 0.5rem;">{ T(ctx, "documents.import") }</button>
+								<a href={ templ.SafeURL("/documents/" + d.ID + "/review") } class="button secondary ms-2">{ T(ctx, "documents.review") }</a>
+								<button type="submit" class="link ms-2" formaction={ templ.SafeURL("/documents/" + d.ID + "/import") }>{ T(ctx, "documents.import") }</button>
 							}
 						</form>
 					}

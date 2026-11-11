@@ -60,3 +60,10 @@ UPDATE runs SET adapter = $3 WHERE id = $1 AND user_id = $2;
 -- a guard stopped before the form say nothing about the adapter.
 SELECT count(*) AS runs, count(*) FILTER (WHERE outcome = 'submitted') AS submitted
 FROM runs WHERE adapter = $1 AND finished_at IS NOT NULL AND finished_at >= $2 AND outcome <> 'guard';
+
+-- name: NavCounts :one
+SELECT
+  count(*) FILTER (WHERE state = 'needs_input' AND (approval_asked_at IS NULL OR approved_at IS NOT NULL))::int AS needs_input,
+  count(*) FILTER (WHERE approval_asked_at IS NOT NULL AND approved_at IS NULL AND state IN ('needs_input', 'parked'))::int AS approvals,
+  count(*) FILTER (WHERE state IN ('running', 'submitting'))::int AS running
+FROM applications WHERE user_id = $1;

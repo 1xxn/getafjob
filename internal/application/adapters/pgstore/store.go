@@ -1020,3 +1020,13 @@ func (s *Store) MarkExternalApplied(ctx context.Context, userID uuid.UUID, jobID
 	})
 	return id, err
 }
+
+// NavCounts counts the user's waiting and running applications in one query.
+func (s *Store) NavCounts(ctx context.Context, userID uuid.UUID) (c application.NavCounts, err error) {
+	err = s.user(ctx, userID, func(qs *q.Queries) error {
+		r, err := qs.NavCounts(ctx, userID)
+		c = application.NavCounts{NeedsInput: int(r.NeedsInput), Approvals: int(r.Approvals), Running: int(r.Running)}
+		return err
+	})
+	return c, err
+}

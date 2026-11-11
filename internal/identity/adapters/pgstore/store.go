@@ -490,3 +490,17 @@ func (s *Store) AuditEvents(ctx context.Context, userID uuid.UUID) ([]identity.A
 	})
 	return list, err
 }
+
+// SetLocale changes the user's UI language.
+func (s *Store) SetLocale(ctx context.Context, userID uuid.UUID, locale string) error {
+	return s.user(ctx, userID, func(qs *q.Queries) error {
+		n, err := qs.SetUserLocale(ctx, q.SetUserLocaleParams{ID: userID, Locale: locale})
+		if err != nil {
+			return err
+		}
+		if n == 0 {
+			return identity.ErrNotFound
+		}
+		return nil
+	})
+}

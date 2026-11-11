@@ -118,10 +118,13 @@ async function signIn(btn: HTMLButtonElement): Promise<void> {
 
 const actions: Record<string, (b: HTMLButtonElement) => Promise<void>> = { register, "sign-in": signIn };
 
-if (window.PublicKeyCredential) {
+// bind wires passkey buttons; it runs on load and after every boosted page swap.
+function bind(): void {
+  if (!window.PublicKeyCredential) return;
   for (const btn of document.querySelectorAll<HTMLButtonElement>("button[data-passkey]")) {
     const run = actions[btn.dataset.passkey ?? ""];
-    if (!run) continue;
+    if (!run || btn.dataset.bound) continue;
+    btn.dataset.bound = "1";
     btn.hidden = false;
     btn.addEventListener("click", () => {
       btn.disabled = true;
@@ -134,3 +137,6 @@ if (window.PublicKeyCredential) {
     });
   }
 }
+
+document.addEventListener("htmx:after:settle", bind);
+bind();

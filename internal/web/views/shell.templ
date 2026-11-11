@@ -1,0 +1,219 @@
+package views
+
+import "github.com/1xxn/getafjob/internal/web/views/ui"
+
+// The app frame of signed-in pages (ADR 0025): top bar, sidebar, phone tab bar, command palette, confirm dialog,
+// toasts and the live dock slot. Links and forms are boosted: only the body is swapped, elements with
+// hx-preserve (live dock, announcer) survive navigation.
+templ navLink(it navItem, path string, counts *NavCounts) {
+	<a
+		href={ templ.SafeURL(it.Href) }
+		class="shell-link"
+		if it.active(path) {
+			aria-current="page"
+		}
+	>
+		@ui.Icon(it.Icon)
+		<span class="shell-label">{ T(ctx, it.Key) }</span>
+		if it.Count != "" {
+			<span class="shell-count" data-count={ it.Count } hidden?={ it.count(counts) == 0 }>{ itoa(it.count(counts)) }</span>
+		}
+	</a>
+}
+
+templ shellNav(prefix string, s Shell, counts *NavCounts) {
+	<nav class="shell-nav" aria-label={ T(ctx, "nav.main") }>
+		for gi, g := range navGroups {
+			if g.Key != "" {
+				<p class="shell-group" id={ prefix + "-g" + itoa(gi) }>{ T(ctx, g.Key) }</p>
+				<ul aria-labelledby={ prefix + "-g" + itoa(gi) }>
+					for _, it := range g.Items {
+						<li>
+							@navLink(it, s.Path, counts)
+						</li>
+					}
+				</ul>
+			} else {
+				<ul>
+					for _, it := range g.Items {
+						<li>
+							@navLink(it, s.Path, counts)
+						</li>
+					}
+				</ul>
+			}
+		}
+	</nav>
+}
+
+templ userMenu(s Shell) {
+	<div class="ui-menu">
+		<button type="button" class="ui-btn ui-btn-ghost shell-user" popovertarget="user-menu" aria-label={ T(ctx, "nav.user_menu") }>
+			@ui.Avatar(s.UserName)
+			<span class="shell-user-name">{ s.UserName }</span>
+			@ui.Icon("chevron-down")
+		</button>
+		<div id="user-menu" popover class="ui-menu-list ui-menu-end">
+			<p class="ui-menu-note">{ T(ctx, "nav.signed_in_as", "name", s.UserName) }</p>
+			@ui.MenuItem(T(ctx, "nav.profile"), "/profile", "user")
+			@ui.MenuItem(T(ctx, "nav.account"), "/account", "lock")
+			@ui.MenuItem(T(ctx, "nav.privacy"), "/privacy", "shield")
+			<hr/>
+			<form method="post" action="/settings/theme" { HX(ctx, "hx-boost", "false")... }>
+				<input type="hidden" name="back" value={ s.Back }/>
+				<p class="ui-menu-heading" id="menu-theme">{ T(ctx, "nav.theme") }</p>
+				<div role="group" aria-labelledby="menu-theme">
+					for _, t := range themeOptions() {
+						<button type="submit" name="theme" value={ t } class="ui-menu-item" aria-pressed={ boolAttr(s.Theme == t) }>
+							@ui.Icon(themeIcon(t))
+							<span>{ T(ctx, themeLabel(t)) }</span>
+						</button>
+					}
+				</div>
+			</form>
+			<hr/>
+			<form method="post" action="/settings/language" { HX(ctx, "hx-boost", "false")... }>
+				<input type="hidden" name="back" value={ s.Back }/>
+				<p class="ui-menu-heading" id="menu-language">{ T(ctx, "nav.language") }</p>
+				<div role="group" aria-labelledby="menu-language">
+					<button type="submit" name="locale" value="en" class="ui-menu-item" lang="en" aria-pressed={ boolAttr(Locale(ctx) == "en") }>
+						@ui.Icon("globe")
+						<span>English</span>
+					</button>
+					<button type="submit" name="locale" value="de" class="ui-menu-item" lang="de" aria-pressed={ boolAttr(Locale(ctx) == "de") }>
+						@ui.Icon("globe")
+						<span>Deutsch</span>
+					</button>
+				</div>
+			</form>
+			<hr/>
+			<form method="post" action="/logout">
+				<button type="submit" class="ui-menu-item">
+					@ui.Icon("logout")
+					<span>{ T(ctx, "nav.sign_out") }</span>
+				</button>
+			</form>
+		</div>
+	</div>
+}
+
+templ shellTop(s Shell) {
+	<header class="shell-top">
+		<button type="button" class="ui-btn ui-btn-ghost ui-btn-icon shell-drawer-btn" aria-label={ T(ctx, "nav.menu") } title={ T(ctx, "nav.menu") } { ui.OpenDialog("nav-drawer")... }>
+			@ui.Icon("menu")
+		</button>
+		<button type="button" class="ui-btn ui-btn-ghost ui-btn-icon shell-collapse-btn" data-nav-toggle aria-label={ T(ctx, "nav.collapse") } title={ T(ctx, "nav.collapse") } aria-pressed={ boolAttr(s.Collapsed) }>
+			@ui.Icon("menu")
+		</button>
+		<a class="shell-brand" href="/">getafjob</a>
+		<button type="button" class="shell-search" { ui.OpenDialog("palette")... }>
+			@ui.Icon("search")
+			<span>{ T(ctx, "nav.search") }</span>
+			<kbd aria-hidden="true">Ctrl K</kbd>
+		</button>
+		<div class="shell-actions">
+			<span id="live-indicator" { HX(ctx, "hx-get", "/live/indicator", "hx-trigger", "load, getafjob:app from:body", "hx-swap", "innerHTML")... }></span>
+			@userMenu(s)
+		</div>
+	</header>
+}
+
+templ palette(s Shell) {
+	<dialog id="palette" class="ui-dialog shell-palette" aria-labelledby="palette-title" closedby="any">
+		<h2 id="palette-title" class="ui-sr">{ T(ctx, "nav.palette.title") }</h2>
+		<form action="/jobs" method="get" class="palette-form" role="search">
+			<label for="palette-q" class="ui-sr">{ T(ctx, "nav.palette.label") }</label>
+			@ui.Icon("search")
+			<input
+				id="palette-q"
+				name="q"
+				type="search"
+				class="palette-input"
+				placeholder={ T(ctx, "nav.palette.label") }
+				autocomplete="off"
+				role="combobox"
+				aria-expanded="true"
+				aria-controls="palette-list"
+				aria-autocomplete="list"
+			/>
+			<kbd aria-hidden="true">Esc</kbd>
+		</form>
+		<ul id="palette-list" class="palette-list" role="listbox" aria-label={ T(ctx, "nav.palette.title") }>
+			for gi, g := range navGroups {
+				for ii, it := range g.Items {
+					<li role="option" id={ "pal-" + itoa(gi) + "-" + itoa(ii) } aria-selected="false">
+						<a href={ templ.SafeURL(it.Href) } tabindex="-1">
+							@ui.Icon(it.Icon)
+							<span>{ T(ctx, it.Key) }</span>
+						</a>
+					</li>
+				}
+			}
+			<li role="option" id="pal-jobs" aria-selected="false" data-template={ T(ctx, "nav.palette.jobs", "q", "{q}") } hidden>
+				<a href="/jobs" tabindex="-1">
+					@ui.Icon("search")
+					<span></span>
+				</a>
+			</li>
+		</ul>
+		<p class="palette-hint"><kbd>↑</kbd> <kbd>↓</kbd> { T(ctx, "nav.palette.hint") }</p>
+	</dialog>
+}
+
+templ confirmDialog() {
+	<dialog id="confirm-dialog" class="ui-dialog" aria-labelledby="confirm-title" aria-describedby="confirm-text" closedby="any">
+		<header class="ui-dialog-head">
+			<h2 id="confirm-title">{ T(ctx, "shell.confirm.title") }</h2>
+		</header>
+		<div class="ui-dialog-body">
+			<p id="confirm-text"></p>
+			<div class="ui-dialog-actions">
+				<button type="button" class="ui-btn ui-btn-secondary" { ui.CloseDialog("confirm-dialog")... }>{ T(ctx, "shell.confirm.cancel") }</button>
+				<button type="button" class="ui-btn ui-btn-danger" data-confirm-ok>{ T(ctx, "shell.confirm.ok") }</button>
+			</div>
+		</div>
+	</dialog>
+}
+
+// AppShell wraps the page content of a signed-in user.
+templ AppShell(s Shell, wide bool) {
+	{{ counts := (*NavCounts)(nil) }}
+	if s.Counts != nil {
+		{{ counts = s.Counts() }}
+	}
+	<div class="shell-progress" aria-hidden="true"></div>
+	<a class="skip" href="#main">{ T(ctx, "nav.skip") }</a>
+	@shellTop(s)
+	<aside class="shell-side">
+		@shellNav("side", s, counts)
+	</aside>
+	<div class="shell-content">
+		<main id="main" tabindex="-1" class={ templ.KV("wide", wide) }>
+			{ children... }
+		</main>
+		<footer class="footer">
+			<p class="muted"><a href="/privacy">{ T(ctx, "nav.privacy") }</a> · getafjob</p>
+		</footer>
+	</div>
+	<nav class="shell-bottom" aria-label={ T(ctx, "nav.quick") }>
+		for _, it := range bottomNav {
+			@navLink(it, s.Path, counts)
+		}
+		<button type="button" class="shell-link" { ui.OpenDialog("nav-drawer")... }>
+			@ui.Icon("menu")
+			<span class="shell-label">{ T(ctx, "nav.menu") }</span>
+		</button>
+	</nav>
+	@ui.Dialog(ui.DialogProps{ID: "nav-drawer", Title: T(ctx, "nav.menu"), CloseLabel: T(ctx, "shell.close"), Drawer: true, Start: true}) {
+		@shellNav("drawer", s, counts)
+	}
+	@palette(s)
+	@confirmDialog()
+	@ui.ToastRegion() {
+		if s.Flash != "" {
+			@ui.Toast(ui.Success, T(ctx, s.Flash), T(ctx, "shell.close"))
+		}
+	}
+	<div id="live-dock" class="shell-dock" { HX(ctx, "hx-preserve", "true")... }></div>
+	<div id="route-announcer" class="ui-sr" aria-live="polite" { HX(ctx, "hx-preserve", "true")... }></div>
+}

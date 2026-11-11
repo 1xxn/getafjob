@@ -102,10 +102,12 @@ async function signIn(btn) {
   else await fail(btn, res);
 }
 var actions = { register, "sign-in": signIn };
-if (window.PublicKeyCredential) {
+function bind() {
+  if (!window.PublicKeyCredential) return;
   for (const btn of document.querySelectorAll("button[data-passkey]")) {
     const run = actions[btn.dataset.passkey ?? ""];
-    if (!run) continue;
+    if (!run || btn.dataset.bound) continue;
+    btn.dataset.bound = "1";
     btn.hidden = false;
     btn.addEventListener("click", () => {
       btn.disabled = true;
@@ -116,3 +118,5 @@ if (window.PublicKeyCredential) {
     });
   }
 }
+document.addEventListener("htmx:after:settle", bind);
+bind();
