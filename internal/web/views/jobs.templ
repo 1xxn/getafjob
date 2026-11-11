@@ -588,7 +588,7 @@ templ CVVariantSwitcher(d CVVariantData) {
 				method="post"
 				action={ templ.SafeURL("/jobs/" + i64(d.JobID) + "/cv") }
 				class="cv-variants-form"
-				{ HX(ctx, "hx-post", "/jobs/" + i64(d.JobID) + "/cv", "hx-target", "#cv-switcher", "hx-swap", "outerHTML")... }
+				{ HX(ctx, "hx-post", "/jobs/" + i64(d.JobID) + "/cv", "hx-target", "#cv-switcher", "hx-swap", "outerHTML", "hx-trigger", "change")... }
 			>
 				<div class="cv-variant-cards">
 					for _, v := range d.Variants {
@@ -598,7 +598,6 @@ templ CVVariantSwitcher(d CVVariantData) {
 								name="cv_id"
 								value={ v.ID }
 								checked?={ v.Selected }
-								onchange="this.form.requestSubmit()"
 							/>
 							<div class="cv-variant-body">
 								<div class="cv-variant-title-row">
@@ -747,14 +746,14 @@ templ ApplyPreview(d ApplyPreviewData) {
 				<h3>⚡ { T(ctx, "jobs.apply_preview.title") }: { d.Title }</h3>
 				<p class="muted text-sm">{ d.Company } · { d.Location } · { itoa(d.Score) }% Match</p>
 			</div>
-			<button
-				type="button"
+			<a
+				href={ templ.SafeURL("/jobs/" + i64(d.JobID)) }
 				class="btn-sm btn-link"
-				onclick="document.getElementById('apply-preview-container').innerHTML=''"
 				title={ T(ctx, "actions.cancel") }
+				aria-label={ T(ctx, "actions.cancel") }
 			>
 				✕
-			</button>
+			</a>
 		</div>
 
 		<div class="apply-guarantee-box">
@@ -871,13 +870,9 @@ templ ApplyPreview(d ApplyPreviewData) {
 						⚠️ { T(ctx, "jobs.apply_preview.blocked_by_guard") }
 					</button>
 				}
-				<button
-					type="button"
-					class="button secondary"
-					onclick="document.getElementById('apply-preview-container').innerHTML=''"
-				>
+				<a href={ templ.SafeURL("/jobs/" + i64(d.JobID)) } class="button secondary">
 					{ T(ctx, "actions.cancel") }
-				</button>
+				</a>
 			</form>
 		</div>
 	</div>
