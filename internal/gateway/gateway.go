@@ -74,6 +74,7 @@ type Server struct {
 	runSteps     sync.Map // map[uuid.UUID]runStepState
 	frameAuth    sync.Map // map[string]frameGrant, token -> run for screencast frames
 	seen         sync.Map // map[uuid.UUID]time.Time, run -> last call of its runner
+	sessionOf    sync.Map // map[string]uuid.UUID, run token -> application of its live session
 }
 
 // Lost runs: a runner calls at least every keepalive interval (agent: 20 s); after reapIdle without a call the
@@ -302,6 +303,15 @@ func (s *Server) run(ctx context.Context) (application.RunRef, error) {
 		s.seen.Store(ref.RunID, time.Now())
 	}
 	return ref, err
+}
+
+// callToken returns the bearer token of a run call.
+func callToken(ctx context.Context) string {
+	info, _ := connect.CallInfoForServerContext(ctx)
+	if info == nil {
+		return ""
+	}
+	return bearer(info.RequestHeader())
 }
 
 // frameRun authorizes a screencast frame call, reusing a check of the same token from the last frameGrantTTL.
@@ -595,10 +605,22 @@ func (s *Server) Handoff(ctx context.Context, req *runnerv1.HandoffRequest) (*ru
 	} else {
 		ref, err = s.run(ctx)
 	}
+	token := callToken(ctx)
+	if err != nil && req.GetDone() {
+		// The run was finished (parked, submitted) before its runner closed the live view; the token no longer
+		// authorizes calls, but it still names the session to close.
+		if app, ok := s.sessionOf.LoadAndDelete(token); ok {
+			if v, ok := s.handoffs.LoadAndDelete(app.(uuid.UUID)); ok {
+				v.(*HandoffSession).closeDone()
+			}
+		}
+		return &runnerv1.HandoffResponse{}, nil
+	}
 	if err != nil {
 		return nil, err
 	}
 	if req.GetDone() {
+		s.sessionOf.Delete(token)
 		if v, ok := s.handoffs.LoadAndDelete(ref.AppID); ok {
 			v.(*HandoffSession).closeDone()
 		}
@@ -612,6 +634,7 @@ func (s *Server) Handoff(ctx context.Context, req *runnerv1.HandoffRequest) (*ru
 		return &runnerv1.HandoffResponse{}, nil
 	}
 	v, _ := s.handoffs.LoadOrStore(ref.AppID, NewHandoffSession(ref.UserID))
+	s.sessionOf.Store(token, ref.AppID)
 	sess := v.(*HandoffSession)
 
 	if len(frame) > 0 {

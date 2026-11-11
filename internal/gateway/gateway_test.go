@@ -371,3 +371,35 @@ func TestGatewayStepDurationMetrics(t *testing.T) {
 		t.Fatalf("expected extract and submit steps in histogram, got: %v", steps)
 	}
 }
+
+// The runner closes the live view after the run was parked; the token no longer authorizes, but the session must
+// still go, or the page keeps showing a dead run as live.
+func TestDoneAfterParkClosesTheLiveSession(t *testing.T) {
+	pool, apps, c, _, srv := setupWithServer(t)
+	ctx := t.Context()
+	reg, err := c.Register(with(ctx, secret), &runnerv1.RegisterRequest{Version: "test"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	u := queue(t, pool, apps)
+	l, err := c.Lease(with(ctx, secret), &runnerv1.LeaseRequest{RunnerId: reg.GetRunnerId()})
+	if err != nil || l.GetRun() == nil {
+		t.Fatalf("lease: %v", err)
+	}
+	tok := l.GetRun().GetToken()
+	if _, err := c.Handoff(with(ctx, tok), &runnerv1.HandoffRequest{}); err != nil {
+		t.Fatal(err)
+	}
+	if len(srv.ActiveRuns(u)) != 1 {
+		t.Fatal("session missing")
+	}
+	if _, err := c.Park(with(ctx, tok), &runnerv1.ParkRequest{Reason: "test"}); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := c.Handoff(with(ctx, tok), &runnerv1.HandoffRequest{Done: true}); err != nil {
+		t.Fatalf("done after park: %v", err)
+	}
+	if active := srv.ActiveRuns(u); len(active) != 0 {
+		t.Fatalf("live sessions after the run ended: %v", active)
+	}
+}
