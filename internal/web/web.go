@@ -24,6 +24,7 @@ import (
 	"github.com/1xxn/getafjob/internal/discovery"
 	"github.com/1xxn/getafjob/internal/discovery/urlimport"
 	"github.com/1xxn/getafjob/internal/identity"
+	"github.com/1xxn/getafjob/internal/platform/events"
 	"github.com/1xxn/getafjob/internal/matching"
 	"github.com/1xxn/getafjob/internal/notify"
 	"github.com/1xxn/getafjob/internal/platform/httpx"
@@ -113,6 +114,7 @@ type Server struct {
 	Privacy        PrivacyService
 	Shots          Screenshots
 	Handoffs       HandoffHub
+	Events         *events.Hub // live application changes; nil turns /events off
 	PushStore      webpush.Store
 	VAPIDPublicKey string
 	Logger         *slog.Logger
@@ -164,6 +166,7 @@ func (s *Server) Register(mux *http.ServeMux) {
 	mux.Handle("GET /applications/{id}/screenshots/{checkpoint}", s.page(s.applicationScreenshot))
 	mux.Handle("GET /applications/{id}/screen", s.page(s.screenWebSocket))
 	mux.Handle("GET /live/indicator", s.page(s.liveIndicator))
+	mux.Handle("GET /events", s.page(s.eventStream))
 	mux.Handle("POST /applications/{id}/answer", s.page(s.applicationAnswer))
 	mux.Handle("POST /applications/{id}/park", s.page(s.applicationPark))
 	mux.Handle("POST /applications/{id}/suggestions/{sugId}/accept", s.page(s.suggestionAccept))
