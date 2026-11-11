@@ -118,6 +118,10 @@ func TestSendThroughProxy(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	if s.proxy != nil {
+		t.Fatal("smtp+insecure must not use the proxy")
+	}
+	s.proxy = pu // the test server has no TLS; exercise the CONNECT path directly
 	if err := s.Send(t.Context(), Message{To: "max@example.com", Subject: "x", Text: "y"}); err != nil {
 		t.Fatal(err)
 	}

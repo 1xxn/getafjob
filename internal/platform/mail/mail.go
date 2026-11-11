@@ -41,7 +41,8 @@ type Sender struct {
 var ErrHeaderInjection = errors.New("mail: line break in header")
 
 // New parses smtps://user:pass@host:465, smtp://user:pass@host:587 (STARTTLS) or smtp+insecure://host:1025
-// (development only, no TLS). proxy may be nil.
+// (development only, no TLS). proxy may be nil. smtp+insecure is the local mail catcher on the internal network,
+// which the egress proxy refuses by design, so it is dialed directly.
 func New(rawURL, from string, proxy *url.URL) (*Sender, error) {
 	u, err := url.Parse(rawURL)
 	if err != nil || u.Host == "" {
@@ -54,6 +55,7 @@ func New(rawURL, from string, proxy *url.URL) (*Sender, error) {
 	case "smtp":
 		s.starttls = true
 	case "smtp+insecure":
+		s.proxy = nil
 	default:
 		return nil, errors.New("mail: scheme must be smtps, smtp or smtp+insecure")
 	}
