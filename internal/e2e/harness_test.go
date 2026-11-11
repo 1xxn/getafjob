@@ -278,7 +278,8 @@ func (tab *Tab) Shot(name string) {
 		return
 	}
 	file := filepath.Join(outDir, strings.NewReplacer("/", "_", " ", "_").Replace(tab.t.Name()+"_"+name)+".png")
-	if err := os.WriteFile(file, img, 0o600); err != nil {
+	// Screenshots of test data; the CI artifact upload reads them as another user than the test container.
+	if err := os.WriteFile(file, img, 0o644); err != nil { //nolint:gosec // see above
 		tab.t.Errorf("screenshot %s: %v", name, err)
 	}
 }
