@@ -4,6 +4,7 @@ import (
 	"context"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 	"time"
 
@@ -211,5 +212,26 @@ func TestService_AddBoard(t *testing.T) {
 	}
 	if b2.ATS != "greenhouse" || b2.Slug != "beispiel" {
 		t.Errorf("Board = %+v, want greenhouse / beispiel", b2)
+	}
+}
+
+// Career sites often embed megabytes of scripts after the posting data; such a page imports from its first part (#213).
+func TestService_ImportJobFromLargePage(t *testing.T) {
+	head := `<!DOCTYPE html><html><head><title>x</title><script type="application/ld+json">{"@context":"https://schema.org",
+"@type":"JobPosting","title":"Platform Engineer","hiringOrganization":{"@type":"Organization","name":"Muster Software GmbH"},
+"jobLocation":{"@type":"Place","address":{"addressLocality":"Berlin"}},"description":"Run Kubernetes."}</script></head><body>`
+	filler := strings.Repeat("<script>var x='"+strings.Repeat("a", 1000)+"';</script>\n", 12_000) // about 12 MB
+	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.Header().Set("Content-Type", "text/html")
+		_, _ = w.Write([]byte(head + filler + "</body></html>"))
+	}))
+	defer ts.Close()
+	disc := &mockDiscovery{}
+	svc := NewService(Options{Client: ts.Client(), AllowPrivate: true, Discovery: disc})
+	if _, err := svc.ImportJob(t.Context(), uuid.New(), ts.URL+"/jobs/1"); err != nil {
+		t.Fatalf("ImportJob: %v", err)
+	}
+	if len(disc.posted) != 1 || disc.posted[0].Title != "Platform Engineer" || disc.posted[0].Company != "Muster Software GmbH" {
+		t.Fatalf("posted %+v", disc.posted)
 	}
 }
