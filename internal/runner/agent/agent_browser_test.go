@@ -13,6 +13,7 @@ import (
 	"os"
 	"path/filepath"
 	"slices"
+	"strings"
 	"sync"
 	"testing"
 	"time"
@@ -367,5 +368,23 @@ func waitFor(t *testing.T, d time.Duration, ok func() bool) {
 			t.Fatal("condition not reached in time")
 		}
 		time.Sleep(100 * time.Millisecond)
+	}
+}
+
+// A run that only asks form questions frees its browser after the short hold and parks with a clear reason (#201).
+func TestUnansweredFormQuestionsFreeTheBrowser(t *testing.T) {
+	g, a, site, _ := setup(t)
+	g.handoff = func(*runnerv1.HandoffRequest) (*runnerv1.HandoffResponse, error) {
+		return &runnerv1.HandoffResponse{}, nil
+	}
+	a.QuestionHold = 2 * time.Second
+	start := time.Now()
+	if err := a.RunOne(t.Context(), run(site)); err != nil {
+		t.Fatalf("run: %v", err)
+	}
+	if time.Since(start) > time.Minute || !slices.ContainsFunc(g.calls, func(c string) bool {
+		return strings.HasPrefix(c, "park:waiting for your answers")
+	}) {
+		t.Fatalf("calls %v after %s", g.calls, time.Since(start))
 	}
 }

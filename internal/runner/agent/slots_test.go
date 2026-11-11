@@ -3,6 +3,8 @@ package agent
 import (
 	"context"
 	"testing"
+
+	"github.com/1xxn/getafjob/internal/runner/engine"
 )
 
 func TestSlotsFreeWhileRunsWaitButCapBrowsers(t *testing.T) {
@@ -34,5 +36,14 @@ func TestSlotsFreeWhileRunsWaitButCapBrowsers(t *testing.T) {
 	}
 	if newSlots(0).parallel != 1 {
 		t.Fatal("zero means one slot")
+	}
+}
+
+func TestFormAnswerableQuestionsOnly(t *testing.T) {
+	field := engine.Question{Kind: "field", Label: "Start date"}
+	if !formAnswerable([]engine.Question{field}) || formAnswerable(nil) ||
+		formAnswerable([]engine.Question{field, {Kind: "captcha"}}) ||
+		formAnswerable([]engine.Question{{Kind: "security_code"}}) {
+		t.Fatal("only plain field questions free the browser early")
 	}
 }

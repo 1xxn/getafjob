@@ -14,6 +14,7 @@ an error. Unknown `GETAFJOB_*` variables are reported as a warning (typos), with
 | `GETAFJOB_DEV_FIXTURE_HOST` | none | serve | development only: `host:port` of the fixture site whose plain http origin may take form values (`deploy/compose.dev.yaml`); ignored unless `GETAFJOB_PUBLIC_URL` is local |
 | `GETAFJOB_LIMITS` | `off` | serve, worker | `off`: no daily quota and no per-host gap, runs lease as fast as runners allow (self-host for a few people); `on`: daily limit per user and one run per host every 5 minutes. Guard rails stay on either way |
 | `GETAFJOB_RUNNER_PARALLEL` | `3` | runner | runs one runner works on at the same time (1 to 16); a run waiting for the user frees its slot, open browsers stay below twice this number. Size memory at about 500 MB per browser |
+| `GETAFJOB_QUESTION_HOLD` | `2m` | runner | how long a run keeps its browser when it only asks form questions (30s to 15m); then the browser closes, the application waits for the answers and the answer starts a new run. Captchas, codes and sign-ins keep the 15 minute hold |
 | `GETAFJOB_PUBLIC_URL` | `https://localhost:8443` | serve, worker | public address behind Caddy (links, cookies, WebAuthn) |
 | `GETAFJOB_DATABASE_URL` | none | serve, worker, migrate | `postgres://user@host:5432/db?sslmode=…` |
 | `GETAFJOB_DATABASE_PASSWORD` | none | serve, worker, migrate | overrides the password in the URL; use `_FILE` |
