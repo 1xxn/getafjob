@@ -198,6 +198,15 @@ func TestRunAsksForUnknownFields(t *testing.T) {
 	if len(g.asked) != 1 || slices.Contains(g.calls, "begin_submit") || len(subs()) != 0 {
 		t.Fatalf("asked %v, calls %v", g.asked, g.calls)
 	}
+	// The known fields of the page are filled before the question (#196).
+	ask := slices.Index(g.calls, "ask")
+	extract := ask - 1
+	for extract >= 0 && g.calls[extract] != "checkpoint:extract" {
+		extract--
+	}
+	if !slices.Contains(g.calls[extract:ask], "checkpoint:execute") {
+		t.Fatalf("no fill between the last extract and the ask: %v", g.calls)
+	}
 }
 
 func TestRunHandoffResumesWithAnswerAndSubmits(t *testing.T) {

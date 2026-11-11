@@ -245,6 +245,23 @@ func TestUnknownRequiredFieldAsksTheUser(t *testing.T) {
 	}
 }
 
+// With FillBeforeAsk the known fields are filled before the question, so the user takes over a nearly full form.
+func TestFillBeforeAskFillsKnownFields(t *testing.T) {
+	r := start(t, "greenhouse_header_submit.html")
+	pl := planner{"First Name": {Text: "Max", Source: "profile.personal.first_name"}}
+	e := r.engine(pl)
+	e.FillBeforeAsk = true
+	if err := e.Run(t.Context(), r.page); !errors.Is(err, ErrAsked) {
+		t.Fatalf("run: %v", err)
+	}
+	if v := r.page.MustEval(`() => document.getElementById("first_name").value`).Str(); v != "Max" {
+		t.Fatalf("first name = %q, want Max before the question", v)
+	}
+	if slices.Contains(r.coord.calls, "begin_submit") {
+		t.Fatalf("calls %v", r.coord.calls)
+	}
+}
+
 func TestPrepareReachesTheForm(t *testing.T) {
 	cases := map[string]string{
 		"posting.html":                  "/apply.html",                    // link opens a new tab with an embedded form
