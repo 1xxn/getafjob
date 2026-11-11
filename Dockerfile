@@ -4,7 +4,7 @@
 #   runner: browser runner on headless-shell (Chromium with sandbox, non-root)
 #   egress: smokescreen egress proxy (blocks private networks and cloud metadata)
 
-FROM --platform=$BUILDPLATFORM golang:1.27.3-trixie@sha256:c65ecfe613b539ac74c62a4c3b2c27e8f8a6076384c8f27e8a3c0f3be17cc385 AS build
+FROM --platform=$BUILDPLATFORM golang:1.27.4-trixie@sha256:b54b2639de8c1bfe538ec5ffc45f29b1932235ac5f6d63c059853646677112d9 AS build
 ARG TARGETOS
 ARG TARGETARCH
 ARG VERSION=dev
@@ -24,7 +24,7 @@ RUN mkdir -p /out/blobs
 
 # smokescreen comes from the build module in deploy/egress: a pinned release with dependencies raised to
 # versions without known vulnerabilities (go.sum verified, Renovate-managed).
-FROM --platform=$BUILDPLATFORM golang:1.27.3-trixie@sha256:c65ecfe613b539ac74c62a4c3b2c27e8f8a6076384c8f27e8a3c0f3be17cc385 AS smokescreen
+FROM --platform=$BUILDPLATFORM golang:1.27.4-trixie@sha256:b54b2639de8c1bfe538ec5ffc45f29b1932235ac5f6d63c059853646677112d9 AS smokescreen
 ARG TARGETOS
 ARG TARGETARCH
 ENV CGO_ENABLED=0 GOTOOLCHAIN=local GOFLAGS=-trimpath
