@@ -11,6 +11,7 @@ an error. Unknown `GETAFJOB_*` variables are reported as a warning (typos), with
 | `GETAFJOB_GATEWAY_ADDR` | `:8090` | serve | runner gateway (Connect RPC), only on the internal gateway network |
 | `GETAFJOB_RUNNER_SECRET` | none | serve, runner | shared secret of the server's runners, at least 32 characters (`admin gen-secret`); empty keeps the gateway off |
 | `GETAFJOB_GATEWAY_URL` | none | runner | where the runner reaches the gateway, e.g. `http://serve:8090`; empty: the runner only self-tests |
+| `GETAFJOB_DEV_FIXTURE_HOST` | none | serve | development only: `host:port` of the fixture site whose plain http origin may take form values (`deploy/compose.dev.yaml`); ignored unless `GETAFJOB_PUBLIC_URL` is local |
 | `GETAFJOB_PUBLIC_URL` | `https://localhost:8443` | serve, worker | public address behind Caddy (links, cookies, WebAuthn) |
 | `GETAFJOB_DATABASE_URL` | none | serve, worker, migrate | `postgres://user@host:5432/db?sslmode=…` |
 | `GETAFJOB_DATABASE_PASSWORD` | none | serve, worker, migrate | overrides the password in the URL; use `_FILE` |

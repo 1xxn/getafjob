@@ -3,6 +3,7 @@ package app
 import (
 	"context"
 	"encoding/json"
+	"net/url"
 	"strings"
 	"time"
 
@@ -41,6 +42,8 @@ type runData struct {
 	apps     appReader
 	portals  portalProvider
 	now      func() time.Time
+	// fixture is the host of the development fixture site; its plain http origin may take values (dev only).
+	fixture string
 }
 
 var _ gateway.Data = runData{}
@@ -72,7 +75,7 @@ func (d runData) RunData(ctx context.Context, userID uuid.UUID, jobID int64) (*r
 	if start == "" {
 		start = job.URL
 	}
-	run := &runnerv1.Run{StartUrl: start, Origins: origins(job), Language: lang,
+	run := &runnerv1.Run{StartUrl: start, Origins: d.origins(job), Language: lang,
 		Profile: facts(snap.Profile, snap.Preferences)}
 	if p := portalOf(job, start); p != "" && d.portals != nil {
 		run.Portal = p
@@ -222,9 +225,19 @@ func placeholders(p profile.Profile, job application.Job, lang string, now time.
 }
 
 // origins are the origins the run's values may go to: the posting, the application page and the ATS's own form
-// hosts.
-func origins(job application.Job) []string {
-	return ats.Origins(job.Source, job.URL, job.Apply)
+// hosts; only https, except the development fixture site.
+func (d runData) origins(job application.Job) []string {
+	out := ats.Origins(job.Source, job.URL, job.Apply)
+	if d.fixture == "" {
+		return out
+	}
+	for _, raw := range []string{job.URL, job.Apply} {
+		if u, err := url.Parse(raw); err == nil && u.Scheme == "http" && strings.EqualFold(u.Host, d.fixture) {
+			out = append(out, "http://"+strings.ToLower(u.Host))
+			break
+		}
+	}
+	return out
 }
 
 func portalOf(job application.Job, start string) string {
