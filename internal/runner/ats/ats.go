@@ -43,7 +43,10 @@ type Adapter struct {
 	Hosts        []string
 	HostSuffixes []string
 	SlugHosts    func(slug string) []string
-	precheck     func(ctx context.Context, client *http.Client, rawURL string) ([]browser.Field, error)
+	// KeepsDrafts marks ATS with candidate accounts that store typed values before the submit; runs there do not
+	// fill a page before asking the user.
+	KeepsDrafts bool
+	precheck    func(ctx context.Context, client *http.Client, rawURL string) ([]browser.Field, error)
 }
 
 var adapters = []*Adapter{
@@ -68,6 +71,7 @@ var adapters = []*Adapter{
 	},
 	{
 		Name:         Workday,
+		KeepsDrafts:  true,
 		Tier:         1,
 		HostSuffixes: []string{".myworkdayjobs.com", ".myworkdaysite.com"},
 	},
@@ -101,6 +105,7 @@ var adapters = []*Adapter{
 	},
 	{
 		Name:         ICIMS,
+		KeepsDrafts:  true,
 		Tier:         2,
 		HostSuffixes: []string{".icims.com"},
 		SlugHosts: func(slug string) []string {
@@ -109,6 +114,7 @@ var adapters = []*Adapter{
 	},
 	{
 		Name:         Taleo,
+		KeepsDrafts:  true,
 		Tier:         2,
 		HostSuffixes: []string{".taleo.net"},
 		SlugHosts: func(slug string) []string {
@@ -117,6 +123,7 @@ var adapters = []*Adapter{
 	},
 	{
 		Name:         SuccessFactors,
+		KeepsDrafts:  true,
 		Tier:         2,
 		Hosts:        []string{"career.successfactors.eu", "career.successfactors.com"},
 		HostSuffixes: []string{".successfactors.com", ".successfactors.eu", ".sapsf.com", ".sapsf.eu"},
@@ -132,12 +139,14 @@ var adapters = []*Adapter{
 	},
 	{
 		Name:         LinkedIn,
+		KeepsDrafts:  true,
 		Tier:         3,
 		Hosts:        []string{"www.linkedin.com", "linkedin.com"},
 		HostSuffixes: []string{".linkedin.com"},
 	},
 	{
 		Name:         Indeed,
+		KeepsDrafts:  true,
 		Tier:         3,
 		Hosts:        []string{"www.indeed.com", "indeed.com", "de.indeed.com", "uk.indeed.com", "fr.indeed.com"},
 		HostSuffixes: []string{".indeed.com"},
@@ -228,6 +237,8 @@ func (a *Adapter) NewEngine(exec *executor.Executor, pl engine.Planner, coord en
 		Planner: pl,
 		Coord:   coord,
 		Wait:    wait,
+		// The generic adapter may sit in front of any ATS; it fills ahead like the open ones.
+		FillBeforeAsk: a == nil || !a.KeepsDrafts,
 	}
 }
 

@@ -91,7 +91,11 @@ type Engine struct {
 	Planner Planner
 	Coord   Coordinator
 	Wait    time.Duration // per click; 0: 8 s (submits load the next page)
-	now     func() time.Time
+	// FillBeforeAsk fills the known fields of a page before asking for the rest, so the user takes over a nearly
+	// complete form (#196). Off for ATS that keep drafts of what is typed (candidate accounts), so a parked
+	// application leaves no data with the employer.
+	FillBeforeAsk bool
+	now           func() time.Time
 }
 
 func (e *Engine) wait() time.Duration {
@@ -159,6 +163,13 @@ func (e *Engine) Run(ctx context.Context, p *rod.Page) error {
 			return err
 		}
 		if len(qs) > 0 {
+			// Fill what is known first, so the user sees a nearly complete form and answers only the rest (#196).
+			// A failed fill does not matter here: the page is planned and filled again after the answers.
+			if e.FillBeforeAsk && len(plan.Values) > 0 {
+				if filledSt, filled, err := e.Exec.Fill(st, plan); err == nil {
+					_ = e.checkpoint(ctx, p, page, StepExecute, filledSt, filled, nil, dialogs)
+				}
+			}
 			return e.ask(ctx, qs)
 		}
 		if err := e.checkpoint(ctx, p, page, StepPlan, st, nil, nil, dialogs); err != nil {

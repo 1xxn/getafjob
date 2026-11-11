@@ -220,3 +220,11 @@ func TestMaturityTrackerAndMetrics(t *testing.T) {
 		t.Fatalf("runs = %v", runs)
 	}
 }
+
+func TestFillBeforeAskOnlyWhereNoDraftsAreKept(t *testing.T) {
+	for name, want := range map[string]bool{Greenhouse: true, Lever: true, Generic: true, Workday: false, LinkedIn: false} {
+		if got := Lookup(name).NewEngine(nil, nil, nil, 0).FillBeforeAsk; got != want {
+			t.Errorf("%s: FillBeforeAsk %v, want %v", name, got, want)
+		}
+	}
+}
