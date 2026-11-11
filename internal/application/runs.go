@@ -49,6 +49,7 @@ type Checkpoint struct {
 // RunStore persists runs (row-level security; leasing in the system role).
 type RunStore interface {
 	// LeaseNext leases the oldest queued application that passes the per-host limits.
+	UnfinishedRuns(ctx context.Context) ([]UnfinishedRun, error)
 	LeaseNext(ctx context.Context, runnerID string, tokenHash []byte, runnerChoice string, userID *uuid.UUID, now, expires, gapStart time.Time, unlimited bool) (Lease, bool, error)
 	RunByToken(ctx context.Context, tokenHash []byte) (RunRef, time.Time, *time.Time, error)
 	FinishRun(ctx context.Context, r RunRef, outcome string, at time.Time) error
@@ -121,6 +122,47 @@ func (r *Runs) Authorize(ctx context.Context, token string) (RunRef, error) {
 		return RunRef{}, ErrNoRun
 	}
 	return ref, nil
+}
+
+// UnfinishedRun is a run whose application still waits on its runner.
+type UnfinishedRun struct {
+	RunRef
+	LeasedAt time.Time
+}
+
+// RunnerLost is the park reason of a run whose runner stopped answering.
+const RunnerLost = "runner lost: the browser of this run stopped (restart or crash)"
+
+// ReapLost parks the applications of runs whose runner has not been heard of for idle: lastSeen reports the last
+// call of a run (false if none since since), since is when the caller started watching. Applications in
+// submitting are left to RecoverCrashed, which never retries them.
+func (r *Runs) ReapLost(ctx context.Context, lastSeen func(runID uuid.UUID) (time.Time, bool), since time.Time,
+	idle time.Duration) (int, error) {
+	runs, err := r.store.UnfinishedRuns(ctx)
+	if err != nil {
+		return 0, err
+	}
+	now := r.apps.now()
+	n := 0
+	var errs []error
+	for _, u := range runs {
+		last := u.LeasedAt
+		if since.After(last) {
+			last = since
+		}
+		if t, ok := lastSeen(u.RunID); ok && t.After(last) {
+			last = t
+		}
+		if now.Sub(last) < idle {
+			continue
+		}
+		if err := r.Park(ctx, u.RunRef, RunnerLost, ""); err != nil {
+			errs = append(errs, err)
+			continue
+		}
+		n++
+	}
+	return n, errors.Join(errs...)
 }
 
 // Checkpoint stores a step.

@@ -311,12 +311,17 @@ func (a *Agent) startLiveScreencast(ctx context.Context, p *rod.Page, tok string
 	var wg sync.WaitGroup
 	wg.Go(waitEvents)
 	wg.Go(func() {
+		// A still page sends no frames; the keepalive tells the gateway the run's browser is alive (#160).
+		keepalive := time.NewTicker(20 * time.Second)
+		defer keepalive.Stop()
 		for {
 			select {
 			case <-sctx.Done():
 				return
 			case f := <-latest:
 				_, _ = a.Client.Handoff(auth(sctx, tok), &runnerv1.HandoffRequest{Frame: f})
+			case <-keepalive.C:
+				_, _ = a.Client.Handoff(auth(sctx, tok), &runnerv1.HandoffRequest{})
 			}
 		}
 	})

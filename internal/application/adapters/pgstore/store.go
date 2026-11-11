@@ -241,6 +241,21 @@ func (s *Store) StaleSubmitting(ctx context.Context, before time.Time) (refs []a
 	return refs, err
 }
 
+// UnfinishedRuns lists runs whose application still waits on its runner (system role).
+func (s *Store) UnfinishedRuns(ctx context.Context) (out []application.UnfinishedRun, err error) {
+	err = db.InSystemTx(ctx, s.pool, func(tx pgx.Tx) error {
+		rows, err := q.New(tx).UnfinishedRuns(ctx)
+		for _, r := range rows {
+			out = append(out, application.UnfinishedRun{
+				RunRef:   application.RunRef{RunID: r.ID, AppID: r.ApplicationID, UserID: r.UserID},
+				LeasedAt: r.LeasedAt,
+			})
+		}
+		return err
+	})
+	return out, err
+}
+
 // HandoffsDue lists waiting applications whose window ends before the given time (system role).
 func (s *Store) HandoffsDue(ctx context.Context, before time.Time) (hs []application.Handoff, err error) {
 	err = db.InSystemTx(ctx, s.pool, func(tx pgx.Tx) error {

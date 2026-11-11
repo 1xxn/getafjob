@@ -186,3 +186,36 @@ func TestRunFlowAndGuardAtLease(t *testing.T) {
 		t.Fatalf("checkpoints = %d", n)
 	}
 }
+
+// Runs whose runner stopped calling are parked; runs with a recent call stay (#160).
+func TestReapLostParksSilentRuns(t *testing.T) {
+	pool, st, svc, now := setup(t)
+	ctx := t.Context()
+	runs := application.NewRuns(svc.WithoutLimits(), st)
+	max := user(t, pool, "max@example.org")
+	silent := queued(t, svc, max, jobAt(t, pool, "https://jobs.lever.co/acme/1", "Acme", "acme|1"))
+	alive := queued(t, svc, max, jobAt(t, pool, "https://jobs.lever.co/muster/2", "Muster", "muster|2"))
+	l1, ok1, err1 := runs.Lease(ctx, "r1", application.RunnerServer, nil)
+	l2, ok2, err2 := runs.Lease(ctx, "r1", application.RunnerServer, nil)
+	if !ok1 || !ok2 || err1 != nil || err2 != nil {
+		t.Fatalf("leases: %v %v %v %v", ok1, ok2, err1, err2)
+	}
+	seen := map[uuid.UUID]time.Time{}
+	for _, l := range []application.Lease{l1, l2} {
+		if l.AppID == alive {
+			seen[l.RunID] = now.Add(110 * time.Second)
+		}
+	}
+	*now = now.Add(3 * time.Minute)
+	n, err := runs.ReapLost(ctx, func(id uuid.UUID) (time.Time, bool) { t, ok := seen[id]; return t, ok },
+		time.Time{}, 2*time.Minute)
+	if err != nil || n != 1 {
+		t.Fatalf("reaped %d, %v; want 1", n, err)
+	}
+	if a, _ := svc.Get(ctx, max, silent); a.State != application.Parked {
+		t.Fatalf("silent run: %s", a.State)
+	}
+	if a, _ := svc.Get(ctx, max, alive); a.State != application.Running {
+		t.Fatalf("run with a recent call: %s", a.State)
+	}
+}
