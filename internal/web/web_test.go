@@ -457,7 +457,7 @@ func TestPasskeyPages(t *testing.T) {
 		t.Fatalf("register %d: %s", rec.Code, rec.Body.String())
 	}
 	page := a.do(http.MethodGet, "/account?added=1", nil, session, nil).Body.String()
-	if !strings.Contains(page, "Laptop") || !strings.Contains(page, "Passkey added") || !strings.Contains(page, `src="/static/js/passkey.js"`) {
+	if !strings.Contains(page, "Laptop") || !strings.Contains(page, "Passkey added") || !strings.Contains(page, `src="/static/js/passkey.js?v=`) {
 		t.Fatalf("account page: %s", page)
 	}
 	if rec := a.json("/account/passkeys", map[string]any{"challenge": o.Challenge, "credential": json.RawMessage(cred), "extra": 1}, session); rec.Code != http.StatusBadRequest {

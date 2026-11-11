@@ -123,8 +123,11 @@ type Server struct {
 func (s *Server) Register(mux *http.ServeMux) {
 	s.limiter = newLimiter(rate.Every(6*time.Second), 10)
 	sub, _ := fs.Sub(staticFiles, "static")
+	if err := views.SetAssets(sub); err != nil && s.Logger != nil {
+		s.Logger.Error("static file versions", "err", err)
+	}
 	static := http.StripPrefix("/static/", http.FileServerFS(sub))
-	mux.Handle("GET /static/", cacheFor(time.Hour, static))
+	mux.Handle("GET /static/", staticCache(static))
 	mux.Handle("GET /sw.js", cacheFor(time.Hour, http.HandlerFunc(s.serviceWorker)))
 	mux.Handle("GET /push/key", http.HandlerFunc(s.vapidPublicKey))
 	mux.Handle("POST /push/subscribe", s.limited(s.page(s.pushSubscribe)))
@@ -369,4 +372,18 @@ const speculation = `{"prefetch":[{"where":{"href_matches":"/jobs/*"},"eagerness
 func speculationRules(w http.ResponseWriter, _ *http.Request) {
 	w.Header().Set("Content-Type", "application/speculationrules+json")
 	_, _ = w.Write([]byte(speculation))
+}
+
+// staticCache lets browsers keep a static file for a year when the URL names its current version (views.Asset),
+// and for an hour otherwise.
+func staticCache(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		p := strings.TrimPrefix(r.URL.Path, "/static/")
+		if v := r.URL.Query().Get("v"); v != "" && v == views.AssetVersion(p) {
+			w.Header().Set("Cache-Control", "public, max-age=31536000, immutable")
+		} else {
+			w.Header().Set("Cache-Control", "public, max-age=3600")
+		}
+		next.ServeHTTP(w, r)
+	})
 }
