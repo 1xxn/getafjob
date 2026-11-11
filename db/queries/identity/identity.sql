@@ -124,3 +124,6 @@ DELETE FROM recoveries WHERE user_id = $1 AND ready_at <= sqlc.arg(at) AND expir
 
 -- name: CancelRecovery :execrows
 DELETE FROM recoveries WHERE user_id = $1;
+
+-- name: SetUserLocale :execrows
+UPDATE users SET locale = $2 WHERE id = $1;

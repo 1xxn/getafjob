@@ -263,6 +263,11 @@ func (s *Service) Approvals(ctx context.Context, userID uuid.UUID) ([]Approval, 
 	return s.store.Approvals(ctx, userID)
 }
 
+// NavCounts counts the user's applications that wait for an answer or an approval, and the running ones.
+func (s *Service) NavCounts(ctx context.Context, userID uuid.UUID) (NavCounts, error) {
+	return s.store.NavCounts(ctx, userID)
+}
+
 // Approve records the user's approval of the submit. A parked or failed application is queued again so that the
 // next run submits it; a waiting one (needs_input) stays for the caller to resume the run or queue it again.
 func (s *Service) Approve(ctx context.Context, userID, id uuid.UUID) (State, error) {

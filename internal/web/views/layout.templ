@@ -1,11 +1,13 @@
 package views
 
+// Layout is the document of every page. Signed-in pages get the app shell with boosted navigation (ADR 0025);
+// the islands load once here and bind to their elements after every swap, so no page carries its own script.
 templ Layout(p Page) {
 	<!DOCTYPE html>
 	<html
 		lang={ string(Locale(ctx)) }
-		if p.Theme != "" {
-			data-theme={ p.Theme }
+		if layoutTheme(ctx, p) != "" {
+			data-theme={ layoutTheme(ctx, p) }
 		}
 	>
 		<head>
@@ -24,49 +26,36 @@ templ Layout(p Page) {
 			<script src={ Asset("vendor/htmx/htmx.min.js") } nonce={ templ.GetNonce(ctx) } defer></script>
 			<script src={ Asset("vendor/htmx/hx-csp.min.js") } nonce={ templ.GetNonce(ctx) } defer></script>
 			<script src={ Asset("vendor/htmx/hx-sse.min.js") } nonce={ templ.GetNonce(ctx) } defer></script>
-			if p.Passkeys {
-				<script type="module" src={ Asset("js/passkey.js") } nonce={ templ.GetNonce(ctx) }></script>
-			}
+			<script type="module" src={ Asset("js/passkey.js") } nonce={ templ.GetNonce(ctx) }></script>
 			if p.UserName != "" {
+				<script type="module" src={ Asset("js/shell.js") } nonce={ templ.GetNonce(ctx) }></script>
 				<script type="module" src={ Asset("js/events.js") } nonce={ templ.GetNonce(ctx) }></script>
-			}
-			if p.Handoff {
 				<script type="module" src={ Asset("js/handoff.js") } nonce={ templ.GetNonce(ctx) }></script>
 			}
 		</head>
-		<body
-			if p.UserName != "" {
+		if p.UserName != "" {
+			<body
+				class={ "shell", templ.KV("nav-collapsed", ShellFrom(ctx).Collapsed) }
 				data-events="1"
-			}
-		>
-			<a class="skip" href="#main">{ T(ctx, "nav.skip") }</a>
-			<header class="topbar">
-				<a class="brand" href="/">getafjob</a>
-				if p.UserName != "" {
-					<nav aria-label={ T(ctx, "nav.main") }>
-						<span class="muted">{ T(ctx, "nav.signed_in_as", "name", p.UserName) }</span>
-						<span id="live-indicator" { HX(ctx, "hx-get", "/live/indicator", "hx-trigger", "load, getafjob:app from:body, every 60s", "hx-swap", "innerHTML")... }></span>
-						<a href="/jobs">{ T(ctx, "nav.jobs") }</a>
-						<a href="/tracker">{ T(ctx, "nav.tracker") }</a>
-						<a href="/approvals">{ T(ctx, "nav.approvals") }</a>
-						<a href="/profile">{ T(ctx, "nav.profile") }</a>
-						<a href="/preferences">{ T(ctx, "nav.preferences") }</a>
-						<a href="/documents">{ T(ctx, "nav.documents") }</a>
-						<a href="/answers">{ T(ctx, "nav.answers") }</a>
-						<a href="/texts">{ T(ctx, "nav.texts") }</a>
-						<a href="/account">{ T(ctx, "nav.account") }</a>
-						<form method="post" action="/logout">
-							<button type="submit" class="link">{ T(ctx, "nav.sign_out") }</button>
-						</form>
-					</nav>
+				{ HX(ctx, "hx-boost:inherited", "true")... }
+			>
+				@AppShell(shellFor(ctx, p), p.Handoff || p.StyleGuide) {
+					{ children... }
 				}
-			</header>
-			<main id="main" tabindex="-1" class={ templ.KV("wide", p.Handoff || p.StyleGuide) }>
-				{ children... }
-			</main>
-			<footer class="footer">
-				<p class="muted"><a href="/privacy">{ T(ctx, "nav.privacy") }</a> · getafjob</p>
-			</footer>
-		</body>
+			</body>
+		} else {
+			<body>
+				<a class="skip" href="#main">{ T(ctx, "nav.skip") }</a>
+				<header class="topbar">
+					<a class="brand" href="/">getafjob</a>
+				</header>
+				<main id="main" tabindex="-1">
+					{ children... }
+				</main>
+				<footer class="footer">
+					<p class="muted"><a href="/privacy">{ T(ctx, "nav.privacy") }</a> · getafjob</p>
+				</footer>
+			</body>
+		}
 	</html>
 }

@@ -117,8 +117,8 @@ templ StyleGuide(p Page) {
 					@ui.Alert(ui.AlertProps{Tone: ui.Danger, Text: T(ctx, "styleguide.s.alert_danger")})
 				</div>
 				<div class="sg-toasts">
-					@ui.Toast(ui.Success, T(ctx, "styleguide.s.alert_success"))
-					@ui.Toast(ui.Danger, T(ctx, "styleguide.s.alert_danger"))
+					@ui.Toast(ui.Success, T(ctx, "styleguide.s.alert_success"), T(ctx, "styleguide.s.close"))
+					@ui.Toast(ui.Danger, T(ctx, "styleguide.s.alert_danger"), T(ctx, "styleguide.s.close"))
 				</div>
 			</section>
 			<section class="sg-section" aria-labelledby="sg-data">
@@ -150,12 +150,20 @@ templ StyleGuide(p Page) {
 					{Label: T(ctx, "styleguide.s.col_state")},
 					{Label: T(ctx, "styleguide.s.col_fit"), SortHref: "/dev/styleguide?sort=fit", Align: "end", Narrow: true},
 				}}) {
-					<tr><td>Acme GmbH</td><td>
-						@ui.StatusPill(ui.StatusProps{Label: T(ctx, "styleguide.s.running"), Tone: ui.Accent, Live: true})
-					</td><td class="ui-end ui-narrow">92</td></tr>
-					<tr><td>Beta AG</td><td>
-						@ui.StatusPill(ui.StatusProps{Label: T(ctx, "styleguide.s.sent"), Tone: ui.Success})
-					</td><td class="ui-end ui-narrow">85</td></tr>
+					<tr>
+						<td>Acme GmbH</td>
+						<td>
+							@ui.StatusPill(ui.StatusProps{Label: T(ctx, "styleguide.s.running"), Tone: ui.Accent, Live: true})
+						</td>
+						<td class="ui-end ui-narrow">92</td>
+					</tr>
+					<tr>
+						<td>Beta AG</td>
+						<td>
+							@ui.StatusPill(ui.StatusProps{Label: T(ctx, "styleguide.s.sent"), Tone: ui.Success})
+						</td>
+						<td class="ui-end ui-narrow">85</td>
+					</tr>
 				}
 				@ui.EmptyState(ui.EmptyProps{Icon: "inbox", Title: T(ctx, "styleguide.s.empty_title"), Text: T(ctx, "styleguide.s.empty_text")}) {
 					@ui.Button(ui.ButtonProps{Label: T(ctx, "styleguide.s.kpi_new"), Variant: "primary", Href: "/jobs"})

@@ -151,3 +151,10 @@ func Guard(c Candidate, now time.Time) error {
 	}
 	return nil
 }
+
+// NavCounts are the numbers the navigation shows next to its items.
+type NavCounts struct {
+	NeedsInput int // waiting for an answer to a form question
+	Approvals  int // waiting for the user's approval before the submit
+	Running    int // running or submitting right now
+}

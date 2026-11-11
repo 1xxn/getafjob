@@ -310,3 +310,7 @@ func TestPlanner(t *testing.T) {
 		}
 	})
 }
+
+func (f *fakePlannerStore) NavCounts(context.Context, uuid.UUID) (application.NavCounts, error) {
+	return application.NavCounts{}, nil
+}

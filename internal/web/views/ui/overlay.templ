@@ -19,10 +19,11 @@ type DialogProps struct {
 	Title      string
 	CloseLabel string
 	Drawer     bool // slides in from the side instead of centered
+	Start      bool // drawer on the start side (navigation) instead of the end side
 }
 
 templ Dialog(p DialogProps) {
-	<dialog id={ p.ID } class={ "ui-dialog", templ.KV("ui-drawer", p.Drawer) } aria-labelledby={ p.ID + "-title" } closedby="any">
+	<dialog id={ p.ID } class={ "ui-dialog", templ.KV("ui-drawer", p.Drawer), templ.KV("ui-drawer-start", p.Drawer && p.Start) } aria-labelledby={ p.ID + "-title" } closedby="any">
 		<header class="ui-dialog-head">
 			<h2 id={ p.ID + "-title" }>{ p.Title }</h2>
 			<button type="button" class="ui-btn ui-btn-ghost ui-btn-icon" aria-label={ p.CloseLabel } title={ p.CloseLabel } { CloseDialog(p.ID)... }>
@@ -90,10 +91,13 @@ templ ToastRegion() {
 	</div>
 }
 
-// Toast is the result of an action; success and info fade out, danger stays.
-templ Toast(tone Tone, text string) {
+// Toast is the result of an action; success and info fade out, danger stays until closed.
+templ Toast(tone Tone, text, closeLabel string) {
 	<div class={ "ui-toast", "ui-tone-" + string(tone.or(Info)) } role={ alertRole(tone) }>
 		@Icon(alertIcon(tone.or(Info)))
 		<p>{ text }</p>
+		<button type="button" class="ui-btn ui-btn-ghost ui-btn-icon ui-toast-close" data-dismiss aria-label={ closeLabel } title={ closeLabel }>
+			@Icon("x")
+		</button>
 	</div>
 }

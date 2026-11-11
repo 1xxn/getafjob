@@ -343,3 +343,8 @@ func (s *Service) DeleteUser(ctx context.Context, userID uuid.UUID) error {
 func (s *Service) AuditEvents(ctx context.Context, userID uuid.UUID) ([]AuditEvent, error) {
 	return s.store.AuditEvents(ctx, userID)
 }
+
+// SetLocale changes the user's UI language; unknown values fall back to the default.
+func (s *Service) SetLocale(ctx context.Context, userID uuid.UUID, locale i18n.Locale) error {
+	return s.store.SetLocale(ctx, userID, string(i18n.Parse(string(locale))))
+}
