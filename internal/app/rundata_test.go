@@ -63,7 +63,7 @@ func TestDevFixtureHostOnlyOnLocalInstances(t *testing.T) {
 	public, _ := url.Parse("https://jobs.example.org")
 	logger := slog.New(slog.DiscardHandler)
 	if devFixtureHost(config.Config{PublicURL: local, DevFixtureHost: "fixtures:8080"}, logger) != "fixtures:8080" {
-		t.Error("local instance must honour the fixture host")
+		t.Error("local instance must honor the fixture host")
 	}
 	if devFixtureHost(config.Config{PublicURL: public, DevFixtureHost: "fixtures:8080"}, logger) != "" {
 		t.Error("public instance must ignore the fixture host")

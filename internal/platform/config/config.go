@@ -80,7 +80,7 @@ type Config struct {
 	// EasyApplyEnabled is an operator switch enabling the Easy Apply module (#43). Default: false.
 	EasyApplyEnabled bool
 	// DevFixtureHost is the host:port of the development fixture site whose plain http origin may take form values;
-	// honoured only when PublicURL is local.
+	// honored only when PublicURL is local.
 	DevFixtureHost string
 	// AIEnabled is an operator switch enabling the optional AI module (#44). Default: false.
 	AIEnabled bool
