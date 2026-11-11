@@ -79,6 +79,9 @@ type Config struct {
 	CrawlInterval time.Duration
 	// EasyApplyEnabled is an operator switch enabling the Easy Apply module (#43). Default: false.
 	EasyApplyEnabled bool
+	// DevFixtureHost is the host:port of the development fixture site whose plain http origin may take form values;
+	// honoured only when PublicURL is local.
+	DevFixtureHost string
 	// AIEnabled is an operator switch enabling the optional AI module (#44). Default: false.
 	AIEnabled bool
 	// AnthropicAPIKey is the operator's Anthropic API key. Empty: users must supply their own key.
@@ -142,6 +145,7 @@ var specs = []spec{
 	{"VAPID_SUBJECT", "", setVAPIDSubject},
 	{"CRAWL_INTERVAL", "6h", setCrawlInterval},
 	{"EASY_APPLY_ENABLED", "false", func(c *Config, v string) error { return setBool(&c.EasyApplyEnabled, v) }},
+	{"DEV_FIXTURE_HOST", "", func(c *Config, v string) error { c.DevFixtureHost = strings.ToLower(strings.TrimSpace(v)); return nil }},
 	{"AI_ENABLED", "false", func(c *Config, v string) error { return setBool(&c.AIEnabled, v) }},
 	{"ANTHROPIC_API_KEY", "", func(c *Config, v string) error { c.AnthropicAPIKey = Secret(v); return nil }},
 	{"ANTHROPIC_MODEL", "claude-3-5-haiku-20241022", func(c *Config, v string) error { c.AnthropicModel = strings.TrimSpace(v); return nil }},

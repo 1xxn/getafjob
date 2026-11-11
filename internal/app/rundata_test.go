@@ -1,11 +1,14 @@
 package app
 
 import (
+	"log/slog"
+	"net/url"
 	"slices"
 	"testing"
 	"time"
 
 	"github.com/1xxn/getafjob/internal/application"
+	"github.com/1xxn/getafjob/internal/platform/config"
 	"github.com/1xxn/getafjob/internal/profile"
 )
 
@@ -40,9 +43,30 @@ func TestOrigins(t *testing.T) {
 		{application.Job{Source: "x", URL: "http://insecure.example/1", Apply: "javascript:alert(1)"}, nil},
 	}
 	for _, tc := range cases {
-		if got := origins(tc.job); !slices.Equal(got, tc.want) {
+		if got := (runData{}).origins(tc.job); !slices.Equal(got, tc.want) {
 			t.Errorf("%+v: %v, want %v", tc.job, got, tc.want)
 		}
+	}
+	// Development: only the configured fixture host gets its plain http origin.
+	dev := runData{fixture: "fixtures:8080"}
+	fixture := application.Job{Source: "demo", URL: "http://fixtures:8080/posting.html?job=1"}
+	if got := dev.origins(fixture); !slices.Equal(got, []string{"http://fixtures:8080"}) {
+		t.Errorf("fixture origins = %v", got)
+	}
+	if got := dev.origins(application.Job{Source: "x", URL: "http://insecure.example/1"}); got != nil {
+		t.Errorf("other http host = %v, want none", got)
+	}
+}
+
+func TestDevFixtureHostOnlyOnLocalInstances(t *testing.T) {
+	local, _ := url.Parse("https://localhost:8443")
+	public, _ := url.Parse("https://jobs.example.org")
+	logger := slog.New(slog.DiscardHandler)
+	if devFixtureHost(config.Config{PublicURL: local, DevFixtureHost: "fixtures:8080"}, logger) != "fixtures:8080" {
+		t.Error("local instance must honour the fixture host")
+	}
+	if devFixtureHost(config.Config{PublicURL: public, DevFixtureHost: "fixtures:8080"}, logger) != "" {
+		t.Error("public instance must ignore the fixture host")
 	}
 }
 

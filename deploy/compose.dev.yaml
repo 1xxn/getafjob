@@ -41,6 +41,10 @@ services:
       start_interval: 1s
     networks: [runnerproxy, fixtures]
 
+  serve:
+    environment:
+      GETAFJOB_DEV_FIXTURE_HOST: fixtures:8080
+
   runner:
     environment:
       GETAFJOB_EGRESS_PROXY: http://runner-egress:4750

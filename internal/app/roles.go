@@ -136,7 +136,8 @@ func serve(ctx context.Context, cfg config.Config, logger *slog.Logger) error {
 		gw = &gateway.Server{Runs: application.NewRuns(apps, astore), Apps: apps, Shots: sealedFiles,
 			Secret: cfg.RunnerSecret.Reveal(), Logger: logger, Notify: appNotifier.YourTurn, ATSMetrics: atsMetrics,
 			Portals: portalsSvc,
-			Data:    runData{profiles: profiles, items: profile.NewItems(pstore, env), docs: docs, stations: profile.NewStations(pstore, env), jobs: astore, apps: astore, portals: portalsSvc, now: time.Now}}
+			Data: runData{profiles: profiles, items: profile.NewItems(pstore, env), docs: docs, stations: profile.NewStations(pstore, env), jobs: astore, apps: astore, portals: portalsSvc, now: time.Now,
+				fixture: devFixtureHost(cfg, logger)}}
 	}
 
 	tstore := trackingstore.New(pool)
@@ -356,4 +357,17 @@ func serveHealth(ctx context.Context, cfg config.Config, health *httpx.Health, l
 	health.Register(mux)
 	return httpx.Run(ctx, httpx.NewServer(cfg.HealthAddr, httpx.SecurityHeaders(mux, false), logger),
 		cfg.ShutdownTimeout, logger)
+}
+
+// devFixtureHost returns GETAFJOB_DEV_FIXTURE_HOST when the instance runs on a local address; elsewhere the setting
+// is ignored, so a production instance never sends values over plain http.
+func devFixtureHost(cfg config.Config, logger *slog.Logger) string {
+	if cfg.DevFixtureHost == "" {
+		return ""
+	}
+	if !localURL(cfg.PublicURL) {
+		logger.Warn("GETAFJOB_DEV_FIXTURE_HOST ignored: GETAFJOB_PUBLIC_URL is not a local address")
+		return ""
+	}
+	return cfg.DevFixtureHost
 }
