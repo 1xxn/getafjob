@@ -264,6 +264,7 @@ func TestHandoffPageAnswerAndPark(t *testing.T) {
 	u := &identity.User{ID: uuid.New(), DisplayName: "Max"}
 	appID := uuid.New()
 	sess := gateway.NewHandoffSession(u.ID)
+	sess.MarkWaiting() // the runner waits for the answers right now
 	st := &fakeAppStore{userID: u.ID, app: application.App{ID: appID, JobID: 42, State: application.NeedsInput, Version: 1}}
 	srv := &Server{
 		Apps:     application.NewService(st),

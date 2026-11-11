@@ -382,6 +382,9 @@
   @keyframes live-pulse { 50% { opacity: 0.35; } }
   @media (prefers-reduced-motion: reduce) { .live-dot.pulse { animation: none; } }
   .runner-company { font-weight: 600; }
+  .check { display: flex; align-items: flex-start; gap: var(--space-2); }
+  .check input { inline-size: auto; margin-block-start: 0.3rem; flex: none; }
+  fieldset.field { border: 0; padding: 0; margin: 0; }
   .remote-browser-box { margin-block: var(--space-4); }
   .live-status { color: var(--ink-2); margin-block: 0 var(--space-2); }
   .remote-browser-box[data-mode="interactive"] .live-status { color: var(--ink-1); font-weight: 600; }

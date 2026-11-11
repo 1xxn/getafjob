@@ -300,6 +300,11 @@ func (s *Server) applicationAnswer(w http.ResponseWriter, r *http.Request, u *id
 		sess, _ = s.Handoffs.SessionFor(appID)
 	}
 
+	// Only a runner that is waiting right now takes the answers in its open browser; otherwise (hold over, restart)
+	// the application is queued again and a new run uses the saved answers.
+	if sess != nil && !sess.Interactive() {
+		sess = nil
+	}
 	if s.Apps != nil {
 		if sess != nil {
 			_, _ = s.Apps.Fire(r.Context(), u.ID, appID, application.EvAnswer, application.ActorUser, nil)
@@ -373,6 +378,10 @@ func (s *Server) applicationPage(w http.ResponseWriter, r *http.Request, u *iden
 					}
 				}
 			}
+		}
+		// A parked application with open questions or a pending approval waits for the user, it did not fail.
+		if app.State == application.Parked && (len(d.Questions) > 0 || app.AwaitingApproval()) {
+			d.Status = "your_turn"
 		}
 		if ev, err := s.Apps.Evidence(r.Context(), u.ID, appID); err == nil {
 			for _, f := range ev.Fields {
