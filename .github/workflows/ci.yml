@@ -43,7 +43,7 @@ jobs:
           out="$(gofmt -l -s .)"
           if [ -n "$out" ]; then echo "::error::not gofmt-ed"; echo "$out"; exit 1; fi
       - name: go vet
-        run: go vet ./... && go vet -tags browser ./...
+        run: go vet ./... && go vet -tags browser ./... && go vet -tags e2e ./internal/e2e/...
       - name: generated code is up to date (buf, oapi-codegen, templ, sqlc)
         run: |
           go tool buf generate
@@ -234,6 +234,39 @@ jobs:
           cache-to: type=gha,scope=runner,mode=max
       - name: browser tests inside the runner image (sandbox on, seccomp profile)
         run: go tool task test:browser:run
+
+  e2e:
+    name: e2e journeys (dev stack)
+    runs-on: ubuntu-26.04
+    timeout-minutes: 30
+    permissions:
+      contents: read
+    steps:
+      - uses: step-security/harden-runner@46b06cea07f9e64621fdf066ba77ac6915163d43 # v2.22.3
+        with:
+          egress-policy: audit
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version-file: go.mod
+          cache: false # job builds images
+      - name: start the dev stack
+        run: go tool task dev:up
+      - name: journeys in the runner image (fresh invited user, sandbox on)
+        run: go tool task test:e2e
+      - name: screenshots
+        if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: e2e-screenshots
+          path: bin/e2e/out
+          if-no-files-found: ignore
+          retention-days: 7
+      - name: stack logs
+        if: failure()
+        run: docker compose -f deploy/compose.yaml -f deploy/compose.dev.yaml --profile dev logs --no-color --tail 200
 
   images:
     name: image (${{ matrix.target }})

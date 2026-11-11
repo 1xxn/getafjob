@@ -44,7 +44,7 @@ tasks:
 
   vet:
     cmds:
-      - go vet ./...
+      - go vet ./... && go vet -tags e2e ./internal/e2e/...
 
   lint:
     desc: golangci-lint (pinned, runs in Docker, no local install)
@@ -92,6 +92,31 @@ tasks:
         -e GETAFJOB_FIXTURES_DIR=/testdata/fixtures/site
         --entrypoint /bin/sh {{.RUNNER_IMAGE}} -c
         'set -e; for t in /tests/*.test; do echo "== $t"; "$t" -test.v -test.shuffle=on {{.CLI_ARGS}}; done'
+
+  test:e2e:
+    desc: >-
+      End to end journeys against the running dev stack (dev:up and admin demo first): a fresh invited user, the
+      runner image's Chromium on the internal edge network, screenshots in bin/e2e/out
+    env:
+      CGO_ENABLED: "0"
+      GOOS: linux
+      GOARCH: '{{ARCH}}'
+    cmds:
+      - go test -c -tags e2e -o bin/e2e/e2e.test ./internal/e2e
+      - cmd: >-
+          {{.COMPOSE}} exec -T caddy cat /data/caddy/pki/authorities/local/intermediate.crt
+          > bin/e2e/caddy-intermediate.crt
+      - cmd: mkdir -p bin/e2e/out && chmod 0777 bin/e2e/out
+      - cmd: >-
+          invite="$({{.COMPOSE}} exec -T serve /usr/local/bin/getafjob admin invite
+          -email "e2e-$(date +%s)@example.org" | head -n 1)" &&
+          docker run --rm --read-only --tmpfs /tmp:rw,size=512m --shm-size=512m
+          --cap-drop ALL --security-opt no-new-privileges
+          --security-opt seccomp=deploy/seccomp/chromium.json
+          --network getafjob_edge
+          -v "{{.ROOT_DIR}}/bin/e2e:/e2e"
+          -e GETAFJOB_E2E_INVITE="$invite" -e GETAFJOB_E2E_CA=/e2e/caddy-intermediate.crt -e GETAFJOB_E2E_OUT=/e2e/out
+          --entrypoint /e2e/e2e.test {{.RUNNER_IMAGE}} -test.v {{.CLI_ARGS}}
 
   vuln:
     desc: Known vulnerabilities in reachable code
