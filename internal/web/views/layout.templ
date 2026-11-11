@@ -29,6 +29,7 @@ templ Layout(p Page) {
 				if p.UserName != "" {
 					<nav aria-label={ T(ctx, "nav.main") }>
 						<span class="muted">{ T(ctx, "nav.signed_in_as", "name", p.UserName) }</span>
+						<span id="live-indicator" { HX(ctx, "hx-get", "/live/indicator", "hx-trigger", "load, every 5s", "hx-swap", "innerHTML")... }></span>
 						<a href="/jobs">{ T(ctx, "nav.jobs") }</a>
 						<a href="/tracker">{ T(ctx, "nav.tracker") }</a>
 						<a href="/approvals">{ T(ctx, "nav.approvals") }</a>
@@ -44,7 +45,7 @@ templ Layout(p Page) {
 					</nav>
 				}
 			</header>
-			<main id="main" tabindex="-1">
+			<main id="main" tabindex="-1" class={ templ.KV("wide", p.Handoff) }>
 				{ children... }
 			</main>
 			<footer class="footer">

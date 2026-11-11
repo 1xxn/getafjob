@@ -219,3 +219,39 @@ func TestRunHandoffResumesWithAnswerAndSubmits(t *testing.T) {
 		t.Fatalf("asked %v, subs %v, calls %v", g.asked, subs(), g.calls)
 	}
 }
+
+// The live view streams frames during a normal run, not only while the run waits for the user (#163).
+func TestRunStreamsFramesWithoutHandoff(t *testing.T) {
+	g, a, site, subs := setup(t)
+	var mu sync.Mutex
+	frames, done := 0, 0
+	g.handoff = func(req *runnerv1.HandoffRequest) (*runnerv1.HandoffResponse, error) {
+		mu.Lock()
+		defer mu.Unlock()
+		if len(req.GetFrame()) > 0 {
+			frames++
+		}
+		if req.GetDone() {
+			done++
+		}
+		if req.GetWait() { // the fixture asks for the privacy consent; answer it like a user would
+			return &runnerv1.HandoffResponse{Events: []*runnerv1.HandoffEvent{{
+				Msg: &runnerv1.HandoffEvent_Resume{Resume: true},
+				Answers: []*runnerv1.Answer{{Id: "0192f3a4-5b6c-7d8e-9f01-000000000003",
+					Question: "Ich willige in die Verarbeitung meiner Daten gemäß Datenschutzerklärung ein*", Answer: "Ja"}},
+			}}}, nil
+		}
+		return &runnerv1.HandoffResponse{}, nil
+	}
+	ctx, cancel := context.WithTimeout(t.Context(), 2*time.Minute)
+	defer cancel()
+	if err := a.RunOne(ctx, run(site)); err != nil {
+		t.Fatalf("run: %v (calls %v)", err, g.calls)
+	}
+	mu.Lock()
+	defer mu.Unlock()
+	if len(subs()) != 1 || frames == 0 || done != 1 {
+		t.Fatalf("subs %d, frames %d, done %d, calls %v", len(subs()), frames, done, g.calls)
+	}
+	t.Logf("%d frames during the run", frames)
+}

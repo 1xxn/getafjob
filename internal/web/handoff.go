@@ -25,7 +25,7 @@ import (
 // HandoffHub accesses active runner handoff sessions.
 type HandoffHub interface {
 	SessionFor(appID uuid.UUID) (*gateway.HandoffSession, bool)
-	ActiveSessions() []uuid.UUID
+	ActiveRuns(userID uuid.UUID) []uuid.UUID
 }
 
 // Screenshots reads sealed run screenshots per user.
@@ -46,8 +46,24 @@ type screenInputMsg struct {
 	WindowsVirtualKeyCode int32   `json:"windowsVirtualKeyCode"`
 }
 
-// screenWebSocket upgrades the connection to WebSocket and streams the live screencast frames to the user
-// while dispatching mouse and keyboard input back to the runner. Input is never logged or stored.
+// Close codes of the live view socket; the client stops reconnecting on screenNotLive.
+const (
+	screenNotLive = websocket.StatusCode(4000) // the run is over or never started: show evidence instead
+	screenWaiting = websocket.StatusCode(4001) // the run is queued but no browser streams yet: try again
+)
+
+// liveStates are the application states in which a runner may stream a live view.
+var liveStates = map[application.State]bool{application.Queued: true, application.Running: true,
+	application.NeedsInput: true, application.Submitting: true}
+
+// screenStatus tells the client whether its input reaches the page.
+type screenStatus struct {
+	Type        string `json:"type"`
+	Interactive bool   `json:"interactive"`
+}
+
+// screenWebSocket streams the run's live view to the user and, while the runner waits for the user, passes mouse
+// and keyboard input back. Any number of viewers can watch the same run. Input is never logged or stored.
 func (s *Server) screenWebSocket(w http.ResponseWriter, r *http.Request, u *identity.User) {
 	if u == nil {
 		http.Error(w, "unauthorized", http.StatusUnauthorized)
@@ -58,62 +74,66 @@ func (s *Server) screenWebSocket(w http.ResponseWriter, r *http.Request, u *iden
 		http.Error(w, "invalid application id", http.StatusBadRequest)
 		return
 	}
-
-	if s.Apps != nil {
-		if _, err := s.Apps.Get(r.Context(), u.ID, appID); err != nil {
-			if errors.Is(err, application.ErrNotFound) {
-				http.NotFound(w, r)
-				return
-			}
-			http.Error(w, "internal error", http.StatusInternalServerError)
-			return
-		}
+	if s.Apps == nil || s.Handoffs == nil {
+		http.Error(w, "live view unavailable", http.StatusServiceUnavailable)
+		return
 	}
-
-	if s.Handoffs == nil {
-		http.Error(w, "handoffs unavailable", http.StatusServiceUnavailable)
+	app, err := s.Apps.Get(r.Context(), u.ID, appID)
+	if errors.Is(err, application.ErrNotFound) {
+		http.NotFound(w, r)
+		return
+	}
+	if err != nil {
+		http.Error(w, "internal error", http.StatusInternalServerError)
 		return
 	}
 
-	ws, err := websocket.Accept(w, r, &websocket.AcceptOptions{
-		Subprotocols: []string{"getafjob-screencast"},
-	})
+	ws, err := websocket.Accept(w, r, &websocket.AcceptOptions{Subprotocols: []string{"getafjob-screencast"}})
 	if err != nil {
 		return
 	}
-	defer func() { _ = ws.Close(websocket.StatusNormalClosure, "") }()
-
+	defer func() { _ = ws.CloseNow() }()
 	ctx, cancel := context.WithCancel(r.Context())
 	defer cancel()
 
 	sess, ok := s.Handoffs.SessionFor(appID)
 	if !ok {
-		ticker := time.NewTicker(250 * time.Millisecond)
-		defer ticker.Stop()
-		timeout := time.After(10 * time.Second)
-	waitLoop:
-		for {
+		if !liveStates[app.State] {
+			_ = ws.Close(screenNotLive, "not live")
+			return
+		}
+		// A queued or starting run gets its browser within seconds; wait a little before the client retries.
+		tick := time.NewTicker(250 * time.Millisecond)
+		defer tick.Stop()
+		timeout := time.After(20 * time.Second)
+		for !ok {
 			select {
 			case <-ctx.Done():
 				return
 			case <-timeout:
-				_ = ws.Close(websocket.StatusPolicyViolation, "no active browser session")
+				_ = ws.Close(screenWaiting, "waiting for the browser")
 				return
-			case <-ticker.C:
-				if sess, ok = s.Handoffs.SessionFor(appID); ok {
-					break waitLoop
-				}
+			case <-tick.C:
+				sess, ok = s.Handoffs.SessionFor(appID)
 			}
 		}
 	}
 
-	// Forward screencast frames to the client
+	frames, unsubscribe := sess.Subscribe()
+	defer unsubscribe()
 	go func() {
+		defer cancel()
 		if last := sess.LastFrame(); len(last) > 0 {
-			if err := ws.Write(ctx, websocket.MessageBinary, last); err != nil {
+			if ws.Write(ctx, websocket.MessageBinary, last) != nil {
 				return
 			}
 		}
+		interactive := sess.Interactive()
+		if wsJSON(ctx, ws, screenStatus{Type: "status", Interactive: interactive}) != nil {
+			return
+		}
+		status := time.NewTicker(time.Second)
+		defer status.Stop()
 		for {
 			select {
 			case <-ctx.Done():
@@ -121,18 +141,21 @@ func (s *Server) screenWebSocket(w http.ResponseWriter, r *http.Request, u *iden
 			case <-sess.Done:
 				_ = ws.Close(websocket.StatusNormalClosure, "session ended")
 				return
-			case frame, ok := <-sess.Frames:
-				if !ok {
-					return
+			case <-status.C:
+				if now := sess.Interactive(); now != interactive {
+					interactive = now
+					if wsJSON(ctx, ws, screenStatus{Type: "status", Interactive: now}) != nil {
+						return
+					}
 				}
-				if err := ws.Write(ctx, websocket.MessageBinary, frame); err != nil {
+			case f := <-frames:
+				if ws.Write(ctx, websocket.MessageBinary, f) != nil {
 					return
 				}
 			}
 		}
 	}()
 
-	// Receive input from the client and forward to the runner (never logged)
 	for {
 		typ, data, err := ws.Read(ctx)
 		if err != nil {
@@ -142,58 +165,78 @@ func (s *Server) screenWebSocket(w http.ResponseWriter, r *http.Request, u *iden
 			continue
 		}
 		var in screenInputMsg
-		if err := json.Unmarshal(data, &in); err != nil {
+		if json.Unmarshal(data, &in) != nil {
 			continue
 		}
-		switch in.Type {
-		case "resume":
-			if s.Apps != nil {
-				_, _ = s.Apps.Fire(ctx, u.ID, appID, application.EvAnswer, application.ActorUser, nil)
-			}
-			select {
-			case sess.Input <- &runnerv1.HandoffEvent{Msg: &runnerv1.HandoffEvent_Resume{Resume: true}}:
-			default:
-			}
-		case "park":
-			if s.Apps != nil {
-				_, _ = s.Apps.Fire(ctx, u.ID, appID, application.EvPark, application.ActorUser, map[string]any{"reason": "parked by user"})
-			}
-			select {
-			case sess.Input <- &runnerv1.HandoffEvent{Msg: &runnerv1.HandoffEvent_Park{Park: true}}:
-			default:
-			}
-		case "mouse":
-			select {
-			case sess.Input <- &runnerv1.HandoffEvent{
-				Msg: &runnerv1.HandoffEvent_Mouse{
-					Mouse: &runnerv1.InputMouseEvent{
-						Type:       in.Action,
-						X:          in.X,
-						Y:          in.Y,
-						Button:     in.Button,
-						ClickCount: in.ClickCount,
-					},
-				},
-			}:
-			default:
-			}
-		case "key":
-			select {
-			case sess.Input <- &runnerv1.HandoffEvent{
-				Msg: &runnerv1.HandoffEvent_Key{
-					Key: &runnerv1.InputKeyEvent{
-						Type:                  in.Action,
-						Text:                  in.Text,
-						Key:                   in.Key,
-						Code:                  in.Code,
-						WindowsVirtualKeyCode: in.WindowsVirtualKeyCode,
-					},
-				},
-			}:
-			default:
-			}
+		ev := s.screenEvent(ctx, u, appID, in)
+		// Input only counts while the runner waits for the user; queued clicks must never replay into the page later.
+		if ev == nil || !sess.Interactive() {
+			continue
+		}
+		select {
+		case sess.Input <- ev:
+		default:
 		}
 	}
+}
+
+// screenEvent turns a client message into a runner event; resume and park also move the application.
+func (s *Server) screenEvent(ctx context.Context, u *identity.User, appID uuid.UUID, in screenInputMsg) *runnerv1.HandoffEvent {
+	switch in.Type {
+	case "resume":
+		_, _ = s.Apps.Fire(ctx, u.ID, appID, application.EvAnswer, application.ActorUser, nil)
+		return &runnerv1.HandoffEvent{Msg: &runnerv1.HandoffEvent_Resume{Resume: true}}
+	case "park":
+		_, _ = s.Apps.Fire(ctx, u.ID, appID, application.EvPark, application.ActorUser, map[string]any{"reason": "parked by user"})
+		return &runnerv1.HandoffEvent{Msg: &runnerv1.HandoffEvent_Park{Park: true}}
+	case "mouse":
+		return &runnerv1.HandoffEvent{Msg: &runnerv1.HandoffEvent_Mouse{Mouse: &runnerv1.InputMouseEvent{
+			Type: in.Action, X: in.X, Y: in.Y, Button: in.Button, ClickCount: in.ClickCount}}}
+	case "key":
+		return &runnerv1.HandoffEvent{Msg: &runnerv1.HandoffEvent_Key{Key: &runnerv1.InputKeyEvent{
+			Type: in.Action, Text: in.Text, Key: in.Key, Code: in.Code, WindowsVirtualKeyCode: in.WindowsVirtualKeyCode}}}
+	}
+	return nil
+}
+
+func wsJSON(ctx context.Context, ws *websocket.Conn, v any) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+	return ws.Write(ctx, websocket.MessageText, b)
+}
+
+// activeRuns lists the user's runs that stream a live view, newest data from the job index.
+func (s *Server) activeRuns(ctx context.Context, userID, current uuid.UUID) []views.ActiveRunItem {
+	if s.Handoffs == nil || s.Apps == nil {
+		return nil
+	}
+	var out []views.ActiveRunItem
+	for _, id := range s.Handoffs.ActiveRuns(userID) {
+		app, err := s.Apps.Get(ctx, userID, id)
+		if err != nil {
+			continue
+		}
+		item := views.ActiveRunItem{AppID: id.String(), JobID: app.JobID, Current: id == current,
+			Waiting: app.State == application.NeedsInput}
+		if s.Jobs != nil {
+			if j, err := s.Jobs.Detail(ctx, userID, app.JobID); err == nil {
+				item.JobTitle, item.Company = j.Title, j.Company
+			}
+		}
+		out = append(out, item)
+	}
+	return out
+}
+
+// liveIndicator renders the live runs pill of the top bar; pages poll it until the event stream exists (#166).
+func (s *Server) liveIndicator(w http.ResponseWriter, r *http.Request, u *identity.User) {
+	if u == nil {
+		w.WriteHeader(http.StatusNoContent)
+		return
+	}
+	s.render(w, r, http.StatusOK, views.LiveIndicator(s.activeRuns(r.Context(), u.ID, uuid.Nil)))
 }
 
 // applicationAnswer saves answers provided during a handoff to the answer bank and resumes the application.
@@ -289,26 +332,8 @@ func (s *Server) applicationPage(w http.ResponseWriter, r *http.Request, u *iden
 		d.JobID = app.JobID
 		d.State = string(app.State)
 		d.Status = appStatus(app.State)
-		if s.Handoffs != nil {
-			for _, actID := range s.Handoffs.ActiveSessions() {
-				actApp, err := s.Apps.Get(r.Context(), u.ID, actID)
-				if err != nil {
-					continue
-				}
-				item := views.ActiveRunItem{
-					AppID:   actID.String(),
-					JobID:   actApp.JobID,
-					Current: actID == appID,
-				}
-				if s.Jobs != nil {
-					if j, err := s.Jobs.Detail(r.Context(), u.ID, actApp.JobID); err == nil {
-						item.JobTitle = j.Title
-						item.Company = j.Company
-					}
-				}
-				d.ActiveRuns = append(d.ActiveRuns, item)
-			}
-		}
+		d.ActiveRuns = s.activeRuns(r.Context(), u.ID, appID)
+		d.Live = liveStates[app.State]
 		if app.AwaitingApproval() {
 			d.ApprovalAsked = true
 			for _, re := range app.ApprovalReasons {

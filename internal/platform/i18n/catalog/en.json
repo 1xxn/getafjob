@@ -487,7 +487,6 @@
   "handoff.active_sessions": "Active live runs",
   "handoff.approval_reasons": "This application requires your approval before submit:",
   "handoff.approve": "Approve application",
-  "handoff.connecting": "Connecting to remote browser...",
   "handoff.continue": "Continue",
   "handoff.park": "Park",
   "handoff.push": "Enable push notifications",
@@ -659,5 +658,14 @@
   "tracker.title": "Application Tracker",
   "tracker.updated": "Updated {when}",
   "tracker.view_application": "Application details",
-  "tracker.view_details": "Details"
+  "tracker.view_details": "Details",
+  "live.indicator": "{count} live",
+  "live.connecting": "Connecting to the browser",
+  "live.waiting": "Waiting for the browser to start",
+  "live.view_only": "Live. The run controls the browser; you watch.",
+  "live.your_turn": "Your turn. The run waits for you: click into the picture to use the browser, then press Continue.",
+  "live.ended": "The run has ended.",
+  "live.reconnecting": "Connection lost, reconnecting",
+  "live.unavailable": "The live view is not reachable. Reload the page to try again.",
+  "live.canvas_label": "Live view of the application browser"
 }

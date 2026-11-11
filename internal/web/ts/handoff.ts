@@ -1,4 +1,5 @@
-// Handoff island (#31): CDP screencast on canvas, mouse and key dispatch back over WebSocket, and Web Push registration.
+// Live view island: the run's browser as a canvas over a WebSocket. While the run waits for the user, mouse and
+// keyboard go back to the browser. Texts come from the page (message catalog), never from this file.
 
 function urlBase64ToUint8Array(base64String: string): Uint8Array {
   const padding = '='.repeat((4 - (base64String.length % 4)) % 4);
@@ -29,185 +30,171 @@ async function enablePush(): Promise<void> {
   });
 }
 
-function initHandoff(): void {
+// Close codes sent by the server (internal/web/handoff.go).
+const NOT_LIVE = 4000;
+const WAITING = 4001;
+const MAX_FAILURES = 8;
+
+type Mode = 'connecting' | 'waiting' | 'view' | 'interactive' | 'ended' | 'reconnecting' | 'unavailable';
+
+function initLiveView(): void {
   const pushBtn = document.getElementById('btn-push');
-  if (pushBtn) {
-    pushBtn.addEventListener('click', () => {
-      void enablePush();
-    });
-  }
+  pushBtn?.addEventListener('click', () => {
+    void enablePush();
+  });
 
+  const box = document.getElementById('live-view');
   const canvas = document.getElementById('screencast') as HTMLCanvasElement | null;
-  if (!canvas) return;
-
-  const appId = canvas.dataset.app;
-  if (!appId) return;
-
-  const fallbackUrl = canvas.dataset.fallback;
-  let receivedFrame = false;
-
-  // Render fallback snapshot if present while waiting for live frames
-  if (fallbackUrl) {
-    const img = new Image();
-    img.onload = () => {
-      if (!receivedFrame) {
-        const ctx = canvas.getContext('2d');
-        if (ctx) {
-          canvas.width = img.naturalWidth || 1280;
-          canvas.height = img.naturalHeight || 800;
-          ctx.drawImage(img, 0, 0);
-        }
-      }
-    };
-    img.src = fallbackUrl;
-  }
-
   const statusEl = document.getElementById('screen-status');
-  function updateStatus(text: string): void {
-    if (statusEl) statusEl.textContent = text;
-  }
+  const resumeBtn = document.getElementById('btn-resume') as HTMLButtonElement | null;
+  if (!box || !canvas || !box.dataset.app) return;
+  const appId = box.dataset.app;
+  const ctx2d = canvas.getContext('2d');
+
+  const texts: Record<Mode, string> = {
+    connecting: box.dataset.tConnecting ?? '',
+    waiting: box.dataset.tWaiting ?? '',
+    view: box.dataset.tViewOnly ?? '',
+    interactive: box.dataset.tYourTurn ?? '',
+    ended: box.dataset.tEnded ?? '',
+    reconnecting: box.dataset.tReconnecting ?? '',
+    unavailable: box.dataset.tUnavailable ?? '',
+  };
 
   let ws: WebSocket | null = null;
-  let reconnectTimer: number | null = null;
-  let retryDelay = 1000;
-  const maxRetryDelay = 5000;
+  let failures = 0;
+  let stopped = false;
+  let interactive = false;
+
+  function setMode(mode: Mode): void {
+    box!.dataset.mode = mode;
+    if (statusEl) statusEl.textContent = texts[mode];
+    if (resumeBtn) resumeBtn.hidden = mode !== 'interactive';
+  }
+
+  function retry(mode: Mode): void {
+    failures++;
+    if (failures > MAX_FAILURES) {
+      setMode('unavailable');
+      return;
+    }
+    setMode(mode);
+    const delay = Math.min(1000 * 2 ** (failures - 1), 15000);
+    window.setTimeout(connect, delay);
+  }
 
   function connect(): void {
-    if (reconnectTimer !== null) {
-      clearTimeout(reconnectTimer);
-      reconnectTimer = null;
-    }
-
+    if (stopped) return;
     const proto = location.protocol === 'https:' ? 'wss:' : 'ws:';
-    ws = new WebSocket(`${proto}//${location.host}/applications/${appId}/screen`, 'getafjob-screencast');
-    ws.binaryType = 'blob';
+    const sock = new WebSocket(`${proto}//${location.host}/applications/${appId}/screen`, 'getafjob-screencast');
+    sock.binaryType = 'blob';
+    ws = sock;
 
-    updateStatus('Connecting to remote browser...');
-
-    ws.onopen = () => {
-      retryDelay = 1000;
-      updateStatus('Connected to remote browser');
-    };
-
-    ws.onmessage = async (e: MessageEvent) => {
-      if (e.data instanceof Blob) {
+    sock.onmessage = async (e: MessageEvent) => {
+      if (typeof e.data === 'string') {
         try {
-          const bmp = await createImageBitmap(e.data);
-          const ctx = canvas.getContext('2d');
-          if (ctx) {
-            receivedFrame = true;
-            if (canvas.width !== bmp.width || canvas.height !== bmp.height) {
-              canvas.width = bmp.width;
-              canvas.height = bmp.height;
-            }
-            ctx.drawImage(bmp, 0, 0);
-            updateStatus('Live streaming active');
+          const msg = JSON.parse(e.data) as { type?: string; interactive?: boolean };
+          if (msg.type === 'status') {
+            interactive = msg.interactive === true;
+            setMode(interactive ? 'interactive' : 'view');
           }
-        } catch (_) {
-          // drop corrupt frames
+        } catch {
+          // ignore malformed status
         }
-      }
-    };
-
-    ws.onclose = (ev) => {
-      ws = null;
-      if (ev.code === 1000 && ev.reason === 'session ended') {
-        updateStatus('Remote browser session ended');
         return;
       }
-      const delaySec = Math.round(retryDelay / 1000);
-      updateStatus(`Disconnected. Reconnecting in ${delaySec}s...`);
-      reconnectTimer = window.setTimeout(() => {
-        retryDelay = Math.min(retryDelay * 1.5, maxRetryDelay);
-        connect();
-      }, retryDelay);
+      if (!(e.data instanceof Blob) || !ctx2d) return;
+      try {
+        const bmp = await createImageBitmap(e.data);
+        failures = 0;
+        if (canvas!.width !== bmp.width || canvas!.height !== bmp.height) {
+          canvas!.width = bmp.width;
+          canvas!.height = bmp.height;
+        }
+        ctx2d.drawImage(bmp, 0, 0);
+        bmp.close();
+      } catch {
+        // drop a corrupt frame
+      }
     };
 
-    ws.onerror = () => {
-      updateStatus('Connection error. Reconnecting...');
+    sock.onclose = (ev: CloseEvent) => {
+      ws = null;
+      interactive = false;
+      if (stopped) return;
+      if (ev.code === NOT_LIVE || (ev.code === 1000 && ev.reason === 'session ended')) {
+        stopped = true;
+        setMode('ended');
+        // The run finished or parked: reload once so the page shows the result and evidence.
+        window.setTimeout(() => location.reload(), 1500);
+        return;
+      }
+      retry(ev.code === WAITING ? 'waiting' : 'reconnecting');
     };
   }
 
-  connect();
-
-  function sendMouse(action: string, e: MouseEvent): void {
-    if (!canvas || !ws || ws.readyState !== WebSocket.OPEN) return;
-    const rect = canvas.getBoundingClientRect();
-    const scaleX = canvas.width / rect.width;
-    const scaleY = canvas.height / rect.height;
-    const x = (e.clientX - rect.left) * scaleX;
-    const y = (e.clientY - rect.top) * scaleY;
-    let button = 'none';
-    if (e.button === 0) button = 'left';
-    else if (e.button === 1) button = 'middle';
-    else if (e.button === 2) button = 'right';
-
-    ws.send(JSON.stringify({
-      type: 'mouse',
-      action,
-      x,
-      y,
-      button,
-      clickCount: e.detail || 1,
-    }));
+  function send(msg: object): void {
+    if (interactive && ws && ws.readyState === WebSocket.OPEN) {
+      ws.send(JSON.stringify(msg));
+    }
   }
 
-  canvas.addEventListener('mousemove', (e) => sendMouse('mouseMoved', e));
+  function point(e: MouseEvent): { x: number; y: number } {
+    const rect = canvas!.getBoundingClientRect();
+    return {
+      x: ((e.clientX - rect.left) * canvas!.width) / rect.width,
+      y: ((e.clientY - rect.top) * canvas!.height) / rect.height,
+    };
+  }
+
+  function mouse(action: string, e: MouseEvent): void {
+    const { x, y } = point(e);
+    const button = action === 'mouseMoved' ? 'none' : (['left', 'middle', 'right'][e.button] ?? 'none');
+    send({ type: 'mouse', action, x, y, button, clickCount: e.detail || 1 });
+  }
+
+  let lastMove = 0;
+  canvas.addEventListener('mousemove', (e) => {
+    const now = performance.now();
+    if (now - lastMove < 50) return; // about 20 moves per second are enough for hover menus
+    lastMove = now;
+    mouse('mouseMoved', e);
+  });
   canvas.addEventListener('mousedown', (e) => {
     canvas.focus();
-    sendMouse('mousePressed', e);
+    mouse('mousePressed', e);
   });
-  canvas.addEventListener('mouseup', (e) => sendMouse('mouseReleased', e));
+  canvas.addEventListener('mouseup', (e) => mouse('mouseReleased', e));
   canvas.addEventListener('contextmenu', (e) => e.preventDefault());
 
-  canvas.addEventListener('keydown', (e) => {
-    if (!ws || ws.readyState !== WebSocket.OPEN) return;
-    ws.send(JSON.stringify({
+  function key(action: string, e: KeyboardEvent): void {
+    if (!interactive) return;
+    send({
       type: 'key',
-      action: 'keyDown',
+      action,
       key: e.key,
       code: e.code,
-      text: e.key.length === 1 ? e.key : '',
+      text: action === 'keyDown' && e.key.length === 1 ? e.key : '',
       windowsVirtualKeyCode: e.keyCode,
-    }));
-    if (['Tab', 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', ' '].includes(e.key)) {
-      e.preventDefault();
-    }
-  });
-
-  canvas.addEventListener('keyup', (e) => {
-    if (!ws || ws.readyState !== WebSocket.OPEN) return;
-    ws.send(JSON.stringify({
-      type: 'key',
-      action: 'keyUp',
-      key: e.key,
-      code: e.code,
-      text: e.key.length === 1 ? e.key : '',
-      windowsVirtualKeyCode: e.keyCode,
-    }));
-  });
-
-  const resumeBtn = document.getElementById('btn-resume');
-  if (resumeBtn) {
-    resumeBtn.addEventListener('click', () => {
-      if (ws && ws.readyState === WebSocket.OPEN) {
-        ws.send(JSON.stringify({ type: 'resume' }));
-      }
     });
+    e.preventDefault();
   }
+  canvas.addEventListener('keydown', (e) => key('keyDown', e));
+  canvas.addEventListener('keyup', (e) => key('keyUp', e));
 
-  window.addEventListener('beforeunload', () => {
-    if (reconnectTimer !== null) {
-      clearTimeout(reconnectTimer);
-    }
-    if (ws) {
-      ws.close();
-    }
+  resumeBtn?.addEventListener('click', () => send({ type: 'resume' }));
+
+  window.addEventListener('pagehide', () => {
+    stopped = true;
+    ws?.close();
   });
+
+  setMode('connecting');
+  connect();
 }
 
 if (document.readyState === 'loading') {
-  document.addEventListener('DOMContentLoaded', initHandoff);
+  document.addEventListener('DOMContentLoaded', initLiveView);
 } else {
-  initHandoff();
+  initLiveView();
 }

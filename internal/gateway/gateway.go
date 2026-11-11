@@ -72,6 +72,15 @@ type Server struct {
 	handoffs     sync.Map // map[uuid.UUID]*HandoffSession
 	runners      sync.Map // map[string]runnerSession
 	runSteps     sync.Map // map[uuid.UUID]runStepState
+	frameAuth    sync.Map // map[string]frameGrant, token -> run for screencast frames
+}
+
+// frameGrantTTL bounds how long a frame call trusts an earlier token check; frames only publish to viewers.
+const frameGrantTTL = 10 * time.Second
+
+type frameGrant struct {
+	ref     application.RunRef
+	expires time.Time
 }
 
 type runStepState struct {
@@ -90,14 +99,41 @@ type runnerSession struct {
 	userID   uuid.UUID
 }
 
-// HandoffSession coordinates a live remote browser screencast between a runner and the web UI.
+// HandoffSession is the live view of one run: the runner publishes screencast frames for the whole run, any number
+// of viewers subscribe, and viewer input reaches the runner while it waits for the user.
 type HandoffSession struct {
-	Frames chan []byte
+	UserID uuid.UUID
 	Input  chan *runnerv1.HandoffEvent
 	Done   chan struct{}
 	once   sync.Once
 	mu     sync.Mutex
 	last   []byte
+	subs   map[chan []byte]struct{}
+	waited time.Time // last time the runner waited for input, i.e. the user has control
+}
+
+// interactiveFor is how long after its last wait call the runner still counts as waiting for input; the runner
+// repeats the call at least every 3 seconds while it holds the handoff.
+const interactiveFor = 5 * time.Second
+
+// MarkWaiting records that the runner waits for the user right now.
+func (h *HandoffSession) MarkWaiting() {
+	h.mu.Lock()
+	h.waited = time.Now()
+	h.mu.Unlock()
+}
+
+// Interactive reports whether the runner currently waits for the user, so viewer input reaches the page.
+func (h *HandoffSession) Interactive() bool {
+	h.mu.Lock()
+	defer h.mu.Unlock()
+	return time.Since(h.waited) < interactiveFor
+}
+
+// NewHandoffSession starts the live view session of one run of the user.
+func NewHandoffSession(userID uuid.UUID) *HandoffSession {
+	return &HandoffSession{UserID: userID, Input: make(chan *runnerv1.HandoffEvent, 50), Done: make(chan struct{}),
+		subs: map[chan []byte]struct{}{}}
 }
 
 func (h *HandoffSession) closeDone() {
@@ -111,6 +147,41 @@ func (h *HandoffSession) LastFrame() []byte {
 	return h.last
 }
 
+// Subscribe returns a channel with the newest frames for one viewer; a slow viewer skips frames instead of
+// slowing down others. Call the returned func to unsubscribe.
+func (h *HandoffSession) Subscribe() (<-chan []byte, func()) {
+	ch := make(chan []byte, 2)
+	h.mu.Lock()
+	h.subs[ch] = struct{}{}
+	h.mu.Unlock()
+	return ch, func() {
+		h.mu.Lock()
+		delete(h.subs, ch)
+		h.mu.Unlock()
+	}
+}
+
+// Publish stores the newest frame and hands it to every viewer.
+func (h *HandoffSession) Publish(f []byte) {
+	h.mu.Lock()
+	defer h.mu.Unlock()
+	h.last = f
+	for ch := range h.subs {
+		select {
+		case ch <- f:
+		default: // drop the oldest queued frame, keep the newest
+			select {
+			case <-ch:
+			default:
+			}
+			select {
+			case ch <- f:
+			default:
+			}
+		}
+	}
+}
+
 // SessionFor returns the active handoff session of an application, if any.
 func (s *Server) SessionFor(appID uuid.UUID) (*HandoffSession, bool) {
 	v, ok := s.handoffs.Load(appID)
@@ -120,15 +191,16 @@ func (s *Server) SessionFor(appID uuid.UUID) (*HandoffSession, bool) {
 	return v.(*HandoffSession), true
 }
 
-// ActiveSessions returns the application IDs of all active handoff sessions (#157).
-func (s *Server) ActiveSessions() []uuid.UUID {
+// ActiveRuns returns the application IDs of the user's runs that currently stream a live view.
+func (s *Server) ActiveRuns(userID uuid.UUID) []uuid.UUID {
 	var ids []uuid.UUID
 	s.handoffs.Range(func(key, value any) bool {
-		if id, ok := key.(uuid.UUID); ok {
+		if id, ok := key.(uuid.UUID); ok && value.(*HandoffSession).UserID == userID {
 			ids = append(ids, id)
 		}
 		return true
 	})
+	slices.SortFunc(ids, func(a, b uuid.UUID) int { return strings.Compare(a.String(), b.String()) })
 	return ids
 }
 
@@ -190,6 +262,26 @@ func (s *Server) run(ctx context.Context) (application.RunRef, error) {
 		return ref, connect.NewError(connect.CodeUnauthenticated, err.Error())
 	}
 	return ref, err
+}
+
+// frameRun authorizes a screencast frame call, reusing a check of the same token from the last frameGrantTTL.
+func (s *Server) frameRun(ctx context.Context) (application.RunRef, error) {
+	info, _ := connect.CallInfoForServerContext(ctx)
+	var h *connect.Header
+	if info != nil {
+		h = info.RequestHeader()
+	}
+	key := bearer(h)
+	if v, ok := s.frameAuth.Load(key); ok && time.Now().Before(v.(frameGrant).expires) {
+		return v.(frameGrant).ref, nil
+	}
+	ref, err := s.run(ctx)
+	if err != nil {
+		s.frameAuth.Delete(key)
+		return ref, err
+	}
+	s.frameAuth.Store(key, frameGrant{ref: ref, expires: time.Now().Add(frameGrantTTL)})
+	return ref, nil
 }
 
 // code maps application errors to Connect codes.
@@ -444,7 +536,16 @@ func clip(s string, n int) string {
 
 // Handoff exchanges live screencast frames and user input during an interactive handoff.
 func (s *Server) Handoff(ctx context.Context, req *runnerv1.HandoffRequest) (*runnerv1.HandoffResponse, error) {
-	ref, err := s.run(ctx)
+	frame := req.GetFrame()
+	var (
+		ref application.RunRef
+		err error
+	)
+	if len(frame) > 0 && !req.GetWait() && !req.GetDone() {
+		ref, err = s.frameRun(ctx) // frames arrive many times a second; authorize from a short cache
+	} else {
+		ref, err = s.run(ctx)
+	}
 	if err != nil {
 		return nil, err
 	}
@@ -452,22 +553,24 @@ func (s *Server) Handoff(ctx context.Context, req *runnerv1.HandoffRequest) (*ru
 		if v, ok := s.handoffs.LoadAndDelete(ref.AppID); ok {
 			v.(*HandoffSession).closeDone()
 		}
+		s.frameAuth.Range(func(k, v any) bool {
+			if v.(frameGrant).ref.AppID == ref.AppID {
+				s.frameAuth.Delete(k)
+			}
+			return true
+		})
 		return &runnerv1.HandoffResponse{}, nil
 	}
-	v, _ := s.handoffs.LoadOrStore(ref.AppID, &HandoffSession{
-		Frames: make(chan []byte, 4),
-		Input:  make(chan *runnerv1.HandoffEvent, 50),
-		Done:   make(chan struct{}),
-	})
+	v, _ := s.handoffs.LoadOrStore(ref.AppID, NewHandoffSession(ref.UserID))
 	sess := v.(*HandoffSession)
 
-	if f := req.GetFrame(); len(f) > 0 && len(f) <= maxScreenshot {
-		sess.mu.Lock()
-		sess.last = f
-		sess.mu.Unlock()
-		select {
-		case sess.Frames <- f:
-		default:
+	if len(frame) > 0 {
+		if len(frame) <= maxScreenshot {
+			sess.Publish(frame)
+		}
+		if !req.GetWait() {
+			// A frame call never takes viewer input; only the runner's wait loop does, so no input is lost.
+			return &runnerv1.HandoffResponse{}, nil
 		}
 	}
 
@@ -481,6 +584,9 @@ func (s *Server) Handoff(ctx context.Context, req *runnerv1.HandoffRequest) (*ru
 				return
 			}
 		}
+	}
+	if req.GetWait() {
+		sess.MarkWaiting()
 	}
 	drain()
 	if len(out) == 0 && req.GetWait() {

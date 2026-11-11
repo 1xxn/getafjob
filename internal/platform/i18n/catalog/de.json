@@ -487,7 +487,6 @@
   "handoff.active_sessions": "Aktive Live-Läufe",
   "handoff.approval_reasons": "Diese Bewerbung erfordert vor dem Absenden deine Freigabe:",
   "handoff.approve": "Bewerbung freigeben",
-  "handoff.connecting": "Verbinde mit dem Remote-Browser...",
   "handoff.continue": "Weiter",
   "handoff.park": "Parken",
   "handoff.push": "Push-Benachrichtigungen aktivieren",
@@ -659,5 +658,14 @@
   "tracker.title": "Bewerbungs-Tracker",
   "tracker.updated": "Aktualisiert {when}",
   "tracker.view_application": "Bewerbungsdetails",
-  "tracker.view_details": "Details"
+  "tracker.view_details": "Details",
+  "live.indicator": "{count} live",
+  "live.connecting": "Verbinde mit dem Browser",
+  "live.waiting": "Warte auf den Start des Browsers",
+  "live.view_only": "Live. Der Lauf steuert den Browser, du schaust zu.",
+  "live.your_turn": "Du bist dran. Der Lauf wartet auf dich: Klick ins Bild, um den Browser zu bedienen, dann auf Weiter.",
+  "live.ended": "Der Lauf ist beendet.",
+  "live.reconnecting": "Verbindung verloren, verbinde neu",
+  "live.unavailable": "Die Live-Ansicht ist nicht erreichbar. Lade die Seite neu, um es noch einmal zu versuchen.",
+  "live.canvas_label": "Live-Ansicht des Bewerbungsbrowsers"
 }

@@ -11,6 +11,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"sync"
 	"time"
 
 	"connectrpc.com/connect/v2"
@@ -132,11 +133,7 @@ func (a *Agent) RunOne(ctx context.Context, run *runnerv1.Run) error {
 		return err
 	}
 	stopStream := a.startLiveScreencast(ctx, p, tok)
-	defer func() {
-		if stopStream != nil {
-			stopStream()
-		}
-	}()
+	defer func() { stopStream() }()
 
 	if len(run.GetSessionCookiesJson()) > 0 {
 		var cookies []*proto.NetworkCookieParam
@@ -161,10 +158,6 @@ func (a *Agent) RunOne(ctx context.Context, run *runnerv1.Run) error {
 			}}); err != nil {
 				return err
 			}
-			if stopStream != nil {
-				stopStream()
-				stopStream = nil
-			}
 			_, ok, herr := a.handoff(ctx, p, c, run)
 			if herr != nil {
 				return herr
@@ -172,7 +165,6 @@ func (a *Agent) RunOne(ctx context.Context, run *runnerv1.Run) error {
 			if !ok {
 				return nil
 			}
-			stopStream = a.startLiveScreencast(ctx, p, tok)
 			if res, err := (proto.NetworkGetCookies{}).Call(p); err == nil && len(res.Cookies) > 0 {
 				params := proto.CookiesToParams(res.Cookies)
 				if updatedJSON, err := json.Marshal(params); err == nil {
@@ -193,19 +185,13 @@ func (a *Agent) RunOne(ctx context.Context, run *runnerv1.Run) error {
 		return c.Park(ctx, "find the form: "+err.Error(), shot)
 	}
 	if form != nil && form != p {
-		if stopStream != nil {
-			stopStream()
-		}
+		stopStream()
 		stopStream = a.startLiveScreencast(ctx, form, tok)
 	}
 	for {
 		err = e.Run(ctx, form)
 		switch {
 		case errors.Is(err, engine.ErrAsked):
-			if stopStream != nil {
-				stopStream()
-				stopStream = nil
-			}
 			ans, ok, herr := a.handoff(ctx, form, c, run)
 			if herr != nil {
 				return herr
@@ -213,7 +199,6 @@ func (a *Agent) RunOne(ctx context.Context, run *runnerv1.Run) error {
 			if !ok {
 				return nil
 			}
-			stopStream = a.startLiveScreencast(ctx, form, tok)
 			for _, an := range ans {
 				k.Answers = append(k.Answers, planner.Answer{ID: an.GetId(), Question: an.GetQuestion(), Answer: an.GetAnswer()})
 			}
@@ -231,40 +216,61 @@ func (a *Agent) RunOne(ctx context.Context, run *runnerv1.Run) error {
 	}
 }
 
-// startLiveScreencast streams CDP screencast frames to the gateway in the background throughout the run (#157).
+// startLiveScreencast streams the page to the gateway for the live view during the whole run. Frames are acked at
+// once and sent from a goroutine that always takes the newest frame, so a slow gateway never stalls Chromium.
 func (a *Agent) startLiveScreencast(ctx context.Context, p *rod.Page, tok string) func() {
 	if p == nil {
 		return func() {}
 	}
-	quality := 70
+	quality, maxW, maxH := 60, 1280, 1024
 	if err := (proto.PageStartScreencast{
-		Format:  proto.PageStartScreencastFormatJpeg,
-		Quality: &quality,
+		Format:    proto.PageStartScreencastFormatJpeg,
+		Quality:   &quality,
+		MaxWidth:  &maxW,
+		MaxHeight: &maxH,
 	}).Call(p); err != nil {
+		a.Logger.WarnContext(ctx, "live view unavailable", "err", err)
 		return func() {}
 	}
-	sctx, stopScreencast := context.WithCancel(ctx)
+	sctx, stop := context.WithCancel(ctx)
+	latest := make(chan []byte, 1)
 	waitEvents := p.Context(sctx).EachEvent(func(e *proto.PageScreencastFrame) {
-		_, _ = a.Client.Handoff(auth(sctx, tok), &runnerv1.HandoffRequest{Frame: e.Data})
 		_ = (proto.PageScreencastFrameAck{SessionID: e.SessionID}).Call(p)
-	})
-	eventsDone := make(chan struct{})
-	go func() {
-		waitEvents()
-		close(eventsDone)
-	}()
-	return func() {
-		stopScreencast()
-		_ = (proto.PageStopScreencast{}).Call(p)
 		select {
-		case <-eventsDone:
+		case <-latest: // replace an unsent frame with the newer one
+		default:
+		}
+		select {
+		case latest <- e.Data:
+		default:
+		}
+	})
+	var wg sync.WaitGroup
+	wg.Go(waitEvents)
+	wg.Go(func() {
+		for {
+			select {
+			case <-sctx.Done():
+				return
+			case f := <-latest:
+				_, _ = a.Client.Handoff(auth(sctx, tok), &runnerv1.HandoffRequest{Frame: f})
+			}
+		}
+	})
+	return func() {
+		stop()
+		_ = (proto.PageStopScreencast{}).Call(p)
+		done := make(chan struct{})
+		go func() { wg.Wait(); close(done) }()
+		select {
+		case <-done:
 		case <-time.After(2 * time.Second):
 		}
 	}
 }
 
-// handoff holds the browser session for the user (default 15 min), streams screencast frames to the gateway,
-// and dispatches user input back to Chromium without ever logging or storing the input.
+// handoff holds the browser session for the user (default 15 min) and dispatches user input back to Chromium
+// without ever logging or storing the input; the run's live stream keeps running meanwhile.
 func (a *Agent) handoff(ctx context.Context, p *rod.Page, c *coordinator, run *runnerv1.Run) ([]*runnerv1.Answer, bool, error) {
 	hold := a.HandoffHold
 	if hold <= 0 {
@@ -280,30 +286,6 @@ func (a *Agent) handoff(ctx context.Context, p *rod.Page, c *coordinator, run *r
 		}
 		return nil, false, err
 	}
-
-	quality := 70
-	if err := (proto.PageStartScreencast{
-		Format:  proto.PageStartScreencastFormatJpeg,
-		Quality: &quality,
-	}).Call(p); err != nil {
-		return nil, false, err
-	}
-	defer func() { _ = (proto.PageStopScreencast{}).Call(p) }()
-
-	sctx, stopScreencast := context.WithCancel(hctx)
-	waitEvents := p.Context(sctx).EachEvent(func(e *proto.PageScreencastFrame) {
-		_, _ = a.Client.Handoff(auth(sctx, tok), &runnerv1.HandoffRequest{Frame: e.Data})
-		_ = (proto.PageScreencastFrameAck{SessionID: e.SessionID}).Call(p)
-	})
-	eventsDone := make(chan struct{})
-	go func() {
-		waitEvents()
-		close(eventsDone)
-	}()
-	defer func() {
-		stopScreencast()
-		<-eventsDone
-	}()
 
 	for {
 		res, err := a.Client.Handoff(auth(hctx, tok), &runnerv1.HandoffRequest{Wait: true})
