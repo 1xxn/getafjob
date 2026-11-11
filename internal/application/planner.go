@@ -15,9 +15,9 @@ func PacingInterval(dailyLimit int) time.Duration {
 }
 
 // Plan plans and queues matching applications on behalf of users whose autonomy settings allow it.
-// Applications are queued immediately up to the user's daily quota (#156).
+// Applications are queued immediately up to the user's daily quota (#156), or all of them without limits (#164).
 func (s *Service) Plan(ctx context.Context) (PlanStats, error) {
-	users, err := s.store.PlanUsers(ctx)
+	users, err := s.store.PlanUsers(ctx, s.unlimited)
 	if err != nil {
 		return PlanStats{}, err
 	}
@@ -25,7 +25,7 @@ func (s *Service) Plan(ctx context.Context) (PlanStats, error) {
 	st := PlanStats{UsersEligible: len(users)}
 	for _, u := range users {
 		cfg, err := s.Settings(ctx, u)
-		if err != nil || !cfg.AutoQueue() || cfg.DailyLimit <= 0 {
+		if err != nil || !cfg.AutoQueue() || (!cfg.Unlimited && cfg.DailyLimit <= 0) {
 			continue
 		}
 		// Check user's submit quota in the 24h window
@@ -38,7 +38,7 @@ func (s *Service) Plan(ctx context.Context) (PlanStats, error) {
 		if err != nil {
 			return st, err
 		}
-		if submits+active >= cfg.DailyLimit {
+		if !cfg.Unlimited && submits+active >= cfg.DailyLimit {
 			continue
 		}
 
@@ -49,7 +49,7 @@ func (s *Service) Plan(ctx context.Context) (PlanStats, error) {
 		}
 
 		for _, c := range cands {
-			if submits+active >= cfg.DailyLimit {
+			if !cfg.Unlimited && submits+active >= cfg.DailyLimit {
 				break
 			}
 			// Check candidate guards (exclusion, duplicate, company window)

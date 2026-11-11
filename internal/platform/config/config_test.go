@@ -52,6 +52,9 @@ func TestLoadDefaults(t *testing.T) {
 	if c.EasyApplyEnabled {
 		t.Errorf("EasyApplyEnabled default = true, want false")
 	}
+	if c.Limits {
+		t.Errorf("Limits default = on, want off")
+	}
 	if c.AIEnabled {
 		t.Errorf("AIEnabled default = true, want false")
 	}
@@ -68,6 +71,7 @@ func TestLoadValuesAndFiles(t *testing.T) {
 		"GETAFJOB_LOG_LEVEL":                "debug",
 		"GETAFJOB_LOG_FORMAT":               "text",
 		"GETAFJOB_EGRESS_PROXY":             "http://egress:4750",
+		"GETAFJOB_LIMITS":                   "ON",
 		"GETAFJOB_EASY_APPLY_ENABLED":       "true",
 		"GETAFJOB_AI_ENABLED":               "true",
 		"GETAFJOB_ANTHROPIC_API_KEY":        "sk-ant-test-key",
@@ -100,6 +104,9 @@ func TestLoadValuesAndFiles(t *testing.T) {
 	if !c.AIEnabled {
 		t.Errorf("AIEnabled = false, want true")
 	}
+	if !c.Limits {
+		t.Errorf("Limits = off, want on")
+	}
 	if c.AnthropicAPIKey.Reveal() != "sk-ant-test-key" || c.AnthropicModel != "claude-3-5-sonnet-20241022" || c.AIBudgetPerUserCents != 1000 {
 		t.Errorf("AI values wrong: key=%q, model=%q, budget=%d", c.AnthropicAPIKey.Reveal(), c.AnthropicModel, c.AIBudgetPerUserCents)
 	}
@@ -126,6 +133,7 @@ func TestLoadErrors(t *testing.T) {
 		{"bad level", map[string]string{"GETAFJOB_LOG_LEVEL": "loud"}, nil, "GETAFJOB_LOG_LEVEL"},
 		{"bad format", map[string]string{"GETAFJOB_LOG_FORMAT": "xml"}, nil, "json or text"},
 		{"bad proxy", map[string]string{"GETAFJOB_EGRESS_PROXY": "socks5://x:1"}, nil, "http(s) URL"},
+		{"bad limits", map[string]string{"GETAFJOB_LIMITS": "maybe"}, nil, "on or off"},
 		{"bad timeout", map[string]string{"GETAFJOB_SHUTDOWN_TIMEOUT": "10m"}, nil, "between 1s and 5m"},
 	}
 	for _, tc := range cases {

@@ -69,7 +69,8 @@ UPDATE applications SET handoff_warned = true WHERE id = $1 AND user_id = $2 AND
 
 -- name: LeaseCandidate :one
 -- System role: the oldest queued application whose host has no active run and no lease within the gap,
--- whose user has free daily quota, that has no unfinished run itself, and that matches the runner's choice.
+-- whose user has free daily quota (both skipped when unlimited), that has no unfinished run itself, and that
+-- matches the runner's choice.
 SELECT a.id, a.user_id, a.job_id,
   lower(coalesce(substring(coalesce(nullif(j.apply_url, ''), j.url) from '^[a-zA-Z]+://([^/:?#]+)'), ''))::text AS host
 FROM applications a
@@ -77,14 +78,16 @@ JOIN jobs j ON j.id = a.job_id
 LEFT JOIN autonomy_settings s ON s.user_id = a.user_id
 WHERE a.state = 'queued'
   AND NOT EXISTS (SELECT 1 FROM runs r WHERE r.application_id = a.id AND r.finished_at IS NULL AND r.expires_at > sqlc.arg(now)::timestamptz)
-  AND NOT EXISTS (SELECT 1 FROM runs r WHERE r.host = lower(coalesce(substring(coalesce(nullif(j.apply_url, ''), j.url) from '^[a-zA-Z]+://([^/:?#]+)'), ''))
-    AND ((r.finished_at IS NULL AND r.expires_at > sqlc.arg(now)::timestamptz) OR r.leased_at > sqlc.arg(gap_start)::timestamptz))
-  AND coalesce(s.daily_limit, 5) > 0
-  AND (
-    SELECT count(*) FROM submit_attempts sa
-    WHERE sa.user_id = a.user_id
-      AND sa.started_at >= sqlc.arg(now)::timestamptz - interval '24 hours'
-  ) < coalesce(s.daily_limit, 5)
+  -- Without limits (self-host) neither the per-host gap nor the daily quota applies.
+  AND (sqlc.arg(unlimited)::bool OR (
+    NOT EXISTS (SELECT 1 FROM runs r WHERE r.host = lower(coalesce(substring(coalesce(nullif(j.apply_url, ''), j.url) from '^[a-zA-Z]+://([^/:?#]+)'), ''))
+      AND ((r.finished_at IS NULL AND r.expires_at > sqlc.arg(now)::timestamptz) OR r.leased_at > sqlc.arg(gap_start)::timestamptz))
+    AND coalesce(s.daily_limit, 5) > 0
+    AND (
+      SELECT count(*) FROM submit_attempts sa
+      WHERE sa.user_id = a.user_id
+        AND sa.started_at >= sqlc.arg(now)::timestamptz - interval '24 hours'
+    ) < coalesce(s.daily_limit, 5)))
   AND coalesce(s.runner_choice, 'server') = sqlc.arg(runner_choice)::text
   AND (sqlc.narg(user_id)::uuid IS NULL OR a.user_id = sqlc.narg(user_id)::uuid)
 ORDER BY a.updated_at, a.id

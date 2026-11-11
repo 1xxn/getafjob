@@ -33,12 +33,20 @@ const StuckAfter = 15 * time.Minute
 
 // Service changes application states.
 type Service struct {
-	store Store
-	now   func() time.Time
+	store     Store
+	now       func() time.Time
+	unlimited bool
 }
 
 // NewService returns an application service.
 func NewService(s Store) *Service { return &Service{store: s, now: time.Now} }
+
+// WithoutLimits turns off the throughput limits for a self-hosted instance: no daily quota and no per-host gap.
+// Guard rails (exclusions, duplicates, company window, approval rule, submit register) stay.
+func (s *Service) WithoutLimits() *Service { s.unlimited = true; return s }
+
+// Unlimited reports whether the throughput limits are off.
+func (s *Service) Unlimited() bool { return s.unlimited }
 
 // WithClock sets the clock (tests).
 func (s *Service) WithClock(now func() time.Time) *Service { s.now = now; return s }
@@ -201,7 +209,9 @@ func (s *Service) BeginSubmit(ctx context.Context, userID, id uuid.UUID) error {
 
 // Settings returns the user's autonomy settings.
 func (s *Service) Settings(ctx context.Context, userID uuid.UUID) (Settings, error) {
-	return s.store.Settings(ctx, userID)
+	st, err := s.store.Settings(ctx, userID)
+	st.Unlimited = s.unlimited
+	return st, err
 }
 
 // SaveSettings validates and stores the user's autonomy settings.

@@ -235,7 +235,11 @@ templ PreferencesPage(name string, f Form) {
 					<p class="hint">{ T(ctx, "profile.hint.runner_choice") }</p>
 				</div>
 				@Field(input(ctx, f, "min_score", "number", "", 3))
-				@Field(input(ctx, f, "daily_limit", "number", "", 3))
+				if f.Values["limits_on"] == "true" {
+					@Field(input(ctx, f, "daily_limit", "number", "", 3))
+				} else {
+					<p class="hint">{ T(ctx, "profile.hint.no_limits") }</p>
+				}
 				<h2>{ T(ctx, "profile.easy_apply.title") }</h2>
 				<p class="muted">{ T(ctx, "profile.easy_apply.hint") }</p>
 				if f.Values["easy_apply_admin_enabled"] != "true" {

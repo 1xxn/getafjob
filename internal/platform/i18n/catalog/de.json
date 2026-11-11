@@ -659,6 +659,7 @@
   "tracker.updated": "Aktualisiert {when}",
   "tracker.view_application": "Bewerbungsdetails",
   "tracker.view_details": "Details",
+  "profile.hint.no_limits": "Diese Instanz hat kein Tageslimit: Bewerbungen laufen so schnell, wie die Runner es schaffen. Freigabe und die übrigen Sicherheitsprüfungen gelten weiter.",
   "live.indicator": "{count} live",
   "live.connecting": "Verbinde mit dem Browser",
   "live.waiting": "Warte auf den Start des Browsers",

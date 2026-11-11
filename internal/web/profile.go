@@ -441,6 +441,7 @@ func preferencesForm(p profile.Preferences, a application.Settings, mb tracking.
 		"runner_choice":             runnerChoice,
 		"min_score":                 strconv.Itoa(a.MinScore),
 		"daily_limit":               strconv.Itoa(a.DailyLimit),
+		"limits_on":                 strconv.FormatBool(!a.Unlimited),
 		"easy_apply_admin_enabled":  strconv.FormatBool(easyApplyAdmin),
 		"portal_status_linkedin":    "disconnected",
 		"portal_status_indeed":      "disconnected",
@@ -704,6 +705,7 @@ func (s *Server) preferencesSave(w http.ResponseWriter, r *http.Request, u *iden
 		f.Values["min_salary"] = r.PostFormValue("min_salary")
 		f.Values["min_score"] = r.PostFormValue("min_score")
 		f.Values["daily_limit"] = r.PostFormValue("daily_limit")
+		f.Values["limits_on"] = strconv.FormatBool(s.Apps == nil || !s.Apps.Unlimited())
 		f.Values["runner_choice"] = r.PostFormValue("runner_choice")
 		f.Checks["easy_apply_enabled"] = easyApplyEnabled
 		f.Checks["easy_apply_terms_accepted"] = termsAccepted

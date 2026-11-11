@@ -410,7 +410,7 @@ var _ application.RunStore = (*Store)(nil)
 
 // LeaseNext leases the next application in the system role: one lease at a time (advisory lock), so the
 // per-host check holds across runners.
-func (s *Store) LeaseNext(ctx context.Context, runnerID string, tokenHash []byte, runnerChoice string, userID *uuid.UUID, now, expires, gapStart time.Time) (
+func (s *Store) LeaseNext(ctx context.Context, runnerID string, tokenHash []byte, runnerChoice string, userID *uuid.UUID, now, expires, gapStart time.Time, unlimited bool) (
 	l application.Lease, ok bool, err error,
 ) {
 	err = db.InSystemTx(ctx, s.pool, func(tx pgx.Tx) error {
@@ -418,7 +418,7 @@ func (s *Store) LeaseNext(ctx context.Context, runnerID string, tokenHash []byte
 		if err := qs.LockLeases(ctx); err != nil {
 			return err
 		}
-		c, err := qs.LeaseCandidate(ctx, q.LeaseCandidateParams{Now: now, GapStart: gapStart, RunnerChoice: runnerChoice, UserID: userID})
+		c, err := qs.LeaseCandidate(ctx, q.LeaseCandidateParams{Now: now, GapStart: gapStart, RunnerChoice: runnerChoice, UserID: userID, Unlimited: unlimited})
 		if errors.Is(err, pgx.ErrNoRows) {
 			return nil
 		}
@@ -745,9 +745,9 @@ func (s *Store) SetAdapter(ctx context.Context, r application.RunRef, adapter st
 }
 
 // PlanUsers lists active users whose autonomy level enables auto-planning and who have daily quota > 0 (system role).
-func (s *Store) PlanUsers(ctx context.Context) (ids []uuid.UUID, err error) {
+func (s *Store) PlanUsers(ctx context.Context, unlimited bool) (ids []uuid.UUID, err error) {
 	err = db.InSystemTx(ctx, s.pool, func(tx pgx.Tx) error {
-		ids, err = q.New(tx).PlanUsers(ctx)
+		ids, err = q.New(tx).PlanUsers(ctx, unlimited)
 		return err
 	})
 	return ids, err

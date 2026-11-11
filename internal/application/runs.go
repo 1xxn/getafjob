@@ -49,7 +49,7 @@ type Checkpoint struct {
 // RunStore persists runs (row-level security; leasing in the system role).
 type RunStore interface {
 	// LeaseNext leases the oldest queued application that passes the per-host limits.
-	LeaseNext(ctx context.Context, runnerID string, tokenHash []byte, runnerChoice string, userID *uuid.UUID, now, expires, gapStart time.Time) (Lease, bool, error)
+	LeaseNext(ctx context.Context, runnerID string, tokenHash []byte, runnerChoice string, userID *uuid.UUID, now, expires, gapStart time.Time, unlimited bool) (Lease, bool, error)
 	RunByToken(ctx context.Context, tokenHash []byte) (RunRef, time.Time, *time.Time, error)
 	FinishRun(ctx context.Context, r RunRef, outcome string, at time.Time) error
 	AddCheckpoint(ctx context.Context, r RunRef, c Checkpoint) error
@@ -84,7 +84,7 @@ func (r *Runs) Lease(ctx context.Context, runnerID string, choice RunnerChoice, 
 		_, _ = rand.Read(b)
 		token := base64.RawURLEncoding.EncodeToString(b)
 		now := r.apps.now()
-		l, ok, err := r.store.LeaseNext(ctx, runnerID, tokenHash(token), runnerChoice, userID, now, now.Add(RunTTL), now.Add(-HostGap))
+		l, ok, err := r.store.LeaseNext(ctx, runnerID, tokenHash(token), runnerChoice, userID, now, now.Add(RunTTL), now.Add(-HostGap), r.apps.unlimited)
 		if err != nil || !ok {
 			return Lease{}, false, err
 		}
@@ -166,6 +166,7 @@ func (r *Runs) BeginSubmit(ctx context.Context, ref RunRef) error {
 		if err != nil {
 			return err
 		}
+		in.Settings.Unlimited = s.unlimited
 		if reasons := Rule(in, now); len(reasons) > 0 {
 			qs := []Question{{Kind: QuestionApproval, Label: QuestionApproval}}
 			if _, err := s.applyChange(ctx, ref.UserID, ref.AppID, Change{Event: EvAsk, Actor: ActorRunner,

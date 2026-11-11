@@ -232,7 +232,7 @@ type Store interface {
 	Approvals(ctx context.Context, userID uuid.UUID) ([]Approval, error)
 
 	// PlanUsers lists active users whose autonomy level enables auto-planning and who have daily quota > 0 (system role).
-	PlanUsers(ctx context.Context) ([]uuid.UUID, error)
+	PlanUsers(ctx context.Context, unlimited bool) ([]uuid.UUID, error)
 	// ActiveApplicationsCount counts applications in queued, running, or submitting for the user.
 	ActiveApplicationsCount(ctx context.Context, userID uuid.UUID) (int, error)
 	// UserLastPacedAt returns the most recent timestamp an application was queued, run leased, or submit started for pacing.
