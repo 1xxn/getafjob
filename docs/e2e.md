@@ -15,7 +15,10 @@ How it runs:
 - Chromium starts through `internal/runner/browser`, so no security switch can be added. It reaches Caddy as
   `https://localhost` by a host resolver rule and trusts only the key of Caddy's local intermediate CA
   (`--ignore-certificate-errors-spki-list`); every other certificate still fails.
-- Each run invites a fresh user (`admin invite`), so journeys never depend on demo data and never touch real data.
+- Each run invites a fresh user (`admin invite`), so most journeys never depend on demo data.
+- Journeys with real runs (`Demo(t)`) use the demo user of `admin demo -fixtures http://fixtures:8080`, whose jobs
+  point at the fixture site. It signs in with a mail link read from Mailpit (the test container joins the
+  `devtools` network). Mail links are limited to 3 per 15 minutes; after many local reruns, wait.
 - A journey opens a tab with `Open(t, width, height, scheme)` and fails on console errors, CSP violations, script
   exceptions and a document status other than 200.
 

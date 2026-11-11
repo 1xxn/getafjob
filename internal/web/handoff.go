@@ -217,8 +217,8 @@ func (s *Server) activeRuns(ctx context.Context, userID, current uuid.UUID) []vi
 	var out []views.ActiveRunItem
 	for _, id := range s.Handoffs.ActiveRuns(userID) {
 		app, err := s.Apps.Get(ctx, userID, id)
-		if err != nil {
-			continue
+		if err != nil || !liveStates[app.State] {
+			continue // a parked or finished run may hold its browser a moment longer; it is not live any more
 		}
 		item := views.ActiveRunItem{AppID: id.String(), JobID: app.JobID, Current: id == current,
 			Waiting: app.State == application.NeedsInput}
@@ -568,5 +568,9 @@ func (s *Server) applicationPark(w http.ResponseWriter, r *http.Request, u *iden
 		}
 	}
 
+	if back := r.PostFormValue("back"); back != "" {
+		http.Redirect(w, r, localBack(back), http.StatusSeeOther) //nolint:gosec // localBack keeps only paths on this site
+		return
+	}
 	http.Redirect(w, r, "/jobs", http.StatusSeeOther)
 }

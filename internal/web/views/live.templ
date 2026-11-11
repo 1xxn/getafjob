@@ -1,0 +1,208 @@
+package views
+
+import "github.com/1xxn/getafjob/internal/web/views/ui"
+
+// LiveScreenProps describe one live view of a run's browser. The handoff island connects every [data-live-view]
+// on the page and closes the ones that leave it, so a page can show several (grid, focus view, dock).
+type LiveScreenProps struct {
+	AppID       string
+	Size        string // thumb, dock or full
+	Controls    bool   // keyboard focus, take over input and the Continue button
+	FPS         int    // draw at most this many frames per second; 0: every frame
+	ReloadOnEnd bool   // reload the page when the run ends (application page)
+}
+
+templ LiveScreen(p LiveScreenProps) {
+	<div
+		class={ "live-screen", "live-screen-" + p.Size }
+		data-live-view
+		data-app={ p.AppID }
+		if p.FPS > 0 {
+			data-fps={ itoa(p.FPS) }
+		}
+		if !p.Controls {
+			data-input="off"
+		}
+		if p.ReloadOnEnd {
+			data-on-end="reload"
+		}
+		data-t-connecting={ T(ctx, "live.connecting") }
+		data-t-waiting={ T(ctx, "live.waiting") }
+		data-t-view-only={ T(ctx, "live.view_only") }
+		data-t-your-turn={ T(ctx, "live.your_turn") }
+		data-t-ended={ T(ctx, "live.ended") }
+		data-t-reconnecting={ T(ctx, "live.reconnecting") }
+		data-t-unavailable={ T(ctx, "live.unavailable") }
+	>
+		if p.Controls {
+			<p class="live-status" data-screen-status role="status" aria-live="polite">{ T(ctx, "live.connecting") }</p>
+		} else {
+			<p class="live-status" data-screen-status>{ T(ctx, "live.connecting") }</p>
+		}
+		<div class="screen-frame">
+			<canvas
+				data-screen
+				class="screencast"
+				width="1280"
+				height="800"
+				if p.Controls {
+					tabindex="0"
+					aria-label={ T(ctx, "live.canvas_label") }
+				} else {
+					aria-hidden="true"
+				}
+			></canvas>
+		</div>
+		if p.Controls {
+			<button type="button" data-resume class="ui-btn ui-btn-primary" hidden>{ T(ctx, "handoff.continue") }</button>
+		}
+	</div>
+}
+
+// LiveData fills the live center: the user's active runs, waiting ones first, and the run in focus.
+type LiveData struct {
+	Name  string
+	Runs  []ActiveRunItem
+	Focus *ActiveRunItem
+}
+
+func runLabel(r ActiveRunItem) string {
+	if r.JobTitle != "" {
+		return r.JobTitle
+	}
+	return r.AppID[:8]
+}
+
+templ runState(r ActiveRunItem) {
+	if r.Waiting {
+		@ui.StatusPill(ui.StatusProps{Label: T(ctx, "live.state.waiting"), Tone: ui.Warning})
+	} else {
+		@ui.StatusPill(ui.StatusProps{Label: T(ctx, "live.state.running"), Tone: ui.Accent, Live: true})
+	}
+}
+
+// LivePage is the live center (/live): every active run as a small live picture, or one run in focus.
+templ LivePage(d LiveData) {
+	@Layout(Page{Title: T(ctx, "live.title"), UserName: d.Name, Handoff: true}) {
+		if d.Focus != nil {
+			@liveFocus(d)
+		} else {
+			<h1>{ T(ctx, "live.title") }</h1>
+			<p class="live-lead">{ T(ctx, "live.lead") }</p>
+			@LiveGrid(d.Runs)
+		}
+	}
+}
+
+// LiveGrid is the run grid; it morphs on live events, so running pictures keep their connection.
+templ LiveGrid(runs []ActiveRunItem) {
+	<div id="live-grid" { HX(ctx, "hx-get", "/live/grid", "hx-trigger", "getafjob:app from:body delay:700ms", "hx-swap", "outerMorph transition:false")... }>
+		if len(runs) == 0 {
+			@ui.EmptyState(ui.EmptyProps{Icon: "live", Title: T(ctx, "live.empty.title"), Text: T(ctx, "live.empty.text")}) {
+				@ui.Button(ui.ButtonProps{Label: T(ctx, "nav.jobs"), Href: "/jobs", Variant: "primary"})
+			}
+		} else {
+			<ul class="live-grid">
+				for _, r := range runs {
+					<li id={ "run-" + r.AppID } class={ "live-card", templ.KV("live-card-waiting", r.Waiting) }>
+						@LiveScreen(LiveScreenProps{AppID: r.AppID, Size: "thumb", FPS: 2})
+						<div class="live-card-body">
+							<h2 class="live-card-title"><a href={ templ.SafeURL("/live?run=" + r.AppID) }>{ runLabel(r) }</a></h2>
+							if r.Company != "" {
+								<p class="live-card-company">{ r.Company }</p>
+							}
+							@runState(r)
+						</div>
+					</li>
+				}
+			</ul>
+		}
+	</div>
+}
+
+templ liveFocus(d LiveData) {
+	<div class="live-focus">
+		<div class="live-focus-main">
+			<p class="live-back">
+				<a href="/live">
+					@ui.Icon("chevron-left")
+					{ T(ctx, "live.all_runs") }
+				</a>
+			</p>
+			<h1>{ runLabel(*d.Focus) }</h1>
+			<p class="live-focus-meta">
+				if d.Focus.Company != "" {
+					<span>{ d.Focus.Company }</span>
+				}
+				@runState(*d.Focus)
+			</p>
+			@LiveScreen(LiveScreenProps{AppID: d.Focus.AppID, Size: "full", Controls: true})
+		</div>
+		<aside class="live-focus-side" aria-label={ T(ctx, "live.actions") }>
+			<div class="live-actions">
+				@ui.Button(ui.ButtonProps{Label: T(ctx, "live.open_app"), Href: "/applications/" + d.Focus.AppID, Icon: "file-text"})
+				if d.Focus.JobID > 0 {
+					@ui.Button(ui.ButtonProps{Label: T(ctx, "live.open_job"), Href: "/jobs/" + i64(d.Focus.JobID), Icon: "briefcase", Variant: "ghost"})
+				}
+				<form method="post" action={ templ.SafeURL("/applications/" + d.Focus.AppID + "/park") } data-confirm={ T(ctx, "live.park_confirm") }>
+					<input type="hidden" name="back" value="/live"/>
+					@ui.Button(ui.ButtonProps{Label: T(ctx, "handoff.park"), Type: "submit", Icon: "pause", Variant: "ghost"})
+				</form>
+			</div>
+			if len(d.Runs) > 1 {
+				<h2 class="live-others-title">{ T(ctx, "live.others") }</h2>
+				<ul class="live-others">
+					for _, r := range d.Runs {
+						if r.AppID != d.Focus.AppID {
+							<li>
+								<a href={ templ.SafeURL("/live?run=" + r.AppID) } class="live-other">
+									<span class="live-other-title">{ runLabel(r) }</span>
+									@runState(r)
+								</a>
+							</li>
+						}
+					}
+				</ul>
+			}
+		</aside>
+	</div>
+}
+
+// liveDock is the floating dock of every signed-in page; it lives in the preserved #live-dock slot, so its
+// picture keeps running while the user navigates. The run list refreshes itself on live events.
+templ liveDock() {
+	<section class="dock" data-dock aria-label={ T(ctx, "live.dock.label") }>
+		<header class="dock-head">
+			<button type="button" class="dock-toggle" data-dock-toggle aria-expanded="false" aria-controls="dock-body">
+				<span class="ui-pill-dot" aria-hidden="true"></span>
+				<span data-dock-count></span>
+				@ui.Icon("chevron-up")
+			</button>
+			<a href="/live" class="ui-btn ui-btn-ghost ui-btn-icon" aria-label={ T(ctx, "live.dock.open") } title={ T(ctx, "live.dock.open") }>
+				@ui.Icon("external")
+			</a>
+		</header>
+		<div id="dock-body" class="dock-body" hidden>
+			<div class="dock-screen" data-dock-screen></div>
+			<ul class="dock-runs" data-dock-runs { HX(ctx, "hx-get", "/live/dock", "hx-trigger", "load, getafjob:app from:body delay:700ms", "hx-swap", "innerHTML transition:false")... }></ul>
+		</div>
+		<template data-dock-template>
+			@LiveScreen(LiveScreenProps{Size: "dock", Controls: true, FPS: 10})
+		</template>
+		<span hidden data-t-count={ T(ctx, "live.indicator", "count", "{n}") }></span>
+	</section>
+}
+
+// LiveDockRuns are the entries of the dock's run list; a click shows that run in the dock.
+templ LiveDockRuns(runs []ActiveRunItem) {
+	for _, r := range runs {
+		<li>
+			<button type="button" class={ "dock-run", templ.KV("dock-run-waiting", r.Waiting) } data-dock-run={ r.AppID } aria-pressed="false">
+				<span class="dock-run-title">{ runLabel(r) }</span>
+				if r.Company != "" {
+					<span class="dock-run-company">{ r.Company }</span>
+				}
+			</button>
+		</li>
+	}
+}
