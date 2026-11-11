@@ -18,7 +18,7 @@ go tool task hooks       # pre-commit: gofmt, go mod tidy, go vet; commit-msg: C
 go tool task dev:up      # full stack on https://localhost:8443
 ```
 
-Go 1.27.3 and Docker are the only requirements; every other tool is pinned in `go.mod` (`go tool …`).
+Go 1.27.4 and Docker are the only requirements; every other tool is pinned in `go.mod` (`go tool …`).
 golangci-lint and goreleaser run in containers (`go tool task lint`, `go tool task release:snapshot`).
 
 ## Before a pull request

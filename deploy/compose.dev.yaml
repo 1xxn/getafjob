@@ -1,0 +1,57 @@
+# Development only, layered over compose.yaml by `go tool task dev:up`; never used in production.
+#
+# Real runs need a site to apply to. `fixtures` serves testdata/fixtures/site, and the runner gets its own egress
+# proxy that refuses every address except the fixture site, so a run in development can never reach a real job
+# site. serve and worker keep the normal egress proxy (crawling real sources stays read-only).
+services:
+  fixtures:
+    image: caddy:2.11.7-alpine@sha256:e70b164da81ef698b3ad19af799ea6086ce6d9e48ed4079eb9fe26f6fbf14ee5
+    read_only: true
+    cap_drop: [ALL]
+    cap_add: [NET_BIND_SERVICE] # the caddy binary carries this file capability; exec fails without it
+    security_opt: [no-new-privileges:true]
+    command: [caddy, run, --config, /etc/caddy/Caddyfile]
+    volumes:
+      - ../testdata/fixtures/site:/srv:ro
+      - ./fixtures/Caddyfile:/etc/caddy/Caddyfile:ro
+    tmpfs: [/data, /config]
+    healthcheck:
+      test: ["CMD", "wget", "-q", "-O", "/dev/null", "http://127.0.0.1:8080/posting.html"]
+      interval: 10s
+      timeout: 3s
+      start_period: 5s
+      start_interval: 1s
+    networks:
+      fixtures: { ipv4_address: 172.30.99.10 }
+
+  runner-egress:
+    image: getafjob-egress:dev
+    read_only: true
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    # Deny everything; allow only the fixture site.
+    command: ["--listen-ip=0.0.0.0", "--listen-port=4750", "--timeout=15s",
+              "--deny-range=0.0.0.0/0", "--deny-range=::/0", "--allow-address=172.30.99.10:8080",
+              "--additional-error-message-on-deny=development runner: only the fixture site is reachable"]
+    healthcheck:
+      test: ["CMD", "/usr/local/bin/getafjob", "healthcheck", "tcp://127.0.0.1:4750"]
+      interval: 10s
+      timeout: 3s
+      start_period: 5s
+      start_interval: 1s
+    networks: [runnerproxy, fixtures]
+
+  runner:
+    environment:
+      GETAFJOB_EGRESS_PROXY: http://runner-egress:4750
+    depends_on:
+      runner-egress: { condition: service_healthy }
+      fixtures: { condition: service_healthy }
+    networks: !override [gateway, runnerproxy]
+
+networks:
+  runnerproxy: { internal: true }
+  fixtures:
+    internal: true
+    ipam:
+      config: [{ subnet: 172.30.99.0/24 }]

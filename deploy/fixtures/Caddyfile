@@ -1,0 +1,13 @@
+# Development fixture site (deploy/compose.dev.yaml): the form fixtures of testdata/fixtures/site plus a submit
+# endpoint that accepts and discards the posted form.
+{
+	admin off
+	auto_https off
+}
+
+:8080 {
+	@submit method POST
+	respond @submit 204
+	root * /srv
+	file_server
+}

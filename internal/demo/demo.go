@@ -1,10 +1,11 @@
 // Package demo invents users, profiles and job postings for local development, screenshots and load tests. All
-// names, companies and addresses are made up; URLs point to example.org.
+// names, companies and addresses are made up; URLs point to example.org or, with PointAt, to the fixture site.
 package demo
 
 import (
 	"fmt"
 	"math/rand/v2"
+	"net/url"
 	"strings"
 	"time"
 
@@ -150,4 +151,16 @@ func description(r *rand.Rand, ro role, company string, german bool) string {
 	}
 	b.WriteString("We offer flexible hours and a learning budget.")
 	return b.String()
+}
+
+// FixturePages are the application pages of testdata/fixtures/site that end in a submit.
+var FixturePages = []string{"posting.html", "greenhouse_like.html", "lever_application.html", "ashby_application.html",
+	"personio_application.html", "smartrecruiters_application.html", "recruitee_application.html",
+	"teamtailor_application.html"}
+
+// PointAt lets the postings link to the fixture site at base, so runs in development apply to fixtures only.
+func PointAt(postings []discovery.Posting, base *url.URL) {
+	for i := range postings {
+		postings[i].URL = base.JoinPath(FixturePages[i%len(FixturePages)]).String() + "?job=" + postings[i].ExternalID
+	}
 }
