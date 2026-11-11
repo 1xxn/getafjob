@@ -1,6 +1,9 @@
 package views
 
 import (
+	"os"
+	"path/filepath"
+	"regexp"
 	"testing"
 
 	"github.com/1xxn/getafjob/internal/platform/i18n"
@@ -16,6 +19,24 @@ func TestAmount(t *testing.T) {
 		}
 		if got := Amount(de, tc.in); got != tc.de {
 			t.Errorf("de %q = %q", tc.in, got)
+		}
+	}
+}
+
+// Inline event handlers never run under the nonce CSP; every interaction goes through htmx or plain links.
+func TestTemplatesHaveNoInlineHandlers(t *testing.T) {
+	files, err := filepath.Glob("*.templ")
+	if err != nil || len(files) == 0 {
+		t.Fatalf("templates: %v", err)
+	}
+	rx := regexp.MustCompile(`\son[a-z]+=`)
+	for _, f := range files {
+		b, err := os.ReadFile(f)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if loc := rx.FindIndex(b); loc != nil {
+			t.Errorf("%s: inline handler near %q", f, b[loc[0]:min(loc[1]+30, len(b))])
 		}
 	}
 }
