@@ -82,6 +82,9 @@ type Config struct {
 	// DevFixtureHost is the host:port of the development fixture site whose plain http origin may take form values;
 	// honored only when PublicURL is local.
 	DevFixtureHost string
+	// Limits keeps the throughput limits (daily quota, per-host gap). Default off: a self-hosted instance for a
+	// few people applies as fast as its runners allow; guard rails stay on either way.
+	Limits bool
 	// AIEnabled is an operator switch enabling the optional AI module (#44). Default: false.
 	AIEnabled bool
 	// AnthropicAPIKey is the operator's Anthropic API key. Empty: users must supply their own key.
@@ -146,6 +149,7 @@ var specs = []spec{
 	{"CRAWL_INTERVAL", "6h", setCrawlInterval},
 	{"EASY_APPLY_ENABLED", "false", func(c *Config, v string) error { return setBool(&c.EasyApplyEnabled, v) }},
 	{"DEV_FIXTURE_HOST", "", func(c *Config, v string) error { c.DevFixtureHost = strings.ToLower(strings.TrimSpace(v)); return nil }},
+	{"LIMITS", "off", setLimits},
 	{"AI_ENABLED", "false", func(c *Config, v string) error { return setBool(&c.AIEnabled, v) }},
 	{"ANTHROPIC_API_KEY", "", func(c *Config, v string) error { c.AnthropicAPIKey = Secret(v); return nil }},
 	{"ANTHROPIC_MODEL", "claude-3-5-haiku-20241022", func(c *Config, v string) error { c.AnthropicModel = strings.TrimSpace(v); return nil }},
@@ -372,6 +376,7 @@ func (c Config) LogValue() slog.Value {
 		slog.String("log_level", c.LogLevel.String()),
 		slog.String("log_format", c.LogFormat),
 		slog.Bool("egress_proxy_set", c.EgressProxy != nil),
+		slog.Bool("limits", c.Limits),
 		slog.String("otel_endpoint", urlString(c.OTelEndpoint)),
 		slog.Bool("smtp_configured", c.SMTPURL != ""),
 		slog.Bool("vapid_configured", c.VAPIDKey != ""),
@@ -441,6 +446,19 @@ func setBool(dst *bool, v string) error {
 		*dst = false
 	default:
 		return errors.New("must be a boolean (true or false)")
+	}
+	return nil
+}
+
+// setLimits reads GETAFJOB_LIMITS: on keeps the daily quota and the per-host gap, off removes them.
+func setLimits(c *Config, v string) error {
+	switch strings.ToLower(strings.TrimSpace(v)) {
+	case "on":
+		c.Limits = true
+	case "off":
+		c.Limits = false
+	default:
+		return errors.New("must be on or off")
 	}
 	return nil
 }

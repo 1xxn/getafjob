@@ -92,6 +92,18 @@ func TestGreenRule(t *testing.T) {
 		}
 	})
 
+	t.Run("quota off without limits", func(t *testing.T) {
+		in := greenInput()
+		in.Submits = 50
+		if !slices.Contains(Rule(in, now), ReasonQuota) {
+			t.Fatal("quota must count with limits on")
+		}
+		in.Settings.Unlimited = true
+		if reasons := Rule(in, now); len(reasons) > 0 {
+			t.Fatalf("Rule() without limits = %v, want green", reasons)
+		}
+	})
+
 	t.Run("level not autonomous", func(t *testing.T) {
 		in := greenInput()
 		in.Settings.Level = LevelApprove

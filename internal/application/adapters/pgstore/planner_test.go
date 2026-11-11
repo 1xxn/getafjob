@@ -2,6 +2,7 @@ package pgstore_test
 
 import (
 	"context"
+	"slices"
 	"testing"
 	"time"
 
@@ -39,7 +40,7 @@ func TestPgstorePlannerAndPacing(t *testing.T) {
 	}
 
 	// 1. PlanUsers
-	users, err := st.PlanUsers(ctx)
+	users, err := st.PlanUsers(ctx, false)
 	if err != nil {
 		t.Fatalf("PlanUsers() err = %v", err)
 	}
@@ -63,6 +64,9 @@ func TestPgstorePlannerAndPacing(t *testing.T) {
 	}
 	if hasU3 {
 		t.Errorf("PlanUsers should not include u3 (daily_limit 0)")
+	}
+	if all, err := st.PlanUsers(ctx, true); err != nil || !slices.Contains(all, u3) || slices.Contains(all, u2) {
+		t.Errorf("unlimited PlanUsers = %v, %v; want u3 in, u2 (suggest) out", all, err)
 	}
 
 	// 2. ActiveApplicationsCount

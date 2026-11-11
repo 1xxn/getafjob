@@ -41,6 +41,7 @@ type Settings struct {
 	Level                    Level
 	MinScore                 int          // the match score an application needs for the green rule
 	DailyLimit               int          // submits per 24 hours the green rule allows
+	Unlimited                bool         // instance runs without limits (not stored; GETAFJOB_LIMITS=off)
 	RunnerChoice             RunnerChoice // server, home_runner, or extension
 	EasyApplyEnabled         bool         // opt-in to Easy Apply for portals (#43)
 	EasyApplyTermsAcceptedAt *time.Time   // when the user accepted terms of use and ban risk
@@ -211,7 +212,7 @@ func Rule(in RuleInput, now time.Time) []Reason {
 	if in.FormErrors > 0 {
 		add(ReasonFormErrors)
 	}
-	if in.Submits >= in.Settings.DailyLimit {
+	if !in.Settings.Unlimited && in.Submits >= in.Settings.DailyLimit {
 		add(ReasonQuota)
 	}
 	if in.Adapter == "" || in.AdapterRuns < MaturityMinRuns ||

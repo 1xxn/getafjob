@@ -93,6 +93,25 @@ func TestLeaseHonorsHostLimits(t *testing.T) {
 	}
 }
 
+// Without limits (self-host) runs on the same host lease at once and no gap applies (#164).
+func TestLeaseWithoutLimitsIgnoresHostAndQuota(t *testing.T) {
+	pool, st, svc, _ := setup(t)
+	ctx := t.Context()
+	runs := application.NewRuns(svc.WithoutLimits(), st)
+	max := user(t, pool, "max@example.org")
+	for i := range 8 {
+		queued(t, svc, max, jobAt(t, pool, "https://jobs.ashbyhq.com/acme/"+string(rune('a'+i)), "Acme"+string(rune('a'+i)), "acme|"+string(rune('a'+i))))
+	}
+	for i := range 8 {
+		if _, ok, err := runs.Lease(ctx, "r1", application.RunnerServer, nil); !ok || err != nil {
+			t.Fatalf("lease %d on the same host: %v, %v", i, ok, err)
+		}
+	}
+	if _, ok, _ := runs.Lease(ctx, "r1", application.RunnerServer, nil); ok {
+		t.Fatal("lease from an empty queue")
+	}
+}
+
 func TestConcurrentLeasesRespectTheHost(t *testing.T) {
 	pool, st, svc, _ := setup(t)
 	ctx := t.Context()

@@ -32,14 +32,14 @@ FROM users u
 LEFT JOIN autonomy_settings s ON s.user_id = u.id
 WHERE u.disabled_at IS NULL
   AND coalesce(s.level, 'approve') IN ('approve', 'autonomous')
-  AND coalesce(s.daily_limit, 5) > 0
+  AND ($1::bool OR coalesce(s.daily_limit, 5) > 0)
 ORDER BY u.created_at, u.id
 `
 
 // Planner queries (#36, ADR 0016).
 // System role: active users whose autonomy level enables auto-queueing and who have daily quota > 0.
-func (q *Queries) PlanUsers(ctx context.Context) ([]uuid.UUID, error) {
-	rows, err := q.db.Query(ctx, planUsers)
+func (q *Queries) PlanUsers(ctx context.Context, unlimited bool) ([]uuid.UUID, error) {
+	rows, err := q.db.Query(ctx, planUsers, unlimited)
 	if err != nil {
 		return nil, err
 	}

@@ -7,7 +7,7 @@ FROM users u
 LEFT JOIN autonomy_settings s ON s.user_id = u.id
 WHERE u.disabled_at IS NULL
   AND coalesce(s.level, 'approve') IN ('approve', 'autonomous')
-  AND coalesce(s.daily_limit, 5) > 0
+  AND (sqlc.arg(unlimited)::bool OR coalesce(s.daily_limit, 5) > 0)
 ORDER BY u.created_at, u.id;
 
 -- name: ActiveApplicationsCount :one

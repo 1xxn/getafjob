@@ -162,7 +162,7 @@ func (f *fakePlannerStore) Approvals(context.Context, uuid.UUID) ([]application.
 	return nil, nil
 }
 
-func (f *fakePlannerStore) PlanUsers(context.Context) ([]uuid.UUID, error) {
+func (f *fakePlannerStore) PlanUsers(context.Context, bool) ([]uuid.UUID, error) {
 	return f.users, nil
 }
 
