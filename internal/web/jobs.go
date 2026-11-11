@@ -1,6 +1,7 @@
 package web
 
 import (
+	"cmp"
 	"context"
 	"errors"
 	"fmt"
@@ -17,6 +18,7 @@ import (
 	"github.com/1xxn/getafjob/internal/discovery/urlimport"
 	"github.com/1xxn/getafjob/internal/identity"
 	"github.com/1xxn/getafjob/internal/matching"
+	"github.com/1xxn/getafjob/internal/platform/applymode"
 	"github.com/1xxn/getafjob/internal/profile"
 	"github.com/1xxn/getafjob/internal/web/views"
 )
@@ -221,6 +223,8 @@ func (s *Server) jobPage(w http.ResponseWriter, r *http.Request, u *identity.Use
 		ApplyURL:    webLink(j.ApplyURL),
 		Open:        j.Open,
 		Computed:    views.When(r.Context(), j.ComputedAt),
+		ApplyMode:   string(applymode.Of(j.URL, j.ApplyURL)),
+		ApplyHost:   applymode.Host(cmp.Or(j.ApplyURL, j.URL)),
 		Back:        "/jobs",
 	}
 	for _, rs := range j.Reasons {
@@ -521,8 +525,13 @@ func (s *Server) jobApplySubmit(w http.ResponseWriter, r *http.Request, u *ident
 		return
 	}
 	if s.Jobs != nil {
-		if _, err := s.Jobs.Detail(r.Context(), u.ID, id); err != nil {
+		j, err := s.Jobs.Detail(r.Context(), u.ID, id)
+		if err != nil {
 			s.notFound(w, r, u)
+			return
+		}
+		if applymode.Of(j.URL, j.ApplyURL) == applymode.Email {
+			http.Redirect(w, r, "/jobs/"+strconv.FormatInt(id, 10), http.StatusSeeOther) // applied by mail, never run
 			return
 		}
 	}

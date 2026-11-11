@@ -670,5 +670,11 @@
   "live.unavailable": "Die Live-Ansicht ist nicht erreichbar. Lade die Seite neu, um es noch einmal zu versuchen.",
   "live.canvas_label": "Live-Ansicht des Bewerbungsbrowsers",
   "handoff.choose": "Bitte wählen",
-  "handoff.file_hint": "Dieses Formular braucht eine Datei. Lege sie bei deinen Dokumenten ab und drücke dann Weiter:"
+  "handoff.file_hint": "Dieses Formular braucht eine Datei. Lege sie bei deinen Dokumenten ab und drücke dann Weiter:",
+  "apply.portal.title": "Bewerbung über {host}.",
+  "apply.portal.text": "Diese Anzeige steht auf einer Jobbörse. Ein Lauf versucht, dem Link zum Formular des Arbeitgebers zu folgen; gibt es keins, bewirb dich dort und markiere den Job als beworben.",
+  "apply.email.title": "Bewerbung per E-Mail.",
+  "apply.email.text": "Dieser Arbeitgeber nimmt Bewerbungen per Mail an, die getafjob nicht verschickt. Schreib ihm und markiere den Job als beworben.",
+  "apply.open_external": "Anzeige öffnen",
+  "apply.mark_applied": "Als beworben markieren"
 }

@@ -118,6 +118,27 @@ type JobData struct {
 	ApplicationState string
 	ApplicationID    string
 	Notice           string
+	ApplyMode        string // form, portal or email (applymode)
+	ApplyHost        string
+}
+
+// ExternalApply explains a posting that is applied for outside getafjob and offers the way there (#159).
+templ ExternalApply(mode, host, link string, jobID int64) {
+	<div class="notice notice-info stack" role="status">
+		if mode == "email" {
+			<p><strong>{ T(ctx, "apply.email.title") }</strong> { T(ctx, "apply.email.text") }</p>
+		} else {
+			<p><strong>{ T(ctx, "apply.portal.title", "host", host) }</strong> { T(ctx, "apply.portal.text") }</p>
+		}
+		<div class="actions">
+			if link != "" {
+				<a class="button secondary" href={ templ.SafeURL(link) } rel="noopener noreferrer external" target="_blank">{ T(ctx, "apply.open_external") }</a>
+			}
+			<form method="post" action={ templ.SafeURL("/jobs/" + i64(jobID) + "/apply-external") }>
+				<button type="submit">{ T(ctx, "apply.mark_applied") }</button>
+			</form>
+		</div>
+	</div>
 }
 
 // PreviewExperience is one experience station in the pre-fill preview.
@@ -668,6 +689,9 @@ templ JobPage(d JobData) {
 			if d.Notice != "" {
 				@Notice("success", d.Notice)
 			}
+			if d.ApplyMode == "portal" || d.ApplyMode == "email" {
+				@ExternalApply(d.ApplyMode, d.ApplyHost, or(d.ApplyURL, d.URL), d.Row.ID)
+			}
 			<div class="job-pipeline-actions">
 				if d.ApplicationState == "running" || d.ApplicationState == "needs_input" || d.ApplicationState == "queued" {
 					<a href={ templ.SafeURL("/applications/" + d.ApplicationID) } class="button primary btn-sm">
@@ -677,7 +701,7 @@ templ JobPage(d JobData) {
 					<a href={ templ.SafeURL("/applications/" + d.ApplicationID) } class="button secondary btn-sm">
 						✓ { T(ctx, "jobs.applied_status") }
 					</a>
-				} else {
+				} else if d.ApplyMode != "email" {
 					<a
 						href={ templ.SafeURL("/jobs/" + i64(d.Row.ID) + "/apply") }
 						class="button primary btn-sm btn-instant-apply"
