@@ -778,5 +778,20 @@
   "shell.confirm.cancel": "Abbrechen",
   "flash.language": "Sprache geändert.",
   "documents.delete_confirm": "{name} löschen? Das lässt sich nicht rückgängig machen.",
-  "account.passkey.delete_confirm": "Diesen Passkey entfernen? Du kannst dich dann nicht mehr damit anmelden."
+  "account.passkey.delete_confirm": "Diesen Passkey entfernen? Du kannst dich dann nicht mehr damit anmelden.",
+  "nav.live": "Live",
+  "live.title": "Live",
+  "live.lead": "Alle Läufe, die gerade arbeiten. Läufe, die auf dich warten, stehen oben.",
+  "live.empty.title": "Gerade läuft nichts",
+  "live.empty.text": "Läufe erscheinen hier, sobald getafjob einen startet. Starte einen bei einem Job mit Jetzt bewerben.",
+  "live.state.running": "Läuft",
+  "live.state.waiting": "Wartet auf dich",
+  "live.all_runs": "Alle Läufe",
+  "live.actions": "Aktionen für diesen Lauf",
+  "live.open_app": "Bewerbung öffnen",
+  "live.open_job": "Job öffnen",
+  "live.park_confirm": "Diesen Lauf parken? getafjob hört auf, das Formular auszufüllen, und behält den Stand.",
+  "live.others": "Weitere Läufe",
+  "live.dock.label": "Laufende Bewerbungen",
+  "live.dock.open": "Live-Center öffnen"
 }

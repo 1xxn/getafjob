@@ -124,7 +124,7 @@ type ActiveRunItem struct {
 // LiveIndicator is the top bar pill with the user's live runs; empty when nothing runs.
 templ LiveIndicator(runs []ActiveRunItem) {
 	if len(runs) > 0 {
-		<a class={ "live-indicator", templ.KV("waiting", anyWaiting(runs)) } href={ templ.SafeURL("/applications/" + firstLive(runs)) }>
+		<a class={ "live-indicator", templ.KV("waiting", anyWaiting(runs)) } href="/live">
 			<span class="live-dot pulse"></span>
 			{ T(ctx, "live.indicator", "count", len(runs)) }
 		</a>
@@ -200,31 +200,9 @@ templ HandoffPage(d HandoffData) {
 				@ExternalApply(d.ApplyMode, d.ApplyHost, d.ExternalURL, d.JobID)
 			}
 			if d.Live {
-				<div
-					class="remote-browser-box"
-					id="live-view"
-					data-app={ d.AppID }
-					data-t-connecting={ T(ctx, "live.connecting") }
-					data-t-waiting={ T(ctx, "live.waiting") }
-					data-t-view-only={ T(ctx, "live.view_only") }
-					data-t-your-turn={ T(ctx, "live.your_turn") }
-					data-t-ended={ T(ctx, "live.ended") }
-					data-t-reconnecting={ T(ctx, "live.reconnecting") }
-					data-t-unavailable={ T(ctx, "live.unavailable") }
-				>
-					<p class="live-status" id="screen-status" role="status" aria-live="polite">{ T(ctx, "live.connecting") }</p>
-					<div class="screen-frame">
-						<canvas
-							id="screencast"
-							class="screencast"
-							width="1280"
-							height="800"
-							tabindex="0"
-							aria-label={ T(ctx, "live.canvas_label") }
-						></canvas>
-					</div>
+				<div class="remote-browser-box">
+					@LiveScreen(LiveScreenProps{AppID: d.AppID, Size: "full", Controls: true, ReloadOnEnd: true})
 					<div class="actions">
-						<button type="button" id="btn-resume" class="primary" hidden>{ T(ctx, "handoff.continue") }</button>
 						<form method="post" action={ templ.SafeURL("/applications/" + d.AppID + "/park") }>
 							<button type="submit" id="btn-park" class="secondary">{ T(ctx, "handoff.park") }</button>
 						</form>

@@ -254,6 +254,10 @@ jobs:
           cache: false # job builds images
       - name: start the dev stack
         run: go tool task dev:up
+      - name: demo data on the fixture site
+        run: >-
+          docker compose -f deploy/compose.yaml -f deploy/compose.dev.yaml exec -T serve
+          /usr/local/bin/getafjob admin demo -jobs 50 -fixtures http://fixtures:8080
       - name: journeys in the runner image (fresh invited user, sandbox on)
         run: go tool task test:e2e
       - name: screenshots

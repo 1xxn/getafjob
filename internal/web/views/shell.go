@@ -54,7 +54,10 @@ type navGroup struct {
 var navGroups = []navGroup{
 	{Items: []navItem{{Key: "nav.home", Href: "/", Icon: "home"}}},
 	{Key: "nav.group.discover", Items: []navItem{{Key: "nav.jobs", Href: "/jobs", Icon: "briefcase"}}},
-	{Key: "nav.group.apply", Items: []navItem{{Key: "nav.approvals", Href: "/approvals", Icon: "check-circle", Count: "approvals"}}},
+	{Key: "nav.group.apply", Items: []navItem{
+		{Key: "nav.live", Href: "/live", Icon: "live", Count: "running"},
+		{Key: "nav.approvals", Href: "/approvals", Icon: "check-circle", Count: "approvals"},
+	}},
 	{Key: "nav.group.track", Items: []navItem{{Key: "nav.tracker", Href: "/tracker", Icon: "columns"}}},
 	{Key: "nav.group.me", Items: []navItem{
 		{Key: "nav.profile", Href: "/profile", Icon: "user"},

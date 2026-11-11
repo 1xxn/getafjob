@@ -778,5 +778,20 @@
   "shell.confirm.cancel": "Cancel",
   "flash.language": "Language changed.",
   "documents.delete_confirm": "Delete {name}? This cannot be undone.",
-  "account.passkey.delete_confirm": "Remove this passkey? You can no longer sign in with it."
+  "account.passkey.delete_confirm": "Remove this passkey? You can no longer sign in with it.",
+  "nav.live": "Live",
+  "live.title": "Live",
+  "live.lead": "Every run that is working right now. Runs that wait for you come first.",
+  "live.empty.title": "Nothing is running",
+  "live.empty.text": "Runs show up here as soon as getafjob starts one. Start one from a job with Apply now.",
+  "live.state.running": "Running",
+  "live.state.waiting": "Waiting for you",
+  "live.all_runs": "All runs",
+  "live.actions": "Actions for this run",
+  "live.open_app": "Open application",
+  "live.open_job": "Open job",
+  "live.park_confirm": "Park this run? getafjob stops filling in the form and keeps what it has.",
+  "live.others": "Other runs",
+  "live.dock.label": "Live runs",
+  "live.dock.open": "Open the live center"
 }

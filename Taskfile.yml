@@ -107,16 +107,20 @@ tasks:
           {{.COMPOSE}} exec -T caddy cat /data/caddy/pki/authorities/local/intermediate.crt
           > bin/e2e/caddy-intermediate.crt
       - cmd: mkdir -p bin/e2e/out && chmod 0777 bin/e2e/out
+      # The test container joins edge (Caddy) and devtools (Mailpit, for the demo user's mail link).
       - cmd: >-
           invite="$({{.COMPOSE}} exec -T serve /usr/local/bin/getafjob admin invite
           -email "e2e-$(date +%s)@example.org" | head -n 1)" &&
-          docker run --rm --read-only --tmpfs /tmp:rw,size=512m --shm-size=512m
+          id="$(docker create --read-only --tmpfs /tmp:rw,size=512m --shm-size=512m
           --cap-drop ALL --security-opt no-new-privileges
           --security-opt seccomp=deploy/seccomp/chromium.json
           --network getafjob_edge
           -v "{{.ROOT_DIR}}/bin/e2e:/e2e"
           -e GETAFJOB_E2E_INVITE="$invite" -e GETAFJOB_E2E_CA=/e2e/caddy-intermediate.crt -e GETAFJOB_E2E_OUT=/e2e/out
-          --entrypoint /e2e/e2e.test {{.RUNNER_IMAGE}} -test.v {{.CLI_ARGS}}
+          -e GETAFJOB_E2E_MAILPIT=http://mailpit:8025
+          --entrypoint /e2e/e2e.test {{.RUNNER_IMAGE}} -test.v {{.CLI_ARGS}})" &&
+          docker network connect getafjob_devtools "$id" &&
+          { docker start -a "$id"; rc=$?; docker rm "$id" > /dev/null; exit $rc; }
 
   vuln:
     desc: Known vulnerabilities in reachable code

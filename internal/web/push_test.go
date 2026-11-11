@@ -276,7 +276,7 @@ func TestHandoffPageAnswerAndPark(t *testing.T) {
 	req := httptest.NewRequest(http.MethodGet, "/applications/"+appID.String(), nil)
 	req.SetPathValue("id", appID.String())
 	srv.applicationPage(rec, req, u)
-	if rec.Code != http.StatusOK || !strings.Contains(rec.Body.String(), `id="screencast"`) {
+	if rec.Code != http.StatusOK || !strings.Contains(rec.Body.String(), `data-live-view`) {
 		t.Fatalf("handoff page: %d %s", rec.Code, rec.Body.String())
 	}
 
@@ -545,12 +545,14 @@ func TestEvidencePageAndScreenshotEndpoint(t *testing.T) {
 		"/applications/" + appID.String() + "/screenshots/11",
 		"https://jobs.example.org/apply/thanks",
 		"submitted -&gt; confirmed",
-		"active-runners-banner",
-		"active-runner-pill current",
 	} {
 		if !strings.Contains(body, want) {
 			t.Fatalf("evidence page missing %q in body:\n%s", want, body)
 		}
+	}
+	// The hub still lists the confirmed run, but a finished run is not live: no banner for it.
+	if strings.Contains(body, "active-runners-banner") {
+		t.Fatal("a confirmed application shows as an active run")
 	}
 
 	// Owner can fetch the decrypted screenshot.

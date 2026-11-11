@@ -84,7 +84,11 @@ func run(m *testing.M, invite string) (int, error) {
 	if err := signIn(invite); err != nil {
 		return 1, fmt.Errorf("sign in: %w", err)
 	}
-	return m.Run(), nil
+	code := m.Run()
+	if demoBrowser != nil {
+		saveDemo(demoBrowser) // the session cookie rotates while it is used
+	}
+	return code, nil
 }
 
 // spkiPin returns the base64 SHA-256 of the certificate's public key, the form Chromium's SPKI list expects.

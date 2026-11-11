@@ -128,13 +128,3 @@ func anyWaiting(runs []ActiveRunItem) bool {
 	}
 	return false
 }
-
-// firstLive picks the run the live indicator links to: one that waits for the user, else the first.
-func firstLive(runs []ActiveRunItem) string {
-	for _, r := range runs {
-		if r.Waiting {
-			return r.AppID
-		}
-	}
-	return runs[0].AppID
-}
