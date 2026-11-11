@@ -56,7 +56,7 @@ func TestJobListLatency(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	paths := []string{"/jobs", "/jobs?q=kubernetes", "/jobs?decision=all&page=10", "/jobs?decision=all&workplace=remote",
+	paths := []string{"/", "/jobs", "/jobs?q=kubernetes", "/jobs?decision=all&page=10", "/jobs?decision=all&workplace=remote",
 		"/jobs/" + strconv.FormatInt(jobID, 10)}
 	for _, path := range paths {
 		var took []time.Duration

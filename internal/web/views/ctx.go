@@ -50,4 +50,6 @@ type Page struct {
 	Theme string
 	// StyleGuide loads the style guide styles (development builds only).
 	StyleGuide bool
+	// Wide uses the full content width instead of the reading column (rebuilt pages).
+	Wide bool
 }

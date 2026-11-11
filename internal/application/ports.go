@@ -255,6 +255,10 @@ type Store interface {
 	SaveNotes(ctx context.Context, userID, appID uuid.UUID, notes, salary string, interviewAt, followUpAt *time.Time, now time.Time) error
 	// PipelineApplications returns all applications for a user with their pipeline information.
 	PipelineApplications(ctx context.Context, userID uuid.UUID) ([]PipelineApplication, error)
+	// ParkReasons returns the reason of the last park per parked application of the user.
+	ParkReasons(ctx context.Context, userID uuid.UUID) (map[uuid.UUID]string, error)
+	// SubmitsPerDay counts the user's submitted applications per UTC day since the given time.
+	SubmitsPerDay(ctx context.Context, userID uuid.UUID, since time.Time) (map[time.Time]int, error)
 	// BookmarkJob saves a job to the user's applications in matched state.
 	BookmarkJob(ctx context.Context, userID uuid.UUID, jobID int64, now time.Time) (uuid.UUID, error)
 	// MarkExternalApplied marks a job as applied externally (state: submitted).

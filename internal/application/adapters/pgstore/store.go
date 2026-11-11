@@ -1030,3 +1030,32 @@ func (s *Store) NavCounts(ctx context.Context, userID uuid.UUID) (c application.
 	})
 	return c, err
 }
+
+// ParkReasons returns the reason of the last park per parked application.
+func (s *Store) ParkReasons(ctx context.Context, userID uuid.UUID) (map[uuid.UUID]string, error) {
+	out := map[uuid.UUID]string{}
+	err := s.user(ctx, userID, func(qs *q.Queries) error {
+		rows, err := qs.ParkReasons(ctx, userID)
+		for _, r := range rows {
+			out[r.ApplicationID] = r.Reason
+		}
+		return err
+	})
+	return out, err
+}
+
+// SubmitsPerDay counts submitted applications per UTC day since the given time.
+func (s *Store) SubmitsPerDay(ctx context.Context, userID uuid.UUID, since time.Time) (map[time.Time]int, error) {
+	out := map[time.Time]int{}
+	err := s.user(ctx, userID, func(qs *q.Queries) error {
+		rows, err := qs.SubmitsPerDay(ctx, q.SubmitsPerDayParams{UserID: userID, At: since})
+		for _, r := range rows {
+			if r.Day.Valid {
+				t := r.Day.Time
+				out[time.Date(t.Year(), t.Month(), t.Day(), 0, 0, 0, 0, time.UTC)] = int(r.N)
+			}
+		}
+		return err
+	})
+	return out, err
+}

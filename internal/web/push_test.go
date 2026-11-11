@@ -639,3 +639,11 @@ func TestExternalApplyNotice(t *testing.T) {
 func (f *fakeAppStore) NavCounts(context.Context, uuid.UUID) (application.NavCounts, error) {
 	return application.NavCounts{}, nil
 }
+
+func (f *fakeAppStore) ParkReasons(context.Context, uuid.UUID) (map[uuid.UUID]string, error) {
+	return nil, nil
+}
+
+func (f *fakeAppStore) SubmitsPerDay(context.Context, uuid.UUID, time.Time) (map[time.Time]int, error) {
+	return nil, nil
+}

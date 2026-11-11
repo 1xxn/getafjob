@@ -205,3 +205,17 @@ JOIN applications a ON a.id = r.application_id
 WHERE r.finished_at IS NULL AND a.state IN ('running', 'needs_input')
 ORDER BY r.leased_at
 LIMIT 500;
+
+-- name: ParkReasons :many
+SELECT DISTINCT ON (e.application_id) e.application_id, coalesce(e.detail->>'reason', '')::text AS reason
+FROM application_events e
+JOIN applications a ON a.id = e.application_id
+WHERE a.user_id = $1 AND a.state = 'parked' AND e.to_state = 'parked'
+ORDER BY e.application_id, e.id DESC;
+
+-- name: SubmitsPerDay :many
+SELECT (e.at AT TIME ZONE 'UTC')::date AS day, count(*)::integer AS n
+FROM application_events e
+WHERE e.user_id = $1 AND e.to_state = 'submitted' AND e.at >= $2
+GROUP BY 1
+ORDER BY 1;

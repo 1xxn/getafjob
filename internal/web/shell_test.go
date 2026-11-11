@@ -77,3 +77,24 @@ func cookies(session, extra string, hdr map[string]string) map[string]string {
 	}
 	return out
 }
+
+func TestDashboard(t *testing.T) {
+	a := newApp(t)
+	cookie := signedIn(t, a)
+	page := a.do(http.MethodGet, "/", nil, cookie, nil)
+	body := page.Body.String()
+	// A fresh user without profile, jobs or applications is led to the setup.
+	for _, want := range []string{`id="dashboard"`, "Welcome, Max Mustermann.", `href="/setup"`, "Set up your profile"} {
+		if !strings.Contains(body, want) {
+			t.Errorf("dashboard lacks %s", want)
+		}
+	}
+	checkNonces(t, page)
+	part := a.do(http.MethodGet, "/dashboard", nil, cookie, nil)
+	if part.Code != http.StatusOK || !strings.HasPrefix(strings.TrimSpace(part.Body.String()), `<div id="dashboard"`) {
+		t.Fatalf("dashboard fragment: %d %.80s", part.Code, part.Body.String())
+	}
+	if rec := a.do(http.MethodGet, "/dashboard", nil, "", nil); rec.Code != http.StatusUnauthorized {
+		t.Fatalf("signed out fragment: %d", rec.Code)
+	}
+}
