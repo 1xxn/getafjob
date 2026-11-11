@@ -46,4 +46,8 @@ type Page struct {
 	Passkeys bool
 	// Handoff loads the remote browser screencast script.
 	Handoff bool
+	// Theme forces "light" or "dark"; empty follows the system setting.
+	Theme string
+	// StyleGuide loads the style guide styles (development builds only).
+	StyleGuide bool
 }

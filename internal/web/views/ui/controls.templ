@@ -1,0 +1,398 @@
+package ui
+
+// Icon is a decorative icon from the sprite (static/icons.svg); the text next to it carries the meaning.
+templ Icon(name string) {
+	<svg class="ui-icon" aria-hidden="true" focusable="false"><use href={ iconHref(name) }></use></svg>
+}
+
+// ButtonProps describe a button or a link that looks like one.
+type ButtonProps struct {
+	Label    string
+	Variant  string // primary, secondary (default), ghost, danger
+	Size     string // md (default), sm
+	Type     string // button (default), submit, reset; ignored for links
+	Href     string // renders a link instead of a button
+	Icon     string // leading icon
+	Disabled bool
+	Loading  bool // shows a spinner and sets aria-busy; htmx requests do the same through .htmx-request
+	Attrs    templ.Attributes
+}
+
+func btnClass(variant, size string) []string {
+	if variant == "" {
+		variant = "secondary"
+	}
+	c := []string{"ui-btn", "ui-btn-" + variant}
+	if size == "sm" {
+		c = append(c, "ui-btn-sm")
+	}
+	return c
+}
+
+func btnType(t string) string {
+	if t == "" {
+		return "button"
+	}
+	return t
+}
+
+templ Button(p ButtonProps) {
+	if p.Href != "" {
+		<a
+			href={ templ.URL(p.Href) }
+			class={ btnClass(p.Variant, p.Size) }
+			if p.Loading {
+				aria-busy="true"
+			}
+			{ p.Attrs... }
+		>
+			if p.Icon != "" {
+				@Icon(p.Icon)
+			}
+			<span>{ p.Label }</span>
+		</a>
+	} else {
+		<button
+			type={ btnType(p.Type) }
+			class={ btnClass(p.Variant, p.Size) }
+			disabled?={ p.Disabled }
+			if p.Loading {
+				aria-busy="true"
+			}
+			{ p.Attrs... }
+		>
+			if p.Icon != "" {
+				@Icon(p.Icon)
+			}
+			<span>{ p.Label }</span>
+		</button>
+	}
+}
+
+// IconButtonProps describe a button that shows only an icon; Label is its accessible name and tooltip.
+type IconButtonProps struct {
+	Icon     string
+	Label    string
+	Variant  string // ghost (default), secondary, primary, danger
+	Type     string
+	Href     string
+	Disabled bool
+	Attrs    templ.Attributes
+}
+
+func iconBtnVariant(v string) string {
+	if v == "" {
+		return "ghost"
+	}
+	return v
+}
+
+templ IconButton(p IconButtonProps) {
+	if p.Href != "" {
+		<a href={ templ.URL(p.Href) } class={ btnClass(iconBtnVariant(p.Variant), ""), "ui-btn-icon" } aria-label={ p.Label } title={ p.Label } { p.Attrs... }>
+			@Icon(p.Icon)
+		</a>
+	} else {
+		<button
+			type={ btnType(p.Type) }
+			class={ btnClass(iconBtnVariant(p.Variant), ""), "ui-btn-icon" }
+			aria-label={ p.Label }
+			title={ p.Label }
+			disabled?={ p.Disabled }
+			{ p.Attrs... }
+		>
+			@Icon(p.Icon)
+		</button>
+	}
+}
+
+// FieldProps are shared by all labelled controls; hint and error are linked with aria-describedby.
+type FieldProps struct {
+	ID        string // element id; empty: f-<Name>
+	Name      string
+	Label     string
+	Hint      string
+	Error     string
+	Required  bool
+	HideLabel bool // label only for screen readers (search boxes with a visible icon)
+}
+
+func (f FieldProps) id() string {
+	if f.ID != "" {
+		return f.ID
+	}
+	return "f-" + f.Name
+}
+
+func (f FieldProps) describedBy() string {
+	var hint, err string
+	if f.Hint != "" {
+		hint = f.id() + "-hint"
+	}
+	if f.Error != "" {
+		err = f.id() + "-error"
+	}
+	return joinIDs(hint, err)
+}
+
+templ field(f FieldProps) {
+	<div class={ "ui-field", templ.KV("ui-field-invalid", f.Error != "") }>
+		<label for={ f.id() } class={ "ui-label", templ.KV("ui-sr", f.HideLabel) }>
+			{ f.Label }
+			if f.Required {
+				<span class="ui-req" aria-hidden="true">*</span>
+			}
+		</label>
+		{ children... }
+		@fieldNotes(f)
+	</div>
+}
+
+templ fieldNotes(f FieldProps) {
+	if f.Hint != "" {
+		<p class="ui-hint" id={ f.id() + "-hint" }>{ f.Hint }</p>
+	}
+	if f.Error != "" {
+		<p class="ui-error" id={ f.id() + "-error" }>
+			@Icon("alert")
+			<span>{ f.Error }</span>
+		</p>
+	}
+}
+
+// InputProps describe a single line input.
+type InputProps struct {
+	FieldProps
+	Type         string // text (default), email, url, search, date, number, tel
+	Value        string
+	Placeholder  string
+	Autocomplete string
+	MaxLength    int
+	Disabled     bool
+	Attrs        templ.Attributes
+}
+
+func inputType(t string) string {
+	if t == "" {
+		return "text"
+	}
+	return t
+}
+
+templ Input(p InputProps) {
+	@field(p.FieldProps) {
+		<input
+			class="ui-input"
+			id={ p.id() }
+			name={ p.Name }
+			type={ inputType(p.Type) }
+			value={ p.Value }
+			if p.Placeholder != "" {
+				placeholder={ p.Placeholder }
+			}
+			if p.Autocomplete != "" {
+				autocomplete={ p.Autocomplete }
+			}
+			if p.MaxLength > 0 {
+				maxlength={ itoa(p.MaxLength) }
+			}
+			required?={ p.Required }
+			disabled?={ p.Disabled }
+			if p.describedBy() != "" {
+				aria-describedby={ p.describedBy() }
+			}
+			if p.Error != "" {
+				aria-invalid="true"
+			}
+			{ p.Attrs... }
+		/>
+	}
+}
+
+// TextareaProps describe a multi line input.
+type TextareaProps struct {
+	FieldProps
+	Value     string
+	Rows      int // default 4
+	MaxLength int
+	Disabled  bool
+	Attrs     templ.Attributes
+}
+
+func rows(n int) string {
+	if n <= 0 {
+		return "4"
+	}
+	return itoa(n)
+}
+
+templ Textarea(p TextareaProps) {
+	@field(p.FieldProps) {
+		<textarea
+			class="ui-input ui-textarea"
+			id={ p.id() }
+			name={ p.Name }
+			rows={ rows(p.Rows) }
+			if p.MaxLength > 0 {
+				maxlength={ itoa(p.MaxLength) }
+			}
+			required?={ p.Required }
+			disabled?={ p.Disabled }
+			if p.describedBy() != "" {
+				aria-describedby={ p.describedBy() }
+			}
+			if p.Error != "" {
+				aria-invalid="true"
+			}
+			{ p.Attrs... }
+		>{ p.Value }</textarea>
+	}
+}
+
+// Option is one choice of a select or radio group.
+type Option struct {
+	Value    string
+	Label    string
+	Hint     string // radio groups only
+	Selected bool
+	Disabled bool
+}
+
+// SelectProps describe a native select.
+type SelectProps struct {
+	FieldProps
+	Options  []Option
+	Disabled bool
+	Attrs    templ.Attributes
+}
+
+templ Select(p SelectProps) {
+	@field(p.FieldProps) {
+		<span class="ui-select">
+			<select
+				class="ui-input"
+				id={ p.id() }
+				name={ p.Name }
+				required?={ p.Required }
+				disabled?={ p.Disabled }
+				if p.describedBy() != "" {
+					aria-describedby={ p.describedBy() }
+				}
+				if p.Error != "" {
+					aria-invalid="true"
+				}
+				{ p.Attrs... }
+			>
+				for _, o := range p.Options {
+					<option value={ o.Value } selected?={ o.Selected } disabled?={ o.Disabled }>{ o.Label }</option>
+				}
+			</select>
+			@Icon("chevron-down")
+		</span>
+	}
+}
+
+// CheckProps describe a checkbox or, with Switch, an on/off switch.
+type CheckProps struct {
+	ID       string // empty: f-<Name>
+	Name     string
+	Value    string // default "on"
+	Label    string
+	Hint     string
+	Checked  bool
+	Disabled bool
+	Switch   bool
+	Attrs    templ.Attributes
+}
+
+func (c CheckProps) id() string {
+	if c.ID != "" {
+		return c.ID
+	}
+	return "f-" + c.Name
+}
+
+func checkValue(v string) string {
+	if v == "" {
+		return "on"
+	}
+	return v
+}
+
+templ Checkbox(p CheckProps) {
+	<div class={ "ui-check", templ.KV("ui-switch", p.Switch) }>
+		<input
+			type="checkbox"
+			id={ p.id() }
+			name={ p.Name }
+			value={ checkValue(p.Value) }
+			checked?={ p.Checked }
+			disabled?={ p.Disabled }
+			if p.Switch {
+				role="switch"
+			}
+			if p.Hint != "" {
+				aria-describedby={ p.id() + "-hint" }
+			}
+			{ p.Attrs... }
+		/>
+		<label for={ p.id() }>{ p.Label }</label>
+		if p.Hint != "" {
+			<p class="ui-hint" id={ p.id() + "-hint" }>{ p.Hint }</p>
+		}
+	</div>
+}
+
+// RadioGroupProps describe a set of radio buttons in a fieldset.
+type RadioGroupProps struct {
+	Name     string
+	Legend   string
+	Hint     string
+	Error    string
+	Required bool
+	Options  []Option
+	Inline   bool
+}
+
+func (p RadioGroupProps) field() FieldProps {
+	return FieldProps{ID: "f-" + p.Name, Name: p.Name, Hint: p.Hint, Error: p.Error}
+}
+
+templ RadioGroup(p RadioGroupProps) {
+	<fieldset
+		class={ "ui-fieldset", templ.KV("ui-field-invalid", p.Error != ""), templ.KV("ui-inline", p.Inline) }
+		if p.field().describedBy() != "" {
+			aria-describedby={ p.field().describedBy() }
+		}
+	>
+		<legend class="ui-label">
+			{ p.Legend }
+			if p.Required {
+				<span class="ui-req" aria-hidden="true">*</span>
+			}
+		</legend>
+		<div class="ui-options">
+			for i, o := range p.Options {
+				<div class="ui-check ui-radio">
+					<input
+						type="radio"
+						id={ "f-" + p.Name + "-" + itoa(i) }
+						name={ p.Name }
+						value={ o.Value }
+						checked?={ o.Selected }
+						disabled?={ o.Disabled }
+						required?={ p.Required }
+						if o.Hint != "" {
+							aria-describedby={ "f-" + p.Name + "-" + itoa(i) + "-hint" }
+						}
+					/>
+					<label for={ "f-" + p.Name + "-" + itoa(i) }>{ o.Label }</label>
+					if o.Hint != "" {
+						<p class="ui-hint" id={ "f-" + p.Name + "-" + itoa(i) + "-hint" }>{ o.Hint }</p>
+					}
+				</div>
+			}
+		</div>
+		@fieldNotes(p.field())
+	</fieldset>
+}

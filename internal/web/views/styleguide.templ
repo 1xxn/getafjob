@@ -1,0 +1,225 @@
+package views
+
+import "github.com/1xxn/getafjob/internal/web/views/ui"
+
+func sgThemeHref(theme string) string {
+	if theme == "" {
+		return "/dev/styleguide"
+	}
+	return "/dev/styleguide?theme=" + theme
+}
+
+// StyleGuide renders every ui component in its states; served only when GETAFJOB_DEV_STYLEGUIDE is on.
+templ StyleGuide(p Page) {
+	@Layout(p) {
+		<div class="sg">
+			<header class="sg-head">
+				<h1>{ T(ctx, "styleguide.title") }</h1>
+				<p class="sg-muted">{ T(ctx, "styleguide.intro") }</p>
+				@ui.Tabs(T(ctx, "styleguide.theme"), []ui.Tab{
+					{Label: T(ctx, "styleguide.theme.system"), Href: sgThemeHref(""), Active: p.Theme == ""},
+					{Label: T(ctx, "styleguide.theme.light"), Href: sgThemeHref("light"), Active: p.Theme == "light"},
+					{Label: T(ctx, "styleguide.theme.dark"), Href: sgThemeHref("dark"), Active: p.Theme == "dark"},
+				})
+			</header>
+			<section class="sg-section" aria-labelledby="sg-colors">
+				<h2 id="sg-colors">{ T(ctx, "styleguide.colors") }</h2>
+				<ul class="sg-swatches">
+					for _, c := range sgColors {
+						<li><span class={ "sg-swatch", "sg-" + c } aria-hidden="true"></span><code>--{ c }</code></li>
+					}
+				</ul>
+			</section>
+			<section class="sg-section" aria-labelledby="sg-type">
+				<h2 id="sg-type">{ T(ctx, "styleguide.type") }</h2>
+				<p class="sg-t-2xl">2xl · { T(ctx, "styleguide.type.sample") }</p>
+				<p class="sg-t-xl">xl · { T(ctx, "styleguide.type.sample") }</p>
+				<p class="sg-t-lg">lg · { T(ctx, "styleguide.type.sample") }</p>
+				<p>md · { T(ctx, "styleguide.type.sample") }</p>
+				<p class="sg-t-sm">sm · { T(ctx, "styleguide.type.sample") }</p>
+				<p class="sg-t-xs">xs · { T(ctx, "styleguide.type.sample") }</p>
+				<p><kbd>Ctrl</kbd> <kbd>K</kbd> · <code>GETAFJOB_DEV_STYLEGUIDE</code></p>
+			</section>
+			<section class="sg-section" aria-labelledby="sg-buttons">
+				<h2 id="sg-buttons">{ T(ctx, "styleguide.buttons") }</h2>
+				<div class="sg-row">
+					@ui.Button(ui.ButtonProps{Label: T(ctx, "styleguide.s.primary"), Variant: "primary", Icon: "send"})
+					@ui.Button(ui.ButtonProps{Label: T(ctx, "styleguide.s.secondary")})
+					@ui.Button(ui.ButtonProps{Label: T(ctx, "styleguide.s.ghost"), Variant: "ghost"})
+					@ui.Button(ui.ButtonProps{Label: T(ctx, "styleguide.s.danger"), Variant: "danger", Icon: "trash"})
+					@ui.Button(ui.ButtonProps{Label: T(ctx, "styleguide.s.open"), Href: "/jobs", Icon: "external"})
+				</div>
+				<div class="sg-row">
+					@ui.Button(ui.ButtonProps{Label: T(ctx, "styleguide.s.small"), Variant: "primary", Size: "sm"})
+					@ui.Button(ui.ButtonProps{Label: T(ctx, "styleguide.s.small"), Size: "sm"})
+					@ui.Button(ui.ButtonProps{Label: T(ctx, "styleguide.s.disabled"), Variant: "primary", Disabled: true})
+					@ui.Button(ui.ButtonProps{Label: T(ctx, "styleguide.s.disabled"), Disabled: true})
+					@ui.Button(ui.ButtonProps{Label: T(ctx, "styleguide.s.loading"), Variant: "primary", Loading: true})
+					@ui.Button(ui.ButtonProps{Label: T(ctx, "styleguide.s.loading"), Loading: true})
+				</div>
+				<div class="sg-row">
+					@ui.IconButton(ui.IconButtonProps{Icon: "search", Label: T(ctx, "styleguide.s.open")})
+					@ui.IconButton(ui.IconButtonProps{Icon: "plus", Label: T(ctx, "styleguide.s.secondary"), Variant: "secondary"})
+					@ui.IconButton(ui.IconButtonProps{Icon: "play", Label: T(ctx, "styleguide.s.primary"), Variant: "primary"})
+					@ui.IconButton(ui.IconButtonProps{Icon: "trash", Label: T(ctx, "styleguide.s.danger"), Variant: "danger"})
+					@ui.IconButton(ui.IconButtonProps{Icon: "x", Label: T(ctx, "styleguide.s.close"), Disabled: true})
+				</div>
+			</section>
+			<section class="sg-section" aria-labelledby="sg-fields">
+				<h2 id="sg-fields">{ T(ctx, "styleguide.fields") }</h2>
+				<form class="sg-grid" action="/dev/styleguide" method="get">
+					<div>
+						@ui.Input(ui.InputProps{FieldProps: ui.FieldProps{Name: "email", Label: T(ctx, "styleguide.s.email"), Hint: T(ctx, "styleguide.s.email_hint"), Required: true}, Type: "email", Placeholder: "max.mustermann@example.org", Autocomplete: "email"})
+						@ui.Input(ui.InputProps{FieldProps: ui.FieldProps{Name: "city", Label: T(ctx, "styleguide.s.city"), Error: T(ctx, "styleguide.s.city_error")}})
+						@ui.Input(ui.InputProps{FieldProps: ui.FieldProps{Name: "locked", Label: T(ctx, "styleguide.s.disabled")}, Value: "Berlin", Disabled: true})
+						@ui.Textarea(ui.TextareaProps{FieldProps: ui.FieldProps{Name: "notes", Label: T(ctx, "styleguide.s.notes")}, Rows: 3})
+					</div>
+					<div>
+						@ui.Select(ui.SelectProps{FieldProps: ui.FieldProps{Name: "source", Label: T(ctx, "styleguide.s.source")}, Options: []ui.Option{
+							{Value: "", Label: "–"}, {Value: "greenhouse", Label: "Greenhouse", Selected: true}, {Value: "lever", Label: "Lever"},
+						}})
+						@ui.Checkbox(ui.CheckProps{Name: "remote", Label: T(ctx, "styleguide.s.remote"), Checked: true})
+						@ui.Checkbox(ui.CheckProps{Name: "remote-off", Label: T(ctx, "styleguide.s.disabled"), Disabled: true})
+						@ui.Checkbox(ui.CheckProps{Name: "notify", Label: T(ctx, "styleguide.s.notify"), Hint: T(ctx, "styleguide.s.email_hint"), Switch: true, Checked: true})
+						@ui.Checkbox(ui.CheckProps{Name: "notify-off", Label: T(ctx, "styleguide.s.notify"), Switch: true})
+						@ui.RadioGroup(ui.RadioGroupProps{Name: "notice", Legend: T(ctx, "styleguide.s.notice"), Required: true, Options: []ui.Option{
+							{Value: "1", Label: T(ctx, "styleguide.s.month1")},
+							{Value: "3", Label: T(ctx, "styleguide.s.month3"), Selected: true, Hint: T(ctx, "styleguide.s.tooltip")},
+						}})
+						@ui.RadioGroup(ui.RadioGroupProps{Name: "notice-err", Legend: T(ctx, "styleguide.s.notice"), Inline: true, Error: T(ctx, "styleguide.s.city_error"), Options: []ui.Option{
+							{Value: "1", Label: T(ctx, "styleguide.s.month1")},
+							{Value: "3", Label: T(ctx, "styleguide.s.month3")},
+						}})
+					</div>
+				</form>
+			</section>
+			<section class="sg-section" aria-labelledby="sg-feedback">
+				<h2 id="sg-feedback">{ T(ctx, "styleguide.feedback") }</h2>
+				<div class="sg-row">
+					@ui.Badge("Greenhouse", ui.Neutral)
+					@ui.Badge(T(ctx, "styleguide.s.remote"), ui.Accent)
+					@ui.Badge("92", ui.Success)
+					@ui.Badge(T(ctx, "styleguide.s.notice"), ui.Warning)
+					@ui.Badge(T(ctx, "styleguide.s.failed"), ui.Danger)
+					@ui.Badge("EN", ui.Info)
+				</div>
+				<div class="sg-row">
+					@ui.StatusPill(ui.StatusProps{Label: T(ctx, "styleguide.s.running"), Tone: ui.Accent, Live: true})
+					@ui.StatusPill(ui.StatusProps{Label: T(ctx, "styleguide.s.waiting"), Tone: ui.Warning})
+					@ui.StatusPill(ui.StatusProps{Label: T(ctx, "styleguide.s.sent"), Tone: ui.Success})
+					@ui.StatusPill(ui.StatusProps{Label: T(ctx, "styleguide.s.failed"), Tone: ui.Danger})
+					@ui.StatusPill(ui.StatusProps{Label: T(ctx, "styleguide.s.disabled")})
+				</div>
+				<div class="sg-stack">
+					@ui.Alert(ui.AlertProps{Text: T(ctx, "styleguide.s.alert_info")})
+					@ui.Alert(ui.AlertProps{Tone: ui.Success, Text: T(ctx, "styleguide.s.alert_success")})
+					@ui.Alert(ui.AlertProps{Tone: ui.Warning, Title: T(ctx, "styleguide.s.waiting"), Text: T(ctx, "styleguide.s.alert_warning")})
+					@ui.Alert(ui.AlertProps{Tone: ui.Danger, Text: T(ctx, "styleguide.s.alert_danger")})
+				</div>
+				<div class="sg-toasts">
+					@ui.Toast(ui.Success, T(ctx, "styleguide.s.alert_success"))
+					@ui.Toast(ui.Danger, T(ctx, "styleguide.s.alert_danger"))
+				</div>
+			</section>
+			<section class="sg-section" aria-labelledby="sg-data">
+				<h2 id="sg-data">{ T(ctx, "styleguide.data") }</h2>
+				<div class="sg-kpis">
+					@ui.KPI(ui.KPIProps{Label: T(ctx, "styleguide.s.kpi_input"), Value: "3", Icon: "inbox", Tone: ui.Warning, Href: "/approvals", LinkLabel: T(ctx, "styleguide.s.open")})
+					@ui.KPI(ui.KPIProps{Label: T(ctx, "styleguide.s.running"), Value: "2", Icon: "live", Tone: ui.Accent})
+					@ui.KPI(ui.KPIProps{Label: T(ctx, "styleguide.s.kpi_new"), Value: "12", Hint: T(ctx, "styleguide.s.kpi_hint"), Icon: "briefcase", Tone: ui.Info})
+					@ui.KPI(ui.KPIProps{Label: T(ctx, "styleguide.s.sent"), Value: "5", Icon: "send", Tone: ui.Success})
+				</div>
+				<div class="sg-grid">
+					@ui.Card(ui.CardProps{Title: T(ctx, "styleguide.s.job"), Subtitle: T(ctx, "styleguide.s.company"), Href: "/jobs"}) {
+						<div class="sg-row">
+							@ui.Badge("Greenhouse", ui.Neutral)
+							@ui.StatusPill(ui.StatusProps{Label: T(ctx, "styleguide.s.waiting"), Tone: ui.Warning})
+						</div>
+					}
+					@ui.Card(ui.CardProps{Title: T(ctx, "styleguide.s.progress")}) {
+						@ui.ProgressBar(ui.ProgressProps{ID: "sg-progress", Label: T(ctx, "styleguide.s.progress"), Value: 4, Max: 9, ValueText: T(ctx, "styleguide.s.progress_value", "n", 4, "total", 9)})
+						<div class="sg-row sg-avatars">
+							@ui.Avatar("Max Mustermann")
+							@ui.Avatar("Erika Musterfrau")
+							@ui.Avatar("Jan Beispiel")
+						</div>
+					}
+				</div>
+				@ui.Table(ui.TableProps{Caption: T(ctx, "styleguide.s.table"), Columns: []ui.Column{
+					{Label: T(ctx, "styleguide.s.col_company"), SortHref: "/dev/styleguide?sort=company", Sort: "asc"},
+					{Label: T(ctx, "styleguide.s.col_state")},
+					{Label: T(ctx, "styleguide.s.col_fit"), SortHref: "/dev/styleguide?sort=fit", Align: "end", Narrow: true},
+				}}) {
+					<tr><td>Acme GmbH</td><td>
+						@ui.StatusPill(ui.StatusProps{Label: T(ctx, "styleguide.s.running"), Tone: ui.Accent, Live: true})
+					</td><td class="ui-end ui-narrow">92</td></tr>
+					<tr><td>Beta AG</td><td>
+						@ui.StatusPill(ui.StatusProps{Label: T(ctx, "styleguide.s.sent"), Tone: ui.Success})
+					</td><td class="ui-end ui-narrow">85</td></tr>
+				}
+				@ui.EmptyState(ui.EmptyProps{Icon: "inbox", Title: T(ctx, "styleguide.s.empty_title"), Text: T(ctx, "styleguide.s.empty_text")}) {
+					@ui.Button(ui.ButtonProps{Label: T(ctx, "styleguide.s.kpi_new"), Variant: "primary", Href: "/jobs"})
+				}
+				@ui.Skeleton(T(ctx, "styleguide.s.loading"), 3)
+			</section>
+			<section class="sg-section" aria-labelledby="sg-nav">
+				<h2 id="sg-nav">{ T(ctx, "styleguide.navigation") }</h2>
+				@ui.Tabs(T(ctx, "styleguide.s.tabs"), []ui.Tab{
+					{Label: T(ctx, "styleguide.s.tab_overview"), Href: "/dev/styleguide", Active: true},
+					{Label: T(ctx, "styleguide.s.tab_fields"), Href: "/dev/styleguide?tab=fields", Count: 9},
+					{Label: T(ctx, "styleguide.s.tab_timeline"), Href: "/dev/styleguide?tab=timeline"},
+				})
+				@ui.Pagination(ui.PaginationProps{Label: T(ctx, "styleguide.s.pages"), PrevLabel: T(ctx, "styleguide.s.prev"), NextLabel: T(ctx, "styleguide.s.next"),
+					PrevHref: "/dev/styleguide?page=1", NextHref: "/dev/styleguide?page=3", Pages: []ui.PageLink{
+						{Label: "1", Href: "/dev/styleguide?page=1"}, {Label: "2", Href: "/dev/styleguide?page=2", Current: true},
+						{Label: "3", Href: "/dev/styleguide?page=3"}, {Label: "…"}, {Label: "9", Href: "/dev/styleguide?page=9"},
+					}})
+				<div class="sg-row">
+					@ui.Menu(ui.MenuProps{ID: "sg-menu", Label: T(ctx, "styleguide.s.menu"), Icon: "user"}) {
+						@ui.MenuItem(T(ctx, "styleguide.s.profile"), "/profile", "user")
+						@ui.MenuItem(T(ctx, "styleguide.s.tab_fields"), "/answers", "message")
+						<hr/>
+						@ui.MenuItem(T(ctx, "styleguide.s.signout"), "/dev/styleguide", "logout")
+					}
+					@ui.Menu(ui.MenuProps{ID: "sg-menu-more", Label: T(ctx, "styleguide.s.menu"), Icon: "more", IconOnly: true, AlignEnd: true}) {
+						@ui.MenuItem(T(ctx, "styleguide.s.open"), "/jobs", "external")
+					}
+				</div>
+			</section>
+			<section class="sg-section" aria-labelledby="sg-overlays">
+				<h2 id="sg-overlays">{ T(ctx, "styleguide.overlays") }</h2>
+				<div class="sg-row">
+					<button type="button" class="ui-btn ui-btn-danger" { ui.OpenDialog("sg-dialog")... }>{ T(ctx, "styleguide.s.danger") }</button>
+					<button type="button" class="ui-btn ui-btn-secondary" { ui.OpenDialog("sg-drawer")... }>{ T(ctx, "styleguide.s.drawer") }</button>
+					@ui.Tooltip("sg-tip", T(ctx, "styleguide.s.tooltip")) {
+						<button type="button" class="ui-btn ui-btn-ghost ui-btn-icon" aria-label={ T(ctx, "styleguide.s.source") } aria-describedby="sg-tip">
+							@ui.Icon("info")
+						</button>
+					}
+				</div>
+				@ui.Dialog(ui.DialogProps{ID: "sg-dialog", Title: T(ctx, "styleguide.s.dialog"), CloseLabel: T(ctx, "styleguide.s.close")}) {
+					<p>{ T(ctx, "styleguide.s.dialog_text") }</p>
+					<div class="ui-dialog-actions">
+						<button type="button" class="ui-btn ui-btn-secondary" { ui.CloseDialog("sg-dialog")... }>{ T(ctx, "styleguide.s.cancel") }</button>
+						<button type="button" class="ui-btn ui-btn-danger" { ui.CloseDialog("sg-dialog")... }>{ T(ctx, "styleguide.s.danger") }</button>
+					</div>
+				}
+				@ui.Dialog(ui.DialogProps{ID: "sg-drawer", Title: T(ctx, "styleguide.s.drawer"), CloseLabel: T(ctx, "styleguide.s.close"), Drawer: true}) {
+					@ui.Checkbox(ui.CheckProps{ID: "sg-d-remote", Name: "d-remote", Label: T(ctx, "styleguide.s.remote"), Switch: true})
+					@ui.Select(ui.SelectProps{FieldProps: ui.FieldProps{ID: "sg-d-source", Name: "d-source", Label: T(ctx, "styleguide.s.source")}, Options: []ui.Option{{Value: "", Label: "–"}, {Value: "lever", Label: "Lever"}}})
+				}
+			</section>
+			<section class="sg-section" aria-labelledby="sg-icons">
+				<h2 id="sg-icons">{ T(ctx, "styleguide.icons") }</h2>
+				<ul class="sg-icons">
+					for _, name := range sgIcons {
+						<li>
+							@ui.Icon(name)
+							<code>{ name }</code>
+						</li>
+					}
+				</ul>
+			</section>
+		</div>
+	}
+}

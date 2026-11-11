@@ -2,13 +2,22 @@ package views
 
 templ Layout(p Page) {
 	<!DOCTYPE html>
-	<html lang={ string(Locale(ctx)) }>
+	<html
+		lang={ string(Locale(ctx)) }
+		if p.Theme != "" {
+			data-theme={ p.Theme }
+		}
+	>
 		<head>
 			<meta charset="utf-8"/>
 			<meta name="viewport" content="width=device-width, initial-scale=1"/>
 			<meta name="color-scheme" content="light dark"/>
 			<title>{ p.Title } · getafjob</title>
+			<link rel="stylesheet" href={ Asset("ui.css") }/>
 			<link rel="stylesheet" href={ Asset("app.css") }/>
+			if p.StyleGuide {
+				<link rel="stylesheet" href={ Asset("styleguide.css") }/>
+			}
 			<link rel="icon" href={ Asset("icon.svg") } type="image/svg+xml"/>
 			<link rel="manifest" href={ Asset("manifest.webmanifest") }/>
 			<meta name="htmx-config" content={ htmxConfig }/>
@@ -52,7 +61,7 @@ templ Layout(p Page) {
 					</nav>
 				}
 			</header>
-			<main id="main" tabindex="-1" class={ templ.KV("wide", p.Handoff) }>
+			<main id="main" tabindex="-1" class={ templ.KV("wide", p.Handoff || p.StyleGuide) }>
 				{ children... }
 			</main>
 			<footer class="footer">
