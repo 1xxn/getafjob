@@ -509,7 +509,8 @@ func (c *coordinator) CheckpointWithCookies(ctx context.Context, cp engine.Check
 func (c *coordinator) Ask(ctx context.Context, qs []engine.Question) error {
 	req := &runnerv1.AskRequest{}
 	for _, q := range qs {
-		req.Questions = append(req.Questions, &runnerv1.Question{Kind: q.Kind, Label: q.Label, Draft: q.Draft})
+		req.Questions = append(req.Questions, &runnerv1.Question{Kind: q.Kind, Label: q.Label, Draft: q.Draft,
+			Input: q.Input, Options: q.Options})
 	}
 	_, err := c.client.Ask(auth(ctx, c.token), req)
 	return err

@@ -51,6 +51,10 @@ type Question struct {
 	FieldID string `json:"field_id,omitempty"`
 	Label   string `json:"label"`
 	Draft   string `json:"draft,omitempty"` // an AI suggestion; used only after the user approved it
+	// Input is the field kind (checkbox, radio, select, date, file, text, ...) and Options its choices, so the user
+	// answers with a matching control instead of free text (#158).
+	Input   string   `json:"input,omitempty"`
+	Options []string `json:"options,omitempty"`
 }
 
 // Coordinator is the server side of a run (through the gateway).

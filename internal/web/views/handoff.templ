@@ -10,6 +10,73 @@ type HandoffQuestion struct {
 	Kind     string
 	Question string
 	Draft    string
+	Input    string   // field kind on the employer's form
+	Options  []string // choices of radio, select and checkbox groups
+}
+
+// questionControl renders a control that matches the employer's field (#158); values travel as answer-<i>.
+templ questionControl(i int, q HandoffQuestion) {
+	{{ id, name := "q-" + strconv.Itoa(i), "answer-" + strconv.Itoa(i) }}
+	<input type="hidden" name={ "question-" + strconv.Itoa(i) } value={ q.Question }/>
+	<input type="hidden" name={ "input-" + strconv.Itoa(i) } value={ q.Input }/>
+	switch {
+		case q.Input == "checkbox" || q.Input == "aria_checkbox":
+			<div class="field check">
+				<input type="hidden" name={ name } value="No"/>
+				<input type="checkbox" id={ id } name={ name } value="Yes" checked?={ q.Draft == "Yes" }/>
+				<label for={ id }>{ q.Question }</label>
+			</div>
+		case q.Input == "checkbox_group" && len(q.Options) > 0:
+			<fieldset class="field">
+				<legend>{ q.Question }</legend>
+				for j, o := range q.Options {
+					<div class="check">
+						<input type="checkbox" id={ id + "-" + strconv.Itoa(j) } name={ name } value={ o }/>
+						<label for={ id + "-" + strconv.Itoa(j) }>{ o }</label>
+					</div>
+				}
+			</fieldset>
+		case len(q.Options) > 0 && len(q.Options) <= 5:
+			<fieldset class="field">
+				<legend>{ q.Question }</legend>
+				for j, o := range q.Options {
+					<div class="check">
+						<input type="radio" id={ id + "-" + strconv.Itoa(j) } name={ name } value={ o } checked?={ q.Draft == o }/>
+						<label for={ id + "-" + strconv.Itoa(j) }>{ o }</label>
+					</div>
+				}
+			</fieldset>
+		case len(q.Options) > 0:
+			<div class="field">
+				<label for={ id }>{ q.Question }</label>
+				<select id={ id } name={ name }>
+					<option value="">{ T(ctx, "handoff.choose") }</option>
+					for _, o := range q.Options {
+						<option value={ o } selected?={ q.Draft == o }>{ o }</option>
+					}
+				</select>
+			</div>
+		case q.Input == "date":
+			<div class="field">
+				<label for={ id }>{ q.Question }</label>
+				<input type="date" id={ id } name={ name } value={ q.Draft }/>
+			</div>
+		case q.Input == "file":
+			<div class="field">
+				<p><strong>{ q.Question }</strong></p>
+				<p class="hint">{ T(ctx, "handoff.file_hint") } <a href="/documents">{ T(ctx, "nav.documents") }</a></p>
+			</div>
+		case q.Input == "textarea" || q.Input == "richtext":
+			<div class="field">
+				<label for={ id }>{ q.Question }</label>
+				<textarea id={ id } name={ name } rows="4">{ q.Draft }</textarea>
+			</div>
+		default:
+			<div class="field">
+				<label for={ id }>{ q.Question }</label>
+				<input type="text" id={ id } name={ name } value={ q.Draft }/>
+			</div>
+	}
 }
 
 // EvidenceFieldRow is one filled form field on the application evidence page.
@@ -200,11 +267,7 @@ templ HandoffPage(d HandoffData) {
 					<p class="muted">{ T(ctx, "handoff.questions_hint") }</p>
 					<form method="post" action={ templ.SafeURL("/applications/" + d.AppID + "/answer") } class="stack">
 						for i, q := range d.Questions {
-							<div class="field">
-								<label for={ "q-" + strconv.Itoa(i) }>{ q.Question }</label>
-								<input type="hidden" name="question" value={ q.Question }/>
-								<textarea id={ "q-" + strconv.Itoa(i) } name="answer" rows="3">{ q.Draft }</textarea>
-							</div>
+							@questionControl(i, q)
 						}
 						<div class="actions">
 							<button type="submit">{ T(ctx, "handoff.save_continue") }</button>

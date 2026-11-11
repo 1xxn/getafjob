@@ -21,6 +21,7 @@ import (
 	"github.com/1xxn/getafjob/internal/identity"
 	"github.com/1xxn/getafjob/internal/platform/blob"
 	"github.com/1xxn/getafjob/internal/platform/webpush"
+	"github.com/1xxn/getafjob/internal/web/views"
 )
 
 type fakeHub struct {
@@ -280,8 +281,9 @@ func TestHandoffPageAnswerAndPark(t *testing.T) {
 
 	// Submit answers
 	form := url.Values{
-		"question": {"Earliest start date?"},
-		"answer":   {"2027-01-01"},
+		"question-0": {"Earliest start date?"},
+		"input-0":    {"date"},
+		"answer-0":   {"2027-01-01"},
 	}
 	rec = httptest.NewRecorder()
 	req = httptest.NewRequest(http.MethodPost, "/applications/"+appID.String()+"/answer", strings.NewReader(form.Encode()))
@@ -568,5 +570,49 @@ func TestEvidencePageAndScreenshotEndpoint(t *testing.T) {
 	srv.applicationScreenshot(rec, req, other)
 	if rec.Code != http.StatusNotFound {
 		t.Fatalf("other user screenshot status = %d, want 404", rec.Code)
+	}
+}
+
+func TestFormAnswerPerControl(t *testing.T) {
+	cases := []struct {
+		input  string
+		values []string
+		want   string
+	}{
+		{"checkbox", []string{"No"}, "No"},
+		{"checkbox", []string{"No", "Yes"}, "Yes"},
+		{"checkbox_group", []string{"Go", "Kubernetes"}, "Go; Kubernetes"},
+		{"select", []string{""}, ""},
+		{"radio", []string{"Berlin"}, "Berlin"},
+		{"text", []string{"  Max  "}, "Max"},
+	}
+	for _, c := range cases {
+		if got := formAnswer(c.input, c.values); got != c.want {
+			t.Errorf("%s %v = %q, want %q", c.input, c.values, got, c.want)
+		}
+	}
+}
+
+func TestQuestionsRenderMatchingControls(t *testing.T) {
+	var b strings.Builder
+	d := views.HandoffData{Name: "Max", AppID: uuid.NewString(), Questions: []views.HandoffQuestion{
+		{Question: "I agree to the privacy policy*", Input: "checkbox"},
+		{Question: "Work permit?", Input: "radio", Options: []string{"Yes", "No"}},
+		{Question: "Country", Input: "select", Options: []string{"Germany", "Austria", "Switzerland", "France", "Spain", "Italy"}},
+		{Question: "Start date", Input: "date"},
+		{Question: "Resume", Input: "file"},
+	}}
+	if err := views.HandoffPage(d).Render(t.Context(), &b); err != nil {
+		t.Fatal(err)
+	}
+	html := b.String()
+	for _, want := range []string{`type="checkbox" id="q-0" name="answer-0" value="Yes"`, `type="radio" id="q-1-0" name="answer-1" value="Yes"`,
+		`<select id="q-2" name="answer-2">`, `type="date" id="q-3" name="answer-3"`, `href="/documents"`} {
+		if !strings.Contains(html, want) {
+			t.Errorf("missing %s", want)
+		}
+	}
+	if strings.Contains(html, "<textarea") {
+		t.Error("no question here is free text")
 	}
 }
