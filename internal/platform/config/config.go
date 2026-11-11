@@ -39,6 +39,9 @@ type Config struct {
 	RunnerSecret Secret
 	// RunnerKind is "server" (default) or "home" for a home runner.
 	RunnerKind string
+	// RunnerParallel is how many runs one runner works on at the same time (1..16, default 3); runs waiting for the
+	// user do not count.
+	RunnerParallel int
 	// GatewayURL is where a runner reaches the gateway (http://serve:8090). Empty: the runner only self-tests.
 	GatewayURL *url.URL
 	// PublicURL is the public address behind Caddy (links in mails, WebAuthn origin, cookies).
@@ -120,6 +123,14 @@ var specs = []spec{
 	{"GATEWAY_ADDR", ":8090", func(c *Config, v string) error { return setAddr(&c.GatewayAddr, v) }},
 	{"RUNNER_SECRET", "", setRunnerSecret},
 	{"RUNNER_KIND", "server", setRunnerKind},
+	{"RUNNER_PARALLEL", "3", func(c *Config, v string) error {
+		n, err := strconv.Atoi(strings.TrimSpace(v))
+		if err != nil || n < 1 || n > 16 {
+			return errors.New("must be a number from 1 to 16")
+		}
+		c.RunnerParallel = n
+		return nil
+	}},
 	{"GATEWAY_URL", "", setGatewayURL},
 	{"PUBLIC_URL", "https://localhost:8443", setPublicURL},
 	{"DATABASE_URL", "", setDatabaseURL},

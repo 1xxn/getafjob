@@ -11,6 +11,7 @@ an error. Unknown `GETAFJOB_*` variables are reported as a warning (typos), with
 | `GETAFJOB_GATEWAY_ADDR` | `:8090` | serve | runner gateway (Connect RPC), only on the internal gateway network |
 | `GETAFJOB_RUNNER_SECRET` | none | serve, runner | shared secret of the server's runners, at least 32 characters (`admin gen-secret`); empty keeps the gateway off |
 | `GETAFJOB_GATEWAY_URL` | none | runner | where the runner reaches the gateway, e.g. `http://serve:8090`; empty: the runner only self-tests |
+| `GETAFJOB_RUNNER_PARALLEL` | `3` | runner | runs one runner works on at the same time (1 to 16); a run waiting for the user frees its slot, open browsers stay below twice this number. Size memory at about 500 MB per browser |
 | `GETAFJOB_PUBLIC_URL` | `https://localhost:8443` | serve, worker | public address behind Caddy (links, cookies, WebAuthn) |
 | `GETAFJOB_DATABASE_URL` | none | serve, worker, migrate | `postgres://user@host:5432/db?sslmode=…` |
 | `GETAFJOB_DATABASE_PASSWORD` | none | serve, worker, migrate | overrides the password in the URL; use `_FILE` |

@@ -126,6 +126,7 @@ func TestLoadErrors(t *testing.T) {
 		{"bad level", map[string]string{"GETAFJOB_LOG_LEVEL": "loud"}, nil, "GETAFJOB_LOG_LEVEL"},
 		{"bad format", map[string]string{"GETAFJOB_LOG_FORMAT": "xml"}, nil, "json or text"},
 		{"bad proxy", map[string]string{"GETAFJOB_EGRESS_PROXY": "socks5://x:1"}, nil, "http(s) URL"},
+		{"bad runner parallel", map[string]string{"GETAFJOB_RUNNER_PARALLEL": "0"}, nil, "1 to 16"},
 		{"bad timeout", map[string]string{"GETAFJOB_SHUTDOWN_TIMEOUT": "10m"}, nil, "between 1s and 5m"},
 	}
 	for _, tc := range cases {
