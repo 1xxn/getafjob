@@ -579,16 +579,18 @@ JOIN jobs j ON j.id = a.job_id
 LEFT JOIN autonomy_settings s ON s.user_id = a.user_id
 WHERE a.state = 'queued'
   AND NOT EXISTS (SELECT 1 FROM runs r WHERE r.application_id = a.id AND r.finished_at IS NULL AND r.expires_at > $1::timestamptz)
-  AND NOT EXISTS (SELECT 1 FROM runs r WHERE r.host = lower(coalesce(substring(coalesce(nullif(j.apply_url, ''), j.url) from '^[a-zA-Z]+://([^/:?#]+)'), ''))
-    AND ((r.finished_at IS NULL AND r.expires_at > $1::timestamptz) OR r.leased_at > $2::timestamptz))
-  AND coalesce(s.daily_limit, 5) > 0
-  AND (
-    SELECT count(*) FROM submit_attempts sa
-    WHERE sa.user_id = a.user_id
-      AND sa.started_at >= $1::timestamptz - interval '24 hours'
-  ) < coalesce(s.daily_limit, 5)
-  AND coalesce(s.runner_choice, 'server') = $3::text
-  AND ($4::uuid IS NULL OR a.user_id = $4::uuid)
+  -- Without limits (self-host) neither the per-host gap nor the daily quota applies.
+  AND ($2::bool OR (
+    NOT EXISTS (SELECT 1 FROM runs r WHERE r.host = lower(coalesce(substring(coalesce(nullif(j.apply_url, ''), j.url) from '^[a-zA-Z]+://([^/:?#]+)'), ''))
+      AND ((r.finished_at IS NULL AND r.expires_at > $1::timestamptz) OR r.leased_at > $3::timestamptz))
+    AND coalesce(s.daily_limit, 5) > 0
+    AND (
+      SELECT count(*) FROM submit_attempts sa
+      WHERE sa.user_id = a.user_id
+        AND sa.started_at >= $1::timestamptz - interval '24 hours'
+    ) < coalesce(s.daily_limit, 5)))
+  AND coalesce(s.runner_choice, 'server') = $4::text
+  AND ($5::uuid IS NULL OR a.user_id = $5::uuid)
 ORDER BY a.updated_at, a.id
 LIMIT 1
 FOR UPDATE OF a SKIP LOCKED
@@ -596,6 +598,7 @@ FOR UPDATE OF a SKIP LOCKED
 
 type LeaseCandidateParams struct {
 	Now          time.Time
+	Unlimited    bool
 	GapStart     time.Time
 	RunnerChoice string
 	UserID       *uuid.UUID
@@ -609,10 +612,12 @@ type LeaseCandidateRow struct {
 }
 
 // System role: the oldest queued application whose host has no active run and no lease within the gap,
-// whose user has free daily quota, that has no unfinished run itself, and that matches the runner's choice.
+// whose user has free daily quota (both skipped when unlimited), that has no unfinished run itself, and that
+// matches the runner's choice.
 func (q *Queries) LeaseCandidate(ctx context.Context, arg LeaseCandidateParams) (LeaseCandidateRow, error) {
 	row := q.db.QueryRow(ctx, leaseCandidate,
 		arg.Now,
+		arg.Unlimited,
 		arg.GapStart,
 		arg.RunnerChoice,
 		arg.UserID,

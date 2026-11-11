@@ -114,7 +114,7 @@ func serve(ctx context.Context, cfg config.Config, logger *slog.Logger) error {
 	notifySvc, _, vapidPub := newNotifyService(pool, cfg, logger)
 	appNotifier := newNotifyAppNotifier(notifySvc)
 	astore := applicationstore.New(pool)
-	apps := application.NewService(astore)
+	apps := newApplications(astore, cfg)
 	portalsStore := portalsstore.New(pool)
 	portalsCipher := portalscrypto.NewCipher(env)
 	portalsSvc := portals.NewService(portalsStore, portalsCipher, newAutonomyAdapter(apps), cfg.EasyApplyEnabled)
@@ -227,7 +227,7 @@ func worker(ctx context.Context, cfg config.Config, logger *slog.Logger) error {
 		profileCriteria{svc: profile.NewService(pstore, env), store: pstore}, mstore, mstore)})
 	river.AddWorker(workers, &boardDiscoveryWorker{
 		discovery: discovery.NewBoardDiscovery(store, store, sources.NewFinder(client)), logger: logger, metrics: metrics})
-	apps := application.NewService(applicationstore.New(pool))
+	apps := newApplications(applicationstore.New(pool), cfg)
 	ids := identity.NewService(pgstore.New(pool), nil, cfg.PublicURL)
 	docs := profile.NewDocuments(pstore, sealed, env)
 	items := profile.NewItems(pstore, env)
@@ -356,4 +356,13 @@ func serveHealth(ctx context.Context, cfg config.Config, health *httpx.Health, l
 	health.Register(mux)
 	return httpx.Run(ctx, httpx.NewServer(cfg.HealthAddr, httpx.SecurityHeaders(mux, false), logger),
 		cfg.ShutdownTimeout, logger)
+}
+
+// newApplications builds the application service; GETAFJOB_LIMITS=off (the default) removes the throughput limits.
+func newApplications(st application.Store, cfg config.Config) *application.Service {
+	svc := application.NewService(st)
+	if !cfg.Limits {
+		svc.WithoutLimits()
+	}
+	return svc
 }

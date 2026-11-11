@@ -659,5 +659,6 @@
   "tracker.title": "Application Tracker",
   "tracker.updated": "Updated {when}",
   "tracker.view_application": "Application details",
-  "tracker.view_details": "Details"
+  "tracker.view_details": "Details",
+  "profile.hint.no_limits": "This instance has no daily limit: applications run as fast as the runners allow. Approval and the other safety checks still apply."
 }

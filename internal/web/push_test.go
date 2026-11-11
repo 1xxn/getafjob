@@ -360,7 +360,7 @@ func (f *fakeAppStore) Approvals(context.Context, uuid.UUID) ([]application.Appr
 	return nil, nil
 }
 
-func (f *fakeAppStore) PlanUsers(context.Context) ([]uuid.UUID, error) {
+func (f *fakeAppStore) PlanUsers(context.Context, bool) ([]uuid.UUID, error) {
 	return nil, nil
 }
 
