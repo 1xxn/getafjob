@@ -368,7 +368,7 @@ templ JobPanel(p JobPanelData) {
 		}
 		if p.Excluded {
 			@ui.Alert(ui.AlertProps{Tone: ui.Warning, Text: T(ctx, "jobs.panel_excluded")}) {
-				<p><a href="/preferences">{ T(ctx, "jobs.panel_excluded_link") }</a></p>
+				<p><a href="/settings/search">{ T(ctx, "jobs.panel_excluded_link") }</a></p>
 			}
 		}
 		<div class="job-panel-actions">

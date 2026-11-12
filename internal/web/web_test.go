@@ -376,7 +376,7 @@ func TestAccountSessions(t *testing.T) {
 	}
 	other := sessionFrom(t, a.do(http.MethodPost, strings.TrimPrefix(link, "https://jobs.example.org"), url.Values{}, "", nil))
 
-	page := a.do(http.MethodGet, "/account", nil, here, nil)
+	page := a.do(http.MethodGet, "/settings/account", nil, here, nil)
 	body := page.Body.String()
 	if page.Code != http.StatusOK || strings.Count(body, "<tr>") != 3 || !strings.Contains(body, "This device") ||
 		!strings.Contains(body, "Sign-in link") || !strings.Contains(body, "Invitation") {
@@ -389,7 +389,7 @@ func TestAccountSessions(t *testing.T) {
 	if rec := a.do(http.MethodGet, "/", nil, other, nil); rec.Code != http.StatusSeeOther {
 		t.Errorf("other session still signed in: %d", rec.Code)
 	}
-	if rec := a.do(http.MethodGet, "/account", nil, "", nil); rec.Code != http.StatusSeeOther {
+	if rec := a.do(http.MethodGet, "/settings/account", nil, "", nil); rec.Code != http.StatusSeeOther {
 		t.Errorf("account without session: %d", rec.Code)
 	}
 }
@@ -457,7 +457,7 @@ func TestPasskeyPages(t *testing.T) {
 	if rec := a.json("/account/passkeys", map[string]any{"challenge": o.Challenge, "name": "Laptop", "credential": json.RawMessage(cred)}, session); rec.Code != http.StatusCreated {
 		t.Fatalf("register %d: %s", rec.Code, rec.Body.String())
 	}
-	page := a.do(http.MethodGet, "/account?added=1", nil, session, nil).Body.String()
+	page := a.do(http.MethodGet, "/settings/account?added=1", nil, session, nil).Body.String()
 	if !strings.Contains(page, "Laptop") || !strings.Contains(page, "Passkey added") || !strings.Contains(page, `src="/static/js/passkey.js?v=`) {
 		t.Fatalf("account page: %s", page)
 	}
@@ -535,7 +535,7 @@ func TestPasskeyNudgeAndRecovery(t *testing.T) {
 	if strings.Contains(a.mail.last.Text, "/login/link/") {
 		t.Fatal("a sign-in link was mailed to an account with a passkey")
 	}
-	page := a.do(http.MethodGet, "/account", nil, session, nil).Body.String()
+	page := a.do(http.MethodGet, "/settings/account", nil, session, nil).Body.String()
 	if !strings.Contains(page, "without your passkey") || !strings.Contains(page, "Cancel this request") {
 		t.Fatalf("account page without the pending recovery: %s", page)
 	}
@@ -589,7 +589,7 @@ func TestProfilePages(t *testing.T) {
 	if rec := a.do(http.MethodPost, "/preferences", prefs, session, nil); rec.Code != http.StatusSeeOther {
 		t.Fatalf("preferences %d", rec.Code)
 	}
-	body = a.do(http.MethodGet, "/preferences", nil, session, nil).Body.String()
+	body = a.do(http.MethodGet, "/settings/search", nil, session, nil).Body.String()
 	if !strings.Contains(body, "Platform Engineer\nSRE") || !strings.Contains(body, `value="70000"`) || !strings.Contains(body, `value="de" selected`) {
 		t.Fatalf("preferences page: %s", body)
 	}
@@ -597,7 +597,7 @@ func TestProfilePages(t *testing.T) {
 	if rec := a.do(http.MethodPost, "/preferences", prefs, session, nil); rec.Code != http.StatusUnprocessableEntity || !strings.Contains(rec.Body.String(), `value="a lot"`) {
 		t.Fatalf("invalid preferences %d", rec.Code)
 	}
-	if body := a.do(http.MethodGet, "/preferences", nil, session, nil).Body.String(); !strings.Contains(body, `value="70000"`) {
+	if body := a.do(http.MethodGet, "/settings/search", nil, session, nil).Body.String(); !strings.Contains(body, `value="70000"`) {
 		t.Error("invalid preferences were saved")
 	}
 
@@ -1129,7 +1129,7 @@ func TestPrivacyExportAndDelete(t *testing.T) {
 	session := sessionFrom(t, rec)
 
 	// 4. View account page and verify privacy section is present
-	accPage := a.do(http.MethodGet, "/account", nil, session, nil).Body.String()
+	accPage := a.do(http.MethodGet, "/settings/account", nil, session, nil).Body.String()
 	if !strings.Contains(accPage, "Privacy &amp; your data") && !strings.Contains(accPage, "Privacy & your data") {
 		t.Errorf("account page lacks privacy section: %s", accPage)
 	}

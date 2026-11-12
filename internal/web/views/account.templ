@@ -28,8 +28,7 @@ type AccountData struct {
 }
 
 templ Account(d AccountData) {
-	@Layout(Page{Title: T(ctx, "account.title"), UserName: d.Name, Passkeys: d.Enabled}) {
-		@Section(T(ctx, "account.title")) {
+	@settingsPage(d.Name, "account", d.Enabled) {
 			if d.Notice != "" {
 				@Notice("info", d.Notice)
 			}
@@ -140,5 +139,4 @@ templ Account(d AccountData) {
 				</form>
 			</div>
 		}
-	}
 }

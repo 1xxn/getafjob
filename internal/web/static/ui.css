@@ -3336,6 +3336,79 @@
   .cand-variant form {
     margin-top: var(--space-3);
   }
+
+  /* settings: section list beside one section */
+  .set {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    gap: var(--space-4);
+    align-items: start;
+  }
+
+  .set-main table {
+    display: block;
+    max-width: 100%;
+    overflow-x: auto;
+  }
+
+  @media (min-width: 64rem) {
+    .set {
+      grid-template-columns: 14rem minmax(0, 1fr);
+    }
+
+    .set-nav {
+      position: sticky;
+      top: calc(var(--top-h, 3.5rem) + var(--space-3));
+    }
+  }
+
+  .set-nav {
+    min-width: 0;
+  }
+
+  .set-nav-title {
+    margin: 0 0 var(--space-2);
+    color: var(--text-2);
+    font-size: var(--text-sm);
+    font-weight: 600;
+  }
+
+  .set-nav ul {
+    display: grid;
+    gap: var(--space-1);
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
+
+  @media (max-width: 63.99rem) {
+    .set-nav ul {
+      display: flex;
+      overflow-x: auto;
+    }
+
+    .set-nav .shell-link {
+      white-space: nowrap;
+    }
+  }
+
+  .set-main {
+    display: grid;
+    gap: var(--space-4);
+    min-width: 0;
+    max-width: 48rem;
+  }
+
+  .set-main h1 {
+    margin: 0;
+  }
+
+  .set-form {
+    padding: var(--space-4);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-md);
+    background: var(--surface);
+  }
 }
 
 

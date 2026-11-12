@@ -1,0 +1,40 @@
+package views
+
+import "github.com/1xxn/getafjob/internal/web/views/ui"
+
+// settingsSections are the settings pages in the order of the section list.
+var settingsSections = []struct{ Key, Icon string }{
+	{"search", "search"}, {"automation", "send"}, {"notifications", "bell"}, {"integrations", "server"}, {"account", "lock"},
+}
+
+// settingsPage is the frame of a settings page: the section list beside one section.
+templ settingsPage(name, section string, passkeys bool) {
+	@Layout(Page{Title: T(ctx, "settings.section."+section), UserName: name, Wide: true, Passkeys: passkeys}) {
+		<div class="set" data-section={ section } data-guard-unsaved data-t-unsaved={ T(ctx, "cand.unsaved") }>
+			<nav class="set-nav" aria-label={ T(ctx, "settings.title") }>
+				<p class="set-nav-title">{ T(ctx, "settings.title") }</p>
+				<ul>
+					for _, s := range settingsSections {
+						<li>
+							<a
+								href={ templ.URL("/settings/" + s.Key) }
+								class="shell-link"
+								if s.Key == section {
+									aria-current="page"
+								}
+							>
+								@ui.Icon(s.Icon)
+								<span>{ T(ctx, "settings.section."+s.Key) }</span>
+							</a>
+						</li>
+					}
+				</ul>
+			</nav>
+			<section class="set-main" aria-labelledby="set-title">
+				<h1 id="set-title">{ T(ctx, "settings.section."+section) }</h1>
+				<p class="app-hint">{ T(ctx, "settings.intro."+section) }</p>
+				{ children... }
+			</section>
+		</div>
+	}
+}

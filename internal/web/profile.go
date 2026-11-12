@@ -545,19 +545,40 @@ func (s *Server) preferencesPage(w http.ResponseWriter, r *http.Request, u *iden
 	if tok := r.URL.Query().Get("runner_token"); tok != "" {
 		f.Notice = views.T(r.Context(), "profile.home_runner.token_notice", "token", tok)
 	}
-	s.render(w, r, http.StatusOK, views.PreferencesPage(u.DisplayName, f))
+	s.render(w, r, http.StatusOK, views.PreferencesPage(u.DisplayName, f, settingsSection(r.PathValue("section"))))
 }
+
+// settingsSection is a settings section with a form of its own; anything else falls back to search.
+func settingsSection(v string) string {
+	switch v { // constants, never the request's text
+	case "automation":
+		return "automation"
+	case "notifications":
+		return "notifications"
+	case "integrations":
+		return "integrations"
+	}
+	return "search"
+}
+
+// sectionIs reports whether a save covers a section: a form names its section, an old form without it saves all.
+func sectionIs(posted, section string) bool { return posted == "" || posted == section }
 
 func (s *Server) preferencesSave(w http.ResponseWriter, r *http.Request, u *identity.User) {
 	if u == nil {
 		http.Redirect(w, r, "/login", http.StatusSeeOther)
 		return
 	}
+	section := r.PostFormValue("section")
+	if section != "" {
+		section = settingsSection(section)
+	}
+	back := "/settings/" + settingsSection(section)
 	if disconnectPortal := strings.TrimSpace(r.PostFormValue("disconnect_portal")); disconnectPortal != "" {
 		if s.Portals != nil {
 			_ = s.Portals.Disconnect(r.Context(), u.ID, disconnectPortal)
 		}
-		http.Redirect(w, r, "/preferences?saved=1", http.StatusSeeOther)
+		http.Redirect(w, r, back+"?saved=1", http.StatusSeeOther)
 		return
 	}
 	p := profile.Preferences{
@@ -648,6 +669,24 @@ func (s *Server) preferencesSave(w http.ResponseWriter, r *http.Request, u *iden
 		EasyApplyTermsAcceptedAt: termsAcceptedAt,
 	}
 	autoErr := errLevel || errRunnerChoice || errScore != nil || errLimit != nil || errEasyApplyTerms || autoSettings.Validate() != nil
+	// A section form carries only its own fields: everything else stays as stored.
+	if !sectionIs(section, "search") {
+		snap, err := s.Profile.Get(r.Context(), u.ID)
+		if err != nil {
+			s.failed(w, r, u, err)
+			return
+		}
+		p, salaryErr = snap.Preferences, false
+	}
+	if !sectionIs(section, "automation") {
+		autoErr = false
+		autoSettings = application.DefaultSettings
+		if s.Apps != nil {
+			if st, err := s.Apps.Settings(r.Context(), u.ID); err == nil {
+				autoSettings = st
+			}
+		}
+	}
 
 	np := notify.DefaultPreferences(u.ID, u.Email)
 	if s.Notify != nil {
@@ -655,27 +694,29 @@ func (s *Server) preferencesSave(w http.ResponseWriter, r *http.Request, u *iden
 			np = cur
 		}
 	}
-	np.EmailEnabled = r.PostFormValue("notify_email_enabled") == "on"
-	np.EmailAddress = strings.TrimSpace(r.PostFormValue("notify_email_address"))
-	np.WebPushEnabled = r.PostFormValue("notify_webpush_enabled") == "on"
-	np.NtfyEnabled = r.PostFormValue("notify_ntfy_enabled") == "on"
-	if urlStr := strings.TrimSpace(r.PostFormValue("notify_ntfy_url")); urlStr != "" {
-		np.NtfyURL = urlStr
-	}
-	np.NtfyTopic = strings.TrimSpace(r.PostFormValue("notify_ntfy_topic"))
-	if tok := strings.TrimSpace(r.PostFormValue("notify_ntfy_token")); tok != "" {
-		np.NtfyToken = tok
-	}
-	np.DailySummaryEnabled = r.PostFormValue("notify_daily_summary_enabled") == "on"
-	if sumTime := strings.TrimSpace(r.PostFormValue("notify_daily_summary_time")); sumTime != "" {
-		np.DailySummaryTime = sumTime
-	}
-	np.QuietHoursEnabled = r.PostFormValue("notify_quiet_hours_enabled") == "on"
-	if qStart := strings.TrimSpace(r.PostFormValue("notify_quiet_hours_start")); qStart != "" {
-		np.QuietHoursStart = qStart
-	}
-	if qEnd := strings.TrimSpace(r.PostFormValue("notify_quiet_hours_end")); qEnd != "" {
-		np.QuietHoursEnd = qEnd
+	if sectionIs(section, "notifications") {
+		np.EmailEnabled = r.PostFormValue("notify_email_enabled") == "on"
+		np.EmailAddress = strings.TrimSpace(r.PostFormValue("notify_email_address"))
+		np.WebPushEnabled = r.PostFormValue("notify_webpush_enabled") == "on"
+		np.NtfyEnabled = r.PostFormValue("notify_ntfy_enabled") == "on"
+		if urlStr := strings.TrimSpace(r.PostFormValue("notify_ntfy_url")); urlStr != "" {
+			np.NtfyURL = urlStr
+		}
+		np.NtfyTopic = strings.TrimSpace(r.PostFormValue("notify_ntfy_topic"))
+		if tok := strings.TrimSpace(r.PostFormValue("notify_ntfy_token")); tok != "" {
+			np.NtfyToken = tok
+		}
+		np.DailySummaryEnabled = r.PostFormValue("notify_daily_summary_enabled") == "on"
+		if sumTime := strings.TrimSpace(r.PostFormValue("notify_daily_summary_time")); sumTime != "" {
+			np.DailySummaryTime = sumTime
+		}
+		np.QuietHoursEnabled = r.PostFormValue("notify_quiet_hours_enabled") == "on"
+		if qStart := strings.TrimSpace(r.PostFormValue("notify_quiet_hours_start")); qStart != "" {
+			np.QuietHoursStart = qStart
+		}
+		if qEnd := strings.TrimSpace(r.PostFormValue("notify_quiet_hours_end")); qEnd != "" {
+			np.QuietHoursEnd = qEnd
+		}
 	}
 
 	if salaryErr || autoErr {
@@ -732,7 +773,7 @@ func (s *Server) preferencesSave(w http.ResponseWriter, r *http.Request, u *iden
 			}
 		}
 		f.Notice, f.Failed = views.T(r.Context(), "profile.invalid"), true
-		s.render(w, r, http.StatusUnprocessableEntity, views.PreferencesPage(u.DisplayName, f))
+		s.render(w, r, http.StatusUnprocessableEntity, views.PreferencesPage(u.DisplayName, f, settingsSection(section)))
 		return
 	}
 
@@ -762,7 +803,7 @@ func (s *Server) preferencesSave(w http.ResponseWriter, r *http.Request, u *iden
 			}
 			f := preferencesForm(p, autoSettings, mb, np, portalAccounts, easyApplyAdmin, aiSettings, aiAdmin)
 			f.Errors, f.Notice, f.Failed = fieldErrors(r, err), views.T(r.Context(), "profile.invalid"), true
-			s.render(w, r, http.StatusUnprocessableEntity, views.PreferencesPage(u.DisplayName, f))
+			s.render(w, r, http.StatusUnprocessableEntity, views.PreferencesPage(u.DisplayName, f, settingsSection(section)))
 			return
 		}
 		s.failed(w, r, u, err)
@@ -774,7 +815,7 @@ func (s *Server) preferencesSave(w http.ResponseWriter, r *http.Request, u *iden
 			return
 		}
 	}
-	if s.Portals != nil {
+	if s.Portals != nil && sectionIs(section, "automation") {
 		for _, portal := range []string{portals.PortalLinkedIn, portals.PortalIndeed} {
 			if v := strings.TrimSpace(r.PostFormValue("portal_limit_" + portal)); v != "" {
 				if lim, err := strconv.Atoi(v); err == nil && lim >= portals.MinDailyLimit && lim <= portals.MaxDailyLimit {
@@ -783,7 +824,7 @@ func (s *Server) preferencesSave(w http.ResponseWriter, r *http.Request, u *iden
 			}
 		}
 	}
-	if s.Tracking != nil {
+	if s.Tracking != nil && sectionIs(section, "integrations") {
 		mbHost := strings.TrimSpace(r.PostFormValue("mailbox_host"))
 		mbUser := strings.TrimSpace(r.PostFormValue("mailbox_username"))
 		mbPass := r.PostFormValue("mailbox_password")
@@ -807,13 +848,13 @@ func (s *Server) preferencesSave(w http.ResponseWriter, r *http.Request, u *iden
 			return
 		}
 	}
-	if s.AI != nil {
+	if s.AI != nil && sectionIs(section, "integrations") {
 		aiEnabled := r.PostFormValue("ai_enabled") == "on"
 		aiCustomKey := strings.TrimSpace(r.PostFormValue("ai_custom_api_key"))
 		aiClearKey := r.PostFormValue("ai_clear_custom_key") == "on"
 		_ = s.AI.SaveSettings(r.Context(), u.ID, aiEnabled, aiCustomKey, aiClearKey)
 	}
-	http.Redirect(w, r, "/preferences?saved=1", http.StatusSeeOther)
+	http.Redirect(w, r, back+"?saved=1", http.StatusSeeOther)
 }
 
 func (s *Server) notifyTest(w http.ResponseWriter, r *http.Request, u *identity.User) {
@@ -827,7 +868,7 @@ func (s *Server) notifyTest(w http.ResponseWriter, r *http.Request, u *identity.
 			return
 		}
 	}
-	http.Redirect(w, r, "/preferences?tested=1", http.StatusSeeOther)
+	http.Redirect(w, r, "/settings/notifications?tested=1", http.StatusSeeOther)
 }
 
 func (s *Server) assistPair(w http.ResponseWriter, r *http.Request, u *identity.User) {
@@ -841,10 +882,10 @@ func (s *Server) assistPair(w http.ResponseWriter, r *http.Request, u *identity.
 			s.failed(w, r, u, err)
 			return
 		}
-		http.Redirect(w, r, "/preferences?assist_code="+url.QueryEscape(code), http.StatusSeeOther)
+		http.Redirect(w, r, "/settings/integrations?assist_code="+url.QueryEscape(code), http.StatusSeeOther)
 		return
 	}
-	http.Redirect(w, r, "/preferences", http.StatusSeeOther)
+	http.Redirect(w, r, "/settings/integrations", http.StatusSeeOther)
 }
 
 func (s *Server) runnerToken(w http.ResponseWriter, r *http.Request, u *identity.User) {
@@ -858,8 +899,8 @@ func (s *Server) runnerToken(w http.ResponseWriter, r *http.Request, u *identity
 			s.failed(w, r, u, err)
 			return
 		}
-		http.Redirect(w, r, "/preferences?runner_token="+url.QueryEscape(tok), http.StatusSeeOther)
+		http.Redirect(w, r, "/settings/integrations?runner_token="+url.QueryEscape(tok), http.StatusSeeOther)
 		return
 	}
-	http.Redirect(w, r, "/preferences", http.StatusSeeOther)
+	http.Redirect(w, r, "/settings/integrations", http.StatusSeeOther)
 }

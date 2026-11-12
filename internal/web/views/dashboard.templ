@@ -118,7 +118,7 @@ templ Dashboard(d DashboardData) {
 		</div>
 		if d.PasskeyNudge {
 			@ui.Alert(ui.AlertProps{Tone: ui.Info, Text: T(ctx, "passkey.nudge")}) {
-				<p><a href="/account">{ T(ctx, "passkey.nudge_link") }</a></p>
+				<p><a href="/settings/account">{ T(ctx, "passkey.nudge_link") }</a></p>
 			}
 		}
 		@DashboardBody(d)

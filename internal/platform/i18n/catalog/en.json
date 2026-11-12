@@ -1113,5 +1113,19 @@
   "cand.gap.notice_period": "Notice period",
   "cand.gap.earliest_start": "Earliest start",
   "cand.gap.salary_expectation": "Salary expectation (yearly gross, EUR)",
-  "cand.gap.years_total": "Years of experience in total"
+  "cand.gap.years_total": "Years of experience in total",
+  "settings.title": "Settings",
+  "settings.section.search": "Search",
+  "settings.section.automation": "Automation",
+  "settings.section.notifications": "Notifications",
+  "settings.section.integrations": "Integrations",
+  "settings.section.account": "Account and security",
+  "settings.intro.search": "Which jobs getafjob looks for and how it fills in what every form asks.",
+  "settings.intro.automation": "How far getafjob goes on its own. Nothing is ever sent twice, and you can park any run.",
+  "settings.intro.notifications": "When and how getafjob tells you that a run needs you.",
+  "settings.intro.integrations": "Optional helpers: AI drafts, your mailbox for replies, the browser extension and your own runner.",
+  "settings.intro.account": "Passkeys, signed-in browsers, your data export and deleting the account.",
+  "settings.autonomy.suggest": "getafjob finds and ranks jobs; you start every application yourself.",
+  "settings.autonomy.approve": "getafjob fills out forms on its own and sends only after you approve.",
+  "settings.autonomy.autonomous": "getafjob sends on its own when every field has a source and no rule asks for you."
 }
