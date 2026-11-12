@@ -249,7 +249,7 @@ ORDER BY a.queue_pos NULLS LAST, a.id;
 UPDATE applications SET queue_paused = $3 WHERE user_id = $1 AND id = $2 AND state = 'queued';
 
 -- name: MoveQueued :execrows
--- Swaps the queue position of a queued application with its neighbour before (up) or after it.
+-- Swaps the queue position of a queued application with its neighbor before (up) or after it.
 WITH me AS (
   SELECT m.id, m.queue_pos FROM applications m
   WHERE m.user_id = $1 AND m.id = $2 AND m.state = 'queued' AND m.queue_pos IS NOT NULL
