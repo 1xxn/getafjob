@@ -124,6 +124,7 @@ func (s *Server) screenWebSocket(w http.ResponseWriter, r *http.Request, u *iden
 
 	frames, unsubscribe := sess.Subscribe()
 	defer unsubscribe()
+	gate := newFrameGate(r.URL.Query().Get("fps"))
 	go func() {
 		defer cancel()
 		if last := sess.LastFrame(); len(last) > 0 {
@@ -137,6 +138,7 @@ func (s *Server) screenWebSocket(w http.ResponseWriter, r *http.Request, u *iden
 		}
 		status := time.NewTicker(time.Second)
 		defer status.Stop()
+		defer gate.stop()
 		for {
 			select {
 			case <-ctx.Done():
@@ -152,7 +154,11 @@ func (s *Server) screenWebSocket(w http.ResponseWriter, r *http.Request, u *iden
 					}
 				}
 			case f := <-frames:
-				if ws.Write(ctx, websocket.MessageBinary, f) != nil {
+				if f = gate.offer(f, time.Now()); f != nil && ws.Write(ctx, websocket.MessageBinary, f) != nil {
+					return
+				}
+			case now := <-gate.tick():
+				if f := gate.flush(now); f != nil && ws.Write(ctx, websocket.MessageBinary, f) != nil {
 					return
 				}
 			}
@@ -610,4 +616,59 @@ func (s *Server) parkApplication(r *http.Request, u *identity.User, appID uuid.U
 		}
 	}
 	return err
+}
+
+// maxViewerFPS caps the frame rate a viewer may ask for; 0 (no fps parameter) sends every frame.
+const maxViewerFPS = 30
+
+// frameGate drops frames for a viewer that asked for a lower frame rate (grid thumbnails): at most one frame per
+// gap, and the newest frame held back is sent when the gap ends, so the picture never stays on an old state.
+type frameGate struct {
+	gap     time.Duration
+	last    time.Time
+	pending []byte
+	ticker  *time.Ticker
+}
+
+func newFrameGate(fps string) *frameGate {
+	n, err := strconv.Atoi(fps)
+	if err != nil || n <= 0 || n >= maxViewerFPS {
+		return &frameGate{}
+	}
+	gap := time.Second / time.Duration(n)
+	return &frameGate{gap: gap, ticker: time.NewTicker(gap)}
+}
+
+// offer returns the frame to send now, or nil when it is held back.
+func (g *frameGate) offer(f []byte, now time.Time) []byte {
+	if g.gap == 0 || now.Sub(g.last) >= g.gap {
+		g.last, g.pending = now, nil
+		return f
+	}
+	g.pending = f
+	return nil
+}
+
+// flush returns the frame held back once its gap has passed.
+func (g *frameGate) flush(now time.Time) []byte {
+	if g.pending == nil || now.Sub(g.last) < g.gap {
+		return nil
+	}
+	f := g.pending
+	g.last, g.pending = now, nil
+	return f
+}
+
+// tick fires while frames may be held back; nil (never fires) without a frame rate.
+func (g *frameGate) tick() <-chan time.Time {
+	if g.ticker == nil {
+		return nil
+	}
+	return g.ticker.C
+}
+
+func (g *frameGate) stop() {
+	if g.ticker != nil {
+		g.ticker.Stop()
+	}
 }
