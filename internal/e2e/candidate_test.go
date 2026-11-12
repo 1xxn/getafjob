@@ -8,7 +8,6 @@ import (
 	"time"
 
 	"github.com/go-rod/rod/lib/input"
-	"github.com/go-rod/rod/lib/proto"
 )
 
 // The candidate pages share a head with completeness and tabs; the answer bank adds, finds, edits and deletes an
@@ -39,14 +38,10 @@ func TestCandidateHub(t *testing.T) {
 
 	// Edit without saving, then try to leave: the question comes, and "stay" keeps the page.
 	must(t, tab.El(item+` textarea[name="answer"]`).Input(" and more"))
-	wait, handle := tab.Page.HandleDialog()
-	go func() {
-		if e := wait(); e.Type == proto.PageDialogTypeConfirm {
-			_ = handle(&proto.PageHandleJavaScriptDialog{Accept: false})
-		}
-	}()
 	tab.Click(`.cand-head .ui-tab[href="/profile"]`)
-	time.Sleep(500 * time.Millisecond)
+	tab.WaitFor("document.getElementById('confirm-dialog').open")
+	tab.Click(`#confirm-dialog [command="close"]`)
+	tab.WaitFor("!document.getElementById('confirm-dialog').open")
 	if tab.Eval("return location.pathname") != `"/answers"` {
 		t.Fatal("left the page with unsaved changes without asking")
 	}
