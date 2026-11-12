@@ -1,4 +1,5 @@
 package views
+
 import "github.com/1xxn/getafjob/internal/web/views/ui"
 
 // SessionRow is one signed-in browser on the account page.
@@ -30,114 +31,114 @@ type AccountData struct {
 
 templ Account(d AccountData) {
 	@settingsPage(d.Name, "account", d.Enabled) {
-			if d.Notice != "" {
-				@ui.Alert(ui.AlertProps{Tone: ui.Info, Text: d.Notice})
-			}
-			if d.Recovery != "" {
-				@ui.Alert(ui.AlertProps{Tone: ui.Danger, Text: d.Recovery})
-				<form method="post" action="/account/recovery/cancel">
-					@ui.Button(ui.ButtonProps{Label: T(ctx, "account.recovery.cancel"), Variant: "primary", Type: "submit"})
-				</form>
-			}
-			if d.Enabled && len(d.Passkeys) == 0 {
-				@ui.Alert(ui.AlertProps{Tone: ui.Info, Text: T(ctx, "passkey.nudge")})
-			}
-			if d.Enabled {
-				<h2>{ T(ctx, "passkey.title") }</h2>
-				<p class="muted">{ T(ctx, "passkey.text") }</p>
-				if len(d.Passkeys) > 0 {
-					<table class="table">
-						<thead>
-							<tr>
-								<th scope="col">{ T(ctx, "passkey.name") }</th>
-								<th scope="col">{ T(ctx, "passkey.created") }</th>
-								<th scope="col">{ T(ctx, "passkey.last_used") }</th>
-								<th scope="col"><span class="visually-hidden">{ T(ctx, "passkey.actions") }</span></th>
-							</tr>
-						</thead>
-						<tbody>
-							for _, p := range d.Passkeys {
-								<tr>
-									<td>{ p.Name }</td>
-									<td>{ p.Created }</td>
-									<td>
-										if p.LastUsed != "" {
-											{ p.LastUsed }
-										} else {
-											{ T(ctx, "passkey.never") }
-										}
-									</td>
-									<td>
-										<form method="post" action={ templ.SafeURL("/account/passkeys/" + p.ID + "/delete") } data-confirm={ T(ctx, "account.passkey.delete_confirm") }>
-											<button type="submit" class="ui-btn ui-btn-ghost ui-btn-sm">{ T(ctx, "passkey.remove") }</button>
-										</form>
-									</td>
-								</tr>
-							}
-						</tbody>
-					</table>
-				}
-				<div class="stack">
-					@ui.Input(ui.InputProps{FieldProps: ui.FieldProps{Name: "passkey-name", Label: T(ctx, "passkey.name"),
-						Hint: T(ctx, "passkey.name_hint")}, MaxLength: 100})
-					<button
-						type="button"
-						class="ui-btn ui-btn-primary"
-						hidden
-						data-passkey="register"
-						data-name="f-passkey-name"
-						data-status="passkey-status"
-						data-error={ T(ctx, "passkey.failed") }
-					>{ T(ctx, "passkey.add") }</button>
-					<p id="passkey-status" role="status" class="muted"></p>
-					<noscript><p class="muted">{ T(ctx, "passkey.needs_script") }</p></noscript>
-				</div>
-			}
-			<h2>{ T(ctx, "account.sessions.title") }</h2>
-			<p class="muted">{ T(ctx, "account.sessions.text") }</p>
-			<table class="table">
-				<thead>
-					<tr>
-						<th scope="col">{ T(ctx, "account.sessions.method") }</th>
-						<th scope="col">{ T(ctx, "account.sessions.created") }</th>
-						<th scope="col">{ T(ctx, "account.sessions.last_seen") }</th>
-						<th scope="col"><span class="visually-hidden">{ T(ctx, "account.sessions.state") }</span></th>
-					</tr>
-				</thead>
-				<tbody>
-					for _, s := range d.Sessions {
+		if d.Notice != "" {
+			@ui.Alert(ui.AlertProps{Tone: ui.Info, Text: d.Notice})
+		}
+		if d.Recovery != "" {
+			@ui.Alert(ui.AlertProps{Tone: ui.Danger, Text: d.Recovery})
+			<form method="post" action="/account/recovery/cancel">
+				@ui.Button(ui.ButtonProps{Label: T(ctx, "account.recovery.cancel"), Variant: "primary", Type: "submit"})
+			</form>
+		}
+		if d.Enabled && len(d.Passkeys) == 0 {
+			@ui.Alert(ui.AlertProps{Tone: ui.Info, Text: T(ctx, "passkey.nudge")})
+		}
+		if d.Enabled {
+			<h2>{ T(ctx, "passkey.title") }</h2>
+			<p class="muted">{ T(ctx, "passkey.text") }</p>
+			if len(d.Passkeys) > 0 {
+				<table class="table">
+					<thead>
 						<tr>
-							<td>{ T(ctx, "account.method." + s.Method) }</td>
-							<td>{ s.Created }</td>
-							<td>{ s.LastSeen }</td>
-							<td>
-								if s.Current {
-									{ T(ctx, "account.sessions.current") }
-								}
-							</td>
+							<th scope="col">{ T(ctx, "passkey.name") }</th>
+							<th scope="col">{ T(ctx, "passkey.created") }</th>
+							<th scope="col">{ T(ctx, "passkey.last_used") }</th>
+							<th scope="col"><span class="visually-hidden">{ T(ctx, "passkey.actions") }</span></th>
 						</tr>
-					}
-				</tbody>
-			</table>
-			if len(d.Sessions) > 1 {
-				<form method="post" action="/account/sessions/others">
-					<button type="submit">{ T(ctx, "account.sessions.sign_out_others") }</button>
-				</form>
+					</thead>
+					<tbody>
+						for _, p := range d.Passkeys {
+							<tr>
+								<td>{ p.Name }</td>
+								<td>{ p.Created }</td>
+								<td>
+									if p.LastUsed != "" {
+										{ p.LastUsed }
+									} else {
+										{ T(ctx, "passkey.never") }
+									}
+								</td>
+								<td>
+									<form method="post" action={ templ.SafeURL("/account/passkeys/" + p.ID + "/delete") } data-confirm={ T(ctx, "account.passkey.delete_confirm") }>
+										<button type="submit" class="ui-btn ui-btn-ghost ui-btn-sm">{ T(ctx, "passkey.remove") }</button>
+									</form>
+								</td>
+							</tr>
+						}
+					</tbody>
+				</table>
 			}
-			<h2>{ T(ctx, "account.privacy.title") }</h2>
-			<p class="muted">{ T(ctx, "account.privacy.text") }</p>
-			<p><a href="/privacy">{ T(ctx, "account.privacy.policy_link") }</a></p>
 			<div class="stack">
-				<h3>{ T(ctx, "account.privacy.export_title") }</h3>
-				<p class="muted">{ T(ctx, "account.privacy.export_text") }</p>
-				<form method="get" action="/account/export" { HX(ctx, "hx-boost", "false")... }>
-					<button type="submit">{ T(ctx, "account.privacy.export_button") }</button>
-				</form>
-				<h3>{ T(ctx, "account.privacy.delete_title") }</h3>
-				<p class="muted">{ T(ctx, "account.privacy.delete_text") }</p>
-				<form method="post" action="/account/delete" data-confirm={ T(ctx, "account.privacy.delete_confirm") }>
-					@ui.Button(ui.ButtonProps{Label: T(ctx, "account.privacy.delete_button"), Type: "submit", Variant: "danger", Icon: "trash"})
-				</form>
+				@ui.Input(ui.InputProps{FieldProps: ui.FieldProps{Name: "passkey-name", Label: T(ctx, "passkey.name"),
+					Hint: T(ctx, "passkey.name_hint")}, MaxLength: 100})
+				<button
+					type="button"
+					class="ui-btn ui-btn-primary"
+					hidden
+					data-passkey="register"
+					data-name="f-passkey-name"
+					data-status="passkey-status"
+					data-error={ T(ctx, "passkey.failed") }
+				>{ T(ctx, "passkey.add") }</button>
+				<p id="passkey-status" role="status" class="muted"></p>
+				<noscript><p class="muted">{ T(ctx, "passkey.needs_script") }</p></noscript>
 			</div>
 		}
+		<h2>{ T(ctx, "account.sessions.title") }</h2>
+		<p class="muted">{ T(ctx, "account.sessions.text") }</p>
+		<table class="table">
+			<thead>
+				<tr>
+					<th scope="col">{ T(ctx, "account.sessions.method") }</th>
+					<th scope="col">{ T(ctx, "account.sessions.created") }</th>
+					<th scope="col">{ T(ctx, "account.sessions.last_seen") }</th>
+					<th scope="col"><span class="visually-hidden">{ T(ctx, "account.sessions.state") }</span></th>
+				</tr>
+			</thead>
+			<tbody>
+				for _, s := range d.Sessions {
+					<tr>
+						<td>{ T(ctx, "account.method." + s.Method) }</td>
+						<td>{ s.Created }</td>
+						<td>{ s.LastSeen }</td>
+						<td>
+							if s.Current {
+								{ T(ctx, "account.sessions.current") }
+							}
+						</td>
+					</tr>
+				}
+			</tbody>
+		</table>
+		if len(d.Sessions) > 1 {
+			<form method="post" action="/account/sessions/others">
+				<button type="submit">{ T(ctx, "account.sessions.sign_out_others") }</button>
+			</form>
+		}
+		<h2>{ T(ctx, "account.privacy.title") }</h2>
+		<p class="muted">{ T(ctx, "account.privacy.text") }</p>
+		<p><a href="/privacy">{ T(ctx, "account.privacy.policy_link") }</a></p>
+		<div class="stack">
+			<h3>{ T(ctx, "account.privacy.export_title") }</h3>
+			<p class="muted">{ T(ctx, "account.privacy.export_text") }</p>
+			<form method="get" action="/account/export" { HX(ctx, "hx-boost", "false")... }>
+				<button type="submit">{ T(ctx, "account.privacy.export_button") }</button>
+			</form>
+			<h3>{ T(ctx, "account.privacy.delete_title") }</h3>
+			<p class="muted">{ T(ctx, "account.privacy.delete_text") }</p>
+			<form method="post" action="/account/delete" data-confirm={ T(ctx, "account.privacy.delete_confirm") }>
+				@ui.Button(ui.ButtonProps{Label: T(ctx, "account.privacy.delete_button"), Type: "submit", Variant: "danger", Icon: "trash"})
+			</form>
+		</div>
+	}
 }

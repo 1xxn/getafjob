@@ -50,7 +50,7 @@ templ JobPage(d JobData) {
 				@ui.Alert(ui.AlertProps{Tone: ui.Success, Text: d.Notice})
 			}
 			<div class="jd-actions">
-				switch {
+				switch  {
 					case jobApplying(d.ApplicationState):
 						@ui.Button(ui.ButtonProps{Label: T(ctx, "apps.action.watch"), Href: "/applications/" + d.ApplicationID + "?tab=live", Variant: "primary", Icon: "live"})
 						@ui.Button(ui.ButtonProps{Label: T(ctx, "jobs.view_application"), Href: "/applications/" + d.ApplicationID})

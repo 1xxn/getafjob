@@ -20,6 +20,7 @@ import (
 	"github.com/1xxn/getafjob/internal/platform/applymode"
 	"github.com/1xxn/getafjob/internal/profile"
 	"github.com/1xxn/getafjob/internal/web/views"
+	"github.com/1xxn/getafjob/internal/web/views/ui"
 )
 
 func (s *Server) jobPage(w http.ResponseWriter, r *http.Request, u *identity.User) {
@@ -704,7 +705,7 @@ func (s *Server) importJob(w http.ResponseWriter, r *http.Request, u *identity.U
 		if partial(r) {
 			w.Header().Set("HX-Reswap", "innerHTML")
 			w.Header().Set("HX-Retarget", "#import-result")
-			s.render(w, r, http.StatusOK, views.Notice("error", views.T(r.Context(), importErrorKey(err))))
+			s.render(w, r, http.StatusOK, ui.Alert(ui.AlertProps{Tone: ui.Danger, Text: views.T(r.Context(), importErrorKey(err))}))
 			return
 		}
 		http.Redirect(w, r, "/jobs", http.StatusSeeOther)

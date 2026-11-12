@@ -13,37 +13,6 @@ import (
 
 func itoa(n int) string { return strconv.Itoa(n) }
 
-func describedBy(f FieldProps) string {
-	var ids []string
-	if f.Hint != "" {
-		ids = append(ids, fieldID(f)+"-hint")
-	}
-	if f.Error != "" {
-		ids = append(ids, fieldID(f)+"-error")
-	}
-	return strings.Join(ids, " ")
-}
-
-func noticeRole(kind string) string {
-	if kind == "error" {
-		return "alert"
-	}
-	return "status"
-}
-
-func statusGlyph(status string) string {
-	switch status {
-	case "done":
-		return "✓"
-	case "failed":
-		return "✗"
-	case "your_turn":
-		return "●"
-	default:
-		return "○"
-	}
-}
-
 // When formats a time for the reader's locale (UTC; the UI has no time zone setting yet).
 func When(ctx context.Context, t time.Time) string {
 	if Locale(ctx) == "de" {
@@ -71,13 +40,6 @@ func Size(n int) string {
 	default:
 		return strconv.Itoa(n) + " B"
 	}
-}
-
-func fieldID(f FieldProps) string {
-	if f.ID != "" {
-		return f.ID
-	}
-	return "f-" + f.Name
 }
 
 func i64(n int64) string { return strconv.FormatInt(n, 10) }

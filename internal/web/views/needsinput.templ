@@ -15,13 +15,13 @@ type NeedsInputData struct {
 
 // NIItem is one waiting run in the inbox.
 type NIItem struct {
-	ID       string
-	Title    string
-	Company  string
-	Since    time.Time
-	LeftMin  int  // minutes until the run gives up; -1: no window (parked, answers start a new run)
-	Count    int  // open questions
-	Current  bool
+	ID      string
+	Title   string
+	Company string
+	Since   time.Time
+	LeftMin int // minutes until the run gives up; -1: no window (parked, answers start a new run)
+	Count   int // open questions
+	Current bool
 }
 
 // NIOpen is the run being answered: its questions and, while it waits, its live browser.

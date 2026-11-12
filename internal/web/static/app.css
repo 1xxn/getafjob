@@ -61,43 +61,6 @@
     }
   }
 
-  .field {
-    display: grid;
-    gap: var(--space-1);
-
-    label {
-      font-weight: 600;
-    }
-
-    input,
-    select,
-    textarea {
-      width: 100%;
-      padding: var(--space-2) var(--space-3);
-      border: 1px solid var(--line);
-      border-radius: var(--radius);
-      background: var(--raised);
-      color: var(--ink-1);
-    }
-
-    .hint {
-      margin: 0;
-      color: var(--ink-3);
-      font-size: 0.9rem;
-    }
-
-    .error {
-      margin: 0;
-      color: var(--danger);
-      font-size: 0.9rem;
-    }
-
-    &.field-invalid input,
-    &.field-invalid textarea {
-      border-color: var(--danger);
-    }
-  }
-
   button {
     cursor: pointer;
     border-radius: var(--radius);
@@ -105,50 +68,6 @@
     border: 1px solid var(--line);
     background: var(--raised);
     color: var(--ink-1);
-
-    &.primary {
-      background: var(--accent);
-      border-color: var(--accent);
-      color: var(--accent-ink);
-      font-weight: 600;
-    }
-
-    &.danger {
-      background: var(--danger);
-      border-color: var(--danger);
-      color: #fff;
-    }
-
-    &.link {
-      border: 0;
-      background: none;
-      padding: 0;
-      color: var(--accent);
-      text-decoration: underline;
-    }
-  }
-
-  .notice {
-    margin: var(--space-4) 0;
-    padding-left: var(--space-3);
-    border-left: 3px solid var(--line);
-
-    &.notice-error {
-      border-left-color: var(--danger);
-    }
-  }
-
-  .status {
-    white-space: nowrap;
-
-    &.status-your_turn {
-      color: var(--accent);
-      font-weight: 600;
-    }
-
-    &.status-failed {
-      color: var(--danger);
-    }
   }
 
   .stickybar {
@@ -184,19 +103,6 @@
 }
 
 @layer components {
-  .field-check {
-    grid-template-columns: auto 1fr;
-    align-items: center;
-
-    & input {
-      width: auto;
-    }
-
-    & label {
-      font-weight: 400;
-    }
-  }
-
   .form-section {
     margin-block-start: var(--space-8);
   }
@@ -209,7 +115,6 @@
     gap: var(--space-4);
     align-items: end;
     margin-block-end: var(--space-6);
-    & .field { margin: 0; flex: 1 1 14rem; }
   }
   .jobs {
     list-style: none;
@@ -257,7 +162,6 @@
 
   .check { display: flex; align-items: flex-start; gap: var(--space-2); }
   .check input { inline-size: auto; margin-block-start: 0.3rem; flex: none; }
-  fieldset.field { border: 0; padding: 0; margin: 0; }
 
   .live-status { color: var(--ink-2); margin-block: 0 var(--space-2); }
 
