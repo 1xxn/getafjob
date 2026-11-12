@@ -28,20 +28,19 @@ func (tab *Tab) WaitFor(cond string) {
 // (its own ::after counts as itself, unlike in rod's covered check), then clicks there with the mouse, like a user.
 func (tab *Tab) Click(selector string) {
 	tab.t.Helper()
-	el := tab.El(selector)
-	must(tab.t, el.Timeout(actionTimeout).WaitVisible())
-	must(tab.t, el.ScrollIntoView())
+	must(tab.t, tab.El(selector).Timeout(actionTimeout).WaitVisible())
 	deadline := time.Now().Add(10 * time.Second)
 	for {
-		res, err := el.Timeout(actionTimeout).Eval(`function () {
-			if (document.activeViewTransition) return null;
+		// Look the element up on every try: htmx may swap it for a new node (history restore, live refresh).
+		res, err := tab.El(selector).Timeout(actionTimeout).Eval(`function () {
+			if (document.activeViewTransition || !this.isConnected) return null;
+			this.scrollIntoView({block: 'center', inline: 'nearest'});
 			const r = this.getBoundingClientRect();
 			const x = r.left + r.width / 2, y = r.top + r.height / 2;
 			const top = document.elementFromPoint(x, y);
 			return top && (top === this || this.contains(top)) ? {x, y} : null;
 		}`)
-		must(tab.t, err)
-		if !res.Value.Nil() {
+		if err == nil && !res.Value.Nil() {
 			pt := proto.Point{X: res.Value.Get("x").Num(), Y: res.Value.Get("y").Num()}
 			mouse := tab.Page.Timeout(actionTimeout).Mouse
 			must(tab.t, mouse.MoveTo(pt))
@@ -49,7 +48,7 @@ func (tab *Tab) Click(selector string) {
 			return
 		}
 		if time.Now().After(deadline) {
-			tab.t.Fatalf("%s: covered or in a view transition", selector)
+			tab.t.Fatalf("%s: covered, detached or in a view transition (%v)", selector, err)
 		}
 		time.Sleep(100 * time.Millisecond)
 	}

@@ -27,10 +27,10 @@ func (tab *Tab) WaitWithin(d time.Duration, cond string) {
 // startRun applies to the first listed fixture job that has no application yet and returns the application id.
 func startRun(t *testing.T, tab *Tab) string {
 	t.Helper()
-	tab.Go("/jobs")
+	tab.Go("/jobs?source=demo")
 	var hrefs []string
-	if err := json.Unmarshal([]byte(tab.Eval(`return [...new Set([...document.querySelectorAll('main a[href^="/jobs/"]')]
-		.map(a => a.getAttribute('href')).filter(h => /^\/jobs\/\d+$/.test(h)))]`)), &hrefs); err != nil {
+	if err := json.Unmarshal([]byte(tab.Eval(`return [...document.querySelectorAll('.job-row')]
+		.filter(r => !r.dataset.state || r.dataset.state === 'new').map(r => '/jobs/' + r.dataset.id)`)), &hrefs); err != nil {
 		t.Fatal(err)
 	}
 	// A fresh stack (CI) starts at the top; locally the order is shuffled so older runs rarely get in the way.
