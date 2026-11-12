@@ -1,0 +1,177 @@
+package views
+
+import (
+	"time"
+
+	"github.com/1xxn/getafjob/internal/web/views/ui"
+)
+
+// NeedsInputData fills the inbox of runs that wait for the user.
+type NeedsInputData struct {
+	Name  string
+	Items []NIItem
+	Open  *NIOpen
+}
+
+// NIItem is one waiting run in the inbox.
+type NIItem struct {
+	ID       string
+	Title    string
+	Company  string
+	Since    time.Time
+	LeftMin  int  // minutes until the run gives up; -1: no window (parked, answers start a new run)
+	Count    int  // open questions
+	Current  bool
+}
+
+// NIOpen is the run being answered: its questions and, while it waits, its live browser.
+type NIOpen struct {
+	HandoffData
+	LeftMin int
+}
+
+templ niLeft(left int) {
+	if left == 0 {
+		@ui.Badge(T(ctx, "ni.closing"), ui.Danger)
+	} else if left > 0 {
+		@ui.Badge(T(ctx, "ni.left", "min", left), niTone(left))
+	} else {
+		@ui.Badge(T(ctx, "ni.paused"), ui.Neutral)
+	}
+}
+
+func niTone(left int) ui.Tone {
+	if left < 10 {
+		return ui.Danger
+	}
+	return ui.Warning
+}
+
+// NeedsInputPage lists waiting runs, oldest first, with the open one beside the list.
+templ NeedsInputPage(d NeedsInputData) {
+	@Layout(Page{Title: T(ctx, "ni.title"), UserName: d.Name, Wide: true, Handoff: d.Open != nil}) {
+		<div class="jobs-head">
+			<h1>{ T(ctx, "ni.title") }</h1>
+		</div>
+		<div class={ "ni-layout", templ.KV("ni-layout-open", d.Open != nil) }>
+			@NIList(d)
+			if d.Open != nil {
+				@niPanel(*d.Open)
+			} else if len(d.Items) > 0 {
+				<p class="ni-hint">{ T(ctx, "ni.pick") }</p>
+			}
+		</div>
+	}
+}
+
+// NIList is the inbox; it follows live changes and refreshes the countdowns.
+templ NIList(d NeedsInputData) {
+	<section
+		id="ni-list"
+		class="ni-list"
+		aria-label={ T(ctx, "ni.list_label") }
+		{ HX(ctx, "hx-get", "/needs-input/list" + niCurrent(d), "hx-trigger", "getafjob:app from:body delay:700ms, every 30s", "hx-swap", "outerMorph transition:false")... }
+	>
+		if len(d.Items) == 0 {
+			@ui.EmptyState(ui.EmptyProps{Icon: "check-circle", Title: T(ctx, "ni.empty"), Text: T(ctx, "ni.empty_hint")}) {
+				@ui.Button(ui.ButtonProps{Label: T(ctx, "apps.title"), Href: "/applications"})
+			}
+		} else {
+			<ol class="ni-items">
+				for _, it := range d.Items {
+					<li class={ "ni-item", templ.KV("ni-item-current", it.Current) } data-ni-item data-id={ it.ID }>
+						<a
+							href={ templ.URL("/needs-input?app=" + it.ID) }
+							class="ni-item-link"
+							if it.Current {
+								aria-current="true"
+							}
+						>
+							<span class="apps-title">{ it.Title }</span>
+							<span class="apps-company">{ it.Company }</span>
+							<span class="ni-item-meta">
+								@niLeft(it.LeftMin)
+								if it.Count > 0 {
+									<span>{ T(ctx, "ni.questions", "count", it.Count) }</span>
+								} else {
+									<span>{ T(ctx, "ni.check") }</span>
+								}
+								<time datetime={ it.Since.UTC().Format(time.RFC3339) }>{ When(ctx, it.Since) }</time>
+							</span>
+						</a>
+					</li>
+				}
+			</ol>
+		}
+	</section>
+}
+
+func niCurrent(d NeedsInputData) string {
+	if d.Open != nil {
+		return "?app=" + d.Open.AppID
+	}
+	return ""
+}
+
+templ niPanel(o NIOpen) {
+	<section class="ni-panel" aria-labelledby="ni-title" data-app={ o.AppID } data-state={ o.State }>
+		<a href="/needs-input" class="ni-back">
+			@ui.Icon("chevron-left")
+			<span>{ T(ctx, "ni.back") }</span>
+		</a>
+		<div class="app-head-top">
+			<div>
+				<h2 id="ni-title" class="app-title">{ or(o.JobTitle, T(ctx, "apps.untitled")) }</h2>
+				<p class="app-company">{ o.Company }</p>
+			</div>
+			@niLeft(o.LeftMin)
+		</div>
+		<div class={ "ni-work", templ.KV("ni-work-live", o.Live) }>
+			<div id="ni-form" class="ni-form">
+				if len(o.Questions) > 0 {
+					<form
+						method="post"
+						action={ templ.URL("/applications/" + o.AppID + "/answer") }
+						class="ni-questions"
+						data-answer-form
+						{ HX(ctx, "hx-post", "/applications/" + o.AppID + "/answer", "hx-target", "#ni-form", "hx-swap", "outerHTML transition:false")... }
+					>
+						<input type="hidden" name="back" value={ "/needs-input?app=" + o.AppID }/>
+						<p class="app-hint">{ T(ctx, "handoff.questions_hint") }</p>
+						for i, q := range o.Questions {
+							@questionControl(i, q)
+						}
+						<div class="app-actions">
+							@ui.Button(ui.ButtonProps{Label: T(ctx, "handoff.save_continue"), Type: "submit", Variant: "primary", Icon: "send"})
+						</div>
+					</form>
+				} else {
+					@ui.Alert(ui.AlertProps{Tone: ui.Warning, Text: T(ctx, "ni.check_text")})
+				}
+				<p class="ni-more">
+					<a href={ templ.URL("/applications/" + o.AppID) }>{ T(ctx, "ni.details") }</a>
+				</p>
+			</div>
+			if o.Live {
+				<div class="ni-live">
+					@LiveScreen(LiveScreenProps{AppID: o.AppID, Size: "full", Controls: true})
+				</div>
+			}
+		</div>
+	</section>
+}
+
+// AnswerSent replaces the questions once the answers are on their way.
+templ AnswerSent(appID string, resumed bool) {
+	<div id="ni-form" class="ni-form" data-answered>
+		if resumed {
+			@ui.Alert(ui.AlertProps{Tone: ui.Success, Title: T(ctx, "ni.sent"), Text: T(ctx, "ni.sent_live")})
+		} else {
+			@ui.Alert(ui.AlertProps{Tone: ui.Success, Title: T(ctx, "ni.sent"), Text: T(ctx, "ni.sent_queued")})
+		}
+		<div class="app-actions">
+			@ui.Button(ui.ButtonProps{Label: T(ctx, "ni.next"), Href: "/needs-input", Variant: "primary", Icon: "inbox"})
+			@ui.Button(ui.ButtonProps{Label: T(ctx, "ni.details"), Href: "/applications/" + appID, Variant: "ghost"})
+		</div>
+	</div>
+}

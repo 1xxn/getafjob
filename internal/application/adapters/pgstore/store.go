@@ -969,6 +969,7 @@ func (s *Store) PipelineApplications(ctx context.Context, userID uuid.UUID) (out
 				ApprovalReasons: reasons,
 				ApprovedAt:      r.ApprovedAt,
 				CvDocumentID:    r.CvDocumentID,
+				HandoffUntil:    r.HandoffUntil,
 				Company:         r.Company,
 				Title:           r.Title,
 				Location:        r.Location,

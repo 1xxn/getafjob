@@ -64,7 +64,7 @@ func (n pushNotifier) HandoffClosing(ctx context.Context, r application.Ref, _ t
 	return n.push.Notify(ctx, r.UserID, webpush.NoticePayload{
 		Title: "getafjob",
 		Body:  "Your turn: an application needs your attention before the window closes.",
-		URL:   "/applications/" + r.ID.String(),
+		URL:   "/needs-input?app=" + r.ID.String(),
 	})
 }
 
@@ -72,7 +72,7 @@ func (n pushNotifier) YourTurn(ctx context.Context, userID, appID uuid.UUID) {
 	if err := n.push.Notify(ctx, userID, webpush.NoticePayload{
 		Title: "getafjob",
 		Body:  "Your turn: an application needs your input.",
-		URL:   "/applications/" + appID.String(),
+		URL:   "/needs-input?app=" + appID.String(),
 	}); err != nil && n.push.Logger != nil {
 		n.push.Logger.WarnContext(ctx, "handoff push failed", "application", appID, "err", err)
 	}

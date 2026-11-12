@@ -278,6 +278,17 @@ func (s *Server) applicationAnswer(w http.ResponseWriter, r *http.Request, u *id
 		return
 	}
 
+	var sess *gateway.HandoffSession
+	if s.Handoffs != nil {
+		sess, _ = s.Handoffs.SessionFor(appID)
+	}
+
+	// Only a runner that is waiting right now takes the answers in its open browser; otherwise (hold over, restart)
+	// the application is queued again and a new run uses the saved answers.
+	if sess != nil && !sess.Interactive() {
+		sess = nil
+	}
+
 	var saved []*runnerv1.Answer
 	for i := 0; i < 50; i++ {
 		key := strconv.Itoa(i)
@@ -290,7 +301,9 @@ func (s *Server) applicationAnswer(w http.ResponseWriter, r *http.Request, u *id
 			continue
 		}
 		id := uuid.New()
-		if s.Items != nil {
+		// save-<i> is "0" then "1" when the switch is on; a form without it saves (older pages). Without a waiting
+		// run the answers always go to the bank: the next run reads them from there.
+		if save := r.Form["save-"+key]; s.Items != nil && (sess == nil || len(save) == 0 || save[len(save)-1] == "1") {
 			if savedID, err := s.Items.SaveAnswer(r.Context(), u.ID, profile.Answer{Question: q, Answer: a}); err == nil {
 				id = savedID
 			}
@@ -298,16 +311,6 @@ func (s *Server) applicationAnswer(w http.ResponseWriter, r *http.Request, u *id
 		saved = append(saved, &runnerv1.Answer{Id: id.String(), Question: q, Answer: a})
 	}
 
-	var sess *gateway.HandoffSession
-	if s.Handoffs != nil {
-		sess, _ = s.Handoffs.SessionFor(appID)
-	}
-
-	// Only a runner that is waiting right now takes the answers in its open browser; otherwise (hold over, restart)
-	// the application is queued again and a new run uses the saved answers.
-	if sess != nil && !sess.Interactive() {
-		sess = nil
-	}
 	if s.Apps != nil {
 		if sess != nil {
 			_, _ = s.Apps.Fire(r.Context(), u.ID, appID, application.EvAnswer, application.ActorUser, nil)
@@ -328,6 +331,14 @@ func (s *Server) applicationAnswer(w http.ResponseWriter, r *http.Request, u *id
 		}
 	}
 
+	if partial(r) {
+		s.render(w, r, http.StatusOK, views.AnswerSent(appID.String(), sess != nil))
+		return
+	}
+	if back := r.PostFormValue("back"); strings.HasPrefix(back, "/needs-input") {
+		http.Redirect(w, r, localBack(back), http.StatusSeeOther) //nolint:gosec // localBack keeps only paths on this site
+		return
+	}
 	http.Redirect(w, r, "/applications/"+appID.String(), http.StatusSeeOther) //nolint:gosec // G710: appID is a parsed UUID
 }
 
@@ -336,7 +347,12 @@ func (s *Server) applicationPage(w http.ResponseWriter, r *http.Request, u *iden
 		http.Redirect(w, r, "/login", http.StatusSeeOther)
 		return
 	}
-	d, ok := s.applicationDetail(w, r, u)
+	appID, err := uuid.Parse(r.PathValue("id"))
+	if err != nil {
+		s.notFound(w, r, u)
+		return
+	}
+	d, ok := s.applicationDetail(w, r, u, appID)
 	if !ok {
 		return
 	}
@@ -364,16 +380,20 @@ func (s *Server) applicationHead(w http.ResponseWriter, r *http.Request, u *iden
 		http.Error(w, "unauthorized", http.StatusUnauthorized)
 		return
 	}
-	if d, ok := s.applicationDetail(w, r, u); ok {
+	appID, err := uuid.Parse(r.PathValue("id"))
+	if err != nil {
+		s.notFound(w, r, u)
+		return
+	}
+	if d, ok := s.applicationDetail(w, r, u, appID); ok {
 		s.render(w, r, http.StatusOK, views.AppHead(d))
 	}
 }
 
 // applicationDetail loads one application of the user with job, questions, evidence and the next steps; on false
 // the response is written.
-func (s *Server) applicationDetail(w http.ResponseWriter, r *http.Request, u *identity.User) (views.AppDetailData, bool) {
-	appID, err := uuid.Parse(r.PathValue("id"))
-	if err != nil || s.Apps == nil {
+func (s *Server) applicationDetail(w http.ResponseWriter, r *http.Request, u *identity.User, appID uuid.UUID) (views.AppDetailData, bool) {
+	if s.Apps == nil {
 		s.notFound(w, r, u)
 		return views.AppDetailData{}, false
 	}
@@ -410,7 +430,7 @@ func (s *Server) applicationDetail(w http.ResponseWriter, r *http.Request, u *id
 			for _, q := range asked {
 				if q.Kind != "captcha" && q.Label != "" {
 					d.Questions = append(d.Questions, views.HandoffQuestion{Kind: q.Kind, Question: q.Label, Draft: q.Draft,
-						Input: q.Input, Options: q.Options})
+						Input: q.Input, Options: q.Options, Keep: app.State != application.NeedsInput})
 				}
 			}
 		}

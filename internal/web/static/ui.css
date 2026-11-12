@@ -2670,6 +2670,116 @@
       gap: var(--space-1);
     }
   }
+
+  /* needs input: inbox beside the open run */
+  .ni-layout {
+    display: grid;
+    gap: var(--space-4);
+    align-items: start;
+  }
+
+  @media (min-width: 64rem) {
+    .ni-layout {
+      grid-template-columns: minmax(16rem, 22rem) minmax(0, 1fr);
+    }
+  }
+
+  .ni-items {
+    display: grid;
+    gap: var(--space-2);
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
+
+  .ni-item-link {
+    display: grid;
+    gap: var(--space-1);
+    padding: var(--space-3);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-md);
+    background: var(--surface);
+    color: inherit;
+    text-decoration: none;
+  }
+
+  .ni-item-link:hover {
+    border-color: var(--accent);
+  }
+
+  .ni-item-current .ni-item-link {
+    border-color: var(--accent);
+    box-shadow: inset 3px 0 0 var(--accent);
+  }
+
+  .ni-item-meta {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: var(--space-2);
+    color: var(--text-2);
+    font-size: var(--text-sm);
+  }
+
+  .ni-hint {
+    color: var(--text-2);
+  }
+
+  .ni-panel {
+    display: grid;
+    gap: var(--space-4);
+    min-width: 0;
+  }
+
+  .ni-back {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--space-1);
+    font-size: var(--text-sm);
+  }
+
+  .ni-work {
+    display: grid;
+    gap: var(--space-4);
+    align-items: start;
+  }
+
+  @media (min-width: 90rem) {
+    .ni-work-live {
+      grid-template-columns: minmax(20rem, 28rem) minmax(0, 1fr);
+    }
+  }
+
+  .ni-form,
+  .ni-questions {
+    display: grid;
+    gap: var(--space-4);
+  }
+
+  .ni-question {
+    display: grid;
+    gap: var(--space-2);
+    padding-bottom: var(--space-3);
+    border-bottom: 1px solid var(--border);
+  }
+
+  .ni-more {
+    margin: 0;
+    font-size: var(--text-sm);
+  }
+
+  /* on small screens the open run replaces the list */
+  @media (max-width: 63.99rem) {
+    .ni-layout-open .ni-list {
+      display: none;
+    }
+  }
+
+  @media (min-width: 64rem) {
+    .ni-back {
+      display: none;
+    }
+  }
 }
 
 

@@ -608,8 +608,8 @@ func TestQuestionsRenderMatchingControls(t *testing.T) {
 		t.Fatal(err)
 	}
 	html := b.String()
-	for _, want := range []string{`type="checkbox" id="q-0" name="answer-0" value="Yes"`, `type="radio" id="q-1-0" name="answer-1" value="Yes"`,
-		`<select id="q-2" name="answer-2">`, `type="date" id="q-3" name="answer-3"`, `href="/documents"`} {
+	for _, want := range []string{`type="checkbox" id="q-0" name="answer-0" value="Yes"`, `type="radio" id="f-answer-1-0" name="answer-1" value="Yes"`,
+		`id="q-2" name="answer-2"`, `type="date"`, `id="q-3" name="answer-3"`, `href="/documents"`, `name="save-0" value="1"`} {
 		if !strings.Contains(html, want) {
 			t.Errorf("missing %s", want)
 		}

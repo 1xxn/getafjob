@@ -168,6 +168,8 @@ func (s *Server) Register(mux *http.ServeMux) {
 	mux.Handle("GET /approvals", s.page(s.approvalsPage))
 	mux.Handle("POST /approvals/{id}/approve", s.page(s.approvalApprove))
 	mux.Handle("POST /approvals/{id}/cv", s.page(s.approvalSetCV))
+	mux.Handle("GET /needs-input", s.page(s.needsInputPage))
+	mux.Handle("GET /needs-input/list", s.page(s.needsInputList))
 	mux.Handle("GET /applications", s.page(s.applicationsPage))
 	mux.Handle("POST /applications/bulk", s.page(s.applicationsBulk))
 	mux.Handle("GET /applications/{id}", s.page(s.applicationPage))
