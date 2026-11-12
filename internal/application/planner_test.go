@@ -218,9 +218,13 @@ func (f *fakePlannerStore) QueueItems(context.Context, uuid.UUID) ([]application
 	return nil, nil
 }
 
-func (f *fakePlannerStore) MoveQueued(context.Context, uuid.UUID, uuid.UUID, bool) (bool, error) { return false, nil }
+func (f *fakePlannerStore) MoveQueued(context.Context, uuid.UUID, uuid.UUID, bool) (bool, error) {
+	return false, nil
+}
 
-func (f *fakePlannerStore) PauseQueued(context.Context, uuid.UUID, uuid.UUID, bool) (bool, error) { return false, nil }
+func (f *fakePlannerStore) PauseQueued(context.Context, uuid.UUID, uuid.UUID, bool) (bool, error) {
+	return false, nil
+}
 
 func (f *fakePlannerStore) BookmarkJob(_ context.Context, _ uuid.UUID, _ int64, _ time.Time) (uuid.UUID, error) {
 	return uuid.New(), nil
