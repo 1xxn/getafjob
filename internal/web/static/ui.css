@@ -3632,6 +3632,38 @@
     gap: var(--space-2);
   }
 
+  .adm-error {
+    color: var(--danger-text);
+    font-size: var(--text-sm);
+    overflow-wrap: anywhere;
+  }
+
+  .adm-toolbar {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--space-3);
+    align-items: end;
+    justify-content: space-between;
+  }
+
+  .adm-filter {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--space-2);
+    align-items: end;
+  }
+
+  .adm-table {
+    max-width: 100%;
+    overflow-x: auto;
+  }
+
+  /* the wrapper scrolls (focusable, named), not the table as on the settings pages */
+  .set-main .adm-table table {
+    display: table;
+    overflow: visible;
+  }
+
   .adm-audit {
     display: grid;
     gap: var(--space-1);

@@ -88,7 +88,7 @@ type app struct {
 	pool *pgxpool.Pool
 }
 
-func newApp(t *testing.T) *app {
+func newApp(t *testing.T, opts ...func(*web.Server)) *app {
 	t.Helper()
 	pool := dbtest.AppPool(t)
 	base, _ := url.Parse("https://jobs.example.org")
@@ -130,10 +130,14 @@ func newApp(t *testing.T) *app {
 		Matcher:      &testMatchEvaluator{matching: mstore},
 		AllowPrivate: true,
 	})
-	(&web.Server{Identity: ids, Profile: profiles, Documents: docs, Items: items, Stations: stations, Importer: importer,
+	srv := &web.Server{Identity: ids, Profile: profiles, Documents: docs, Items: items, Stations: stations, Importer: importer,
 		Jobs: listings, Discovery: discoverySvc, Apps: apps, Privacy: privacySvc, StyleGuide: true,
 		Notify: notify.NewService(notifystore.New(pool), nil, nil, nil, "", nil),
-		Logger: slog.New(slog.NewTextHandler(io.Discard, nil))}).Register(mux)
+		Logger: slog.New(slog.NewTextHandler(io.Discard, nil))}
+	for _, o := range opts {
+		o(srv)
+	}
+	srv.Register(mux)
 	return &app{t: t, h: httpx.Protect(mux, 1<<20, true, httpx.Upload{Path: "/documents", Max: web.MaxUpload},
 		httpx.Upload{Path: "/setup/cv", Max: web.MaxUpload}), ids: ids, mail: mb, pool: pool}
 }

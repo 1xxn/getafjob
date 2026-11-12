@@ -78,6 +78,9 @@ var navGroups = []navGroup{
 	}},
 	{Key: "nav.group.admin", Admin: true, Items: []navItem{
 		{Key: "admin.users", Href: "/admin/users", Icon: "users"},
+		{Key: "admin.runners", Href: "/admin/runners", Icon: "monitor"},
+		{Key: "admin.sources", Href: "/admin/sources", Icon: "database"},
+		{Key: "admin.queue", Href: "/admin/queue", Icon: "list"},
 		{Key: "admin.system", Href: "/admin/system", Icon: "server"},
 	}},
 }
