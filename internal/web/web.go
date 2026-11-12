@@ -233,6 +233,7 @@ func (s *Server) Register(mux *http.ServeMux) {
 	mux.Handle("POST /setup/{step}", s.page(s.setupSave))
 	mux.Handle("POST /setup/cv", s.limited(s.page(s.setupCVUpload)))
 	mux.Handle("POST /setup/cv/import/{id}", s.limited(s.page(s.setupCVImport)))
+	mux.Handle("POST /setup/crawl", s.limited(s.page(s.setupCrawl)))
 	mux.Handle("GET /account", http.RedirectHandler("/settings/account", http.StatusPermanentRedirect))
 	mux.Handle("POST /account/sessions/others", s.page(s.signOutOthers))
 	mux.Handle("POST /account/passkeys/options", s.page(s.passkeyAddOptions))

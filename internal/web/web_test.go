@@ -1021,20 +1021,29 @@ func TestSetupAssistant(t *testing.T) {
 	if home := a.do(http.MethodGet, "/", nil, session, nil).Body.String(); !strings.Contains(home, `href="/setup"`) {
 		t.Fatal("no setup link on an empty profile")
 	}
-	if rec := a.do(http.MethodGet, "/setup", nil, session, nil); rec.Header().Get("Location") != "/setup/cv" {
-		t.Fatalf("start %d %s", rec.Code, rec.Header().Get("Location"))
+	resume := func(want string) {
+		t.Helper()
+		if rec := a.do(http.MethodGet, "/setup", nil, session, nil); rec.Header().Get("Location") != want {
+			t.Fatalf("resume at %s, want %s", rec.Header().Get("Location"), want)
+		}
 	}
+	resume("/setup/cv")
 	cv := cvDocx(t, "Max Mustermann", "10115 Berlin", "max.mustermann@example.org | +49 30 1234567",
 		"Summary", "Platform engineer with eight years of experience in Go, Kubernetes and PostgreSQL in production.",
 		"Experience", "Senior Platform Engineer at Muster GmbH 01/2021 - present", "Backend Developer, Beispiel AG 2017 - 2020",
 		"Skills", "Go, Kubernetes")
 	rec := a.uploadTo("/setup/cv", "cv.docx", cv, session)
-	if rec.Code != http.StatusSeeOther || rec.Header().Get("Location") != "/setup/contact?imported=1" {
+	if rec.Code != http.StatusSeeOther || rec.Header().Get("Location") != "/setup/profile?imported=1" {
 		t.Fatalf("cv step %d %s: %s", rec.Code, rec.Header().Get("Location"), rec.Body.String())
 	}
-	page := a.do(http.MethodGet, "/setup/contact?imported=1", nil, session, nil).Body.String()
-	if !strings.Contains(page, `value="Mustermann"`) || !strings.Contains(page, `aria-current="step"`) {
-		t.Fatalf("contact step: %s", page)
+	resume("/setup/profile")
+
+	// The profile step shows what the import found, positions included, and the progress.
+	page := a.do(http.MethodGet, "/setup/profile?imported=1", nil, session, nil).Body.String()
+	for _, want := range []string{`value="Mustermann"`, `aria-current="step"`, "Step 2 of 5", "Senior Platform Engineer, Muster GmbH"} {
+		if !strings.Contains(page, want) {
+			t.Fatalf("profile step lacks %q: %s", want, page)
+		}
 	}
 	version := func(body string) string {
 		_, rest, ok := strings.Cut(body, `name="version" value="`)
@@ -1045,50 +1054,46 @@ func TestSetupAssistant(t *testing.T) {
 		return v
 	}
 	form := url.Values{"version": {version(page)}, "first_name": {"Max"}, "last_name": {"Mustermann"}, "email": {"bad"}, "phone": {"+49 30 1234567"}}
-	if rec := a.do(http.MethodPost, "/setup/contact", form, session, nil); rec.Code != http.StatusUnprocessableEntity || !strings.Contains(rec.Body.String(), `value="bad"`) {
-		t.Fatalf("invalid contact %d", rec.Code)
+	if rec := a.do(http.MethodPost, "/setup/profile", form, session, nil); rec.Code != http.StatusUnprocessableEntity || !strings.Contains(rec.Body.String(), `value="bad"`) {
+		t.Fatalf("invalid profile %d", rec.Code)
 	}
 	form.Set("email", "max.mustermann@example.org")
-	form.Set("city", "Berlin")
-	if rec := a.do(http.MethodPost, "/setup/contact", form, session, nil); rec.Header().Get("Location") != "/setup/work" {
-		t.Fatalf("contact save %d", rec.Code)
+	for k, v := range map[string]string{"city": "Berlin", "years_total": "8", "notice_period": "3 months",
+		"earliest_start": "2027-01-01", "salary_expectation": "80000", "skills": "Go\nKubernetes"} {
+		form.Set(k, v)
 	}
-	page = a.do(http.MethodGet, "/setup/work", nil, session, nil).Body.String()
-	if rec := a.do(http.MethodPost, "/setup/work", url.Values{"version": {version(page)}, "notice_period": {"3 months"}, "skills": {"Go\nKubernetes\nTerraform"}}, session, nil); rec.Header().Get("Location") != "/setup/history" {
-		t.Fatalf("work save %d: %s", rec.Code, rec.Body.String())
+	if rec := a.do(http.MethodPost, "/setup/profile", form, session, nil); rec.Header().Get("Location") != "/setup/search" {
+		t.Fatalf("profile save %d: %s", rec.Code, rec.Body.String())
 	}
+	resume("/setup/search")
 
-	// History: the import found two positions; correct one, remove one, add one.
-	page = a.do(http.MethodGet, "/setup/history", nil, session, nil).Body.String()
-	if !strings.Contains(page, `value="Senior Platform Engineer"`) || !strings.Contains(page, `value="Beispiel AG"`) || !strings.Contains(page, `name="exp-count" value="3"`) {
-		t.Fatalf("history step: %s", page)
+	if rec := a.do(http.MethodPost, "/setup/search", url.Values{"titles": {"Platform Engineer"}, "remote": {"on"}, "min_salary": {"x"}}, session, nil); rec.Code != http.StatusUnprocessableEntity || !strings.Contains(rec.Body.String(), `value="x"`) {
+		t.Fatalf("invalid salary %d", rec.Code)
 	}
-	hist := url.Values{"version": {version(page)}, "exp-count": {"3"}, "edu-count": {"1"},
-		"exp-0-title": {"Staff Platform Engineer"}, "exp-0-company": {"Muster GmbH"}, "exp-0-start": {"01/2021"},
-		"exp-0-highlights": {"Built the platform, with care\nCut deploy time"},
-		"exp-1-title":      {"Backend Developer"}, "exp-1-company": {"Beispiel AG"}, "exp-1-remove": {"on"},
-		"exp-2-title": {"Trainee"}, "exp-2-company": {"Muster AG"}, "exp-2-start": {"2016"}, "exp-2-end": {"2017"},
-		"edu-0-degree": {"B.Sc. Computer Science"}, "edu-0-institution": {"TU Musterstadt"}}
-	if rec := a.do(http.MethodPost, "/setup/history", hist, session, nil); rec.Header().Get("Location") != "/setup/search" {
-		t.Fatalf("history save %d: %s", rec.Code, rec.Body.String())
-	}
-	page = a.do(http.MethodGet, "/setup/history", nil, session, nil).Body.String()
-	if !strings.Contains(page, `value="Staff Platform Engineer"`) || strings.Contains(page, `value="Beispiel AG"`) || !strings.Contains(page, `value="Trainee"`) ||
-		!strings.Contains(page, "Built the platform, with care\nCut deploy time") || !strings.Contains(page, `value="TU Musterstadt"`) {
-		t.Fatalf("history after save: %s", page)
-	}
-
-	if rec := a.do(http.MethodPost, "/setup/search", url.Values{"titles": {"Platform Engineer"}, "remote": {"on"}, "min_salary": {"70000"}}, session, nil); rec.Header().Get("Location") != "/setup/done" {
+	if rec := a.do(http.MethodPost, "/setup/search", url.Values{"titles": {"Platform Engineer"}, "remote": {"on"}, "min_salary": {"70000"}}, session, nil); rec.Header().Get("Location") != "/setup/automation" {
 		t.Fatalf("search save %d", rec.Code)
 	}
-	done := a.do(http.MethodGet, "/setup/done", nil, session, nil).Body.String()
-	for _, want := range []string{"still missing", "Earliest start", "Salary expectation", "Add a passkey now"} {
-		if !strings.Contains(done, want) {
-			t.Errorf("done step lacks %q", want)
+	resume("/setup/matches")
+
+	// Automation stores the level only.
+	if rec := a.do(http.MethodPost, "/setup/automation", url.Values{"autonomy_level": {"bogus"}}, session, nil); rec.Code != http.StatusUnprocessableEntity {
+		t.Fatalf("invalid level %d", rec.Code)
+	}
+	if rec := a.do(http.MethodPost, "/setup/automation", url.Values{"autonomy_level": {"suggest"}}, session, nil); rec.Header().Get("Location") != "/setup/matches" {
+		t.Fatalf("automation save %d", rec.Code)
+	}
+	if page := a.do(http.MethodGet, "/setup/automation", nil, session, nil).Body.String(); !strings.Contains(page, `value="suggest" checked`) {
+		t.Fatal("level not stored")
+	}
+
+	matches := a.do(http.MethodGet, "/setup/matches", nil, session, nil).Body.String()
+	for _, want := range []string{`id="setup-matches"`, "Step 5 of 5", `href="/jobs"`, "Add a passkey"} {
+		if !strings.Contains(matches, want) {
+			t.Errorf("matches step lacks %q", want)
 		}
 	}
-	if strings.Contains(done, "<li>Phone</li>") {
-		t.Error("phone from the CV reported missing")
+	if rec := a.do(http.MethodGet, "/setup/history", nil, session, nil); rec.Code != http.StatusPermanentRedirect || rec.Header().Get("Location") != "/setup/profile" {
+		t.Errorf("old step %d %s", rec.Code, rec.Header().Get("Location"))
 	}
 	if rec := a.do(http.MethodGet, "/setup/nonsense", nil, session, nil); rec.Code != http.StatusNotFound {
 		t.Errorf("unknown step %d", rec.Code)
