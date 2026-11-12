@@ -35,19 +35,24 @@ and the browser fixture tests already cover what a smoke run finds.
 
 **Pull request gate** (`ci.yml`, pull requests and pushes to main):
 
-- Always: `verify` (mod, fmt, vet, generate, buf), `lint`, `govulncheck`, `zizmor`, `commits`,
-  `test (linux 1/2)`, `test (linux 2/2)`, `test (windows)`, `test (macos)`, `fuzz`.
-- A `changes` job decides the rest. Documentation-only changes skip all Go jobs. `images` (build and trivy),
-  `browser fixtures`, `compose stack` and `release (snapshot)` run only when their inputs change (Dockerfile,
-  `deploy/`, the runner, `.goreleaser.yaml`, `go.mod`) and on main. A skipped job counts as passed.
+- Go checks (skipped for documentation-only changes): `verify` (mod, fmt, vet, generate, buf), `lint`,
+  `govulncheck`, `fuzz`, and `tests`, which collects `test (linux, web|db|rest)` (three shards in parallel) and
+  `test (windows-latest|macos-latest)`. Always: `zizmor`, `commits`, CodeQL, dependency review.
+- A `changes` job decides the rest. `stack` (images built once and scanned, browser fixtures and Compose
+  rehearsals on them, no e2e; `stack.yml`) runs only when its inputs change (Dockerfile, `deploy/`, the runner,
+  fixtures, `go.mod`); `release (snapshot)` only when release inputs change. A skipped job counts as passed;
+  the aggregate checks `tests`, `fuzz` and `stack` exist because a skipped matrix or reusable job reports no
+  usable check name.
 - Concurrency: one group per pull request that cancels outdated runs; a push to main gets a group per commit.
 
-**After the merge** (`main.yml`, on `workflow_run` of a successful CI run on main, group per commit, never
-cancelled): build the three images once (layer cache written here only), run the e2e journeys and the compose
-rehearsals on them, then publish and sign `sha-<commit>`, move `main` and deploy staging only when the commit is
-still the head of main (#266). A failure opens an issue (or comments on the open one); the next commit fixes it.
+**After the merge** (`main.yml`, on every push to main, group per commit, never cancelled; not `workflow_run`,
+which zizmor rates a dangerous trigger): `stack.yml` with the e2e journeys and the layer cache written here only,
+and the release snapshot; then publish and sign `sha-<commit>`, move `main` and deploy staging only when the
+commit is still the head of main (#266). A failure opens an issue (or comments on the open one); the next commit
+fixes it.
 
-**Nightly**: full e2e and fuzz as before. **On demand**: the label `e2e` on a pull request runs the journeys for it.
+**On demand**: `gh workflow run stack.yml --ref <branch>` runs the stack with the journeys for any branch (a
+label on the pull request would start a second CI run whose skipped jobs could hide a failing check).
 Locally only the journey of the changed page runs.
 
 ### Consequences
