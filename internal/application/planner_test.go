@@ -323,6 +323,10 @@ func (f *fakePlannerStore) SubmitsPerDay(context.Context, uuid.UUID, time.Time) 
 	return nil, nil
 }
 
+func (f *fakePlannerStore) Briefs(context.Context, uuid.UUID, []uuid.UUID) ([]application.Brief, error) {
+	return nil, nil
+}
+
 func (f *fakePlannerStore) StatesByJob(context.Context, uuid.UUID, []int64) (map[int64]application.State, error) {
 	return nil, nil
 }

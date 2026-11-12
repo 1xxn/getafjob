@@ -215,20 +215,23 @@ func (s *Server) activeRuns(ctx context.Context, userID, current uuid.UUID) []vi
 	if s.Handoffs == nil || s.Apps == nil {
 		return nil
 	}
+	ids := s.Handoffs.ActiveRuns(userID)
+	briefs, err := s.Apps.Briefs(ctx, userID, ids)
+	if err != nil {
+		return nil
+	}
+	byID := make(map[uuid.UUID]application.Brief, len(briefs))
+	for _, b := range briefs {
+		byID[b.ID] = b
+	}
 	var out []views.ActiveRunItem
-	for _, id := range s.Handoffs.ActiveRuns(userID) {
-		app, err := s.Apps.Get(ctx, userID, id)
-		if err != nil || !liveStates[app.State] {
+	for _, id := range ids { // the order of the gateway: oldest run first
+		b, ok := byID[id]
+		if !ok || !liveStates[b.State] {
 			continue // a parked or finished run may hold its browser a moment longer; it is not live any more
 		}
-		item := views.ActiveRunItem{AppID: id.String(), JobID: app.JobID, Current: id == current,
-			Waiting: app.State == application.NeedsInput}
-		if s.Jobs != nil {
-			if j, err := s.Jobs.Detail(ctx, userID, app.JobID); err == nil {
-				item.JobTitle, item.Company = j.Title, j.Company
-			}
-		}
-		out = append(out, item)
+		out = append(out, views.ActiveRunItem{AppID: id.String(), JobID: b.JobID, Current: id == current,
+			Waiting: b.State == application.NeedsInput, JobTitle: b.Title, Company: b.Company})
 	}
 	return out
 }

@@ -242,34 +242,16 @@
     & li { border-block-end: 1px solid var(--line); padding-block: var(--space-4); }
     & h2 { font-size: 1.1rem; margin: 0 0 var(--space-1); }
   }
-  .job-meta { margin: 0 0 var(--space-1); }
-  .job-header { display: flex; justify-content: space-between; align-items: baseline; gap: var(--space-3); }
-  .btn-link { background: none; border: none; padding: 0; color: inherit; text-decoration: underline; cursor: pointer; font: inherit; font-size: 0.875rem; }
-  .btn-link.danger { color: #b91c1c; }
-  .badge-blocked { background: #fee2e2; color: #991b1b; }
-  .blocklist-panel { margin-block-end: var(--space-4); padding: var(--space-3); border: 1px solid var(--line); border-radius: 6px; }
-  .blocklist-summary { cursor: pointer; font-weight: 600; display: inline-flex; align-items: center; gap: var(--space-2); }
-  .blocklist-body { margin-block-start: var(--space-3); }
-  .blocklist-add-form { display: flex; gap: var(--space-2); align-items: center; flex-wrap: wrap; margin-block-end: var(--space-3); }
-  .blocklist-items { list-style: none; padding: 0; display: flex; flex-direction: column; gap: var(--space-2); }
-  .blocklist-items li { display: flex; align-items: center; gap: var(--space-3); }
-  .discovery-toolbar { display: flex; flex-direction: column; gap: var(--space-3); margin-block-end: var(--space-4); }
-  .crawl-sync-box { display: flex; align-items: center; justify-content: space-between; }
+
   .crawl-status-bar { display: inline-flex; align-items: center; gap: var(--space-3); }
   .crawl-trigger-form { display: inline; margin: 0; }
-  .job-import-form { display: flex; gap: var(--space-2); align-items: center; }
-  .job-import-form input { flex: 1; min-inline-size: 200px; }
-  .career-site-panel { padding: var(--space-2) var(--space-3); border: 1px dashed var(--line); border-radius: 6px; }
-  .career-site-summary { cursor: pointer; font-weight: 500; font-size: 0.9375rem; color: var(--ink-2); }
-  .career-site-body { margin-block-start: var(--space-2); }
-  .board-add-form { display: flex; gap: var(--space-2); align-items: center; }
-  .board-add-form input { flex: 1; }
+
   .badge-running { background: #e0f2fe; color: #0369a1; }
   .badge-queued { background: #fef3c7; color: #b45309; }
   @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.5; } }
   .animate-pulse { animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite; }
   .decision { font-weight: 600; color: var(--ink-2); }
-  .decision-match { color: var(--ink-1); }
+
   .reasons {
     padding-inline-start: var(--space-4);
     & .points { display: inline-block; min-inline-size: 3ch; font-variant-numeric: tabular-nums; }
@@ -279,21 +261,7 @@
   .screencast { max-inline-size: 100%; block-size: auto; border: 1px solid var(--line); display: block; background: #000; }
   .actions { display: flex; flex-wrap: wrap; gap: var(--space-3); margin-block-start: var(--space-3); }
 
-  /* Live view */
-  .active-runners-banner {
-    display: flex;
-    flex-wrap: wrap;
-    align-items: center;
-    gap: var(--space-3);
-    padding: var(--space-3) var(--space-4);
-    margin-block: var(--space-2) var(--space-4);
-    background: var(--raised);
-    border: 1px solid var(--line);
-    border-radius: var(--radius);
-  }
-  .active-runners-label { display: inline-flex; align-items: center; gap: var(--space-2); font-weight: 600; }
-  .active-runners-list { display: flex; flex-wrap: wrap; gap: var(--space-2); }
-  .active-runner-pill, .live-indicator {
+  .live-indicator {
     display: inline-flex;
     align-items: center;
     gap: var(--space-2);
@@ -305,25 +273,23 @@
     text-decoration: none;
     color: var(--ink-2);
   }
-  .active-runner-pill:hover, .live-indicator:hover { border-color: var(--accent); color: var(--ink-1); }
-  .active-runner-pill.current { border-color: var(--accent); color: var(--ink-1); font-weight: 600; }
+  .live-indicator:hover { border-color: var(--accent); color: var(--ink-1); }
+
   .live-indicator { font-weight: 600; color: var(--ink-1); white-space: nowrap; }
   .live-indicator.waiting { border-color: var(--danger); }
   .live-dot { inline-size: 0.5rem; block-size: 0.5rem; border-radius: 50%; background: var(--accent); display: inline-block; }
   .live-dot.waiting, .live-indicator.waiting .live-dot { background: var(--danger); }
   .live-dot.pulse { animation: live-pulse 1.5s ease-in-out infinite; }
-  .live-dot.mini { inline-size: 0.4rem; block-size: 0.4rem; }
+
   @keyframes live-pulse { 50% { opacity: 0.35; } }
   @media (prefers-reduced-motion: reduce) { .live-dot.pulse { animation: none; } }
-  .runner-company { font-weight: 600; }
+
   .check { display: flex; align-items: flex-start; gap: var(--space-2); }
   .check input { inline-size: auto; margin-block-start: 0.3rem; flex: none; }
   fieldset.field { border: 0; padding: 0; margin: 0; }
-  .remote-browser-box { margin-block: var(--space-4); }
+
   .live-status { color: var(--ink-2); margin-block: 0 var(--space-2); }
-  .remote-browser-box[data-mode="interactive"] .live-status { color: var(--ink-1); font-weight: 600; }
-  .remote-browser-box[data-mode="interactive"] .screencast { outline: 3px solid var(--accent); cursor: crosshair; }
-  .remote-browser-box[data-mode="view"] .screencast { cursor: default; }
+
   .screen-frame { inline-size: min(100%, 80rem); }
 
   /* Fit Inspector */
@@ -341,51 +307,7 @@
     margin-block-end: var(--space-3);
     & h3 { margin: 0; font-size: 1.2rem; }
   }
-  .skills-overlap-section {
-    margin-block-end: var(--space-4);
-    & h4 { margin: var(--space-3) 0 var(--space-2); font-size: 0.95rem; }
-  }
-  .badge-list {
-    display: flex;
-    flex-wrap: wrap;
-    gap: var(--space-2);
-  }
-  .badge-match {
-    background: #dcfce7;
-    color: #166534;
-    font-weight: 500;
-    padding: 0.2rem 0.55rem;
-    border-radius: 9999px;
-    font-size: 0.8125rem;
-  }
-  .badge-missing {
-    background: #fef3c7;
-    color: #92400e;
-    font-weight: 500;
-    padding: 0.15rem 0.45rem;
-    border-radius: 9999px;
-    font-size: 0.8125rem;
-    display: inline-flex;
-    align-items: center;
-    gap: 0.35rem;
-  }
-  .skill-add-inline {
-    display: inline;
-    margin: 0;
-  }
-  .btn-badge-add {
-    background: #fde68a;
-    color: #78350f;
-    border: 1px solid #f59e0b;
-    border-radius: 9999px;
-    padding: 0.05rem 0.35rem;
-    font-size: 0.75rem;
-    font-weight: 600;
-    cursor: pointer;
-    line-height: 1.2;
-    transition: background 0.15s ease;
-    &:hover { background: #fcd34d; }
-  }
+
   .fit-breakdown-section {
     margin-block-start: var(--space-4);
     & h4 { margin: 0 0 var(--space-2); font-size: 0.95rem; }
@@ -394,48 +316,6 @@
     display: flex;
     flex-direction: column;
     gap: var(--space-1);
-  }
-  .breakdown-row {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    padding-block: var(--space-2);
-    border-block-end: 1px solid var(--line);
-  }
-  .breakdown-info {
-    display: flex;
-    flex-direction: column;
-    gap: 0.125rem;
-  }
-  .breakdown-label {
-    font-weight: 600;
-    font-size: 0.875rem;
-  }
-  .breakdown-score {
-    display: flex;
-    align-items: center;
-    gap: var(--space-3);
-  }
-  .breakdown-points {
-    font-variant-numeric: tabular-nums;
-    font-weight: 500;
-    min-inline-size: 5ch;
-    text-align: end;
-    font-size: 0.875rem;
-  }
-  .progress-bar {
-    inline-size: 100px;
-    block-size: 8px;
-    background: var(--sunken);
-    border-radius: 4px;
-    overflow: hidden;
-    border: 1px solid var(--line);
-  }
-  .progress-fill {
-    block-size: 100%;
-    background: var(--accent);
-    border-radius: 4px;
-    transition: width 0.3s ease;
   }
 
   /* CV Variant Switcher */
@@ -464,7 +344,7 @@
     background: var(--paper);
     transition: border-color 0.15s ease, background 0.15s ease;
     &:hover { border-color: var(--ink-3); }
-    &.is-selected { border-color: var(--accent); background: var(--sunken); }
+
   }
   .cv-variant-body {
     flex: 1;
@@ -484,28 +364,7 @@
     gap: var(--space-1);
     align-items: center;
   }
-  .badge-selected {
-    background: #e0e7ff;
-    color: #3730a3;
-    font-size: 0.75rem;
-    font-weight: 600;
-  }
-  .badge-recommended {
-    background: #dbeafe;
-    color: #1e40af;
-    font-size: 0.75rem;
-    font-weight: 600;
-  }
-  .badge-lang {
-    background: var(--sunken);
-    color: var(--ink-2);
-    font-size: 0.75rem;
-  }
-  .badge-variant {
-    background: #ede9fe;
-    color: #5b21b6;
-    font-size: 0.8rem;
-  }
+
   .cv-variant-meta {
     display: flex;
     gap: var(--space-3);
@@ -513,15 +372,6 @@
     font-size: 0.8125rem;
   }
 
-  @media (prefers-color-scheme: dark) {
-    .badge-match { background: #064e3b; color: #a7f3d0; }
-    .badge-missing { background: #78350f; color: #fde68a; }
-    .btn-badge-add { background: #92400e; color: #fef3c7; border-color: #b45309; }
-    .btn-badge-add:hover { background: #b45309; }
-    .badge-selected { background: #312e81; color: #c7d2fe; }
-    .badge-recommended { background: #1e3a8a; color: #bfdbfe; }
-    .badge-variant { background: #4c1d95; color: #ddd6fe; }
-  }
 }
 
 @layer components {
