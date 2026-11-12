@@ -87,7 +87,9 @@ function initLiveView(box: HTMLElement): () => void {
   function connect(): void {
     if (stopped) return;
     const proto = location.protocol === 'https:' ? 'wss:' : 'ws:';
-    const sock = new WebSocket(`${proto}//${location.host}/applications/${appId}/screen`, 'getafjob-screencast');
+    // Thumbnails ask the server for their frame rate, so it does not send frames they would drop.
+    const fps = box.dataset.fps ? `?fps=${encodeURIComponent(box.dataset.fps)}` : '';
+    const sock = new WebSocket(`${proto}//${location.host}/applications/${appId}/screen${fps}`, 'getafjob-screencast');
     sock.binaryType = 'blob';
     ws = sock;
 

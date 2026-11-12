@@ -72,7 +72,8 @@ function initLiveView(box) {
   function connect() {
     if (stopped) return;
     const proto = location.protocol === "https:" ? "wss:" : "ws:";
-    const sock = new WebSocket(`${proto}//${location.host}/applications/${appId}/screen`, "getafjob-screencast");
+    const fps = box.dataset.fps ? `?fps=${encodeURIComponent(box.dataset.fps)}` : "";
+    const sock = new WebSocket(`${proto}//${location.host}/applications/${appId}/screen${fps}`, "getafjob-screencast");
     sock.binaryType = "blob";
     ws = sock;
     sock.onmessage = async (e) => {
