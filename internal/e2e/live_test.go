@@ -64,7 +64,14 @@ func startRun(t *testing.T, tab *Tab) string {
 			continue // a guard stops it (company window, duplicate)
 		}
 		tab.Click(`#apply-body [data-action="apply-confirm"]`)
-		tab.WaitWithin(15*time.Second, "location.pathname === '/live' && location.search.startsWith('?run=')")
+		// The planner may have queued the job a moment earlier (the demo user applies on its own): then the job page
+		// comes back with its application instead of the live view, and the next job is tried.
+		tab.WaitWithin(15*time.Second, "(location.pathname === '/live' && location.search.startsWith('?run=')) || "+
+			"(location.pathname.startsWith('/jobs/') && !document.getElementById('dlg-apply')?.open && "+
+			"!!document.querySelector('.jd-actions a[href^=\"/applications/\"]'))")
+		if tab.Eval("return location.pathname") != `"/live"` {
+			continue
+		}
 		return strings.TrimPrefix(strings.Trim(tab.Eval("return location.search"), `"`), "?run=")
 	}
 	if app := retryRun(t, tab); app != "" {
