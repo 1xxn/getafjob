@@ -17,6 +17,7 @@ templ Layout(p Page) {
 			<title>{ p.Title } · getafjob</title>
 			<link rel="stylesheet" href={ Asset("ui.css") }/>
 			<link rel="stylesheet" href={ Asset("app.css") }/>
+			<link rel="preload" href={ Asset("icons.svg") } as="image" type="image/svg+xml"/>
 			if p.StyleGuide {
 				<link rel="stylesheet" href={ Asset("styleguide.css") }/>
 			}

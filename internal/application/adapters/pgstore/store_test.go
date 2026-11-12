@@ -548,3 +548,22 @@ func TestPipelineAndNotes(t *testing.T) {
 		t.Fatalf("erika saw %d pipeline items, want 0", len(erikaPipeline))
 	}
 }
+
+// Briefs reads state and job of several applications in one query, and only the user's own.
+func TestBriefs(t *testing.T) {
+	pool, _, svc, _ := setup(t)
+	ctx := t.Context()
+	maxID, erika := user(t, pool, "brief-max@example.org"), user(t, pool, "brief-erika@example.org")
+	a := running(ctx, t, svc, maxID, job(t, pool, "greenhouse:acme", "Acme GmbH", "acme|brief"))
+	b := running(ctx, t, svc, erika, job(t, pool, "greenhouse:beta", "Beta AG", "beta|brief"))
+	got, err := svc.Briefs(ctx, maxID, []uuid.UUID{a, b, uuid.New()})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(got) != 1 || got[0].ID != a || got[0].State != application.Running || got[0].Company != "Acme GmbH" || got[0].Title != "Go Developer" {
+		t.Fatalf("briefs = %+v", got)
+	}
+	if got, err := svc.Briefs(ctx, maxID, nil); err != nil || got != nil {
+		t.Fatalf("no ids: %v %v", got, err)
+	}
+}

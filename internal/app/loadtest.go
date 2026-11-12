@@ -109,12 +109,20 @@ func adminLoadTest(ctx context.Context, args []string, env Env) int {
 	var paths []loadtest.WeightedPath
 	if sessionCookie != nil {
 		paths = []loadtest.WeightedPath{
+			{Path: "/", Weight: 15},
 			{Path: "/jobs", Weight: 30},
 			{Path: "/jobs?q=engineer", Weight: 20},
 			{Path: "/jobs?workplace=remote", Weight: 15},
 			{Path: "/jobs?decision=all&page=2", Weight: 15},
+			{Path: "/applications", Weight: 10},
+			{Path: "/pipeline", Weight: 10},
+			{Path: "/needs-input", Weight: 5},
+			{Path: "/approvals", Weight: 5},
+			{Path: "/live", Weight: 5},
+			{Path: "/activity", Weight: 5},
+			{Path: "/notifications/bell", Weight: 15},
 			{Path: "/profile", Weight: 10},
-			{Path: "/preferences", Weight: 5},
+			{Path: "/settings/search", Weight: 5},
 			{Path: "/healthz", Weight: 5},
 		}
 		if sampleJobID > 0 {

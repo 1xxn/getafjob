@@ -231,3 +231,8 @@ JOIN runs r ON r.id = c.run_id
 CROSS JOIN LATERAL jsonb_array_elements(CASE WHEN jsonb_typeof(c.data->'filled') = 'array' THEN c.data->'filled' ELSE '[]'::jsonb END) f
 WHERE c.user_id = $1 AND f->>'source' LIKE 'answer#%'
 GROUP BY 1;
+
+-- name: ApplicationBriefs :many
+SELECT a.id, a.job_id, a.state, j.title, j.company
+FROM applications a JOIN jobs j ON j.id = a.job_id
+WHERE a.user_id = $1 AND a.id = ANY (sqlc.arg(ids)::uuid[]);
