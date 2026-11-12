@@ -246,10 +246,13 @@ document.addEventListener('htmx:finally:request', (e) => {
   const ctx = (e as CustomEvent<{ ctx?: RequestCtx }>).detail?.ctx;
   if (ctx) running.delete(ctx);
 });
-window.addEventListener('pagehide', () => {
+// Chrome cancels the old document's fetches as soon as a navigation starts, before pagehide: abort there too.
+const abortRunning = (): void => {
   for (const ctx of running) ctx.request?.abort?.();
   running.clear();
-});
+};
+window.addEventListener('beforeunload', abortRunning);
+window.addEventListener('pagehide', abortRunning);
 
 document.addEventListener(
   'click',

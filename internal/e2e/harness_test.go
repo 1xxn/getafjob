@@ -180,10 +180,19 @@ func OpenIn(t *testing.T, b *rod.Browser, width, height int, scheme string) *Tab
 	must(t, proto.RuntimeEnable{}.Call(p))
 	must(t, proto.LogEnable{}.Call(p))
 	must(t, proto.NetworkEnable{}.Call(p))
-	// CSP reports in the log name no element; this one does (test only, added by the harness).
+	// CSP reports in the log name no element, and htmx errors no request; these lines do (test only, added by the
+	// harness).
 	_, err = proto.PageAddScriptToEvaluateOnNewDocument{Source: `document.addEventListener('securitypolicyviolation', e => {
 		const el = e.target && e.target.outerHTML ? e.target.outerHTML.slice(0, 160) : String(e.target);
 		console.warn('csp-detail', e.violatedDirective, e.sourceFile + ':' + e.lineNumber, 'sample=' + e.sample, el);
+	});
+	let leaving = '';
+	addEventListener('beforeunload', () => { leaving = 'beforeunload'; });
+	addEventListener('pagehide', () => { leaving += '+pagehide'; });
+	document.addEventListener('htmx:error', e => {
+		const r = e.detail && e.detail.ctx && e.detail.ctx.request;
+		console.warn('htmx-detail', r ? r.method + ' ' + r.action : '(no request)', 'page=' + location.pathname + location.search,
+			'leaving=' + (leaving || 'no'), 'aborted=' + (r && r.signal ? r.signal.aborted : '?'));
 	});`}.Call(p)
 	must(t, err)
 	go p.EachEvent(
@@ -191,7 +200,8 @@ func OpenIn(t *testing.T, b *rod.Browser, width, height int, scheme string) *Tab
 			switch {
 			case e.Type == proto.RuntimeConsoleAPICalledTypeError:
 				tab.problem("console: " + consoleText(e))
-			case e.Type == proto.RuntimeConsoleAPICalledTypeWarning && strings.HasPrefix(consoleText(e), "csp-detail"):
+			case e.Type == proto.RuntimeConsoleAPICalledTypeWarning && (strings.HasPrefix(consoleText(e), "csp-detail") ||
+				strings.HasPrefix(consoleText(e), "htmx-detail")):
 				tab.problem(consoleText(e))
 			}
 		},
@@ -238,6 +248,9 @@ func (tab *Tab) problem(s string) {
 func (tab *Tab) Go(path string) {
 	tab.t.Helper()
 	p := tab.Page.Timeout(actionTimeout)
+	// A navigation through DevTools skips beforeunload, which a link click fires; the app aborts its running requests
+	// there (live parts, the bell). Fire it, so a request cut by the navigation is not reported as an error.
+	_, _ = p.Eval(`() => { window.dispatchEvent(new Event('beforeunload')); }`)
 	wait := p.WaitNavigation(proto.PageLifecycleEventNameNetworkAlmostIdle)
 	must(tab.t, p.Navigate(base+path))
 	wait()

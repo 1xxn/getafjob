@@ -36,9 +36,10 @@ func TestSettings(t *testing.T) {
 		other = "en"
 	}
 	for _, v := range []string{other, before} {
-		tab.Eval("const s = document.getElementById('f-cover_letter_lang'); s.value = '" + v + "'; s.dispatchEvent(new Event('input', {bubbles: true})); return true")
+		// Mark the page: only the server's answer replaces the form, and only then the save is done.
+		tab.Eval("const s = document.getElementById('f-cover_letter_lang'); s.value = '" + v + "'; s.dispatchEvent(new Event('input', {bubbles: true})); s.form.dataset.e2e = 'old'; return true")
 		tab.Click(`.set-form button[data-save]`)
-		tab.WaitWithin(10*time.Second, "location.search.includes('saved=1') && document.getElementById('f-cover_letter_lang')?.value === '"+v+"'")
+		tab.WaitWithin(10*time.Second, "location.search.includes('saved=1') && !document.querySelector('.set-form[data-e2e]') && document.getElementById('f-cover_letter_lang')?.value === '"+v+"'")
 	}
 	tab.Shot("search")
 

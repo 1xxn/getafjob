@@ -195,10 +195,12 @@ document.addEventListener("htmx:finally:request", (e) => {
   const ctx = e.detail?.ctx;
   if (ctx) running.delete(ctx);
 });
-window.addEventListener("pagehide", () => {
+var abortRunning = () => {
   for (const ctx of running) ctx.request?.abort?.();
   running.clear();
-});
+};
+window.addEventListener("beforeunload", abortRunning);
+window.addEventListener("pagehide", abortRunning);
 document.addEventListener(
   "click",
   (e) => {
