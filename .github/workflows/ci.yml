@@ -253,9 +253,38 @@ jobs:
       - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
         with:
           go-version-file: go.mod
-          cache: false # job builds images
+          # The task runner and the journey binary compile from the Go cache (pull requests read main's, write their own).
+      - uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4.4.1
+      # The stack images reuse the layer cache of the images job. Only pushes to main write it (images job), so a pull
+      # request cannot put layers into the cache that main builds from.
+      - name: build the app image
+        uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7.4.0
+        with:
+          context: .
+          target: app
+          tags: getafjob:dev
+          load: true
+          cache-from: type=gha,scope=app
+      - name: build the runner image
+        uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7.4.0
+        with:
+          context: .
+          target: runner
+          tags: getafjob-runner:dev
+          load: true
+          cache-from: type=gha,scope=runner
+      - name: build the egress image
+        uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7.4.0
+        with:
+          context: .
+          target: egress
+          tags: getafjob-egress:dev
+          load: true
+          cache-from: type=gha,scope=egress
       - name: start the dev stack
-        run: go tool task dev:up
+        run: |
+          go tool task dev:secrets
+          docker compose -f deploy/compose.yaml -f deploy/compose.dev.yaml --profile dev up -d --no-build --wait --wait-timeout 300
       - name: demo data on the fixture site
         run: >-
           docker compose -f deploy/compose.yaml -f deploy/compose.dev.yaml exec -T serve
@@ -299,7 +328,8 @@ jobs:
           tags: getafjob-${{ matrix.target }}:ci
           load: true
           cache-from: type=gha,scope=${{ matrix.target }}
-          cache-to: type=gha,scope=${{ matrix.target }},mode=max
+          # Write the layer cache from main only; pull requests read it (the e2e job builds from it too).
+          cache-to: ${{ github.event_name == 'push' && format('type=gha,scope={0},mode=max', matrix.target) || '' }}
       - name: trivy (fixable HIGH/CRITICAL fail the build)
         uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
         with:
