@@ -46,6 +46,12 @@ services:
       GETAFJOB_DEV_FIXTURE_HOST: fixtures:8080
       GETAFJOB_DEV_STYLEGUIDE: "true"
 
+  # No scheduled crawl of real sources: development and the e2e job work on demo data (admin demo), so no demo user
+  # is matched or queued onto a real posting. GETAFJOB_DEV_CRAWL_INTERVAL=6h turns it on; "Crawl now" always works.
+  worker:
+    environment:
+      GETAFJOB_CRAWL_INTERVAL: ${GETAFJOB_DEV_CRAWL_INTERVAL:-0}
+
   runner:
     environment:
       GETAFJOB_EGRESS_PROXY: http://runner-egress:4750

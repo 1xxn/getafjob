@@ -81,7 +81,7 @@ type Config struct {
 	VAPIDSubject string
 	// ShutdownTimeout bounds the graceful shutdown.
 	ShutdownTimeout time.Duration
-	// CrawlInterval is the time between two crawls (worker).
+	// CrawlInterval is the time between two crawls (worker); 0 schedules none.
 	CrawlInterval time.Duration
 	// EasyApplyEnabled is an operator switch enabling the Easy Apply module (#43). Default: false.
 	EasyApplyEnabled bool
@@ -370,9 +370,13 @@ func setShutdownTimeout(c *Config, v string) error {
 }
 
 func setCrawlInterval(c *Config, v string) error {
+	if v == "0" {
+		c.CrawlInterval = 0 // no scheduled crawl (development stacks); "Crawl now" still works
+		return nil
+	}
 	d, err := time.ParseDuration(v)
 	if err != nil || d < 30*time.Minute || d > 7*24*time.Hour {
-		return errors.New("must be a duration between 30m and 168h")
+		return errors.New("must be 0 or a duration between 30m and 168h")
 	}
 	c.CrawlInterval = d
 	return nil

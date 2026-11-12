@@ -195,13 +195,11 @@ func (w *cleanupWorker) Work(ctx context.Context, _ *river.Job[CleanupArgs]) err
 	return nil
 }
 
-// periodicJobs schedules the crawl, the cleanup, the recovery of stuck submits and the handoff watch; all also run
+// periodicJobs schedules the crawl (unless its interval is 0), the cleanup, the recovery of stuck submits and the handoff watch; all also run
 // once at start.
 func periodicJobs(cfg config.Config) []*river.PeriodicJob {
 	start := &river.PeriodicJobOpts{RunOnStart: true}
-	return []*river.PeriodicJob{
-		river.NewPeriodicJob(river.PeriodicInterval(cfg.CrawlInterval),
-			func() (river.JobArgs, *river.InsertOpts) { return CrawlArgs{}, nil }, start),
+	jobs := []*river.PeriodicJob{
 		river.NewPeriodicJob(river.PeriodicInterval(15*time.Minute),
 			func() (river.JobArgs, *river.InsertOpts) { return CleanupArgs{}, nil }, start),
 		river.NewPeriodicJob(river.PeriodicInterval(5*time.Minute),
@@ -215,4 +213,9 @@ func periodicJobs(cfg config.Config) []*river.PeriodicJob {
 		river.NewPeriodicJob(river.PeriodicInterval(time.Hour),
 			func() (river.JobArgs, *river.InsertOpts) { return DailySummaryArgs{}, nil }, start),
 	}
+	if cfg.CrawlInterval > 0 {
+		jobs = append(jobs, river.NewPeriodicJob(river.PeriodicInterval(cfg.CrawlInterval),
+			func() (river.JobArgs, *river.InsertOpts) { return CrawlArgs{}, nil }, start))
+	}
+	return jobs
 }

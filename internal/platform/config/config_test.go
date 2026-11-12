@@ -208,6 +208,9 @@ func TestCrawlSettings(t *testing.T) {
 	if d, _ := Load(fakeSource(nil, nil)); d.CrawlInterval != 6*time.Hour {
 		t.Fatalf("default = %v", d.CrawlInterval)
 	}
+	if c, err := Load(fakeSource(map[string]string{"GETAFJOB_CRAWL_INTERVAL": "0"}, nil)); err != nil || c.CrawlInterval != 0 {
+		t.Errorf("0 (no scheduled crawl): %v, %v", c.CrawlInterval, err)
+	}
 	if _, err := Load(fakeSource(map[string]string{"GETAFJOB_CRAWL_INTERVAL": "5m"}, nil)); err == nil ||
 		!strings.Contains(err.Error(), "GETAFJOB_CRAWL_INTERVAL") {
 		t.Errorf("5m: err = %v", err)
