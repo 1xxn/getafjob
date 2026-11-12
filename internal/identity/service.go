@@ -44,8 +44,9 @@ type InviteRequest struct {
 	Send   bool // also send the link by mail
 }
 
-// Invite creates a one-time invitation link.
-func (s *Service) Invite(ctx context.Context, r InviteRequest) (link string, expires time.Time, err error) {
+// CreateInvitation stores an invitation and returns its one-use link; it never sends mail (the web console passes
+// the link on by hand).
+func (s *Service) CreateInvitation(ctx context.Context, r InviteRequest) (link string, expires time.Time, err error) {
 	email, err := NormalizeEmail(r.Email)
 	if err != nil {
 		return "", time.Time{}, err
@@ -68,13 +69,20 @@ func (s *Service) Invite(ctx context.Context, r InviteRequest) (link string, exp
 	if err := s.store.CreateInvitation(ctx, NewInvitation{Email: email, Role: r.Role, Hash: hash, CreatedBy: r.By, ExpiresAt: expires}, audit); err != nil {
 		return "", time.Time{}, err
 	}
-	link = s.link("/invite/", token)
-	if r.Send && s.mailer != nil {
-		l := r.Locale
-		body := i18n.T(l, "mail.invitation.body", map[string]any{"link": link, "expires": expires.UTC().Format("2006-01-02 15:04 UTC")})
-		if err := s.mailer.Send(ctx, Mail{To: email, Subject: i18n.T(l, "mail.invitation.subject", nil), Text: body}); err != nil {
-			return "", time.Time{}, fmt.Errorf("send invitation: %w", err)
-		}
+	return s.link("/invite/", token), expires, nil
+}
+
+// Invite creates an invitation and, with r.Send, mails the link (admin command).
+func (s *Service) Invite(ctx context.Context, r InviteRequest) (link string, expires time.Time, err error) {
+	link, expires, err = s.CreateInvitation(ctx, r)
+	if err != nil || !r.Send || s.mailer == nil {
+		return link, expires, err
+	}
+	email, _ := NormalizeEmail(r.Email)
+	l := r.Locale
+	body := i18n.T(l, "mail.invitation.body", map[string]any{"link": link, "expires": expires.UTC().Format("2006-01-02 15:04 UTC")})
+	if err := s.mailer.Send(ctx, Mail{To: email, Subject: i18n.T(l, "mail.invitation.subject", nil), Text: body}); err != nil {
+		return "", time.Time{}, fmt.Errorf("send invitation: %w", err)
 	}
 	return link, expires, nil
 }

@@ -134,8 +134,7 @@ func auditText(ctx context.Context, a identity.AuditEntry, emails map[uuid.UUID]
 func (s *Server) adminInvite(w http.ResponseWriter, r *http.Request, u *identity.User) {
 	email, role := strings.TrimSpace(r.PostFormValue("email")), r.PostFormValue("role")
 	by := u.ID
-	link, expires, err := s.Identity.Invite(r.Context(), identity.InviteRequest{Email: email, Role: identity.Role(role), By: &by,
-		Locale: u.Locale})
+	link, expires, err := s.Identity.CreateInvitation(r.Context(), identity.InviteRequest{Email: email, Role: identity.Role(role), By: &by})
 	d := views.AdminUsersData{Form: views.Form{Values: map[string]string{"email": email, "role": role}, Errors: map[string]string{}}}
 	switch {
 	case err == nil:
