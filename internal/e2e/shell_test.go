@@ -55,7 +55,7 @@ func (tab *Tab) Click(selector string) {
 	}
 }
 
-var pages = []string{"/", "/jobs", "/applications", "/needs-input", "/approvals", "/tracker", "/profile", "/documents", "/answers", "/texts",
+var pages = []string{"/", "/jobs", "/applications", "/needs-input", "/approvals", "/pipeline", "/profile", "/documents", "/answers", "/texts",
 	"/preferences", "/account", "/privacy"}
 
 // Every page renders in the shell with a heading, without console errors and without horizontal scrolling.
@@ -81,7 +81,6 @@ func TestPagesRender(t *testing.T) {
 
 // Links swap the page without a reload, keep the live dock, move focus to the heading and mark the active item.
 func TestShellNavigation(t *testing.T) {
-	t.Parallel()
 	tab := Open(t, 1440, 900, "light")
 	tab.Go("/")
 	tab.Eval("window.__e2e = 1; document.getElementById('live-dock').dataset.e2e = 'kept'; return true")
@@ -121,7 +120,6 @@ func TestShellNavigation(t *testing.T) {
 
 // On a phone the tab bar replaces the sidebar and the menu opens the navigation as a drawer.
 func TestShellPhone(t *testing.T) {
-	t.Parallel()
 	tab := Open(t, 375, 812, "dark")
 	tab.Go("/")
 	if tab.Eval("return getComputedStyle(document.querySelector('.shell-side')).display") != `"none"` {

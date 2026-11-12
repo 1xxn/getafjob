@@ -54,6 +54,9 @@ func startRun(t *testing.T, tab *Tab) string {
 	rand.Shuffle(len(ids), func(i, j int) { ids[i], ids[j] = ids[j], ids[i] })
 	for _, id := range ids {
 		tab.Go("/jobs/" + id)
+		if tab.Eval(`return !!document.querySelector('.jd-actions [data-action="apply"]')`) != "true" {
+			continue // taken meanwhile (a run of the planner, another journey)
+		}
 		// Apply now opens the preview in a drawer; starting there leads to the run in focus.
 		tab.Click(`.jd-actions [data-action="apply"]`)
 		tab.WaitFor("document.getElementById('dlg-apply').open && document.querySelector('#apply-body [data-action=\"apply-confirm\"]')")

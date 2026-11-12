@@ -10,7 +10,6 @@ import (
 // A new user is led to the setup; the demo user sees numbers, actions, runs, matches and the trend, at both sizes,
 // and a live event refreshes the dashboard in place.
 func TestDashboard(t *testing.T) {
-	t.Parallel()
 	fresh := Open(t, 1440, 900, "light")
 	fresh.Go("/")
 	fresh.El(`#dashboard .ui-empty a[href="/setup"]`)
@@ -22,7 +21,6 @@ func TestDashboard(t *testing.T) {
 		scheme        string
 	}{{"desktop-dark", 1440, 900, "dark"}, {"phone-light", 375, 812, "light"}} {
 		t.Run(v.name, func(t *testing.T) {
-			t.Parallel()
 			tab := OpenIn(t, Demo(t), v.width, v.height, v.scheme)
 			tab.Go("/")
 			tab.El("#dashboard .dash-kpis .ui-kpi")

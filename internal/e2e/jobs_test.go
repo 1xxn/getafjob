@@ -66,7 +66,6 @@ func TestJobsFilterOpenQueue(t *testing.T) {
 
 // On a phone the open job covers the list and closes again; keyboard j/k move in the list.
 func TestJobsPhoneAndKeys(t *testing.T) {
-	t.Parallel()
 	tab := OpenIn(t, Demo(t), 375, 812, "dark")
 	tab.Go("/jobs?source=demo&decision=all")
 	tab.NoOverflow("page")
