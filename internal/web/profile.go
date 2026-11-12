@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"net/http"
 	"net/url"
+	"slices"
 	"strconv"
 	"strings"
 	"time"
@@ -231,18 +232,7 @@ func (s *Server) experienceSave(w http.ResponseWriter, r *http.Request, u *ident
 		s.notFound(w, r, u)
 		return
 	}
-	we := profile.WorkExperience{
-		ID:                 id,
-		Title:              strings.TrimSpace(r.PostFormValue("title")),
-		Company:            strings.TrimSpace(r.PostFormValue("company")),
-		Location:           strings.TrimSpace(r.PostFormValue("location")),
-		WorkplaceType:      strings.TrimSpace(r.PostFormValue("workplace_type")),
-		StartDate:          strings.TrimSpace(r.PostFormValue("start_date")),
-		EndDate:            strings.TrimSpace(r.PostFormValue("end_date")),
-		IsCurrent:          r.PostFormValue("is_current") == "on",
-		DescriptionBullets: profile.Lines(r.PostFormValue("bullets")),
-	}
-	_, err = s.Stations.SaveWorkExperience(r.Context(), u.ID, we)
+	_, err = s.Stations.SaveWorkExperience(r.Context(), u.ID, readExperience(r, id))
 	if err != nil {
 		s.failed(w, r, u, err)
 		return
@@ -334,17 +324,7 @@ func (s *Server) educationSave(w http.ResponseWriter, r *http.Request, u *identi
 		s.notFound(w, r, u)
 		return
 	}
-	e := profile.EducationStation{
-		ID:           id,
-		Degree:       strings.TrimSpace(r.PostFormValue("degree")),
-		Institution:  strings.TrimSpace(r.PostFormValue("institution")),
-		FieldOfStudy: strings.TrimSpace(r.PostFormValue("field_of_study")),
-		StartDate:    strings.TrimSpace(r.PostFormValue("start_date")),
-		EndDate:      strings.TrimSpace(r.PostFormValue("end_date")),
-		IsCurrent:    r.PostFormValue("is_current") == "on",
-		Grade:        strings.TrimSpace(r.PostFormValue("grade")),
-	}
-	_, err = s.Stations.SaveEducation(r.Context(), u.ID, e)
+	_, err = s.Stations.SaveEducation(r.Context(), u.ID, readEducation(r, id))
 	if err != nil {
 		s.failed(w, r, u, err)
 		return
@@ -903,4 +883,126 @@ func (s *Server) runnerToken(w http.ResponseWriter, r *http.Request, u *identity
 		return
 	}
 	http.Redirect(w, r, "/settings/integrations", http.StatusSeeOther)
+}
+
+// readExperience reads a position from its form.
+func readExperience(r *http.Request, id uuid.UUID) profile.WorkExperience {
+	v := func(name string) string { return strings.TrimSpace(r.PostFormValue(name)) }
+	return profile.WorkExperience{ID: id, Title: v("title"), Company: v("company"), Location: v("location"),
+		WorkplaceType: v("workplace_type"), StartDate: v("start_date"), EndDate: v("end_date"),
+		IsCurrent: r.PostFormValue("is_current") == "on", DescriptionBullets: profile.Lines(r.PostFormValue("bullets"))}
+}
+
+// readEducation reads a degree from its form.
+func readEducation(r *http.Request, id uuid.UUID) profile.EducationStation {
+	v := func(name string) string { return strings.TrimSpace(r.PostFormValue(name)) }
+	return profile.EducationStation{ID: id, Degree: v("degree"), Institution: v("institution"), FieldOfStudy: v("field_of_study"),
+		StartDate: v("start_date"), EndDate: v("end_date"), IsCurrent: r.PostFormValue("is_current") == "on", Grade: v("grade")}
+}
+
+// saveState answers an autosave: what happened, in words, in the form's status line.
+func (s *Server) saveState(w http.ResponseWriter, r *http.Request, id string, err error, version int64) {
+	st := views.SaveState{ID: id, Version: version}
+	status := http.StatusOK
+	switch {
+	case err == nil:
+		st.State, st.Text = "saved", views.T(r.Context(), "profile.autosave.saved")
+	case errors.Is(err, profile.ErrInvalid):
+		status, st.State = http.StatusUnprocessableEntity, "invalid"
+		var names []string
+		for field := range fieldErrors(r, err) {
+			names = append(names, views.T(r.Context(), "profile.field."+field))
+		}
+		slices.Sort(names)
+		st.Text = views.T(r.Context(), "profile.autosave.invalid", "fields", strings.Join(names, ", "))
+	case errors.Is(err, profile.ErrConflict):
+		status, st.State, st.Text = http.StatusConflict, "conflict", views.T(r.Context(), "profile.autosave.conflict")
+	case errors.Is(err, profile.ErrStationNotFound):
+		status, st.State, st.Text = http.StatusNotFound, "conflict", views.T(r.Context(), "profile.autosave.gone")
+	default:
+		if s.Logger != nil {
+			s.Logger.ErrorContext(r.Context(), "autosave failed", "err", err)
+		}
+		status, st.State, st.Text = http.StatusInternalServerError, "error", views.T(r.Context(), "profile.autosave.error")
+	}
+	s.render(w, r, status, views.SaveStateLine(st))
+}
+
+// profileAutosave stores the profile form while the user types; the answer is the status line and the new version.
+func (s *Server) profileAutosave(w http.ResponseWriter, r *http.Request, u *identity.User) {
+	if u == nil {
+		w.WriteHeader(http.StatusUnauthorized)
+		return
+	}
+	snap, err := s.Profile.Get(r.Context(), u.ID)
+	if err != nil {
+		s.saveState(w, r, "profile", err, 0)
+		return
+	}
+	version, _ := strconv.ParseInt(r.PostFormValue("version"), 10, 64)
+	err = s.Profile.SaveProfile(r.Context(), u.ID, readProfile(r, snap.Profile), version)
+	if err == nil {
+		if now, gerr := s.Profile.Get(r.Context(), u.ID); gerr == nil {
+			version = now.Version
+		}
+	}
+	s.saveState(w, r, "profile", err, version)
+}
+
+// stationAutosave stores one position or degree while the user types.
+func (s *Server) stationAutosave(kind string) func(http.ResponseWriter, *http.Request, *identity.User) {
+	return func(w http.ResponseWriter, r *http.Request, u *identity.User) {
+		if u == nil {
+			w.WriteHeader(http.StatusUnauthorized)
+			return
+		}
+		id, err := uuid.Parse(r.PathValue("id"))
+		if err != nil || s.Stations == nil {
+			s.notFound(w, r, u)
+			return
+		}
+		if kind == "experience" {
+			_, err = s.Stations.SaveWorkExperience(r.Context(), u.ID, readExperience(r, id))
+		} else {
+			_, err = s.Stations.SaveEducation(r.Context(), u.ID, readEducation(r, id))
+		}
+		s.saveState(w, r, id.String(), err, 0)
+	}
+}
+
+// stationOrder stores the order of all positions or degrees after a drag (one id per entry, top first).
+func (s *Server) stationOrder(kind string) func(http.ResponseWriter, *http.Request, *identity.User) {
+	return func(w http.ResponseWriter, r *http.Request, u *identity.User) {
+		if u == nil {
+			http.Redirect(w, r, "/login", http.StatusSeeOther)
+			return
+		}
+		if s.Stations == nil || r.ParseForm() != nil {
+			s.notFound(w, r, u)
+			return
+		}
+		var ids []uuid.UUID
+		for _, raw := range r.PostForm["id"] {
+			id, err := uuid.Parse(raw)
+			if err != nil {
+				s.notFound(w, r, u)
+				return
+			}
+			ids = append(ids, id)
+		}
+		var err error
+		if kind == "experience" {
+			err = s.Stations.ReorderWorkExperiences(r.Context(), u.ID, ids)
+		} else {
+			err = s.Stations.ReorderEducations(r.Context(), u.ID, ids)
+		}
+		switch {
+		case errors.Is(err, profile.ErrStationNotFound):
+			http.Redirect(w, r, "/profile#stations", http.StatusSeeOther) // changed meanwhile: show what is stored
+		case err != nil:
+			s.failed(w, r, u, err)
+		default:
+			http.Redirect(w, r, "/profile#stations", http.StatusSeeOther)
+		}
+	}
 }

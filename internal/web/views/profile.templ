@@ -1,6 +1,26 @@
 package views
 
-import "context"
+import (
+	"context"
+	"strconv"
+
+	"github.com/1xxn/getafjob/internal/web/views/ui"
+)
+
+// SaveState is the answer to an autosave: the status line of one form and, for the profile, its new version.
+type SaveState struct {
+	ID      string // profile, or the station's ID
+	State   string // saved, invalid, conflict, error; empty before the first save
+	Text    string
+	Version int64 // > 0: the form's version input is replaced too
+}
+
+// autosave makes a form save itself while the user types (800 ms after the last key) and when a field is left;
+// a newer save replaces one still running.
+func autosave(ctx context.Context, url, id string) templ.Attributes {
+	return HX(ctx, "hx-post", url, "hx-trigger", "input delay:800ms, change", "hx-target", "#save-"+id,
+		"hx-swap", "outerHTML transition:false", "hx-sync", "this:replace")
+}
 
 // Form carries the values and errors of a form; Errors hold translated texts by field name.
 type Form struct {
@@ -78,12 +98,34 @@ templ workplaceSelect(id, value string) {
 	</div>
 }
 
+// SaveStateLine is the status of a form that saves itself.
+templ SaveStateLine(st SaveState) {
+	<p id={ "save-" + st.ID } class="save-state" data-save-state={ st.State } role="status" aria-live="polite">
+		if st.State == "saved" {
+			@ui.Icon("check")
+		} else if st.State != "" {
+			@ui.Icon("alert")
+		}
+		<span>{ st.Text }</span>
+	</p>
+	if st.Version > 0 {
+		<input type="hidden" id={ "version-" + st.ID } name="version" value={ strconv.FormatInt(st.Version, 10) } { HX(ctx, "hx-swap-oob", "true")... }/>
+	}
+}
+
+// sortHandle starts a drag of its station; the up and down buttons do the same with the keyboard.
+templ sortHandle() {
+	<span class="st-handle" data-drag-handle aria-hidden="true">
+		@ui.Icon("arrow-up-down")
+	</span>
+}
+
 templ ProfilePage(name string, h CandidateHead, f Form, experiences []ProfileExperienceRow, educations []ProfileEducationRow) {
 	@candidatePage(T(ctx, "profile.title"), name, h) {
 		<p class="muted">{ T(ctx, "profile.text") }</p>
 		@formNotice(f)
-		<form method="post" data-dirty-guard action="/profile" class="stack" novalidate>
-			<input type="hidden" name="version" value={ f.Version }/>
+		<form method="post" action="/profile" class="stack" novalidate data-autosave { autosave(ctx, "/profile/autosave", "profile")... }>
+			<input type="hidden" id="version-profile" name="version" value={ f.Version }/>
 			<h2>{ T(ctx, "profile.section.personal") }</h2>
 			@Field(input(ctx, f, "first_name", "text", "given-name", 200))
 			@Field(input(ctx, f, "last_name", "text", "family-name", 200))
@@ -116,7 +158,7 @@ templ ProfilePage(name string, h CandidateHead, f Form, experiences []ProfileExp
 			@TextArea(area(ctx, f, "languages", 3000))
 			@TextArea(area(ctx, f, "certifications", 12000))
 			@StickyBar() {
-				<button type="submit" class="primary">{ T(ctx, "profile.save") }</button>
+				@SaveStateLine(SaveState{ID: "profile", Text: T(ctx, "profile.autosave.hint")})
 			}
 		</form>
 		<h2 class="form-section" id="stations">{ T(ctx, "profile.section.experience") }</h2>
@@ -132,8 +174,13 @@ templ ProfilePage(name string, h CandidateHead, f Form, experiences []ProfileExp
 			@TextArea(FieldProps{Name: "bullets", Label: T(ctx, "profile.station.bullets"), Hint: T(ctx, "profile.station.bullets_hint"), MaxLength: 5000})
 			<button type="submit" class="primary">{ T(ctx, "profile.station.add_experience") }</button>
 		</form>
+		<div class="st-group" data-sortable>
+		<form method="post" action="/profile/experiences/order" data-sort-form hidden { HX(ctx)... }></form>
+		<ol class="st-list">
 		for _, exp := range experiences {
-			<form method="post" data-dirty-guard action={ templ.SafeURL("/profile/experiences/" + exp.ID) } class="stack form-section" novalidate>
+			<li class="st-item" data-sort-item data-id={ exp.ID }>
+			<form method="post" action={ templ.SafeURL("/profile/experiences/" + exp.ID) } class="stack form-section" novalidate data-autosave { autosave(ctx, "/profile/experiences/"+exp.ID+"/autosave", exp.ID)... }>
+				@sortHandle()
 				@Field(FieldProps{Name: "title", ID: "f-title-" + exp.ID, Label: T(ctx, "profile.station.title"), Type: "text", Value: exp.Title, MaxLength: 200})
 				@Field(FieldProps{Name: "company", ID: "f-company-" + exp.ID, Label: T(ctx, "profile.station.company"), Type: "text", Value: exp.Company, MaxLength: 200})
 				@Field(FieldProps{Name: "location", ID: "f-location-" + exp.ID, Label: T(ctx, "profile.station.location"), Type: "text", Value: exp.Location, MaxLength: 200})
@@ -143,13 +190,16 @@ templ ProfilePage(name string, h CandidateHead, f Form, experiences []ProfileExp
 				@Check("is_current", T(ctx, "profile.station.is_current"), exp.IsCurrent)
 				@TextArea(FieldProps{Name: "bullets", ID: "f-bullets-" + exp.ID, Label: T(ctx, "profile.station.bullets"), Hint: T(ctx, "profile.station.bullets_hint"), Value: exp.DescriptionBullets, MaxLength: 5000})
 				<div class="actions">
-					<button type="submit">{ T(ctx, "profile.save") }</button>
+					@SaveStateLine(SaveState{ID: exp.ID})
 					<button { HX(ctx)... } type="submit" class="link" formaction={ templ.SafeURL("/profile/experiences/" + exp.ID + "/up") }>{ T(ctx, "profile.station.up") }</button>
 					<button { HX(ctx)... } type="submit" class="link" formaction={ templ.SafeURL("/profile/experiences/" + exp.ID + "/down") }>{ T(ctx, "profile.station.down") }</button>
 					<button { HX(ctx)... } type="submit" class="link danger" formaction={ templ.SafeURL("/profile/experiences/" + exp.ID + "/delete") }>{ T(ctx, "profile.station.delete") }</button>
 				</div>
 			</form>
+			</li>
 		}
+		</ol>
+		</div>
 		<h2 class="form-section">{ T(ctx, "profile.section.education") }</h2>
 		<form method="post" data-dirty-guard action="/profile/educations" class="stack" novalidate>
 			<h3>{ T(ctx, "profile.station.add_education") }</h3>
@@ -162,8 +212,13 @@ templ ProfilePage(name string, h CandidateHead, f Form, experiences []ProfileExp
 			@Field(FieldProps{Name: "grade", Label: T(ctx, "profile.station.grade"), Type: "text", MaxLength: 50})
 			<button type="submit" class="primary">{ T(ctx, "profile.station.add_education") }</button>
 		</form>
+		<div class="st-group" data-sortable>
+		<form method="post" action="/profile/educations/order" data-sort-form hidden { HX(ctx)... }></form>
+		<ol class="st-list">
 		for _, edu := range educations {
-			<form method="post" data-dirty-guard action={ templ.SafeURL("/profile/educations/" + edu.ID) } class="stack form-section" novalidate>
+			<li class="st-item" data-sort-item data-id={ edu.ID }>
+			<form method="post" action={ templ.SafeURL("/profile/educations/" + edu.ID) } class="stack form-section" novalidate data-autosave { autosave(ctx, "/profile/educations/"+edu.ID+"/autosave", edu.ID)... }>
+				@sortHandle()
 				@Field(FieldProps{Name: "degree", ID: "f-degree-" + edu.ID, Label: T(ctx, "profile.station.degree"), Type: "text", Value: edu.Degree, MaxLength: 200})
 				@Field(FieldProps{Name: "institution", ID: "f-institution-" + edu.ID, Label: T(ctx, "profile.station.institution"), Type: "text", Value: edu.Institution, MaxLength: 200})
 				@Field(FieldProps{Name: "field_of_study", ID: "f-field_of_study-" + edu.ID, Label: T(ctx, "profile.station.field_of_study"), Type: "text", Value: edu.FieldOfStudy, MaxLength: 200})
@@ -172,13 +227,16 @@ templ ProfilePage(name string, h CandidateHead, f Form, experiences []ProfileExp
 				@Check("is_current", T(ctx, "profile.station.is_current_edu"), edu.IsCurrent)
 				@Field(FieldProps{Name: "grade", ID: "f-grade-" + edu.ID, Label: T(ctx, "profile.station.grade"), Type: "text", Value: edu.Grade, MaxLength: 50})
 				<div class="actions">
-					<button type="submit">{ T(ctx, "profile.save") }</button>
+					@SaveStateLine(SaveState{ID: edu.ID})
 					<button { HX(ctx)... } type="submit" class="link" formaction={ templ.SafeURL("/profile/educations/" + edu.ID + "/up") }>{ T(ctx, "profile.station.up") }</button>
 					<button { HX(ctx)... } type="submit" class="link" formaction={ templ.SafeURL("/profile/educations/" + edu.ID + "/down") }>{ T(ctx, "profile.station.down") }</button>
 					<button { HX(ctx)... } type="submit" class="link danger" formaction={ templ.SafeURL("/profile/educations/" + edu.ID + "/delete") }>{ T(ctx, "profile.station.delete") }</button>
 				</div>
 			</form>
+			</li>
 		}
+		</ol>
+		</div>
 	}
 }
 

@@ -446,3 +446,65 @@ func (s *Stations) MoveEducation(ctx context.Context, userID, id uuid.UUID, dire
 	_, err2 := s.store.UpdateEducationOrder(ctx, userID, all[target].ID, idx, now)
 	return err2
 }
+
+// ReorderWorkExperiences puts the user's positions in the given order; ids must name each of them exactly once.
+func (s *Stations) ReorderWorkExperiences(ctx context.Context, userID uuid.UUID, ids []uuid.UUID) error {
+	all, err := s.WorkExperiences(ctx, userID)
+	if err != nil {
+		return err
+	}
+	have := make([]uuid.UUID, len(all))
+	for i, w := range all {
+		have[i] = w.ID
+	}
+	if !sameIDs(have, ids) {
+		return ErrStationNotFound
+	}
+	now := s.now()
+	for i, id := range ids {
+		if _, err := s.store.UpdateWorkExperienceOrder(ctx, userID, id, i, now); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+// ReorderEducations puts the user's degrees in the given order; ids must name each of them exactly once.
+func (s *Stations) ReorderEducations(ctx context.Context, userID uuid.UUID, ids []uuid.UUID) error {
+	all, err := s.Educations(ctx, userID)
+	if err != nil {
+		return err
+	}
+	have := make([]uuid.UUID, len(all))
+	for i, e := range all {
+		have[i] = e.ID
+	}
+	if !sameIDs(have, ids) {
+		return ErrStationNotFound
+	}
+	now := s.now()
+	for i, id := range ids {
+		if _, err := s.store.UpdateEducationOrder(ctx, userID, id, i, now); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+// sameIDs reports whether b holds exactly the IDs of a, each once, in any order.
+func sameIDs(a, b []uuid.UUID) bool {
+	if len(a) != len(b) {
+		return false
+	}
+	seen := make(map[uuid.UUID]bool, len(a))
+	for _, id := range a {
+		seen[id] = true
+	}
+	for _, id := range b {
+		if !seen[id] {
+			return false
+		}
+		delete(seen, id)
+	}
+	return true
+}
