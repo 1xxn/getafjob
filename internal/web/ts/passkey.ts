@@ -126,6 +126,8 @@ function bind(): void {
     if (!run || btn.dataset.bound) continue;
     btn.dataset.bound = "1";
     btn.hidden = false;
+    const box = btn.closest<HTMLElement>("[data-passkey-box]");
+    if (box) box.hidden = false; // the "or" line around the button shows only with passkey support
     btn.addEventListener("click", () => {
       btn.disabled = true;
       say(btn, "");
