@@ -69,6 +69,7 @@ func (s *Server) jobPage(w http.ResponseWriter, r *http.Request, u *identity.Use
 		if app, err := s.Apps.ByJob(r.Context(), u.ID, j.JobID); err == nil {
 			d.ApplicationState = string(app.State)
 			d.ApplicationID = app.ID.String()
+			d.Row.State = stateKey(app.State, d.Row.Age)
 		}
 	}
 	s.render(w, r, http.StatusOK, views.JobPage(d))
@@ -210,7 +211,7 @@ func (s *Server) jobApplyPreview(w http.ResponseWriter, r *http.Request, u *iden
 	}
 
 	d := views.ApplyPreviewData{
-		Name:      u.Email,
+		Name:      u.DisplayName,
 		JobID:     j.JobID,
 		Title:     j.Title,
 		Company:   j.Company,
@@ -325,7 +326,7 @@ func (s *Server) jobApplyPreview(w http.ResponseWriter, r *http.Request, u *iden
 		case errors.Is(err, application.ErrExcluded):
 			d.Guard.Reason = views.T(r.Context(), "jobs.apply_preview.error_excluded")
 		default:
-			d.Guard.Reason = err.Error()
+			d.Guard.Reason = views.T(r.Context(), "jobs.apply_preview.error_other")
 		}
 	}
 
@@ -364,6 +365,7 @@ func (s *Server) jobApplySubmit(w http.ResponseWriter, r *http.Request, u *ident
 
 	if err := s.Apps.CheckGuard(r.Context(), u.ID, id); err != nil {
 		s.Logger.WarnContext(r.Context(), "instant apply refused by safety guard", "job_id", id, "err", err)
+		s.flash(w, guardFlash(err))
 		http.Redirect(w, r, fmt.Sprintf("/jobs/%d", id), http.StatusSeeOther)
 		return
 	}
@@ -380,14 +382,13 @@ func (s *Server) jobApplySubmit(w http.ResponseWriter, r *http.Request, u *ident
 		return
 	}
 
-	destURL := fmt.Sprintf("/applications/%s", appID)
+	destURL := "/live?run=" + appID.String() // the run in focus: the user watches it start
 	if partial(r) {
 		w.Header().Set("HX-Location", destURL)
 		w.WriteHeader(http.StatusOK)
 		return
 	}
-	//nolint:gosec // G710: destURL is formatted /applications/%s with internal UUID
-	http.Redirect(w, r, destURL, http.StatusSeeOther)
+	http.Redirect(w, r, destURL, http.StatusSeeOther) //nolint:gosec // G710: destURL is a fixed path with an internal UUID
 }
 
 func criteriaFromSnapshot(snap profile.Snapshot) matching.Criteria {
