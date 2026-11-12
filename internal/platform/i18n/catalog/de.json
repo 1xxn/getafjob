@@ -1095,7 +1095,7 @@
   "answers.search_placeholder": "Frage oder Antwort",
   "answers.unused": "Noch nicht genutzt",
   "answers.uses": "In {n} genutzt",
-  "cand.complete": "Profil vollständig",
+  "cand.complete": "Vollständigkeit des Profils",
   "cand.complete_of": "{done} von {total}",
   "cand.gaps": "Fehlt noch",
   "cand.tabs": "Über mich",
