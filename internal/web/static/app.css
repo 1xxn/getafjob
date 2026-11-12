@@ -246,10 +246,6 @@
   .crawl-status-bar { display: inline-flex; align-items: center; gap: var(--space-3); }
   .crawl-trigger-form { display: inline; margin: 0; }
 
-  .badge-running { background: #e0f2fe; color: #0369a1; }
-  .badge-queued { background: #fef3c7; color: #b45309; }
-  @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.5; } }
-  .animate-pulse { animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite; }
   .decision { font-weight: 600; color: var(--ink-2); }
 
   .reasons {
