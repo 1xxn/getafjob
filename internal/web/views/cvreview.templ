@@ -1,10 +1,12 @@
 package views
 
 import (
+	"context"
 	"fmt"
 	"strings"
 
 	"github.com/1xxn/getafjob/internal/profile"
+	"github.com/1xxn/getafjob/internal/web/views/ui"
 )
 
 // DocumentReviewProps holds the properties for rendering the CV import review page.
@@ -21,13 +23,14 @@ type DocumentReviewProps struct {
 
 templ DocumentReviewPage(p DocumentReviewProps) {
 	@Layout(Page{Title: T(ctx, "documents.review_title"), UserName: p.UserName}) {
-		@Section(T(ctx, "documents.review_title")) {
+		<section class="section">
+			<h1>{ T(ctx, "documents.review_title") }</h1>
 			<p class="muted">{ T(ctx, "documents.review_lead") }</p>
 			if p.Notice != "" {
 				if p.Failed {
-					@Notice("error", p.Notice)
+					@ui.Alert(ui.AlertProps{Tone: ui.Danger, Text: p.Notice})
 				} else {
-					@Notice("info", p.Notice)
+					@ui.Alert(ui.AlertProps{Tone: ui.Info, Text: p.Notice})
 				}
 			}
 			<div class="card rv-intro">
@@ -45,56 +48,21 @@ templ DocumentReviewPage(p DocumentReviewProps) {
 						for i, exp := range p.Experiences {
 							<div class="card rv-item">
 								<div class="rv-row-head">
-									<label class="rv-check rv-strong">
-										<input type="checkbox" name={ fmt.Sprintf("include_exp_%d", i) } value="1" checked/>
-										{ T(ctx, "documents.review_include_position") } #{ fmt.Sprintf("%d", i+1) }
-									</label>
+									@rvCheck(fmt.Sprintf("include_exp_%d", i), T(ctx, "documents.review_include_position") + " #" + fmt.Sprint(i+1), true, true)
 								</div>
 								<div class="grid rv-grid">
-									<div class="field">
-										<label>{ T(ctx, "profile.station.company") }</label>
-										<input type="text" name={ fmt.Sprintf("exp_%d_company", i) } value={ exp.Company } maxlength="200"/>
-									</div>
-									<div class="field">
-										<label>{ T(ctx, "profile.station.title") }</label>
-										<input type="text" name={ fmt.Sprintf("exp_%d_title", i) } value={ exp.Title } maxlength="200"/>
-									</div>
-									<div class="field">
-										<label>{ T(ctx, "profile.station.location") }</label>
-										<input type="text" name={ fmt.Sprintf("exp_%d_location", i) } value={ exp.Location } maxlength="200"/>
-									</div>
-									<div class="field">
-										<label>{ T(ctx, "profile.station.workplace_type") }</label>
-										<select name={ fmt.Sprintf("exp_%d_workplace", i) }>
-											for _, w := range []string{"", "remote", "hybrid", "onsite"} {
-												<option value={ w } selected?={ string(exp.WorkplaceType) == w }>
-													if w == "" {
-														—
-													} else {
-														{ T(ctx, "profile.station.workplace." + w) }
-													}
-												</option>
-											}
-										</select>
-									</div>
-									<div class="field">
-										<label>{ T(ctx, "profile.station.start_date") }</label>
-										<input type="text" name={ fmt.Sprintf("exp_%d_start", i) } value={ exp.StartDate } placeholder={ T(ctx, "documents.review_month_placeholder") } maxlength="30"/>
-									</div>
-									<div class="field">
-										<label>{ T(ctx, "profile.station.end_date") }</label>
-										<input type="text" name={ fmt.Sprintf("exp_%d_end", i) } value={ exp.EndDate } placeholder={ T(ctx, "documents.review_month_placeholder") } maxlength="30"/>
-									</div>
+									@ui.Input(rvInput(ctx, "profile.station.company", fmt.Sprintf("exp_%d_company", i), exp.Company, 200, false))
+									@ui.Input(rvInput(ctx, "profile.station.title", fmt.Sprintf("exp_%d_title", i), exp.Title, 200, false))
+									@ui.Input(rvInput(ctx, "profile.station.location", fmt.Sprintf("exp_%d_location", i), exp.Location, 200, false))
+									@ui.Select(rvWorkplace(ctx, fmt.Sprintf("exp_%d_workplace", i), string(exp.WorkplaceType)))
+									@ui.Input(rvInput(ctx, "profile.station.start_date", fmt.Sprintf("exp_%d_start", i), exp.StartDate, 30, true))
+									@ui.Input(rvInput(ctx, "profile.station.end_date", fmt.Sprintf("exp_%d_end", i), exp.EndDate, 30, true))
 								</div>
 								<div class="rv-mt-sm">
-									<label class="rv-check">
-										<input type="checkbox" name={ fmt.Sprintf("exp_%d_current", i) } value="1" checked?={ exp.IsCurrent }/>
-										{ T(ctx, "profile.station.is_current") }
-									</label>
+									@rvCheck(fmt.Sprintf("exp_%d_current", i), T(ctx, "profile.station.is_current"), exp.IsCurrent, false)
 								</div>
-								<div class="field rv-mt">
-									<label>{ T(ctx, "profile.station.bullets") }</label>
-									<textarea name={ fmt.Sprintf("exp_%d_bullets", i) } rows="3" placeholder={ T(ctx, "documents.review_bullets_hint") }>{ strings.Join(exp.DescriptionBullets, "\n") }</textarea>
+								<div class="rv-mt">
+									@ui.Textarea(rvBullets(ctx, fmt.Sprintf("exp_%d_bullets", i), bulletLines(exp.DescriptionBullets)))
 								</div>
 							</div>
 						}
@@ -109,42 +77,18 @@ templ DocumentReviewPage(p DocumentReviewProps) {
 						for i, edu := range p.Educations {
 							<div class="card rv-item">
 								<div class="rv-row-head">
-									<label class="rv-check rv-strong">
-										<input type="checkbox" name={ fmt.Sprintf("include_edu_%d", i) } value="1" checked/>
-										{ T(ctx, "documents.review_include_education") } #{ fmt.Sprintf("%d", i+1) }
-									</label>
+									@rvCheck(fmt.Sprintf("include_edu_%d", i), T(ctx, "documents.review_include_education") + " #" + fmt.Sprint(i+1), true, true)
 								</div>
 								<div class="grid rv-grid">
-									<div class="field">
-										<label>{ T(ctx, "profile.station.institution") }</label>
-										<input type="text" name={ fmt.Sprintf("edu_%d_institution", i) } value={ edu.Institution } maxlength="200"/>
-									</div>
-									<div class="field">
-										<label>{ T(ctx, "profile.station.degree") }</label>
-										<input type="text" name={ fmt.Sprintf("edu_%d_degree", i) } value={ edu.Degree } maxlength="200"/>
-									</div>
-									<div class="field">
-										<label>{ T(ctx, "profile.station.field_of_study") }</label>
-										<input type="text" name={ fmt.Sprintf("edu_%d_field", i) } value={ edu.FieldOfStudy } maxlength="200"/>
-									</div>
-									<div class="field">
-										<label>{ T(ctx, "profile.station.grade") }</label>
-										<input type="text" name={ fmt.Sprintf("edu_%d_grade", i) } value={ edu.Grade } maxlength="50"/>
-									</div>
-									<div class="field">
-										<label>{ T(ctx, "profile.station.start_date") }</label>
-										<input type="text" name={ fmt.Sprintf("edu_%d_start", i) } value={ edu.StartDate } placeholder={ T(ctx, "documents.review_month_placeholder") } maxlength="30"/>
-									</div>
-									<div class="field">
-										<label>{ T(ctx, "profile.station.end_date") }</label>
-										<input type="text" name={ fmt.Sprintf("edu_%d_end", i) } value={ edu.EndDate } placeholder={ T(ctx, "documents.review_month_placeholder") } maxlength="30"/>
-									</div>
+									@ui.Input(rvInput(ctx, "profile.station.institution", fmt.Sprintf("edu_%d_institution", i), edu.Institution, 200, false))
+									@ui.Input(rvInput(ctx, "profile.station.degree", fmt.Sprintf("edu_%d_degree", i), edu.Degree, 200, false))
+									@ui.Input(rvInput(ctx, "profile.station.field_of_study", fmt.Sprintf("edu_%d_field", i), edu.FieldOfStudy, 200, false))
+									@ui.Input(rvInput(ctx, "profile.station.grade", fmt.Sprintf("edu_%d_grade", i), edu.Grade, 50, false))
+									@ui.Input(rvInput(ctx, "profile.station.start_date", fmt.Sprintf("edu_%d_start", i), edu.StartDate, 30, true))
+									@ui.Input(rvInput(ctx, "profile.station.end_date", fmt.Sprintf("edu_%d_end", i), edu.EndDate, 30, true))
 								</div>
 								<div class="rv-mt-sm">
-									<label class="rv-check">
-										<input type="checkbox" name={ fmt.Sprintf("edu_%d_current", i) } value="1" checked?={ edu.IsCurrent }/>
-										{ T(ctx, "profile.station.is_current_edu") }
-									</label>
+									@rvCheck(fmt.Sprintf("edu_%d_current", i), T(ctx, "profile.station.is_current_edu"), edu.IsCurrent, false)
 								</div>
 							</div>
 						}
@@ -152,10 +96,7 @@ templ DocumentReviewPage(p DocumentReviewProps) {
 				</div>
 
 				<div class="card rv-box">
-					<label class="rv-check rv-strong">
-						<input type="checkbox" name="include_profile" value="1" checked/>
-						{ T(ctx, "documents.review_profile_include") }
-					</label>
+					@rvCheck("include_profile", T(ctx, "documents.review_profile_include"), true, true)
 					if len(p.Profile.Skills) > 0 {
 						<p class="muted rv-note rv-note-first">
 							<strong>{ T(ctx, "profile.field.skills") }:</strong> { strings.Join(p.Profile.Skills, ", ") }
@@ -175,10 +116,45 @@ templ DocumentReviewPage(p DocumentReviewProps) {
 				</div>
 
 				<div class="rv-actions">
-					<button type="submit" class="button primary">{ T(ctx, "documents.review_confirm") }</button>
-					<a href="/documents" class="button secondary">{ T(ctx, "actions.cancel") }</a>
+					@ui.Button(ui.ButtonProps{Label: T(ctx, "documents.review_confirm"), Variant: "primary", Type: "submit"})
+					@ui.Button(ui.ButtonProps{Label: T(ctx, "actions.cancel"), Href: "/documents"})
 				</div>
 			</form>
-		}
+		</section>
 	}
 }
+
+// rvInput is a field of an imported station; month fields hint at the expected format.
+func rvInput(ctx context.Context, labelKey, name, value string, maxLen int, month bool) ui.InputProps {
+	p := ui.InputProps{FieldProps: ui.FieldProps{Name: name, Label: T(ctx, labelKey)}, Value: value, MaxLength: maxLen}
+	if month {
+		p.Placeholder = T(ctx, "documents.review_month_placeholder")
+	}
+	return p
+}
+
+// rvWorkplace is the workplace type of an imported station.
+func rvWorkplace(ctx context.Context, name, value string) ui.SelectProps {
+	opts := []ui.Option{{Value: "", Label: "—", Selected: value == ""}}
+	for _, w := range []string{"remote", "hybrid", "onsite"} {
+		opts = append(opts, ui.Option{Value: w, Label: T(ctx, "profile.station.workplace."+w), Selected: value == w})
+	}
+	return ui.SelectProps{FieldProps: ui.FieldProps{Name: name, Label: T(ctx, "profile.station.workplace_type")},
+		Options: opts}
+}
+
+// rvBullets are the description lines of an imported station.
+func rvBullets(ctx context.Context, name, value string) ui.TextareaProps {
+	return ui.TextareaProps{FieldProps: ui.FieldProps{Name: name, Label: T(ctx, "profile.station.bullets"),
+		Hint: T(ctx, "documents.review_bullets_hint")}, Value: value, Rows: 3}
+}
+
+// rvCheck includes or marks an imported entry; strong ones head an entry.
+templ rvCheck(name, label string, checked, strong bool) {
+	<div class={ "rv-check", templ.KV("rv-strong", strong) }>
+		@ui.Checkbox(ui.CheckProps{Name: name, Value: "1", Label: label, Checked: checked})
+	</div>
+}
+
+// bulletLines puts one description line per row.
+func bulletLines(b []string) string { return strings.Join(b, string(rune(10))) }

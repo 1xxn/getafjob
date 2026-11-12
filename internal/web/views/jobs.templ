@@ -187,9 +187,9 @@ templ CrawlStatus(c CrawlStatusData) {
 }
 
 templ BoardAddSuccess(company, atsPlatform string) {
-	@Notice("success", T(ctx, "jobs.board_add_success", "company", company, "ats", atsPlatform))
+	@ui.Alert(ui.AlertProps{Tone: ui.Success, Text: T(ctx, "jobs.board_add_success", "company", company, "ats", atsPlatform)})
 }
 
 templ BoardAddError(msg string) {
-	@Notice("error", msg)
+	@ui.Alert(ui.AlertProps{Tone: ui.Danger, Text: msg})
 }

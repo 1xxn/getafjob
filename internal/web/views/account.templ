@@ -31,16 +31,16 @@ type AccountData struct {
 templ Account(d AccountData) {
 	@settingsPage(d.Name, "account", d.Enabled) {
 			if d.Notice != "" {
-				@Notice("info", d.Notice)
+				@ui.Alert(ui.AlertProps{Tone: ui.Info, Text: d.Notice})
 			}
 			if d.Recovery != "" {
-				<p class="notice notice-error" role="alert">{ d.Recovery }</p>
+				@ui.Alert(ui.AlertProps{Tone: ui.Danger, Text: d.Recovery})
 				<form method="post" action="/account/recovery/cancel">
-					<button type="submit" class="primary">{ T(ctx, "account.recovery.cancel") }</button>
+					@ui.Button(ui.ButtonProps{Label: T(ctx, "account.recovery.cancel"), Variant: "primary", Type: "submit"})
 				</form>
 			}
 			if d.Enabled && len(d.Passkeys) == 0 {
-				<p class="notice notice-info">{ T(ctx, "passkey.nudge") }</p>
+				@ui.Alert(ui.AlertProps{Tone: ui.Info, Text: T(ctx, "passkey.nudge")})
 			}
 			if d.Enabled {
 				<h2>{ T(ctx, "passkey.title") }</h2>
@@ -69,7 +69,7 @@ templ Account(d AccountData) {
 									</td>
 									<td>
 										<form method="post" action={ templ.SafeURL("/account/passkeys/" + p.ID + "/delete") } data-confirm={ T(ctx, "account.passkey.delete_confirm") }>
-											<button type="submit" class="link">{ T(ctx, "passkey.remove") }</button>
+											<button type="submit" class="ui-btn ui-btn-ghost ui-btn-sm">{ T(ctx, "passkey.remove") }</button>
 										</form>
 									</td>
 								</tr>
@@ -78,11 +78,11 @@ templ Account(d AccountData) {
 					</table>
 				}
 				<div class="stack">
-					@Field(FieldProps{Name: "passkey-name", Label: T(ctx, "passkey.name"), Type: "text",
-						Hint: T(ctx, "passkey.name_hint"), MaxLength: 100})
+					@ui.Input(ui.InputProps{FieldProps: ui.FieldProps{Name: "passkey-name", Label: T(ctx, "passkey.name"),
+						Hint: T(ctx, "passkey.name_hint")}, MaxLength: 100})
 					<button
 						type="button"
-						class="primary"
+						class="ui-btn ui-btn-primary"
 						hidden
 						data-passkey="register"
 						data-name="f-passkey-name"

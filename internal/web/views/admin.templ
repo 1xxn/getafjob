@@ -111,16 +111,11 @@ templ AdminUsersPage(d AdminUsersData) {
 		<form method="post" action="/admin/invites" class="set-form stack adm-invite" novalidate>
 			<h2>{ T(ctx, "admin.invite.title") }</h2>
 			<div class="adm-invite-fields">
-				@Field(FieldProps{Name: "email", Label: T(ctx, "admin.invite.email"), Type: "email", Value: d.Form.Values["email"],
-					Error: d.Form.Errors["email"], MaxLength: 254, Autocomplete: "off"})
-				<div class="field">
-					<label for="f-role">{ T(ctx, "admin.role") }</label>
-					<select id="f-role" name="role">
-						for _, r := range []string{"user", "admin"} {
-							<option value={ r } selected?={ d.Form.Values["role"] == r }>{ T(ctx, "admin.role." + r) }</option>
-						}
-					</select>
-				</div>
+				@ui.Input(ui.InputProps{FieldProps: ui.FieldProps{Name: "email", Label: T(ctx, "admin.invite.email"),
+					Error: d.Form.Errors["email"]}, Type: "email", Value: d.Form.Values["email"], MaxLength: 254, Autocomplete: "off"})
+				@ui.Select(ui.SelectProps{FieldProps: ui.FieldProps{Name: "role", Label: T(ctx, "admin.role")}, Options: []ui.Option{
+					{Value: "user", Label: T(ctx, "admin.role.user"), Selected: d.Form.Values["role"] != "admin"},
+					{Value: "admin", Label: T(ctx, "admin.role.admin"), Selected: d.Form.Values["role"] == "admin"}}})
 			</div>
 			<p class="app-hint">{ T(ctx, "admin.invite.hint") }</p>
 			<div class="app-actions">

@@ -290,7 +290,7 @@ func BoardAddSuccess(company, atsPlatform string) templ.Component {
 		}
 		ctx = templ.InitializeContext(ctx)
 		ctx = templ.ClearChildren(ctx)
-		templ_7745c5c3_Err = Notice("success", T(ctx, "jobs.board_add_success", "company", company, "ats", atsPlatform)).Render(ctx, templ_7745c5c3_Buffer)
+		templ_7745c5c3_Err = ui.Alert(ui.AlertProps{Tone: ui.Success, Text: T(ctx, "jobs.board_add_success", "company", company, "ats", atsPlatform)}).Render(ctx, templ_7745c5c3_Buffer)
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
@@ -315,7 +315,7 @@ func BoardAddError(msg string) templ.Component {
 		}
 		ctx = templ.InitializeContext(ctx)
 		ctx = templ.ClearChildren(ctx)
-		templ_7745c5c3_Err = Notice("error", msg).Render(ctx, templ_7745c5c3_Buffer)
+		templ_7745c5c3_Err = ui.Alert(ui.AlertProps{Tone: ui.Danger, Text: msg}).Render(ctx, templ_7745c5c3_Buffer)
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
