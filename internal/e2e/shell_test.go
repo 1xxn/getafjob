@@ -58,7 +58,8 @@ func (tab *Tab) Click(selector string) {
 var pages = []string{"/", "/jobs", "/applications", "/needs-input", "/approvals", "/pipeline", "/profile", "/documents", "/answers", "/texts",
 	"/settings/search", "/settings/automation", "/settings/notifications", "/settings/integrations", "/settings/account", "/privacy", "/activity", "/setup/profile", "/setup/matches"}
 
-// Every page renders in the shell with a heading, without console errors and without horizontal scrolling.
+// Every page renders in the shell with a heading, without console errors, horizontal scrolling or WCAG A/AA
+// violations found by axe, in light and dark.
 func TestPagesRender(t *testing.T) {
 	t.Parallel()
 	for _, v := range []struct {
@@ -73,6 +74,7 @@ func TestPagesRender(t *testing.T) {
 				tab.Go(p)
 				tab.El("body.shell main h1")
 				tab.NoOverflow(p)
+				tab.Axe(p)
 				tab.Shot(p)
 			}
 		})

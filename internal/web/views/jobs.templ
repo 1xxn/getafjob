@@ -1,4 +1,5 @@
 package views
+import "github.com/1xxn/getafjob/internal/web/views/ui"
 
 
 // JobRow is one job in the list.
@@ -167,13 +168,13 @@ templ CrawlStatus(c CrawlStatusData) {
 	>
 		<div class="crawl-status-info">
 			if c.Running {
-				<span class="badge badge-running animate-pulse">{ T(ctx, "jobs.crawl_running") }</span>
+				@ui.StatusPill(ui.StatusProps{Label: T(ctx, "jobs.crawl_running"), Tone: ui.Info, Live: true})
 			} else if c.Queued {
-				<span class="badge badge-queued">{ T(ctx, "jobs.crawl_queued") }</span>
+				@ui.StatusPill(ui.StatusProps{Label: T(ctx, "jobs.crawl_queued"), Tone: ui.Warning})
 			} else if c.LastRun != "" {
-				<span class="badge badge-muted">{ T(ctx, "jobs.crawl_last_run", "time", c.LastRun) }</span>
+				@ui.StatusPill(ui.StatusProps{Label: T(ctx, "jobs.crawl_last_run", "time", c.LastRun)})
 			} else {
-				<span class="badge badge-muted">{ T(ctx, "jobs.crawl_never") }</span>
+				@ui.StatusPill(ui.StatusProps{Label: T(ctx, "jobs.crawl_never")})
 			}
 		</div>
 		<form
@@ -182,9 +183,7 @@ templ CrawlStatus(c CrawlStatusData) {
 			class="crawl-trigger-form"
 			{ HX(ctx, "hx-post", "/jobs/crawl", "hx-target", "#crawl-status", "hx-swap", "outerHTML")... }
 		>
-			<button type="submit" class="btn-sm" disabled?={ c.Running || c.Queued }>
-				{ T(ctx, "jobs.crawl_button") }
-			</button>
+			@ui.Button(ui.ButtonProps{Label: T(ctx, "jobs.crawl_button"), Type: "submit", Size: "sm", Icon: "refresh", Disabled: c.Running || c.Queued})
 		</form>
 	</div>
 }
