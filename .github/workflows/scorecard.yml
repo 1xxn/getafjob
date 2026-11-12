@@ -10,7 +10,9 @@ on:
 permissions: {}
 
 concurrency:
-  group: scorecard-${{ github.ref }}
+  # A push to main gets a group of its own commit: a newer push never drops a waiting run of an older one, so every
+  # main commit gets all its checks. Pull requests share one group per branch and cancel outdated runs.
+  group: scorecard-${{ github.event_name == 'push' && github.sha || github.ref }}
   cancel-in-progress: true
 
 jobs:

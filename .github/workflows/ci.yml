@@ -8,7 +8,9 @@ on:
 permissions: {}
 
 concurrency:
-  group: ci-${{ github.ref }}
+  # A push to main gets a group of its own commit: a newer push never drops a waiting run of an older one, so every
+  # main commit gets all its checks. Pull requests share one group per branch and cancel outdated runs.
+  group: ci-${{ github.event_name == 'push' && github.sha || github.ref }}
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 env:
