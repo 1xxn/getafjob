@@ -186,6 +186,9 @@ document.addEventListener("submit", (e) => {
 window.addEventListener("beforeunload", (e) => {
   if (dirty()) e.preventDefault();
 });
+window.addEventListener("pagehide", () => {
+  document.querySelectorAll(".htmx-request").forEach((el) => el.dispatchEvent(new Event("htmx:abort")));
+});
 document.addEventListener(
   "click",
   (e) => {

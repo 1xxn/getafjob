@@ -232,6 +232,12 @@ window.addEventListener('beforeunload', (e) => {
   if (dirty()) e.preventDefault();
 });
 
+// Leaving the page cuts running requests (the bell, live parts). Abort them first, so htmx treats them as
+// cancelled instead of reporting "Failed to fetch" as an error.
+window.addEventListener('pagehide', () => {
+  document.querySelectorAll('.htmx-request').forEach((el) => el.dispatchEvent(new Event('htmx:abort')));
+});
+
 document.addEventListener(
   'click',
   (e) => {
