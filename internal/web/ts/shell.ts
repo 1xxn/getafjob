@@ -75,7 +75,8 @@ async function refreshCounts(): Promise<void> {
 
 document.body.addEventListener('getafjob:app', () => {
   window.clearTimeout(countTimer);
-  countTimer = window.setTimeout(() => void refreshCounts(), 400);
+  // A refresh cut off by leaving the page is fine: the next event brings the counts again.
+  countTimer = window.setTimeout(() => refreshCounts().catch(() => undefined), 400);
 });
 
 // --- command palette ---

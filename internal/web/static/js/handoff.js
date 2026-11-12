@@ -199,7 +199,7 @@ function bindViews() {
   if (push && !push.dataset.bound) {
     push.dataset.bound = "1";
     push.addEventListener("click", () => {
-      void enablePush();
+      enablePush().catch(() => void 0);
     });
   }
 }
