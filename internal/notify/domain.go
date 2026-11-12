@@ -4,12 +4,13 @@ package notify
 
 import (
 	"errors"
-	"fmt"
 	"strconv"
 	"strings"
 	"time"
 
 	"github.com/google/uuid"
+
+	"github.com/1xxn/getafjob/internal/platform/i18n"
 )
 
 // ErrInvalidPreferences reports validation failure in notification preferences.
@@ -40,10 +41,13 @@ const (
 	PriorityUrgent Priority = 5
 )
 
-// Notification is an outbound message to a user.
+// Notification is an outbound message to a user. With Key set, Title and Body come from the catalog
+// ("notify.<key>.title", "notify.<key>.body") in the user's language, filled with Params.
 type Notification struct {
 	UserID    uuid.UUID
 	Event     Event
+	Key       string
+	Params    map[string]any
 	Title     string
 	Body      string
 	URL       string // relative or absolute click link
@@ -135,26 +139,24 @@ type DailyStats struct {
 	Rejections         int64
 }
 
-// FormatSummary formats a readable daily summary text for email or push notifications.
-func (s DailyStats) FormatSummary() (title, body string) {
-	title = "getafjob · Daily Summary"
-	var sb strings.Builder
-	sb.WriteString("Summary for the past 24 hours:\n")
-	fmt.Fprintf(&sb, "• Applications submitted: %d\n", s.SubmittedCount)
+// FormatSummary formats the daily summary in the given language for email or push notifications.
+func (s DailyStats) FormatSummary(l i18n.Locale) (title, body string) {
+	title = i18n.T(l, "notify.summary.title", nil)
+	lines := []string{i18n.T(l, "notify.summary.intro", nil), i18n.T(l, "notify.summary.submitted", map[string]any{"n": s.SubmittedCount})}
 	if s.PendingApprovals > 0 {
-		fmt.Fprintf(&sb, "• Awaiting your approval: %d\n", s.PendingApprovals)
+		lines = append(lines, i18n.T(l, "notify.summary.approvals", map[string]any{"n": s.PendingApprovals}))
 	}
 	if s.NeedsInputCount > 0 {
-		fmt.Fprintf(&sb, "• Action required (CAPTCHA / Question): %d\n", s.NeedsInputCount)
+		lines = append(lines, i18n.T(l, "notify.summary.needs_input", map[string]any{"n": s.NeedsInputCount}))
 	}
 	if s.PendingSuggestions > 0 {
-		fmt.Fprintf(&sb, "• Pending status suggestions: %d\n", s.PendingSuggestions)
+		lines = append(lines, i18n.T(l, "notify.summary.suggestions", map[string]any{"n": s.PendingSuggestions}))
 	}
 	if s.Invitations > 0 || s.Confirmations > 0 || s.Rejections > 0 {
-		fmt.Fprintf(&sb, "• Responses received: %d invitations, %d confirmations, %d rejections\n",
-			s.Invitations, s.Confirmations, s.Rejections)
+		lines = append(lines, i18n.T(l, "notify.summary.responses", map[string]any{"invitations": s.Invitations,
+			"confirmations": s.Confirmations, "rejections": s.Rejections}))
 	}
-	return title, strings.TrimRight(sb.String(), "\n")
+	return title, strings.Join(lines, "\n")
 }
 
 func parseHourMinute(s string) (hour, minute int, err error) {

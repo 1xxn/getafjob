@@ -123,3 +123,6 @@ func anyWaiting(runs []ActiveRunItem) bool {
 	}
 	return false
 }
+
+// DayLabel is a short date for the reader's locale, as the dashboard shows it.
+func DayLabel(ctx context.Context, t time.Time) string { return dayLabel(ctx, t) }

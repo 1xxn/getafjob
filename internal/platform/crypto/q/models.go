@@ -248,6 +248,11 @@ type NotifyPreference struct {
 	UpdatedAt           time.Time
 }
 
+type NotifyRead struct {
+	UserID uuid.UUID
+	SeenAt time.Time
+}
+
 type Passkey struct {
 	ID         []byte
 	UserID     uuid.UUID

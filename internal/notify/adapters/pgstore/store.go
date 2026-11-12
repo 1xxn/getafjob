@@ -13,6 +13,7 @@ import (
 	"github.com/1xxn/getafjob/internal/notify"
 	"github.com/1xxn/getafjob/internal/notify/adapters/pgstore/q"
 	"github.com/1xxn/getafjob/internal/platform/db"
+	"github.com/1xxn/getafjob/internal/platform/i18n"
 )
 
 // Store is the PostgreSQL notify store.
@@ -213,4 +214,62 @@ func (s *Store) DailyStats(ctx context.Context, userID uuid.UUID, since time.Tim
 	})
 
 	return stats, err
+}
+
+// UserLocale returns the language the user reads the app in.
+func (s *Store) UserLocale(ctx context.Context, userID uuid.UUID) (i18n.Locale, error) {
+	var l string
+	err := s.system(ctx, func(qs *q.Queries) error {
+		var err error
+		l, err = qs.GetUserLocale(ctx, userID)
+		return err
+	})
+	return i18n.Parse(l), err
+}
+
+// Activity returns the newest feed entries before a time.
+func (s *Store) Activity(ctx context.Context, userID uuid.UUID, before time.Time, limit int) ([]notify.ActivityItem, error) {
+	var out []notify.ActivityItem
+	err := s.user(ctx, userID, func(qs *q.Queries) error {
+		rows, err := qs.Activity(ctx, q.ActivityParams{UserID: userID, States: notify.ActivityStates, Before: before,
+			Lim: int32(min(limit, 1000))}) //nolint:gosec // bounded above
+		for _, r := range rows {
+			out = append(out, notify.ActivityItem{ID: r.ID, Kind: notify.ActivityKind(r.Kind), State: r.State,
+				ApplicationID: r.ApplicationID, Title: r.Title, Company: r.Company, At: r.At})
+		}
+		return err
+	})
+	return out, err
+}
+
+// CountActivitySince counts the feed entries after a time.
+func (s *Store) CountActivitySince(ctx context.Context, userID uuid.UUID, since time.Time) (int, error) {
+	var n int64
+	err := s.user(ctx, userID, func(qs *q.Queries) error {
+		var err error
+		n, err = qs.CountActivitySince(ctx, q.CountActivitySinceParams{UserID: userID, States: notify.ActivityStates, Since: since})
+		return err
+	})
+	return int(n), err
+}
+
+// SeenAt is when the user last marked the feed read; zero when never.
+func (s *Store) SeenAt(ctx context.Context, userID uuid.UUID) (time.Time, error) {
+	var at time.Time
+	err := s.user(ctx, userID, func(qs *q.Queries) error {
+		var err error
+		at, err = qs.GetSeenAt(ctx, userID)
+		if errors.Is(err, pgx.ErrNoRows) {
+			return nil
+		}
+		return err
+	})
+	return at, err
+}
+
+// MarkSeen moves the read mark forward to at.
+func (s *Store) MarkSeen(ctx context.Context, userID uuid.UUID, at time.Time) error {
+	return s.user(ctx, userID, func(qs *q.Queries) error {
+		return qs.SetSeenAt(ctx, q.SetSeenAtParams{UserID: userID, SeenAt: at})
+	})
 }

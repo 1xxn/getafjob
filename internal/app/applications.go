@@ -7,7 +7,6 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/riverqueue/river"
 
@@ -59,24 +58,6 @@ func (w *handoffWorker) Work(ctx context.Context, _ *river.Job[HandoffArgs]) err
 }
 
 type pushNotifier struct{ push *webpush.Notifier }
-
-func (n pushNotifier) HandoffClosing(ctx context.Context, r application.Ref, _ time.Time) error {
-	return n.push.Notify(ctx, r.UserID, webpush.NoticePayload{
-		Title: "getafjob",
-		Body:  "Your turn: an application needs your attention before the window closes.",
-		URL:   "/needs-input?app=" + r.ID.String(),
-	})
-}
-
-func (n pushNotifier) YourTurn(ctx context.Context, userID, appID uuid.UUID) {
-	if err := n.push.Notify(ctx, userID, webpush.NoticePayload{
-		Title: "getafjob",
-		Body:  "Your turn: an application needs your input.",
-		URL:   "/needs-input?app=" + appID.String(),
-	}); err != nil && n.push.Logger != nil {
-		n.push.Logger.WarnContext(ctx, "handoff push failed", "application", appID, "err", err)
-	}
-}
 
 func newPushNotifier(pool *pgxpool.Pool, cfg config.Config, logger *slog.Logger) (pushNotifier, string) {
 	var priv *ecdsa.PrivateKey

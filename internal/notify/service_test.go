@@ -9,6 +9,7 @@ import (
 	"github.com/google/uuid"
 
 	"github.com/1xxn/getafjob/internal/notify"
+	"github.com/1xxn/getafjob/internal/platform/i18n"
 )
 
 type fakeStore struct {
@@ -16,6 +17,9 @@ type fakeStore struct {
 	emails    map[uuid.UUID]string
 	summaries map[uuid.UUID]time.Time
 	stats     notify.DailyStats
+	locales   map[uuid.UUID]i18n.Locale
+	seen      map[uuid.UUID]time.Time
+	activity  []notify.ActivityItem // newest first
 }
 
 func newFakeStore() *fakeStore {
@@ -23,6 +27,8 @@ func newFakeStore() *fakeStore {
 		prefs:     make(map[uuid.UUID]notify.Preferences),
 		emails:    make(map[uuid.UUID]string),
 		summaries: make(map[uuid.UUID]time.Time),
+		locales:   make(map[uuid.UUID]i18n.Locale),
+		seen:      make(map[uuid.UUID]time.Time),
 	}
 }
 
@@ -59,6 +65,41 @@ func (f *fakeStore) UpdateLastSummaryAt(_ context.Context, userID uuid.UUID, at 
 
 func (f *fakeStore) GetUserEmail(_ context.Context, userID uuid.UUID) (string, error) {
 	return f.emails[userID], nil
+}
+
+func (f *fakeStore) UserLocale(_ context.Context, userID uuid.UUID) (i18n.Locale, error) {
+	return f.locales[userID], nil
+}
+
+func (f *fakeStore) Activity(_ context.Context, _ uuid.UUID, before time.Time, limit int) ([]notify.ActivityItem, error) {
+	var out []notify.ActivityItem
+	for _, a := range f.activity {
+		if a.At.Before(before) && len(out) < limit {
+			out = append(out, a)
+		}
+	}
+	return out, nil
+}
+
+func (f *fakeStore) CountActivitySince(_ context.Context, _ uuid.UUID, since time.Time) (int, error) {
+	n := 0
+	for _, a := range f.activity {
+		if a.At.After(since) {
+			n++
+		}
+	}
+	return n, nil
+}
+
+func (f *fakeStore) SeenAt(_ context.Context, userID uuid.UUID) (time.Time, error) {
+	return f.seen[userID], nil
+}
+
+func (f *fakeStore) MarkSeen(_ context.Context, userID uuid.UUID, at time.Time) error {
+	if at.After(f.seen[userID]) {
+		f.seen[userID] = at
+	}
+	return nil
 }
 
 func (f *fakeStore) DailyStats(_ context.Context, userID uuid.UUID, _ time.Time) (notify.DailyStats, error) {
@@ -216,6 +257,7 @@ func TestDailySummaryDelivery(t *testing.T) {
 
 	st := newFakeStore()
 	st.emails[u] = "user@example.org"
+	st.locales[u] = i18n.DE
 	st.stats = notify.DailyStats{
 		SubmittedCount: 5,
 		Invitations:    2,
@@ -243,10 +285,60 @@ func TestDailySummaryDelivery(t *testing.T) {
 	if sent != 1 {
 		t.Errorf("sent = %d, want 1", sent)
 	}
-	if len(em.sentBody) != 1 || !strings.Contains(em.sentBody[0], "Applications submitted: 5") {
+	if len(em.sentBody) != 1 || !strings.Contains(em.sentBody[0], "Gesendete Bewerbungen: 5") {
 		t.Errorf("email body = %v", em.sentBody)
 	}
 	if st.summaries[u].IsZero() {
 		t.Errorf("expected last summary time updated")
+	}
+}
+
+func TestNotifyFollowsTheUsersLanguage(t *testing.T) {
+	ctx := context.Background()
+	u := uuid.New()
+	st := newFakeStore()
+	st.emails[u] = "user@example.org"
+	st.locales[u] = i18n.DE
+	_ = st.SavePreferences(ctx, notify.Preferences{UserID: u, EmailEnabled: true})
+	em := &fakeEmailClient{}
+	svc := notify.NewService(st, nil, em, nil, "https://app.example.org", nil)
+	if err := svc.Notify(ctx, notify.Notification{UserID: u, Event: notify.EventHandoffClosing, Key: "handoff_closing",
+		Params: map[string]any{"time": "18:30 UTC"}, URL: "/needs-input?app=x", Priority: notify.PriorityHigh}); err != nil {
+		t.Fatal(err)
+	}
+	if len(em.sentBody) != 1 || !strings.Contains(em.sentBody[0], "bis 18:30 UTC auf dich") ||
+		!strings.Contains(em.sentBody[0], "https://app.example.org/needs-input?app=x") {
+		t.Errorf("body = %v", em.sentBody)
+	}
+}
+
+func TestActivityUnreadAndMarkRead(t *testing.T) {
+	ctx := context.Background()
+	u := uuid.New()
+	st := newFakeStore()
+	now := time.Date(2026, 11, 12, 12, 0, 0, 0, time.UTC)
+	app := uuid.New()
+	st.activity = []notify.ActivityItem{
+		{ID: "2", Kind: notify.KindState, State: "needs_input", ApplicationID: app, At: now.Add(-time.Minute)},
+		{ID: "1", Kind: notify.KindState, State: "submitted", ApplicationID: app, At: now.Add(-time.Hour)},
+	}
+	st.seen[u] = now.Add(-30 * time.Minute)
+	svc := notify.NewService(st, nil, nil, nil, "", nil)
+	svc.SetNow(func() time.Time { return now })
+	a, err := svc.Activity(ctx, u, time.Time{}, 1)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if a.Unread != 1 || len(a.Items) != 1 || !a.Items[0].Unread || !a.More {
+		t.Fatalf("activity = %+v", a)
+	}
+	if got := a.Items[0].Link(); got != "/needs-input?app="+app.String() {
+		t.Errorf("link %s", got)
+	}
+	if err := svc.MarkRead(ctx, u); err != nil {
+		t.Fatal(err)
+	}
+	if a, _ := svc.Activity(ctx, u, time.Time{}, 10); a.Unread != 0 || a.Items[0].Unread {
+		t.Errorf("after mark read: %+v", a)
 	}
 }

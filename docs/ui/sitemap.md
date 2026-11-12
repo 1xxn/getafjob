@@ -10,6 +10,7 @@ Sidebar at 1024 px and wider, a bottom bar with five items plus "More" below. Co
 | Group | Page | URL | Counter | Replaces |
 |---|---|---|---|---|
 | Home | Dashboard | `/` | | `/` |
+| | Activity | `/activity` | unread (bell in the top bar) | new |
 | Discover | Jobs | `/jobs` | new since last visit | `/jobs` |
 | | Job | `/jobs/{id}` | | `/jobs/{id}` |
 | | Saved searches | `/searches` | | new |

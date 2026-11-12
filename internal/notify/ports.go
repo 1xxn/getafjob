@@ -5,6 +5,8 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+
+	"github.com/1xxn/getafjob/internal/platform/i18n"
 )
 
 // NtfyClient posts notifications to an ntfy topic.
@@ -29,5 +31,12 @@ type Store interface {
 	ListDailySummaryCandidates(ctx context.Context) ([]Preferences, error)
 	UpdateLastSummaryAt(ctx context.Context, userID uuid.UUID, at time.Time) error
 	GetUserEmail(ctx context.Context, userID uuid.UUID) (string, error)
+	UserLocale(ctx context.Context, userID uuid.UUID) (i18n.Locale, error)
+	// Activity returns the newest feed entries before a time; CountActivitySince counts the entries after one.
+	Activity(ctx context.Context, userID uuid.UUID, before time.Time, limit int) ([]ActivityItem, error)
+	CountActivitySince(ctx context.Context, userID uuid.UUID, since time.Time) (int, error)
+	// SeenAt is when the user last marked the feed read (zero: never); MarkSeen moves it forward only.
+	SeenAt(ctx context.Context, userID uuid.UUID) (time.Time, error)
+	MarkSeen(ctx context.Context, userID uuid.UUID, at time.Time) error
 	DailyStats(ctx context.Context, userID uuid.UUID, since time.Time) (DailyStats, error)
 }

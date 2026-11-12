@@ -56,6 +56,8 @@ type NotificationService interface {
 	GetPreferences(ctx context.Context, userID uuid.UUID) (notify.Preferences, error)
 	SavePreferences(ctx context.Context, prefs notify.Preferences) error
 	SendTestNotification(ctx context.Context, userID uuid.UUID) error
+	Activity(ctx context.Context, userID uuid.UUID, before time.Time, limit int) (notify.Activity, error)
+	MarkRead(ctx context.Context, userID uuid.UUID) error
 }
 
 // AssistService manages extension pairing and tokens.
@@ -228,6 +230,9 @@ func (s *Server) Register(mux *http.ServeMux) {
 	mux.Handle("POST /texts", s.page(s.textSave))
 	mux.Handle("POST /texts/{id}", s.page(s.textSave))
 	mux.Handle("POST /texts/{id}/delete", s.page(s.itemDelete(profile.ItemText, "/texts")))
+	mux.Handle("GET /notifications/bell", s.page(s.bell))
+	mux.Handle("POST /notifications/read", s.page(s.markRead))
+	mux.Handle("GET /activity", s.page(s.activityPage))
 	mux.Handle("GET /setup", s.page(s.setupStart))
 	mux.Handle("GET /setup/{step}", s.page(s.setupPage))
 	mux.Handle("POST /setup/{step}", s.page(s.setupSave))

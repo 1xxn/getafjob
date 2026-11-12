@@ -112,6 +112,7 @@ templ shellTop(s Shell) {
 			<kbd aria-hidden="true">Ctrl K</kbd>
 		</button>
 		<div class="shell-actions">
+			@bellSlot()
 			<span id="live-indicator" { HX(ctx, "hx-get", "/live/indicator", "hx-trigger", "load, getafjob:app from:body", "hx-swap", "innerHTML transition:false")... }></span>
 			@userMenu(s)
 		</div>
