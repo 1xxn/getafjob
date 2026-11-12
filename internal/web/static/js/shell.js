@@ -191,13 +191,19 @@ document.addEventListener(
   (e) => {
     const link = e.target.closest?.("a[href]");
     if (!link || !dirty() || link.getAttribute("href")?.startsWith("#")) return;
-    const text = document.querySelector("[data-t-unsaved]")?.dataset.tUnsaved ?? "";
-    if (window.confirm(text)) {
-      for (const f of document.querySelectorAll("form[data-dirty]")) delete f.dataset.dirty;
-      return;
-    }
+    const dialog = document.getElementById("confirm-dialog");
+    const body = document.getElementById("confirm-text");
+    const ok = dialog?.querySelector("[data-confirm-ok]");
+    if (!dialog || !body || !ok) return;
     e.preventDefault();
     e.stopImmediatePropagation();
+    body.textContent = document.querySelector("[data-t-unsaved]")?.dataset.tUnsaved ?? "";
+    ok.onclick = () => {
+      dialog.close();
+      for (const f of document.querySelectorAll("form[data-dirty]")) delete f.dataset.dirty;
+      link.click();
+    };
+    dialog.showModal();
   },
   true
 );

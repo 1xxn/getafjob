@@ -235,15 +235,21 @@ window.addEventListener('beforeunload', (e) => {
 document.addEventListener(
   'click',
   (e) => {
-    const link = (e.target as Element).closest?.('a[href]');
+    const link = (e.target as Element).closest?.<HTMLAnchorElement>('a[href]');
     if (!link || !dirty() || link.getAttribute('href')?.startsWith('#')) return;
-    const text = document.querySelector<HTMLElement>('[data-t-unsaved]')?.dataset.tUnsaved ?? '';
-    if (window.confirm(text)) {
-      for (const f of document.querySelectorAll<HTMLFormElement>('form[data-dirty]')) delete f.dataset.dirty;
-      return;
-    }
+    const dialog = document.getElementById('confirm-dialog') as HTMLDialogElement | null;
+    const body = document.getElementById('confirm-text');
+    const ok = dialog?.querySelector<HTMLButtonElement>('[data-confirm-ok]');
+    if (!dialog || !body || !ok) return;
     e.preventDefault();
     e.stopImmediatePropagation();
+    body.textContent = document.querySelector<HTMLElement>('[data-t-unsaved]')?.dataset.tUnsaved ?? '';
+    ok.onclick = () => {
+      dialog.close();
+      for (const f of document.querySelectorAll<HTMLFormElement>('form[data-dirty]')) delete f.dataset.dirty;
+      link.click(); // not dirty any more: the click goes its normal way
+    };
+    dialog.showModal();
   },
   true,
 );
