@@ -436,3 +436,29 @@ func (s *Service) Overview(ctx context.Context, userID uuid.UUID) (Overview, err
 	}
 	return Overview{Apps: apps, ParkReasons: reasons, SubmitsByDay: days, Since: since}, nil
 }
+
+// StatesByJob returns the state of the user's application per job (jobs without one are missing).
+func (s *Service) StatesByJob(ctx context.Context, userID uuid.UUID, jobIDs []int64) (map[int64]State, error) {
+	if len(jobIDs) == 0 {
+		return map[int64]State{}, nil
+	}
+	return s.store.StatesByJob(ctx, userID, jobIDs)
+}
+
+// SkipJob marks a job as skipped: it gets an application in state skipped, so it leaves the to-do lists. A job
+// that is already being applied to or was sent is not changed (the transition is refused).
+func (s *Service) SkipJob(ctx context.Context, userID uuid.UUID, jobID int64) error {
+	id, err := s.store.BookmarkJob(ctx, userID, jobID, s.now())
+	if err != nil {
+		return err
+	}
+	app, err := s.store.Get(ctx, userID, id)
+	if err != nil {
+		return err
+	}
+	if app.State == Skipped {
+		return nil
+	}
+	_, err = s.Fire(ctx, userID, id, EvSkip, ActorUser, map[string]any{"reason": "skipped by user"})
+	return err
+}

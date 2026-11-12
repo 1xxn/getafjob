@@ -3,6 +3,8 @@ package views
 import (
 	"context"
 	"strings"
+
+	"github.com/1xxn/getafjob/internal/web/views/ui"
 )
 
 // NavCounts are the numbers next to navigation items.
@@ -146,4 +148,12 @@ func shellFor(ctx context.Context, p Page) Shell {
 		s.Back = "/"
 	}
 	return s
+}
+
+// flashTone shows partial results as a warning.
+func flashTone(key string) ui.Tone {
+	if strings.HasSuffix(key, "_partial") || strings.Contains(key, ".not_queued.") {
+		return ui.Warning
+	}
+	return ui.Success
 }

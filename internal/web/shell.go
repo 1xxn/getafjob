@@ -19,7 +19,11 @@ const (
 )
 
 // flashKeys are the one-time messages a redirect may leave for the next page; anything else is ignored.
-var flashKeys = map[string]bool{"flash.language": true}
+var flashKeys = map[string]bool{"flash.language": true,
+	"flash.jobs.queue": true, "flash.jobs.save": true, "flash.jobs.skip": true, "flash.jobs.block": true,
+	"flash.jobs.queue_partial": true, "flash.jobs.save_partial": true, "flash.jobs.skip_partial": true,
+	"flash.jobs.block_partial": true, "flash.jobs.not_queued.mail": true, "flash.jobs.not_queued.duplicate": true,
+	"flash.jobs.not_queued.company": true, "flash.jobs.not_queued.excluded": true, "flash.jobs.not_queued.other": true}
 
 // shell returns the app frame data of the request: theme and sidebar width from cookies for everyone, for
 // signed-in users also the counters (computed once, when the frame renders) and a one-time message.

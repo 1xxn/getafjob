@@ -1059,3 +1059,16 @@ func (s *Store) SubmitsPerDay(ctx context.Context, userID uuid.UUID, since time.
 	})
 	return out, err
 }
+
+// StatesByJob returns the state of the user's application per job.
+func (s *Store) StatesByJob(ctx context.Context, userID uuid.UUID, jobIDs []int64) (map[int64]application.State, error) {
+	out := map[int64]application.State{}
+	err := s.user(ctx, userID, func(qs *q.Queries) error {
+		rows, err := qs.StatesByJob(ctx, q.StatesByJobParams{UserID: userID, JobIds: jobIDs})
+		for _, r := range rows {
+			out[r.JobID] = application.State(r.State)
+		}
+		return err
+	})
+	return out, err
+}

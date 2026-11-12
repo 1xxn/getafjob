@@ -647,3 +647,7 @@ func (f *fakeAppStore) ParkReasons(context.Context, uuid.UUID) (map[uuid.UUID]st
 func (f *fakeAppStore) SubmitsPerDay(context.Context, uuid.UUID, time.Time) (map[time.Time]int, error) {
 	return nil, nil
 }
+
+func (f *fakeAppStore) StatesByJob(context.Context, uuid.UUID, []int64) (map[int64]application.State, error) {
+	return nil, nil
+}

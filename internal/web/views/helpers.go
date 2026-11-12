@@ -95,11 +95,6 @@ const htmxConfig = `extensions:"hx-csp,hx-sse",includeIndicatorCSS:false,transit
 // under hx-csp. Use it for every element with hx-* attributes.
 func HX(ctx context.Context, kv ...string) templ.Attributes { return ui.HX(ctx, kv...) }
 
-// pageLink loads another page of the job list into #results.
-func pageLink(ctx context.Context, url string) templ.Attributes {
-	return HX(ctx, "hx-get", url, "hx-target", "#results", "hx-swap", "outerHTML", "hx-push-url", "true")
-}
-
 // Amount groups the digits of a whole number for the reader's locale: 90,000 or 90.000.
 func Amount(ctx context.Context, digits string) string {
 	if digits == "" || strings.Trim(digits, "0123456789") != "" {

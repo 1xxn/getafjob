@@ -15,6 +15,10 @@ type JobRow struct {
 	Age       int // days since posted or first seen, -1: unknown
 	Score     int
 	Decision  string
+	State     string // new, saved, applying, applied, skipped, stopped, closed or empty (jobs.state.*)
+	PanelURL  string // list URL with this job open beside it
+	PanelGet  string // fragment URL of the job panel
+	Current   bool   // open beside the list
 }
 
 // BlocklistItemData is a blocked employer or keyword in the UI.
@@ -30,30 +34,6 @@ type CrawlStatusData struct {
 	Running bool
 	Queued  bool
 	LastRun string
-}
-
-// JobsData fills the job list.
-type JobsData struct {
-	Name         string
-	Query        string
-	Decision     string // relevant, match, maybe, skip, all, blocked
-	Workplace    string // "", remote, hybrid, onsite
-	Location     string
-	Source       string // ATS platform
-	MinSalary    int
-	Freshness    string // "all", "24h", "3d", "7d", "14d", "30d"
-	Sort         string // "match", "newest", "salary", "company"
-	Rows         []JobRow
-	Total        int
-	Page         int
-	Pages        int
-	Counts       map[string]int
-	BlockedCount int
-	Pending      bool // no results for the user yet
-	PrevURL      string
-	NextURL      string
-	Blocklist    []BlocklistItemData
-	Crawl        CrawlStatusData
 }
 
 // Reason is one translated part of a score.
@@ -226,10 +206,6 @@ templ decision(r JobRow) {
 	</span>
 }
 
-templ option(value, current, label string) {
-	<option value={ value } selected?={ value == current }>{ label }</option>
-}
-
 templ CrawlStatus(c CrawlStatusData) {
 	<div
 		id="crawl-status"
@@ -268,252 +244,6 @@ templ BoardAddSuccess(company, atsPlatform string) {
 
 templ BoardAddError(msg string) {
 	@Notice("error", msg)
-}
-
-templ JobsPage(d JobsData) {
-	@Layout(Page{Title: T(ctx, "jobs.title"), UserName: d.Name}) {
-		@Section(T(ctx, "jobs.title")) {
-			<div class="discovery-toolbar">
-				<div class="crawl-sync-box">
-					@CrawlStatus(d.Crawl)
-				</div>
-				<form
-					method="post"
-					action="/jobs/import"
-					class="job-import-form"
-					{ HX(ctx, "hx-post", "/jobs/import", "hx-target", "#results", "hx-swap", "outerHTML")... }
-				>
-					<input
-						type="url"
-						name="url"
-						placeholder={ T(ctx, "jobs.import_placeholder") }
-						required
-						maxlength="500"
-					/>
-					<button type="submit">{ T(ctx, "jobs.import_button") }</button>
-				</form>
-				<details class="career-site-panel">
-					<summary class="career-site-summary">{ T(ctx, "jobs.board_add_title") }</summary>
-					<div class="career-site-body">
-						<form
-							method="post"
-							action="/jobs/boards"
-							class="board-add-form"
-							{ HX(ctx, "hx-post", "/jobs/boards", "hx-target", "#board-add-result", "hx-swap", "innerHTML")... }
-						>
-							<input
-								type="url"
-								name="url"
-								placeholder={ T(ctx, "jobs.board_add_placeholder") }
-								required
-								maxlength="500"
-							/>
-							<button type="submit">{ T(ctx, "jobs.board_add_button") }</button>
-						</form>
-						<div id="board-add-result"></div>
-					</div>
-				</details>
-			</div>
-			<div id="import-result"></div>
-			<form
-				method="get"
-				action="/jobs"
-				class="filters"
-				role="search"
-				{ HX(ctx, "hx-get", "/jobs", "hx-target", "#results", "hx-swap", "outerHTML", "hx-push-url", "true",
-					"hx-trigger", "submit, change, input delay:300ms")... }
-			>
-				@Field(FieldProps{Name: "q", Label: T(ctx, "jobs.search_label"), Type: "search", Value: d.Query,
-					Hint: T(ctx, "jobs.search_hint"), MaxLength: 200})
-				@Field(FieldProps{Name: "location", Label: T(ctx, "jobs.location_label"), Type: "text", Value: d.Location,
-					MaxLength: 100})
-				<div class="field">
-					<label for="f-decision">{ T(ctx, "jobs.decision") }</label>
-					<select id="f-decision" name="decision">
-						@option("relevant", d.Decision, T(ctx, "jobs.decision.relevant"))
-						@option("match", d.Decision, T(ctx, "match.decision.match"))
-						@option("maybe", d.Decision, T(ctx, "match.decision.maybe"))
-						@option("skip", d.Decision, T(ctx, "match.decision.skip"))
-						@option("all", d.Decision, T(ctx, "jobs.decision.all"))
-						if d.BlockedCount > 0 || d.Decision == "blocked" {
-							@option("blocked", d.Decision, T(ctx, "jobs.decision.blocked", "count", d.BlockedCount))
-						}
-					</select>
-				</div>
-				<div class="field">
-					<label for="f-freshness">{ T(ctx, "jobs.freshness") }</label>
-					<select id="f-freshness" name="freshness">
-						@option("all", d.Freshness, T(ctx, "jobs.freshness.all"))
-						@option("24h", d.Freshness, T(ctx, "jobs.freshness.24h"))
-						@option("3d", d.Freshness, T(ctx, "jobs.freshness.3d"))
-						@option("7d", d.Freshness, T(ctx, "jobs.freshness.7d"))
-						@option("14d", d.Freshness, T(ctx, "jobs.freshness.14d"))
-						@option("30d", d.Freshness, T(ctx, "jobs.freshness.30d"))
-					</select>
-				</div>
-				<div class="field">
-					<label for="f-sort">{ T(ctx, "jobs.sort") }</label>
-					<select id="f-sort" name="sort">
-						@option("match", d.Sort, T(ctx, "jobs.sort.match"))
-						@option("newest", d.Sort, T(ctx, "jobs.sort.newest"))
-						@option("salary", d.Sort, T(ctx, "jobs.sort.salary"))
-						@option("company", d.Sort, T(ctx, "jobs.sort.company"))
-					</select>
-				</div>
-				<div class="field">
-					<label for="f-workplace">{ T(ctx, "jobs.workplace") }</label>
-					<select id="f-workplace" name="workplace">
-						@option("", d.Workplace, T(ctx, "jobs.workplace.any"))
-						@option("remote", d.Workplace, T(ctx, "jobs.workplace.remote"))
-						@option("hybrid", d.Workplace, T(ctx, "jobs.workplace.hybrid"))
-						@option("onsite", d.Workplace, T(ctx, "jobs.workplace.onsite"))
-					</select>
-				</div>
-				<div class="field">
-					<label for="f-source">{ T(ctx, "jobs.source_label") }</label>
-					<select id="f-source" name="source">
-						@option("", d.Source, T(ctx, "jobs.source.any"))
-						@option("greenhouse", d.Source, "Greenhouse")
-						@option("lever", d.Source, "Lever")
-						@option("ashby", d.Source, "Ashby")
-						@option("workday", d.Source, "Workday")
-						@option("personio", d.Source, "Personio")
-						@option("smartrecruiters", d.Source, "SmartRecruiters")
-						@option("recruitee", d.Source, "Recruitee")
-						@option("workable", d.Source, "Workable")
-					</select>
-				</div>
-				<div class="field">
-					<label for="f-min-salary">{ T(ctx, "jobs.min_salary_label") }</label>
-					<select id="f-min-salary" name="min_salary">
-						@option("0", i64(int64(d.MinSalary)), T(ctx, "jobs.min_salary.any"))
-						@option("50000", i64(int64(d.MinSalary)), T(ctx, "jobs.min_salary.val", "val", "50.000"))
-						@option("60000", i64(int64(d.MinSalary)), T(ctx, "jobs.min_salary.val", "val", "60.000"))
-						@option("70000", i64(int64(d.MinSalary)), T(ctx, "jobs.min_salary.val", "val", "70.000"))
-						@option("80000", i64(int64(d.MinSalary)), T(ctx, "jobs.min_salary.val", "val", "80.000"))
-						@option("90000", i64(int64(d.MinSalary)), T(ctx, "jobs.min_salary.val", "val", "90.000"))
-						@option("100000", i64(int64(d.MinSalary)), T(ctx, "jobs.min_salary.val", "val", "100.000"))
-					</select>
-				</div>
-				<button type="submit">{ T(ctx, "jobs.apply_filter") }</button>
-			</form>
-			@JobResults(d)
-		}
-	}
-}
-
-// JobResults is the part of the list that htmx swaps on search, filters and pages.
-templ JobResults(d JobsData) {
-	<div id="results">
-		if d.Pending {
-			@Notice("info", T(ctx, "jobs.pending"))
-		} else {
-			<details class="blocklist-panel">
-				<summary class="blocklist-summary">
-					{ T(ctx, "jobs.blocklist_manage") }
-					if d.BlockedCount > 0 {
-						<span class="badge badge-blocked">{ i64(int64(d.BlockedCount)) }</span>
-					}
-				</summary>
-				<div class="blocklist-body">
-					<h4>{ T(ctx, "jobs.blocklist_title") }</h4>
-					<form
-						method="post"
-						action="/jobs/blocklist"
-						class="blocklist-add-form"
-						{ HX(ctx, "hx-post", "/jobs/blocklist", "hx-target", "#results", "hx-swap", "outerHTML")... }
-					>
-						<select name="kind">
-							<option value="company">{ T(ctx, "jobs.blocklist_kind_company") }</option>
-							<option value="keyword">{ T(ctx, "jobs.blocklist_kind_keyword") }</option>
-						</select>
-						<input type="text" name="pattern" placeholder={ T(ctx, "jobs.blocklist_pattern") } required maxlength="200"/>
-						<button type="submit">{ T(ctx, "jobs.blocklist_add") }</button>
-					</form>
-					if len(d.Blocklist) == 0 {
-						<p class="muted">{ T(ctx, "jobs.blocklist_empty") }</p>
-					} else {
-						<ul class="blocklist-items">
-							for _, b := range d.Blocklist {
-								<li>
-									<span class="badge">{ b.Kind }</span>
-									<span class="pattern">{ b.Pattern }</span>
-									<form
-										method="post"
-										action="/jobs/blocklist/delete"
-										class="inline"
-										{ HX(ctx, "hx-post", "/jobs/blocklist/delete", "hx-target", "#results", "hx-swap", "outerHTML")... }
-									>
-										<input type="hidden" name="id" value={ i64(b.ID) }/>
-										<button type="submit" class="btn-link danger">{ T(ctx, "jobs.blocklist_remove") }</button>
-									</form>
-								</li>
-							}
-						</ul>
-					}
-				</div>
-			</details>
-			<p class="muted" role="status">
-				{ T(ctx, "jobs.count", "total", d.Total) }.
-				{ T(ctx, "jobs.counts", "match", d.Counts["match"], "maybe", d.Counts["maybe"], "skip", d.Counts["skip"]) }
-				if d.BlockedCount > 0 {
-					{ " " }
-					{ T(ctx, "jobs.counts_blocked", "blocked", d.BlockedCount) }
-				}
-			</p>
-			if len(d.Rows) == 0 {
-				<p>{ T(ctx, "jobs.none") }</p>
-			}
-			<ol class="jobs">
-				for _, r := range d.Rows {
-					<li>
-						<div class="job-header">
-							<h2><a href={ templ.SafeURL("/jobs/" + i64(r.ID)) }>{ r.Title }</a></h2>
-							<div class="job-actions">
-								if r.Blocked {
-									<span class="badge badge-blocked">{ T(ctx, "jobs.blocked_badge") }</span>
-									<form
-										method="post"
-										action="/jobs/blocklist/delete"
-										class="inline"
-										{ HX(ctx, "hx-post", "/jobs/blocklist/delete", "hx-target", "#results", "hx-swap", "outerHTML")... }
-									>
-										<input type="hidden" name="kind" value="company"/>
-										<input type="hidden" name="pattern" value={ r.Company }/>
-										<button type="submit" class="btn-link">{ T(ctx, "jobs.unblock") }</button>
-									</form>
-								} else {
-									<form
-										method="post"
-										action="/jobs/blocklist"
-										class="inline"
-										{ HX(ctx, "hx-post", "/jobs/blocklist", "hx-target", "#results", "hx-swap", "outerHTML")... }
-									>
-										<input type="hidden" name="kind" value="company"/>
-										<input type="hidden" name="pattern" value={ r.Company }/>
-										<button type="submit" class="btn-link muted" title={ T(ctx, "jobs.block_company") }>{ T(ctx, "jobs.block_company") }</button>
-									</form>
-								}
-							</div>
-						</div>
-						@jobMeta(r)
-						@decision(r)
-					</li>
-				}
-			</ol>
-			if d.Pages > 1 {
-				<nav class="pager" aria-label={ T(ctx, "jobs.pages") }>
-					if d.PrevURL != "" {
-						<a href={ templ.SafeURL(d.PrevURL) } rel="prev" { pageLink(ctx, d.PrevURL)... }>{ T(ctx, "jobs.prev") }</a>
-					}
-					<span>{ T(ctx, "jobs.page", "page", d.Page, "pages", d.Pages) }</span>
-					if d.NextURL != "" {
-						<a href={ templ.SafeURL(d.NextURL) } rel="next" { pageLink(ctx, d.NextURL)... }>{ T(ctx, "jobs.next") }</a>
-					}
-				</nav>
-			}
-		}
-	</div>
 }
 
 templ FitInspector(d FitData) {
