@@ -16,10 +16,10 @@ type HandoffQuestion struct {
 
 // questionControl renders a control that matches the employer's field (#158); values travel as answer-<i>.
 templ questionControl(i int, q HandoffQuestion) {
-	{{ id, name := "q-" + strconv.Itoa(i), "answer-" + strconv.Itoa(i) }}
+	{{ id, name := "q-"+strconv.Itoa(i), "answer-"+strconv.Itoa(i) }}
 	<input type="hidden" name={ "question-" + strconv.Itoa(i) } value={ q.Question }/>
 	<input type="hidden" name={ "input-" + strconv.Itoa(i) } value={ q.Input }/>
-	switch {
+	switch  {
 		case q.Input == "checkbox" || q.Input == "aria_checkbox":
 			<div class="field check">
 				<input type="hidden" name={ name } value="No"/>
@@ -140,7 +140,7 @@ type HandoffData struct {
 	Company             string
 	State               string
 	Status              string
-	Live                bool // the run may stream a live view now
+	Live                bool   // the run may stream a live view now
 	ApplyMode           string // form, portal or email (applymode)
 	ApplyHost           string
 	ExternalURL         string // where to apply outside getafjob
@@ -155,208 +155,4 @@ type HandoffData struct {
 	ConfirmationURL     string
 	Confirmed           bool
 	Timeline            []TimelineRow
-}
-
-templ HandoffPage(d HandoffData) {
-	@Layout(Page{Title: T(ctx, "handoff.title"), UserName: d.Name, Handoff: true}) {
-		if len(d.ActiveRuns) > 0 {
-			<div class="active-runners-banner">
-				<span class="active-runners-label">
-					<span class="live-dot pulse"></span>
-					{ T(ctx, "handoff.active_sessions") } ({ strconv.Itoa(len(d.ActiveRuns)) }):
-				</span>
-				<div class="active-runners-list">
-					for _, ar := range d.ActiveRuns {
-						<a
-							href={ templ.SafeURL("/applications/" + ar.AppID) }
-							class={ "active-runner-pill", templ.KV("current", ar.Current) }
-						>
-							<span class={ "live-dot", "mini", templ.KV("waiting", ar.Waiting) }></span>
-							if ar.Company != "" {
-								<span class="runner-company">{ ar.Company }</span>
-							}
-							if ar.JobTitle != "" {
-								<span class="runner-title">{ ar.JobTitle }</span>
-							} else {
-								<span class="runner-title">{ ar.AppID[:8] }</span>
-							}
-						</a>
-					}
-				</div>
-			</div>
-		}
-		@Section(d.Company + " · " + d.JobTitle) {
-			<div hidden data-watch-app={ d.AppID } data-watch-state={ d.State }></div>
-			<p>
-				<a href="/jobs">{ T(ctx, "jobs.back") }</a>
-				if d.JobID > 0 {
-					· <a href={ templ.SafeURL("/jobs/" + i64(d.JobID)) }>{ T(ctx, "evidence.job_link") }</a>
-				}
-				if d.Status != "" {
-					· @StatusLabel(d.Status)
-				}
-			</p>
-			if d.State == "parked" && (d.ApplyMode == "portal" || d.ApplyMode == "email") {
-				@ExternalApply(d.ApplyMode, d.ApplyHost, d.ExternalURL, d.JobID)
-			}
-			if d.Live {
-				<div class="remote-browser-box">
-					@LiveScreen(LiveScreenProps{AppID: d.AppID, Size: "full", Controls: true, ReloadOnEnd: true})
-					<div class="actions">
-						<form method="post" action={ templ.SafeURL("/applications/" + d.AppID + "/park") }>
-							<button type="submit" id="btn-park" class="secondary">{ T(ctx, "handoff.park") }</button>
-						</form>
-						<button type="button" id="btn-push" class="secondary">{ T(ctx, "handoff.push") }</button>
-					</div>
-				</div>
-			}
-
-			if d.Suggestion != nil {
-				<div class="form-section stack notice notice-info">
-					<h2>{ T(ctx, "handoff.suggestion.title") }</h2>
-					<p>{ d.Company } · <strong>{ d.Suggestion.SuggestedState }</strong> ({ d.Suggestion.From })</p>
-					<ul class="reasons">
-						for _, r := range d.Suggestion.Reasons {
-							<li>{ r }</li>
-						}
-					</ul>
-					<div class="actions">
-						<form method="post" action={ templ.SafeURL("/applications/" + d.AppID + "/suggestions/" + d.Suggestion.ID + "/accept") }>
-							<button type="submit" class="primary">{ T(ctx, "handoff.suggestion.accept") }</button>
-						</form>
-						<form method="post" action={ templ.SafeURL("/applications/" + d.AppID + "/suggestions/" + d.Suggestion.ID + "/dismiss") }>
-							<button type="submit" class="secondary">{ T(ctx, "handoff.suggestion.dismiss") }</button>
-						</form>
-					</div>
-				</div>
-			}
-
-			if d.ApprovalAsked {
-				<div class="form-section stack">
-					<h2>{ T(ctx, "handoff.approval_reasons") }</h2>
-					<ul class="reasons">
-						for _, r := range d.ApprovalReasons {
-							<li>{ r }</li>
-						}
-					</ul>
-					<form method="post" action={ templ.SafeURL("/approvals/" + d.AppID + "/approve") }>
-						<button type="submit" class="primary">{ T(ctx, "handoff.approve") }</button>
-					</form>
-				</div>
-			}
-
-			if len(d.Questions) > 0 {
-				<div class="form-section stack">
-					<h2>{ T(ctx, "handoff.questions") }</h2>
-					<p class="muted">{ T(ctx, "handoff.questions_hint") }</p>
-					<form method="post" action={ templ.SafeURL("/applications/" + d.AppID + "/answer") } class="stack">
-						for i, q := range d.Questions {
-							@questionControl(i, q)
-						}
-						<div class="actions">
-							<button type="submit">{ T(ctx, "handoff.save_continue") }</button>
-						</div>
-					</form>
-				</div>
-			}
-
-			<div class="form-section stack">
-				<h2>{ T(ctx, "evidence.fields.title") }</h2>
-				if len(d.Fields) == 0 {
-					<p class="muted">{ T(ctx, "evidence.fields.empty") }</p>
-				} else {
-					<table class="table">
-						<thead>
-							<tr>
-								<th>{ T(ctx, "evidence.fields.field") }</th>
-								<th>{ T(ctx, "evidence.fields.value") }</th>
-								<th>{ T(ctx, "evidence.fields.source") }</th>
-							</tr>
-						</thead>
-						<tbody>
-							for _, f := range d.Fields {
-								<tr>
-									<td>
-										{ f.Label }
-										if f.Page > 1 {
-											<span class="muted"> ({ T(ctx, "evidence.fields.page", "page", f.Page) })</span>
-										}
-									</td>
-									<td>{ f.Value }</td>
-									<td><code>{ f.Source }</code></td>
-								</tr>
-							}
-						</tbody>
-					</table>
-				}
-			</div>
-
-			<div class="form-section stack">
-				<h2>{ T(ctx, "evidence.before_submit.title") }</h2>
-				if d.BeforeSubmitURL != "" {
-					<img src={ d.BeforeSubmitURL } alt={ T(ctx, "evidence.before_submit.title") } class="screencast" loading="lazy"/>
-				} else {
-					<p class="muted">{ T(ctx, "evidence.before_submit.empty") }</p>
-				}
-			</div>
-
-			<div class="form-section stack">
-				<h2>{ T(ctx, "evidence.confirmation.title") }</h2>
-				if d.Confirmed {
-					<p>{ T(ctx, "evidence.confirmation.confirmed") }</p>
-				} else {
-					<p class="muted">{ T(ctx, "evidence.confirmation.unconfirmed") }</p>
-				}
-				if d.ConfirmationURL != "" {
-					<p><a href={ templ.SafeURL(d.ConfirmationURL) } rel="noopener noreferrer external">{ d.ConfirmationURL }</a></p>
-				}
-				if d.ConfirmationShotURL != "" {
-					<img src={ d.ConfirmationShotURL } alt={ T(ctx, "evidence.confirmation.title") } class="screencast" loading="lazy"/>
-				}
-			</div>
-
-			<div class="form-section stack">
-				<h2>{ T(ctx, "evidence.timeline.title") }</h2>
-				<p class="muted">{ T(ctx, "evidence.retention_hint") }</p>
-				if len(d.Timeline) == 0 {
-					<p class="muted">{ T(ctx, "evidence.timeline.empty") }</p>
-				} else {
-					<table class="table">
-						<thead>
-							<tr>
-								<th>{ T(ctx, "evidence.timeline.when") }</th>
-								<th>{ T(ctx, "evidence.timeline.step") }</th>
-								<th>{ T(ctx, "evidence.timeline.detail") }</th>
-							</tr>
-						</thead>
-						<tbody>
-							for _, t := range d.Timeline {
-								<tr>
-									<td>{ When(ctx, t.At) }</td>
-									<td>
-										<strong>{ t.Step }</strong>
-										if t.Kind == "event" && t.ToState != "" {
-											<span class="muted"> ({ t.FromState } -&gt; { t.ToState })</span>
-										}
-										if t.Page > 0 {
-											<span class="muted"> · { T(ctx, "evidence.fields.page", "page", t.Page) }</span>
-										}
-									</td>
-									<td>
-										{ or(t.Detail, t.URL) }
-										if t.ScreenshotURL != "" {
-											if t.Detail != "" || t.URL != "" {
-												<span> · </span>
-											}
-											<a href={ templ.SafeURL(t.ScreenshotURL) }>{ T(ctx, "evidence.timeline.screenshot") }</a>
-										}
-									</td>
-								</tr>
-							}
-						</tbody>
-					</table>
-				}
-			</div>
-		}
-	}
 }

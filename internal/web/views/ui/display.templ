@@ -94,6 +94,7 @@ type Column struct {
 	Sort     string // asc, desc or empty
 	Align    string // end for numbers
 	Narrow   bool   // hidden below 640 px
+	SrOnly   bool   // label for screen readers only (e.g. a checkbox column)
 }
 
 func ariaSort(c Column) string {
@@ -145,6 +146,8 @@ templ Table(p TableProps) {
 									{ c.Label }
 									@Icon(sortIcon(c))
 								</a>
+							} else if c.SrOnly {
+								<span class="ui-sr">{ c.Label }</span>
 							} else {
 								{ c.Label }
 							}

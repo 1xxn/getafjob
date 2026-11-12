@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"errors"
 	"net/http"
+	"slices"
 	"strconv"
 	"strings"
 	"time"
@@ -327,7 +328,7 @@ func (s *Server) applicationAnswer(w http.ResponseWriter, r *http.Request, u *id
 		}
 	}
 
-	http.Redirect(w, r, "/jobs", http.StatusSeeOther)
+	http.Redirect(w, r, "/applications/"+appID.String(), http.StatusSeeOther) //nolint:gosec // G710: appID is a parsed UUID
 }
 
 func (s *Server) applicationPage(w http.ResponseWriter, r *http.Request, u *identity.User) {
@@ -335,114 +336,125 @@ func (s *Server) applicationPage(w http.ResponseWriter, r *http.Request, u *iden
 		http.Redirect(w, r, "/login", http.StatusSeeOther)
 		return
 	}
-	appID, err := uuid.Parse(r.PathValue("id"))
-	if err != nil {
-		s.notFound(w, r, u)
+	d, ok := s.applicationDetail(w, r, u)
+	if !ok {
 		return
 	}
-	d := views.HandoffData{
-		Name:  u.DisplayName,
-		AppID: appID.String(),
+	d.Tab = r.URL.Query().Get("tab")
+	if !slices.Contains([]string{"live", "fields", "timeline", "evidence", "notes"}, d.Tab) {
+		d.Tab = "overview"
 	}
-	if s.Apps != nil {
-		app, err := s.Apps.Get(r.Context(), u.ID, appID)
-		if err != nil {
-			if errors.Is(err, application.ErrNotFound) {
-				s.notFound(w, r, u)
-				return
+	if d.Tab == "notes" && s.Apps != nil {
+		if n, err := s.Apps.GetNotes(r.Context(), u.ID, uuid.MustParse(d.AppID)); err == nil {
+			d.Notes = views.NoteForm{Notes: n.Notes, Salary: n.SalaryDiscussed}
+			if n.InterviewAt != nil {
+				d.Notes.InterviewAt = n.InterviewAt.Format("2006-01-02T15:04")
 			}
+			if n.FollowUpAt != nil {
+				d.Notes.FollowUpAt = n.FollowUpAt.Format("2006-01-02")
+			}
+		}
+	}
+	s.render(w, r, http.StatusOK, views.ApplicationPage(d))
+}
+
+// applicationHead renders the state and next steps alone; the page swaps it in on live changes.
+func (s *Server) applicationHead(w http.ResponseWriter, r *http.Request, u *identity.User) {
+	if u == nil {
+		http.Error(w, "unauthorized", http.StatusUnauthorized)
+		return
+	}
+	if d, ok := s.applicationDetail(w, r, u); ok {
+		s.render(w, r, http.StatusOK, views.AppHead(d))
+	}
+}
+
+// applicationDetail loads one application of the user with job, questions, evidence and the next steps; on false
+// the response is written.
+func (s *Server) applicationDetail(w http.ResponseWriter, r *http.Request, u *identity.User) (views.AppDetailData, bool) {
+	appID, err := uuid.Parse(r.PathValue("id"))
+	if err != nil || s.Apps == nil {
+		s.notFound(w, r, u)
+		return views.AppDetailData{}, false
+	}
+	ctx := r.Context()
+	app, err := s.Apps.Get(ctx, u.ID, appID)
+	if err != nil {
+		if errors.Is(err, application.ErrNotFound) {
+			s.notFound(w, r, u)
+		} else {
 			s.failed(w, r, u, err)
-			return
 		}
-		d.JobID = app.JobID
-		d.State = string(app.State)
-		d.Status = appStatus(app.State)
-		d.ActiveRuns = s.activeRuns(r.Context(), u.ID, appID)
-		d.Live = liveStates[app.State]
-		if app.AwaitingApproval() {
-			d.ApprovalAsked = true
-			for _, re := range app.ApprovalReasons {
-				d.ApprovalReasons = append(d.ApprovalReasons, views.T(r.Context(), "rule.reason."+string(re)))
-			}
+		return views.AppDetailData{}, false
+	}
+	d := views.AppDetailData{HandoffData: views.HandoffData{Name: u.DisplayName, AppID: appID.String(), JobID: app.JobID,
+		State: string(app.State), Live: liveStates[app.State]}}
+	d.StateKey, d.Tone, d.NextKey = "apps.state."+string(app.State), appTone(app.State), "apps.next."+string(app.State)
+	if app.AwaitingApproval() {
+		d.ApprovalAsked = true
+		d.NextKey = "apps.next.approval"
+		for _, re := range app.ApprovalReasons {
+			d.ApprovalReasons = append(d.ApprovalReasons, views.T(ctx, "rule.reason."+string(re)))
 		}
-		if s.Jobs != nil {
-			if j, err := s.Jobs.Detail(r.Context(), u.ID, app.JobID); err == nil {
-				d.JobTitle = j.Title
-				d.Company = j.Company
-				d.ApplyMode = string(applymode.Of(j.URL, j.ApplyURL))
-				d.ApplyHost = applymode.Host(cmp.Or(j.ApplyURL, j.URL))
-				d.ExternalURL = webLink(cmp.Or(j.ApplyURL, j.URL))
-			}
+	}
+	if s.Jobs != nil {
+		if j, err := s.Jobs.Detail(ctx, u.ID, app.JobID); err == nil {
+			d.JobTitle, d.Company = j.Title, j.Company
+			d.ApplyMode = string(applymode.Of(j.URL, j.ApplyURL))
+			d.ApplyHost = applymode.Host(cmp.Or(j.ApplyURL, j.URL))
+			d.ExternalURL = webLink(cmp.Or(j.ApplyURL, j.URL))
 		}
-		if app.State == application.NeedsInput || app.State == application.Parked {
-			if asked, err := s.Apps.Questions(r.Context(), u.ID, appID); err == nil {
-				for _, q := range asked {
-					if q.Kind != "captcha" && q.Label != "" {
-						d.Questions = append(d.Questions, views.HandoffQuestion{Kind: q.Kind, Question: q.Label, Draft: q.Draft,
-							Input: q.Input, Options: q.Options})
-					}
+	}
+	if app.State == application.NeedsInput || app.State == application.Parked {
+		if asked, err := s.Apps.Questions(ctx, u.ID, appID); err == nil {
+			for _, q := range asked {
+				if q.Kind != "captcha" && q.Label != "" {
+					d.Questions = append(d.Questions, views.HandoffQuestion{Kind: q.Kind, Question: q.Label, Draft: q.Draft,
+						Input: q.Input, Options: q.Options})
 				}
 			}
 		}
-		// A parked application with open questions or a pending approval waits for the user, it did not fail.
-		if app.State == application.Parked && (len(d.Questions) > 0 || app.AwaitingApproval()) {
-			d.Status = "your_turn"
+	}
+	if app.State == application.Parked {
+		if reason, err := s.Apps.ParkReason(ctx, u.ID, appID); err == nil {
+			d.ReasonKey = parkReasonKey(reason)
 		}
-		if ev, err := s.Apps.Evidence(r.Context(), u.ID, appID); err == nil {
-			for _, f := range ev.Fields {
-				d.Fields = append(d.Fields, views.EvidenceFieldRow{
-					Page:   f.Page,
-					Label:  f.Label,
-					Value:  f.Value,
-					Source: f.Source,
-				})
+		if d.ReasonKey == "dash.park.answers" && len(d.Questions) > 0 && !d.ApprovalAsked {
+			d.NextKey = "apps.next.answers"
+		}
+	}
+	if ev, err := s.Apps.Evidence(ctx, u.ID, appID); err == nil {
+		shot := func(id int64) string {
+			if id <= 0 {
+				return ""
 			}
-			if ev.BeforeSubmitCheckpointID > 0 {
-				d.BeforeSubmitURL = "/applications/" + appID.String() + "/screenshots/" + strconv.FormatInt(ev.BeforeSubmitCheckpointID, 10)
-			}
-			if ev.ConfirmationCheckpointID > 0 {
-				d.ConfirmationShotURL = "/applications/" + appID.String() + "/screenshots/" + strconv.FormatInt(ev.ConfirmationCheckpointID, 10)
-			}
-			d.ConfirmationURL = webLink(ev.ConfirmationURL)
-			d.Confirmed = ev.Confirmed || app.State == application.Confirmed
-			for _, t := range ev.Timeline {
-				var shotURL string
-				if t.CheckpointID > 0 {
-					shotURL = "/applications/" + appID.String() + "/screenshots/" + strconv.FormatInt(t.CheckpointID, 10)
-				}
-				d.Timeline = append(d.Timeline, views.TimelineRow{
-					At:            t.At,
-					Kind:          t.Kind,
-					Step:          t.Step,
-					FromState:     string(t.FromState),
-					ToState:       string(t.ToState),
-					Actor:         string(t.Actor),
-					Page:          t.Page,
-					URL:           t.URL,
-					Detail:        t.Detail,
-					ScreenshotURL: shotURL,
-				})
-			}
+			return "/applications/" + appID.String() + "/screenshots/" + strconv.FormatInt(id, 10)
+		}
+		for _, f := range ev.Fields {
+			d.Fields = append(d.Fields, views.EvidenceFieldRow{Page: f.Page, Label: f.Label, Value: f.Value, Source: f.Source})
+		}
+		d.BeforeSubmitURL, d.ConfirmationShotURL = shot(ev.BeforeSubmitCheckpointID), shot(ev.ConfirmationCheckpointID)
+		d.ConfirmationURL = webLink(ev.ConfirmationURL)
+		d.Confirmed = ev.Confirmed || app.State == application.Confirmed
+		for _, t := range ev.Timeline {
+			d.Timeline = append(d.Timeline, views.TimelineRow{At: t.At, Kind: t.Kind, Step: t.Step, FromState: string(t.FromState),
+				ToState: string(t.ToState), Actor: string(t.Actor), Page: t.Page, URL: t.URL, Detail: t.Detail,
+				ScreenshotURL: shot(t.CheckpointID)})
 		}
 	}
 	if s.Tracking != nil {
-		if sugs, err := s.Tracking.SuggestionsForApplication(r.Context(), u.ID, appID); err == nil {
+		if sugs, err := s.Tracking.SuggestionsForApplication(ctx, u.ID, appID); err == nil {
 			for _, sg := range sugs {
 				if sg.Status == tracking.SuggestionPending {
-					d.Suggestion = &views.SuggestionData{
-						ID:             sg.ID.String(),
-						Category:       string(sg.Category),
-						SuggestedState: sg.SuggestedState,
-						Reasons:        sg.Reasons,
-						From:           sg.MessageFrom,
-						Subject:        sg.MessageSubject,
-					}
+					d.Suggestion = &views.SuggestionData{ID: sg.ID.String(), Category: string(sg.Category),
+						SuggestedState: sg.SuggestedState, Reasons: sg.Reasons, From: sg.MessageFrom, Subject: sg.MessageSubject}
 					break
 				}
 			}
 		}
 	}
-	s.render(w, r, http.StatusOK, views.HandoffPage(d))
+	d.Actions = appActions(d, app.State)
+	return d, true
 }
 
 func (s *Server) suggestionAccept(w http.ResponseWriter, r *http.Request, u *identity.User) {
@@ -487,19 +499,6 @@ func (s *Server) suggestionDismiss(w http.ResponseWriter, r *http.Request, u *id
 		return
 	}
 	http.Redirect(w, r, "/applications/"+appID.String(), http.StatusSeeOther) //nolint:gosec // G710: appID is a parsed UUID
-}
-
-func appStatus(st application.State) string {
-	switch st {
-	case application.Submitted, application.Confirmed, application.Interview, application.Offer:
-		return "done"
-	case application.NeedsInput:
-		return "your_turn"
-	case application.Parked, application.Failed, application.Rejected, application.Withdrawn:
-		return "failed"
-	default:
-		return "waiting"
-	}
 }
 
 // applicationScreenshot serves a decrypted checkpoint screenshot belonging to an application of the signed-in user.
@@ -555,10 +554,22 @@ func (s *Server) applicationPark(w http.ResponseWriter, r *http.Request, u *iden
 		return
 	}
 
-	if s.Apps != nil {
-		_, _ = s.Apps.Fire(r.Context(), u.ID, appID, application.EvPark, application.ActorUser, map[string]any{"reason": "parked by user"})
-	}
+	_ = s.parkApplication(r, u, appID)
 
+	if back := r.PostFormValue("back"); back != "" {
+		http.Redirect(w, r, localBack(back), http.StatusSeeOther) //nolint:gosec // localBack keeps only paths on this site
+		return
+	}
+	http.Redirect(w, r, "/jobs", http.StatusSeeOther)
+}
+
+// parkApplication parks the application and stops its run if one is open.
+func (s *Server) parkApplication(r *http.Request, u *identity.User, appID uuid.UUID) error {
+	if s.Apps == nil {
+		return errors.New("no application service")
+	}
+	_, err := s.Apps.Fire(r.Context(), u.ID, appID, application.EvPark, application.ActorUser,
+		map[string]any{"reason": "parked by user"})
 	if s.Handoffs != nil {
 		if sess, ok := s.Handoffs.SessionFor(appID); ok {
 			select {
@@ -567,10 +578,5 @@ func (s *Server) applicationPark(w http.ResponseWriter, r *http.Request, u *iden
 			}
 		}
 	}
-
-	if back := r.PostFormValue("back"); back != "" {
-		http.Redirect(w, r, localBack(back), http.StatusSeeOther) //nolint:gosec // localBack keeps only paths on this site
-		return
-	}
-	http.Redirect(w, r, "/jobs", http.StatusSeeOther)
+	return err
 }

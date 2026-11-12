@@ -193,6 +193,11 @@ func (s *Server) trackerSaveNotes(w http.ResponseWriter, r *http.Request, u *ide
 			}
 		}
 	}
+	if back := r.PostFormValue("back"); strings.HasPrefix(back, "/applications/") {
+		s.flash(w, "flash.apps.notes")
+		http.Redirect(w, r, localBack(back), http.StatusSeeOther) //nolint:gosec // localBack keeps only paths on this site
+		return
+	}
 	http.Redirect(w, r, "/tracker", http.StatusSeeOther)
 }
 
