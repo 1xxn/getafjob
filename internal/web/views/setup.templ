@@ -216,15 +216,14 @@ templ SetupPage(d SetupData) {
 	}
 }
 
-// SetupMatches lists the best jobs so far; while a crawl runs or nothing is rated yet it reloads itself.
+// SetupMatches lists the best jobs so far; it refreshes when a crawl starts or ends and when the jobs are rated.
 templ SetupMatches(d SetupMatchesData) {
 	<div
 		id="setup-matches"
 		class="wiz-card wiz-matches"
 		data-setup-matches={ strconv.Itoa(d.Total) }
-		if d.waiting() {
-			{ HX(ctx, "hx-get", "/setup/matches", "hx-trigger", "every 4s", "hx-swap", "outerMorph transition:false")... }
-		}
+		data-waiting={ boolAttr(d.waiting()) }
+		{ HX(ctx, "hx-get", "/setup/matches", "hx-trigger", "getafjob:jobs from:body delay:700ms", "hx-swap", "outerMorph transition:false")... }
 	>
 		<div class="wiz-crawl" role="status">
 			if d.Crawl.Running {

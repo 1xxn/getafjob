@@ -20,10 +20,18 @@ const Channel = "getafjob_events"
 // replay is how many recent events per user a reconnecting page can catch up on.
 const replay = 50
 
-// Event is one application change; it carries ids and states only.
+// Topics of events besides application changes (Topic empty).
+const (
+	TopicCrawl      = "crawl"      // a crawl started or finished; for every user
+	TopicMatches    = "matches"    // the user's jobs (no user: everyone's) were rated again
+	TopicSuggestion = "suggestion" // the mailbox suggested a status for one of the user's applications
+)
+
+// Event is one change; it carries ids, states and a topic only. An event without a user goes to every user.
 type Event struct {
 	ID    uint64    `json:"id"`
 	User  uuid.UUID `json:"-"`
+	Topic string    `json:"topic,omitempty"`
 	App   uuid.UUID `json:"app"`
 	Event string    `json:"event"`
 	From  string    `json:"from"`
@@ -51,6 +59,17 @@ func (h *Hub) Publish(e Event) {
 	// IDs grow across restarts (micro seconds), so a page's Last-Event-ID never skips new events.
 	h.seq = max(h.seq+1, uint64(time.Now().UnixMicro()))
 	e.ID = h.seq
+	if e.User == uuid.Nil { // for everyone, without replay: it only asks pages to refresh
+		for _, subs := range h.subs {
+			for ch := range subs {
+				select {
+				case ch <- e:
+				default:
+				}
+			}
+		}
+		return
+	}
 	h.recent[e.User] = append(h.recent[e.User], e)
 	if r := h.recent[e.User]; len(r) > replay {
 		h.recent[e.User] = r[len(r)-replay:]
@@ -93,6 +112,7 @@ func (h *Hub) Subscribe(user uuid.UUID, lastID uint64) ([]Event, <-chan Event, f
 
 type payload struct {
 	User  uuid.UUID `json:"user"`
+	Topic string    `json:"topic"`
 	App   uuid.UUID `json:"app"`
 	Event string    `json:"event"`
 	From  string    `json:"from"`
@@ -128,9 +148,19 @@ func listenOnce(ctx context.Context, pool *pgxpool.Pool, hub *Hub) error {
 			return err
 		}
 		var p payload
-		if json.Unmarshal([]byte(n.Payload), &p) != nil || p.User == uuid.Nil {
+		if json.Unmarshal([]byte(n.Payload), &p) != nil || (p.User == uuid.Nil && p.Topic != TopicCrawl && p.Topic != TopicMatches) {
 			continue
 		}
-		hub.Publish(Event{User: p.User, App: p.App, Event: p.Event, From: p.From, To: p.To})
+		hub.Publish(Event{User: p.User, Topic: p.Topic, App: p.App, Event: p.Event, From: p.From, To: p.To})
 	}
+}
+
+// Notify sends an event on the channel from a worker (user uuid.Nil: every user); listening servers forward it.
+func Notify(ctx context.Context, pool *pgxpool.Pool, topic, event string, user uuid.UUID) error {
+	b, err := json.Marshal(payload{User: user, Topic: topic, Event: event})
+	if err != nil {
+		return err
+	}
+	_, err = pool.Exec(ctx, "SELECT pg_notify($1, $2)", Channel, string(b))
+	return err
 }

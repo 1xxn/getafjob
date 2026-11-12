@@ -13,6 +13,7 @@ import (
 	"github.com/riverqueue/river/rivertype"
 
 	"github.com/1xxn/getafjob/internal/matching"
+	"github.com/1xxn/getafjob/internal/platform/events"
 	"github.com/1xxn/getafjob/internal/profile"
 	profilestore "github.com/1xxn/getafjob/internal/profile/adapters/pgstore"
 )
@@ -40,6 +41,7 @@ type matchWorker struct {
 	river.WorkerDefaults[MatchArgs]
 	svc    *matching.Service
 	logger *slog.Logger
+	notify notifier
 }
 
 // Timeout bounds one run over the whole index.
@@ -53,6 +55,9 @@ func (w *matchWorker) Work(ctx context.Context, job *river.Job[MatchArgs]) error
 	st, err := w.svc.Run(ctx, users)
 	if err != nil {
 		return err
+	}
+	if w.notify != nil { // one user's ratings, or (after a crawl) everyone's
+		w.notify(ctx, events.TopicMatches, "rated", job.Args.UserID)
 	}
 	w.logger.InfoContext(ctx, "matching finished", "users", st.Users, "jobs", st.Jobs,
 		"match", st.Decisions[matching.Match], "maybe", st.Decisions[matching.Maybe], "skip", st.Decisions[matching.Skip])

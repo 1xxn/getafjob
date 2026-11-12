@@ -192,11 +192,9 @@ func CrawlStatus(c CrawlStatusData) templ.Component {
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
-			if c.Running || c.Queued {
-				templ_7745c5c3_Err = templruntime.RenderAttributes(ctx, templ_7745c5c3_Buffer, templ_7745c5c3_ElementWriter, "div", HX(ctx, "hx-get", "/jobs/crawl/status", "hx-trigger", "every 3s", "hx-swap", "outerHTML"))
-				if templ_7745c5c3_Err != nil {
-					return templ_7745c5c3_Err
-				}
+			templ_7745c5c3_Err = templruntime.RenderAttributes(ctx, templ_7745c5c3_Buffer, templ_7745c5c3_ElementWriter, "div", HX(ctx, "hx-get", "/jobs/crawl/status", "hx-trigger", "getafjob:jobs from:body delay:700ms", "hx-swap", "outerMorph transition:false"))
+			if templ_7745c5c3_Err != nil {
+				return templ_7745c5c3_Err
 			}
 			templ_7745c5c3_Err = templ.RenderScriptItems(ctx, templ_7745c5c3_ElementWriter, templ_7745c5c3_ElementScripts...)
 			if templ_7745c5c3_Err != nil {

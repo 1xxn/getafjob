@@ -19,6 +19,15 @@ function initEvents() {
       }
     }
   });
+  source.addEventListener("jobs", (e) => {
+    let detail = null;
+    try {
+      detail = JSON.parse(e.data);
+    } catch {
+      return;
+    }
+    document.body.dispatchEvent(new CustomEvent("getafjob:jobs", { detail }));
+  });
   window.addEventListener("pagehide", () => source.close());
 }
 if (document.readyState === "loading") {

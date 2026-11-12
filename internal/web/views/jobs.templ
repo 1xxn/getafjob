@@ -162,9 +162,7 @@ templ CrawlStatus(c CrawlStatusData) {
 	<div
 		id="crawl-status"
 		class="crawl-status-bar"
-		if c.Running || c.Queued {
-			{ HX(ctx, "hx-get", "/jobs/crawl/status", "hx-trigger", "every 3s", "hx-swap", "outerHTML")... }
-		}
+		{ HX(ctx, "hx-get", "/jobs/crawl/status", "hx-trigger", "getafjob:jobs from:body delay:700ms", "hx-swap", "outerMorph transition:false")... }
 	>
 		<div class="crawl-status-info">
 			if c.Running {

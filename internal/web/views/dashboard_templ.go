@@ -254,7 +254,7 @@ func DashboardBody(d DashboardData) templ.Component {
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
-			templ_7745c5c3_Err = templruntime.RenderAttributes(ctx, templ_7745c5c3_Buffer, templ_7745c5c3_ElementWriter, "div", HX(ctx, "hx-get", "/dashboard", "hx-trigger", "getafjob:app from:body delay:700ms", "hx-swap", "outerMorph transition:false"))
+			templ_7745c5c3_Err = templruntime.RenderAttributes(ctx, templ_7745c5c3_Buffer, templ_7745c5c3_ElementWriter, "div", HX(ctx, "hx-get", "/dashboard", "hx-trigger", "getafjob:app from:body delay:700ms, getafjob:jobs from:body delay:700ms", "hx-swap", "outerMorph transition:false"))
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
