@@ -1124,5 +1124,11 @@
   "admin.system.passkeys": "Passkeys",
   "admin.system.on": "an",
   "admin.system.off": "aus",
-  "documents.review_month_placeholder": "JJJJ-MM"
+  "documents.review_month_placeholder": "JJJJ-MM",
+  "profile.autosave.hint": "Änderungen werden automatisch gespeichert.",
+  "profile.autosave.saved": "Gespeichert",
+  "profile.autosave.invalid": "Nicht gespeichert, prüf: {fields}",
+  "profile.autosave.conflict": "In einem anderen Fenster geändert. Lade die Seite neu, um den neuesten Stand zu sehen.",
+  "profile.autosave.gone": "Diesen Eintrag gibt es nicht mehr. Lade die Seite neu.",
+  "profile.autosave.error": "Nicht gespeichert. Versuch es gleich noch einmal."
 }

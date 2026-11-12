@@ -1124,5 +1124,11 @@
   "admin.system.passkeys": "Passkeys",
   "admin.system.on": "on",
   "admin.system.off": "off",
-  "documents.review_month_placeholder": "YYYY-MM"
+  "documents.review_month_placeholder": "YYYY-MM",
+  "profile.autosave.hint": "Changes save on their own.",
+  "profile.autosave.saved": "Saved",
+  "profile.autosave.invalid": "Not saved, check: {fields}",
+  "profile.autosave.conflict": "Changed in another window. Reload the page to see the newest state.",
+  "profile.autosave.gone": "This entry does not exist any more. Reload the page.",
+  "profile.autosave.error": "Not saved. Try again in a moment."
 }
