@@ -16,7 +16,7 @@ How it runs:
   `https://localhost` by a host resolver rule and trusts only the key of Caddy's local intermediate CA
   (`--ignore-certificate-errors-spki-list`); every other certificate still fails.
 - Each run invites a fresh user (`admin invite`), so most journeys never depend on demo data.
-- Journeys with real runs (`Demo(t)`) use the demo user of `admin demo -fixtures http://fixtures:8080`, whose jobs
+- Journeys with real runs (`Demo(t)`) use the demo user of `admin demo -fixtures http://fixtures:8080 -autonomy suggest`, whose jobs
   point at the fixture site. It signs in with a mail link read from Mailpit (the test container joins the
   `devtools` network). Mail links are limited to 3 per 15 minutes; after many local reruns, wait.
 - A journey opens a tab with `Open(t, width, height, scheme)` and fails on console errors, CSP violations, script

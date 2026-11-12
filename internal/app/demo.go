@@ -13,6 +13,8 @@ import (
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5/pgxpool"
 
+	"github.com/1xxn/getafjob/internal/application"
+	applicationstore "github.com/1xxn/getafjob/internal/application/adapters/pgstore"
 	"github.com/1xxn/getafjob/internal/demo"
 	"github.com/1xxn/getafjob/internal/discovery"
 	discoverystore "github.com/1xxn/getafjob/internal/discovery/adapters/pgstore"
@@ -39,10 +41,12 @@ func adminDemo(ctx context.Context, args []string, env Env) int {
 	seed := fs.Uint64("seed", 1, "seed; the same seed gives the same postings")
 	force := fs.Bool("force", false, "also run when GETAFJOB_PUBLIC_URL is not a local address")
 	fixtures := fs.String("fixtures", "", "point the postings at this fixture site (development stack: http://fixtures:8080)")
-	if err := fs.Parse(args); err != nil || fs.NArg() != 0 || *jobs < 0 || *jobs > maxDemoJobs {
-		_, _ = fmt.Fprintln(env.Stderr, "usage: getafjob admin demo [-jobs 2000] [-seed 1] [-fixtures URL] [-force]")
+	autonomy := fs.String("autonomy", "", "autonomy level of the demo users: suggest, approve or autonomous (empty: keep)")
+	if err := fs.Parse(args); err != nil || fs.NArg() != 0 || *jobs < 0 || *jobs > maxDemoJobs || !validLevel(*autonomy) {
+		_, _ = fmt.Fprintln(env.Stderr, "usage: getafjob admin demo [-jobs 2000] [-seed 1] [-fixtures URL] [-autonomy suggest|approve|autonomous] [-force]")
 		return ExitUsage
 	}
+	level := application.Level(*autonomy)
 	cfg, err := config.Load(env.Config)
 	if err != nil {
 		_, _ = fmt.Fprintf(env.Stderr, "configuration error:\n%v\n", err)
@@ -80,7 +84,7 @@ func adminDemo(ctx context.Context, args []string, env Env) int {
 		}
 		docs = profile.NewDocuments(profilestore.New(pool), blob.NewSealed(files, envelope), envelope)
 	}
-	st, err := seedDemo(ctx, pool, envelope, cfg.PublicURL, *jobs, *seed, time.Now(), site, docs, env.Stdout)
+	st, err := seedDemo(ctx, pool, envelope, cfg.PublicURL, *jobs, *seed, time.Now(), site, docs, level, env.Stdout)
 	if err != nil {
 		_, _ = fmt.Fprintln(env.Stderr, "demo failed:", err)
 		return ExitError
@@ -88,6 +92,15 @@ func adminDemo(ctx context.Context, args []string, env Env) int {
 	_, _ = fmt.Fprintf(env.Stdout, "matched %d jobs for %d users: %d match, %d maybe, %d skip\n", st.Jobs,
 		st.Users, st.Decisions[matching.Match], st.Decisions[matching.Maybe], st.Decisions[matching.Skip])
 	return ExitOK
+}
+
+// validLevel accepts an empty level (keep the users' setting) or one of the autonomy levels.
+func validLevel(l string) bool {
+	switch application.Level(l) {
+	case "", application.LevelSuggest, application.LevelApprove, application.LevelAutonomous:
+		return true
+	}
+	return false
 }
 
 // localURL reports a development address: localhost, loopback, *.localhost or *.test.
@@ -102,8 +115,9 @@ func localURL(u *url.URL) bool {
 
 // seedDemo creates the demo users (or reuses them), saves their profiles, upserts the postings and matches them.
 func seedDemo(ctx context.Context, pool *pgxpool.Pool, sealer profile.Sealer, public *url.URL, jobs int, seed uint64,
-	now time.Time, fixtures *url.URL, docs *profile.Documents, out io.Writer,
+	now time.Time, fixtures *url.URL, docs *profile.Documents, level application.Level, out io.Writer,
 ) (matching.Stats, error) {
+	apps := application.NewService(applicationstore.New(pool))
 	ids := identity.NewService(pgstore.New(pool), nil, public)
 	pstore := profilestore.New(pool)
 	profiles := profile.NewService(pstore, sealer)
@@ -122,6 +136,18 @@ func seedDemo(ctx context.Context, pool *pgxpool.Pool, sealer profile.Sealer, pu
 		}
 		if err := profiles.SavePreferences(ctx, id, p.Preferences); err != nil {
 			return matching.Stats{}, err
+		}
+		// The level is set before the postings arrive, so the planner never queues for a user who should only get
+		// suggestions (the end to end stack: journeys start their own runs).
+		if level != "" {
+			st, err := apps.Settings(ctx, id)
+			if err != nil {
+				return matching.Stats{}, err
+			}
+			st.Level = level
+			if err := apps.SaveSettings(ctx, id, st); err != nil {
+				return matching.Stats{}, err
+			}
 		}
 		if err := demoCV(ctx, docs, id, p); err != nil {
 			return matching.Stats{}, fmt.Errorf("%s cv: %w", p.Email, err)
