@@ -2,6 +2,7 @@ name: Dependency review
 
 on:
   pull_request:
+  merge_group: # the check is required; in the queue it is skipped (it ran on the pull request), which counts as passed
 
 permissions: {}
 
@@ -12,6 +13,7 @@ concurrency:
 jobs:
   dependency-review:
     name: dependency-review
+    if: github.event_name == 'pull_request'
     runs-on: ubuntu-26.04
     permissions:
       contents: read

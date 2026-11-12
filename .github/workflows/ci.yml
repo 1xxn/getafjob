@@ -2,6 +2,7 @@ name: CI
 
 on:
   pull_request:
+  merge_group: # the merge queue tests each pull request on top of main before it lands
   push:
     branches: [main]
 
@@ -54,7 +55,7 @@ jobs:
       - name: buf lint
         run: go tool buf lint
       - name: buf breaking
-        if: github.event_name == 'pull_request'
+        if: github.event_name != 'push'
         run: go tool buf breaking --against "https://github.com/${GITHUB_REPOSITORY}.git#branch=main"
 
   lint:
@@ -233,7 +234,8 @@ jobs:
           tags: getafjob-runner:dev
           load: true
           cache-from: type=gha,scope=runner
-          cache-to: type=gha,scope=runner,mode=max
+          # Only main writes the cache, so a pull request cannot place layers that main builds from.
+          cache-to: ${{ github.event_name == 'push' && 'type=gha,scope=runner,mode=max' || '' }}
       - name: browser tests inside the runner image (sandbox on, seccomp profile)
         run: go tool task test:browser:run
 
