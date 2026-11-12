@@ -1,7 +1,7 @@
 name: Publish images
 
 # Reusable: builds app, runner and egress for amd64 and arm64, pushes them to GHCR, signs them keyless with
-# cosign and attaches build provenance. Called by images.yml (main → staging) and release.yml (tags).
+# cosign and attaches build provenance. Called by main.yml (main → staging) and release.yml (tags).
 on:
   workflow_call:
     inputs:
