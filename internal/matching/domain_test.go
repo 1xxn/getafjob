@@ -285,6 +285,9 @@ func TestInspectFit(t *testing.T) {
 	if fit.JobLevel != "senior" {
 		t.Errorf("JobLevel = %q, want senior", fit.JobLevel)
 	}
+	if fit.LocationReason != "location.city" || fit.LocationParams["city"] == "" {
+		t.Errorf("location reason %q without its city: %v", fit.LocationReason, fit.LocationParams)
+	}
 	if fit.SkillPoints <= 0 || fit.MaxSkillPoints != 25 {
 		t.Errorf("SkillPoints = %d / %d", fit.SkillPoints, fit.MaxSkillPoints)
 	}

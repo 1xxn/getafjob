@@ -168,26 +168,27 @@ func (m *Matcher) Evaluate(j Job, now time.Time) Result {
 
 // FitInspection is a granular breakdown of how a candidate matches a job.
 type FitInspection struct {
-	Score              int      `json:"score"`
-	Decision           Decision `json:"decision"`
-	MatchingSkills     []string `json:"matching_skills"`
-	MissingSkills      []string `json:"missing_skills"`
-	SkillPoints        int      `json:"skill_points"`
-	MaxSkillPoints     int      `json:"max_skill_points"`
-	TitlePoints        int      `json:"title_points"`
-	MaxTitlePoints     int      `json:"max_title_points"`
-	SeniorityPoints    int      `json:"seniority_points"`
-	MaxSeniorityPoints int      `json:"max_seniority_points"`
-	CandidateLevel     string   `json:"candidate_level"`
-	JobLevel           string   `json:"job_level"`
-	LocationPoints     int      `json:"location_points"`
-	MaxLocationPoints  int      `json:"max_location_points"`
-	LocationReason     string   `json:"location_reason"`
-	Workplace          string   `json:"workplace"`
-	LanguagePoints     int      `json:"language_points"`
-	SalaryPoints       int      `json:"salary_points"`
-	RecencyPoints      int      `json:"recency_points"`
-	Reasons            []Reason `json:"reasons"`
+	Score              int               `json:"score"`
+	Decision           Decision          `json:"decision"`
+	MatchingSkills     []string          `json:"matching_skills"`
+	MissingSkills      []string          `json:"missing_skills"`
+	SkillPoints        int               `json:"skill_points"`
+	MaxSkillPoints     int               `json:"max_skill_points"`
+	TitlePoints        int               `json:"title_points"`
+	MaxTitlePoints     int               `json:"max_title_points"`
+	SeniorityPoints    int               `json:"seniority_points"`
+	MaxSeniorityPoints int               `json:"max_seniority_points"`
+	CandidateLevel     string            `json:"candidate_level"`
+	JobLevel           string            `json:"job_level"`
+	LocationPoints     int               `json:"location_points"`
+	MaxLocationPoints  int               `json:"max_location_points"`
+	LocationReason     string            `json:"location_reason"`
+	LocationParams     map[string]string `json:"location_params,omitempty"`
+	Workplace          string            `json:"workplace"`
+	LanguagePoints     int               `json:"language_points"`
+	SalaryPoints       int               `json:"salary_points"`
+	RecencyPoints      int               `json:"recency_points"`
+	Reasons            []Reason          `json:"reasons"`
 }
 
 // InspectFit provides a detailed fit breakdown including all matching skills and missing keywords.
@@ -224,6 +225,7 @@ func (m *Matcher) InspectFit(j Job, now time.Time) FitInspection {
 		LocationPoints:     locationReason.Points,
 		MaxLocationPoints:  maxLocation,
 		LocationReason:     locationReason.Code,
+		LocationParams:     locationReason.Params,
 		Workplace:          j.Workplace,
 		LanguagePoints:     langReason.Points,
 		SalaryPoints:       salReason.Points,
