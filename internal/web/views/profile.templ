@@ -78,12 +78,11 @@ templ workplaceSelect(id, value string) {
 	</div>
 }
 
-templ ProfilePage(name string, f Form, experiences []ProfileExperienceRow, educations []ProfileEducationRow) {
-	@Layout(Page{Title: T(ctx, "profile.title"), UserName: name}) {
-		@Section(T(ctx, "profile.title")) {
+templ ProfilePage(name string, h CandidateHead, f Form, experiences []ProfileExperienceRow, educations []ProfileEducationRow) {
+	@candidatePage(T(ctx, "profile.title"), name, h) {
 			<p class="muted">{ T(ctx, "profile.text") }</p>
 			@formNotice(f)
-			<form method="post" action="/profile" class="stack" novalidate>
+			<form method="post" data-dirty-guard action="/profile" class="stack" novalidate>
 				<input type="hidden" name="version" value={ f.Version }/>
 				<h2>{ T(ctx, "profile.section.personal") }</h2>
 				@Field(input(ctx, f, "first_name", "text", "given-name", 200))
@@ -122,7 +121,7 @@ templ ProfilePage(name string, f Form, experiences []ProfileExperienceRow, educa
 			</form>
 
 			<h2 class="form-section" id="stations">{ T(ctx, "profile.section.experience") }</h2>
-			<form method="post" action="/profile/experiences" class="stack" novalidate>
+			<form method="post" data-dirty-guard action="/profile/experiences" class="stack" novalidate>
 				<h3>{ T(ctx, "profile.station.add_experience") }</h3>
 				@Field(FieldProps{Name: "title", Label: T(ctx, "profile.station.title"), Type: "text", MaxLength: 200})
 				@Field(FieldProps{Name: "company", Label: T(ctx, "profile.station.company"), Type: "text", MaxLength: 200})
@@ -135,7 +134,7 @@ templ ProfilePage(name string, f Form, experiences []ProfileExperienceRow, educa
 				<button type="submit" class="primary">{ T(ctx, "profile.station.add_experience") }</button>
 			</form>
 			for _, exp := range experiences {
-				<form method="post" action={ templ.SafeURL("/profile/experiences/" + exp.ID) } class="stack form-section" novalidate>
+				<form method="post" data-dirty-guard action={ templ.SafeURL("/profile/experiences/" + exp.ID) } class="stack form-section" novalidate>
 					@Field(FieldProps{Name: "title", ID: "f-title-" + exp.ID, Label: T(ctx, "profile.station.title"), Type: "text", Value: exp.Title, MaxLength: 200})
 					@Field(FieldProps{Name: "company", ID: "f-company-" + exp.ID, Label: T(ctx, "profile.station.company"), Type: "text", Value: exp.Company, MaxLength: 200})
 					@Field(FieldProps{Name: "location", ID: "f-location-" + exp.ID, Label: T(ctx, "profile.station.location"), Type: "text", Value: exp.Location, MaxLength: 200})
@@ -146,15 +145,15 @@ templ ProfilePage(name string, f Form, experiences []ProfileExperienceRow, educa
 					@TextArea(FieldProps{Name: "bullets", ID: "f-bullets-" + exp.ID, Label: T(ctx, "profile.station.bullets"), Hint: T(ctx, "profile.station.bullets_hint"), Value: exp.DescriptionBullets, MaxLength: 5000})
 					<div class="actions">
 						<button type="submit">{ T(ctx, "profile.save") }</button>
-						<button type="submit" class="link" formaction={ templ.SafeURL("/profile/experiences/" + exp.ID + "/up") }>{ T(ctx, "profile.station.up") }</button>
-						<button type="submit" class="link" formaction={ templ.SafeURL("/profile/experiences/" + exp.ID + "/down") }>{ T(ctx, "profile.station.down") }</button>
-						<button type="submit" class="link danger" formaction={ templ.SafeURL("/profile/experiences/" + exp.ID + "/delete") }>{ T(ctx, "profile.station.delete") }</button>
+						<button { HX(ctx)... } type="submit" class="link" formaction={ templ.SafeURL("/profile/experiences/" + exp.ID + "/up") }>{ T(ctx, "profile.station.up") }</button>
+						<button { HX(ctx)... } type="submit" class="link" formaction={ templ.SafeURL("/profile/experiences/" + exp.ID + "/down") }>{ T(ctx, "profile.station.down") }</button>
+						<button { HX(ctx)... } type="submit" class="link danger" formaction={ templ.SafeURL("/profile/experiences/" + exp.ID + "/delete") }>{ T(ctx, "profile.station.delete") }</button>
 					</div>
 				</form>
 			}
 
 			<h2 class="form-section">{ T(ctx, "profile.section.education") }</h2>
-			<form method="post" action="/profile/educations" class="stack" novalidate>
+			<form method="post" data-dirty-guard action="/profile/educations" class="stack" novalidate>
 				<h3>{ T(ctx, "profile.station.add_education") }</h3>
 				@Field(FieldProps{Name: "degree", Label: T(ctx, "profile.station.degree"), Type: "text", MaxLength: 200})
 				@Field(FieldProps{Name: "institution", Label: T(ctx, "profile.station.institution"), Type: "text", MaxLength: 200})
@@ -166,7 +165,7 @@ templ ProfilePage(name string, f Form, experiences []ProfileExperienceRow, educa
 				<button type="submit" class="primary">{ T(ctx, "profile.station.add_education") }</button>
 			</form>
 			for _, edu := range educations {
-				<form method="post" action={ templ.SafeURL("/profile/educations/" + edu.ID) } class="stack form-section" novalidate>
+				<form method="post" data-dirty-guard action={ templ.SafeURL("/profile/educations/" + edu.ID) } class="stack form-section" novalidate>
 					@Field(FieldProps{Name: "degree", ID: "f-degree-" + edu.ID, Label: T(ctx, "profile.station.degree"), Type: "text", Value: edu.Degree, MaxLength: 200})
 					@Field(FieldProps{Name: "institution", ID: "f-institution-" + edu.ID, Label: T(ctx, "profile.station.institution"), Type: "text", Value: edu.Institution, MaxLength: 200})
 					@Field(FieldProps{Name: "field_of_study", ID: "f-field_of_study-" + edu.ID, Label: T(ctx, "profile.station.field_of_study"), Type: "text", Value: edu.FieldOfStudy, MaxLength: 200})
@@ -176,14 +175,13 @@ templ ProfilePage(name string, f Form, experiences []ProfileExperienceRow, educa
 					@Field(FieldProps{Name: "grade", ID: "f-grade-" + edu.ID, Label: T(ctx, "profile.station.grade"), Type: "text", Value: edu.Grade, MaxLength: 50})
 					<div class="actions">
 						<button type="submit">{ T(ctx, "profile.save") }</button>
-						<button type="submit" class="link" formaction={ templ.SafeURL("/profile/educations/" + edu.ID + "/up") }>{ T(ctx, "profile.station.up") }</button>
-						<button type="submit" class="link" formaction={ templ.SafeURL("/profile/educations/" + edu.ID + "/down") }>{ T(ctx, "profile.station.down") }</button>
-						<button type="submit" class="link danger" formaction={ templ.SafeURL("/profile/educations/" + edu.ID + "/delete") }>{ T(ctx, "profile.station.delete") }</button>
+						<button { HX(ctx)... } type="submit" class="link" formaction={ templ.SafeURL("/profile/educations/" + edu.ID + "/up") }>{ T(ctx, "profile.station.up") }</button>
+						<button { HX(ctx)... } type="submit" class="link" formaction={ templ.SafeURL("/profile/educations/" + edu.ID + "/down") }>{ T(ctx, "profile.station.down") }</button>
+						<button { HX(ctx)... } type="submit" class="link danger" formaction={ templ.SafeURL("/profile/educations/" + edu.ID + "/delete") }>{ T(ctx, "profile.station.delete") }</button>
 					</div>
 				</form>
 			}
 		}
-	}
 }
 
 templ PreferencesPage(name string, f Form) {
@@ -319,13 +317,13 @@ templ PreferencesPage(name string, f Form) {
 				@Field(input(ctx, f, "notify_quiet_hours_end", "text", "", 5))
 				<h2>{ T(ctx, "profile.assist.title") }</h2>
 				<p class="muted">{ T(ctx, "profile.assist.hint") }</p>
-				<button type="submit" formaction="/preferences/assist/pair" class="secondary">{ T(ctx, "profile.assist.generate_code") }</button>
+				<button { HX(ctx)... } type="submit" formaction="/preferences/assist/pair" class="secondary">{ T(ctx, "profile.assist.generate_code") }</button>
 				<h2>{ T(ctx, "profile.home_runner.title") }</h2>
 				<p class="muted">{ T(ctx, "profile.home_runner.hint") }</p>
-				<button type="submit" formaction="/preferences/runner/token" class="secondary">{ T(ctx, "profile.home_runner.generate_token") }</button>
+				<button { HX(ctx)... } type="submit" formaction="/preferences/runner/token" class="secondary">{ T(ctx, "profile.home_runner.generate_token") }</button>
 				@StickyBar() {
 					<button type="submit" class="primary">{ T(ctx, "profile.save") }</button>
-					<button type="submit" formaction="/preferences/notify/test" class="secondary">{ T(ctx, "profile.notify.test") }</button>
+					<button { HX(ctx)... } type="submit" formaction="/preferences/notify/test" class="secondary">{ T(ctx, "profile.notify.test") }</button>
 				}
 			</form>
 		}

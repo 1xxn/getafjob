@@ -3,6 +3,7 @@ package web
 import (
 	"errors"
 	"net/http"
+	"strings"
 
 	"github.com/google/uuid"
 
@@ -17,11 +18,20 @@ func (s *Server) renderAnswers(w http.ResponseWriter, r *http.Request, u *identi
 		s.failed(w, r, u, err)
 		return
 	}
-	rows := make([]views.AnswerRow, len(list))
-	for i, a := range list {
-		rows[i] = views.AnswerRow{ID: a.ID.String(), Question: a.Question, Answer: a.Answer}
+	var uses map[string]int
+	if s.Apps != nil {
+		uses, _ = s.Apps.AnswerUsage(r.Context(), u.ID) // a count, not worth failing the page for
 	}
-	s.render(w, r, status, views.AnswersPage(u.DisplayName, f, rows))
+	q := strings.TrimSpace(r.URL.Query().Get("q"))
+	needle := strings.ToLower(q)
+	d := views.AnswersData{Query: q, Total: len(list)}
+	for _, a := range list {
+		if needle != "" && !strings.Contains(strings.ToLower(a.Question+" "+a.Answer), needle) {
+			continue
+		}
+		d.Rows = append(d.Rows, views.AnswerRow{ID: a.ID.String(), Question: a.Question, Answer: a.Answer, Uses: uses[a.ID.String()]})
+	}
+	s.render(w, r, status, views.AnswersPage(u.DisplayName, s.candidateHead(r.Context(), u, "answers"), f, d))
 }
 
 func (s *Server) renderTexts(w http.ResponseWriter, r *http.Request, u *identity.User, status int, f views.Form) {
@@ -34,7 +44,7 @@ func (s *Server) renderTexts(w http.ResponseWriter, r *http.Request, u *identity
 	for i, t := range list {
 		rows[i] = views.TextRow{ID: t.ID.String(), Name: t.Name, Language: t.Language, Body: t.Body}
 	}
-	s.render(w, r, status, views.TextsPage(u.DisplayName, f, rows, profile.Placeholders))
+	s.render(w, r, status, views.TextsPage(u.DisplayName, s.candidateHead(r.Context(), u, "texts"), f, rows, profile.Placeholders))
 }
 
 // itemID parses the {id} of an existing item; the add routes have none.

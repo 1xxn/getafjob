@@ -44,7 +44,7 @@ func (s *Server) renderDocuments(w http.ResponseWriter, r *http.Request, u *iden
 			Created: views.When(r.Context(), d.CreatedAt), Label: d.Label, Language: d.Language, Focus: strings.Join(d.Focus, ", "),
 			Import: s.Importer != nil && (d.Mime == profile.MimePDF || d.Mime == profile.MimeDOCX)}
 	}
-	s.render(w, r, status, views.DocumentsPage(u.DisplayName, notice, failed, rows))
+	s.render(w, r, status, views.DocumentsPage(u.DisplayName, s.candidateHead(r.Context(), u, "documents"), notice, failed, rows))
 }
 
 // readUpload streams the multipart body: the kind field and one file, kept in memory (no temporary files).

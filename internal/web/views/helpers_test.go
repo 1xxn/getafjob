@@ -4,6 +4,7 @@ import (
 	"os"
 	"path/filepath"
 	"regexp"
+	"strings"
 	"testing"
 
 	"github.com/1xxn/getafjob/internal/platform/i18n"
@@ -49,15 +50,29 @@ func TestTemplatesHaveNoInlineStyles(t *testing.T) {
 	more, _ := filepath.Glob("ui/*.templ")
 	rx := regexp.MustCompile(`\sstyle=`)
 	for _, f := range append(files, more...) {
-		if f == "cvreview.templ" { // rebuilt in #181
-			continue
-		}
 		b, err := os.ReadFile(f)
 		if err != nil {
 			t.Fatal(err)
 		}
 		if loc := rx.FindIndex(b); loc != nil {
 			t.Errorf("%s: inline style near %q", f, b[loc[0]:min(loc[1]+30, len(b))])
+		}
+	}
+}
+
+// A submit button that overrides the form's action needs a nonce, or htmx's CSP extension blocks the boosted form.
+func TestFormactionButtonsHaveNonce(t *testing.T) {
+	files, _ := filepath.Glob("*.templ")
+	rx := regexp.MustCompile(`<button\b[^>]*formaction=[^>]*>`)
+	for _, f := range files {
+		b, err := os.ReadFile(f)
+		if err != nil {
+			t.Fatal(err)
+		}
+		for _, m := range rx.FindAll(b, -1) {
+			if !strings.Contains(string(m), "HX(ctx") {
+				t.Errorf("%s: button with formaction and no nonce: %.80s", f, m)
+			}
 		}
 	}
 }

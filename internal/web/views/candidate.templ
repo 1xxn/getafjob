@@ -1,0 +1,68 @@
+package views
+
+import (
+	"context"
+
+	"github.com/1xxn/getafjob/internal/web/views/ui"
+)
+
+// CandidateHead is the shared head of the candidate pages: how complete the profile is, what is missing, and the
+// tabs between profile, documents, answers and texts.
+type CandidateHead struct {
+	Tab   string // profile, documents, answers, texts
+	Done  int
+	Total int
+	Gaps  []CandidateGap
+}
+
+// CandidateGap is one missing piece with the place that fills it.
+type CandidateGap struct {
+	Key  string // catalog key
+	Href string
+}
+
+func candidateTabs(ctx context.Context, tab string) []ui.Tab {
+	var out []ui.Tab
+	for _, t := range []string{"profile", "documents", "answers", "texts"} {
+		out = append(out, ui.Tab{Label: T(ctx, "nav."+t), Href: "/" + t, Active: t == tab})
+	}
+	return out
+}
+
+// candidateHead renders the page title, the completeness meter with its gaps, and the tabs.
+templ candidateHead(title string, h CandidateHead) {
+	<div class="cand-head" data-done={ itoa(h.Done) } data-total={ itoa(h.Total) }>
+		<h1>{ title }</h1>
+		if h.Total > 0 {
+			<div class="cand-meter">
+				@ui.ProgressBar(ui.ProgressProps{ID: "cand-complete", Label: T(ctx, "cand.complete"), Value: h.Done, Max: h.Total,
+					ValueText: T(ctx, "cand.complete_of", "done", h.Done, "total", h.Total), Tone: candTone(h)})
+				if len(h.Gaps) > 0 {
+					<ul class="cand-gaps" aria-label={ T(ctx, "cand.gaps") }>
+						for _, g := range h.Gaps {
+							<li><a href={ templ.URL(g.Href) } data-gap>{ T(ctx, g.Key) }</a></li>
+						}
+					</ul>
+				}
+			</div>
+		}
+		@ui.Tabs(T(ctx, "cand.tabs"), candidateTabs(ctx, h.Tab))
+	</div>
+}
+
+func candTone(h CandidateHead) ui.Tone {
+	if h.Done >= h.Total {
+		return ui.Success
+	}
+	return ui.Accent
+}
+
+// candidatePage is the frame of a candidate page: wide layout, shared head, then the page.
+templ candidatePage(title, name string, h CandidateHead) {
+	@Layout(Page{Title: title, UserName: name, Wide: true}) {
+		<section class="cand" data-guard-unsaved data-t-unsaved={ T(ctx, "cand.unsaved") }>
+			@candidateHead(title, h)
+			{ children... }
+		</section>
+	}
+}

@@ -187,7 +187,8 @@ document.addEventListener(
   'submit',
   (e) => {
     const form = e.target as HTMLFormElement;
-    const text = form.dataset.confirm;
+    // The button that submits may carry its own question (a delete next to save).
+    const text = ((e as SubmitEvent).submitter as HTMLElement | null)?.dataset.confirm || form.dataset.confirm;
     if (!text || confirmed === form) {
       confirmed = null;
       return;
@@ -206,6 +207,43 @@ document.addEventListener(
       form.requestSubmit(submitter instanceof HTMLButtonElement ? submitter : undefined);
     };
     dialog.showModal();
+  },
+  true,
+);
+
+// --- unsaved changes ---
+// Forms with data-dirty-guard remember edits; leaving the page by a link or closing it asks first. The question
+// comes from the page (data-t-unsaved).
+
+function dirty(): boolean {
+  return !!document.querySelector('form[data-dirty-guard][data-dirty]');
+}
+
+document.addEventListener('input', (e) => {
+  const form = (e.target as Element).closest?.<HTMLFormElement>('form[data-dirty-guard]');
+  if (form) form.dataset.dirty = '1';
+});
+
+document.addEventListener('submit', (e) => {
+  delete (e.target as HTMLFormElement).dataset.dirty;
+});
+
+window.addEventListener('beforeunload', (e) => {
+  if (dirty()) e.preventDefault();
+});
+
+document.addEventListener(
+  'click',
+  (e) => {
+    const link = (e.target as Element).closest?.('a[href]');
+    if (!link || !dirty() || link.getAttribute('href')?.startsWith('#')) return;
+    const text = document.querySelector<HTMLElement>('[data-t-unsaved]')?.dataset.tUnsaved ?? '';
+    if (window.confirm(text)) {
+      for (const f of document.querySelectorAll<HTMLFormElement>('form[data-dirty]')) delete f.dataset.dirty;
+      return;
+    }
+    e.preventDefault();
+    e.stopImmediatePropagation();
   },
   true,
 );

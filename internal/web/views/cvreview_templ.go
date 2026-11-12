@@ -99,7 +99,7 @@ func DocumentReviewPage(p DocumentReviewProps) templ.Component {
 						}
 					}
 				}
-				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 3, " <div class=\"card\" style=\"margin-bottom: 1.5rem; background: var(--bg-surface, #f8f9fa); padding: 0.75rem 1rem; border-radius: 6px;\"><strong>")
+				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 3, " <div class=\"card rv-intro\"><strong>")
 				if templ_7745c5c3_Err != nil {
 					return templ_7745c5c3_Err
 				}
@@ -164,7 +164,7 @@ func DocumentReviewPage(p DocumentReviewProps) templ.Component {
 				if templ_7745c5c3_Err != nil {
 					return templ_7745c5c3_Err
 				}
-				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 8, "\"><div style=\"margin-bottom: 2rem;\"><h3>")
+				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 8, "\"><div class=\"rv-section\"><h3>")
 				if templ_7745c5c3_Err != nil {
 					return templ_7745c5c3_Err
 				}
@@ -201,7 +201,7 @@ func DocumentReviewPage(p DocumentReviewProps) templ.Component {
 					}
 				} else {
 					for i, exp := range p.Experiences {
-						templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 12, "<div class=\"card\" style=\"margin-bottom: 1.25rem; border: 1px solid var(--border, #e5e7eb); padding: 1rem; border-radius: 6px;\"><div style=\"display: flex; align-items: center; justify-content: space-between; margin-bottom: 0.75rem;\"><label style=\"font-weight: 600; display: flex; align-items: center; gap: 0.5rem; cursor: pointer;\"><input type=\"checkbox\" name=\"")
+						templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 12, "<div class=\"card rv-item\"><div class=\"rv-row-head\"><label class=\"rv-check rv-strong\"><input type=\"checkbox\" name=\"")
 						if templ_7745c5c3_Err != nil {
 							return templ_7745c5c3_Err
 						}
@@ -240,7 +240,7 @@ func DocumentReviewPage(p DocumentReviewProps) templ.Component {
 						if templ_7745c5c3_Err != nil {
 							return templ_7745c5c3_Err
 						}
-						templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 15, "</label></div><div class=\"grid\" style=\"display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 0.75rem;\"><div class=\"field\"><label>")
+						templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 15, "</label></div><div class=\"grid rv-grid\"><div class=\"field\"><label>")
 						if templ_7745c5c3_Err != nil {
 							return templ_7745c5c3_Err
 						}
@@ -514,7 +514,7 @@ func DocumentReviewPage(p DocumentReviewProps) templ.Component {
 						if templ_7745c5c3_Err != nil {
 							return templ_7745c5c3_Err
 						}
-						templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 39, "\" placeholder=\"YYYY-MM\" maxlength=\"30\"></div></div><div style=\"margin-top: 0.5rem;\"><label style=\"display: flex; align-items: center; gap: 0.5rem; cursor: pointer;\"><input type=\"checkbox\" name=\"")
+						templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 39, "\" placeholder=\"YYYY-MM\" maxlength=\"30\"></div></div><div class=\"rv-mt-sm\"><label class=\"rv-check\"><input type=\"checkbox\" name=\"")
 						if templ_7745c5c3_Err != nil {
 							return templ_7745c5c3_Err
 						}
@@ -550,7 +550,7 @@ func DocumentReviewPage(p DocumentReviewProps) templ.Component {
 						if templ_7745c5c3_Err != nil {
 							return templ_7745c5c3_Err
 						}
-						templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 43, "</label></div><div class=\"field\" style=\"margin-top: 0.75rem;\"><label>")
+						templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 43, "</label></div><div class=\"field rv-mt\"><label>")
 						if templ_7745c5c3_Err != nil {
 							return templ_7745c5c3_Err
 						}
@@ -608,7 +608,7 @@ func DocumentReviewPage(p DocumentReviewProps) templ.Component {
 						}
 					}
 				}
-				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 48, "</div><div style=\"margin-bottom: 2rem;\"><h3>")
+				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 48, "</div><div class=\"rv-section\"><h3>")
 				if templ_7745c5c3_Err != nil {
 					return templ_7745c5c3_Err
 				}
@@ -645,7 +645,7 @@ func DocumentReviewPage(p DocumentReviewProps) templ.Component {
 					}
 				} else {
 					for i, edu := range p.Educations {
-						templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 52, "<div class=\"card\" style=\"margin-bottom: 1.25rem; border: 1px solid var(--border, #e5e7eb); padding: 1rem; border-radius: 6px;\"><div style=\"display: flex; align-items: center; justify-content: space-between; margin-bottom: 0.75rem;\"><label style=\"font-weight: 600; display: flex; align-items: center; gap: 0.5rem; cursor: pointer;\"><input type=\"checkbox\" name=\"")
+						templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 52, "<div class=\"card rv-item\"><div class=\"rv-row-head\"><label class=\"rv-check rv-strong\"><input type=\"checkbox\" name=\"")
 						if templ_7745c5c3_Err != nil {
 							return templ_7745c5c3_Err
 						}
@@ -684,7 +684,7 @@ func DocumentReviewPage(p DocumentReviewProps) templ.Component {
 						if templ_7745c5c3_Err != nil {
 							return templ_7745c5c3_Err
 						}
-						templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 55, "</label></div><div class=\"grid\" style=\"display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 0.75rem;\"><div class=\"field\"><label>")
+						templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 55, "</label></div><div class=\"grid rv-grid\"><div class=\"field\"><label>")
 						if templ_7745c5c3_Err != nil {
 							return templ_7745c5c3_Err
 						}
@@ -918,7 +918,7 @@ func DocumentReviewPage(p DocumentReviewProps) templ.Component {
 						if templ_7745c5c3_Err != nil {
 							return templ_7745c5c3_Err
 						}
-						templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 73, "\" placeholder=\"YYYY-MM\" maxlength=\"30\"></div></div><div style=\"margin-top: 0.5rem;\"><label style=\"display: flex; align-items: center; gap: 0.5rem; cursor: pointer;\"><input type=\"checkbox\" name=\"")
+						templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 73, "\" placeholder=\"YYYY-MM\" maxlength=\"30\"></div></div><div class=\"rv-mt-sm\"><label class=\"rv-check\"><input type=\"checkbox\" name=\"")
 						if templ_7745c5c3_Err != nil {
 							return templ_7745c5c3_Err
 						}
@@ -960,7 +960,7 @@ func DocumentReviewPage(p DocumentReviewProps) templ.Component {
 						}
 					}
 				}
-				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 78, "</div><div class=\"card\" style=\"margin-bottom: 2rem; padding: 1rem; border: 1px solid var(--border, #e5e7eb); border-radius: 6px;\"><label style=\"font-weight: 600; display: flex; align-items: center; gap: 0.5rem; cursor: pointer;\"><input type=\"checkbox\" name=\"include_profile\" value=\"1\" checked> ")
+				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 78, "</div><div class=\"card rv-box\"><label class=\"rv-check rv-strong\"><input type=\"checkbox\" name=\"include_profile\" value=\"1\" checked> ")
 				if templ_7745c5c3_Err != nil {
 					return templ_7745c5c3_Err
 				}
@@ -978,7 +978,7 @@ func DocumentReviewPage(p DocumentReviewProps) templ.Component {
 					return templ_7745c5c3_Err
 				}
 				if len(p.Profile.Skills) > 0 {
-					templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 80, "<p style=\"margin: 0.5rem 0 0 1.5rem; font-size: 0.9rem;\" class=\"muted\"><strong>")
+					templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 80, "<p class=\"muted rv-note rv-note-first\"><strong>")
 					if templ_7745c5c3_Err != nil {
 						return templ_7745c5c3_Err
 					}
@@ -1010,7 +1010,7 @@ func DocumentReviewPage(p DocumentReviewProps) templ.Component {
 					}
 				}
 				if len(p.Profile.Languages) > 0 {
-					templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 83, "<p style=\"margin: 0.25rem 0 0 1.5rem; font-size: 0.9rem;\" class=\"muted\"><strong>")
+					templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 83, "<p class=\"muted rv-note\"><strong>")
 					if templ_7745c5c3_Err != nil {
 						return templ_7745c5c3_Err
 					}
@@ -1070,7 +1070,7 @@ func DocumentReviewPage(p DocumentReviewProps) templ.Component {
 						return templ_7745c5c3_Err
 					}
 				}
-				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 90, "</div><div style=\"display: flex; gap: 1rem; align-items: center;\"><button type=\"submit\" class=\"button primary\">")
+				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 90, "</div><div class=\"rv-actions\"><button type=\"submit\" class=\"button primary\">")
 				if templ_7745c5c3_Err != nil {
 					return templ_7745c5c3_Err
 				}

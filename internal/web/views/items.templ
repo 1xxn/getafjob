@@ -1,10 +1,16 @@
 package views
 
-import "strings"
+import (
+	"context"
+	"strings"
+
+	"github.com/1xxn/getafjob/internal/web/views/ui"
+)
 
 // AnswerRow is one saved answer.
 type AnswerRow struct {
 	ID, Question, Answer string
+	Uses                 int // applications that used it
 }
 
 // TextRow is one text block.
@@ -12,63 +18,135 @@ type TextRow struct {
 	ID, Name, Language, Body string
 }
 
-templ AnswersPage(name string, f Form, answers []AnswerRow) {
-	@Layout(Page{Title: T(ctx, "answers.title"), UserName: name}) {
-		@Section(T(ctx, "answers.title")) {
-			<p class="muted">{ T(ctx, "answers.text") }</p>
-			@formNotice(f)
-			<form method="post" action="/answers" class="stack">
-				<h2>{ T(ctx, "answers.add") }</h2>
-				@Field(FieldProps{Name: "question", Label: T(ctx, "answers.question"), Type: "text", Value: f.Values["question"],
-					Error: f.Errors["question"], Hint: T(ctx, "answers.question_hint"), MaxLength: 300})
-				@TextArea(FieldProps{Name: "answer", Label: T(ctx, "answers.answer"), Value: f.Values["answer"], Error: f.Errors["answer"], MaxLength: 5000})
-				<button type="submit" class="primary">{ T(ctx, "answers.save") }</button>
+// AnswersData fills the answer bank.
+type AnswersData struct {
+	Query   string
+	Rows    []AnswerRow
+	Total   int // before the search
+}
+
+templ AnswersPage(name string, h CandidateHead, f Form, d AnswersData) {
+	@candidatePage(T(ctx, "answers.title"), name, h) {
+		<p class="app-hint">{ T(ctx, "answers.text") }</p>
+		@formNotice(f)
+		<div class="cand-tools">
+			<form
+				method="get"
+				action="/answers"
+				role="search"
+				class="apps-search"
+				aria-label={ T(ctx, "answers.search") }
+				{ HX(ctx, "hx-get", "/answers", "hx-target", "#answer-list", "hx-select", "#answer-list", "hx-swap", "outerHTML transition:false", "hx-push-url", "true",
+					"hx-trigger", "submit, input changed delay:300ms from:input")... }
+			>
+				@ui.Input(ui.InputProps{FieldProps: ui.FieldProps{Name: "q", Label: T(ctx, "answers.search"), HideLabel: true},
+					Type: "search", Value: d.Query, Placeholder: T(ctx, "answers.search_placeholder"), MaxLength: 200})
 			</form>
-			for _, a := range answers {
-				<form method="post" action={ templ.SafeURL("/answers/" + a.ID) } class="stack form-section">
-					@Field(FieldProps{Name: "question", ID: "f-question-" + a.ID, Label: T(ctx, "answers.question"), Type: "text", Value: a.Question, MaxLength: 300})
-					@TextArea(FieldProps{Name: "answer", ID: "f-answer-" + a.ID, Label: T(ctx, "answers.answer"), Value: a.Answer, MaxLength: 5000})
-					<button type="submit">{ T(ctx, "profile.save") }</button>
-					<button type="submit" class="link" formaction={ templ.SafeURL("/answers/" + a.ID + "/delete") }>{ T(ctx, "passkey.remove") }</button>
-				</form>
+			@ui.Button(ui.ButtonProps{Label: T(ctx, "answers.add"), Icon: "plus", Attrs: ui.OpenDialog("dlg-answer")})
+		</div>
+		<div id="answer-list" class="cand-list">
+			<p class="app-hint" role="status">{ T(ctx, "answers.count", "shown", len(d.Rows), "total", d.Total) }</p>
+			for _, a := range d.Rows {
+				<details class="cand-item" data-answer={ a.ID }>
+					<summary>
+						<span class="cand-item-title">{ a.Question }</span>
+						<span class="cand-item-meta">
+							if a.Uses > 0 {
+								@ui.Badge(T(ctx, "answers.uses", "n", a.Uses), ui.Accent)
+							} else {
+								@ui.Badge(T(ctx, "answers.unused"), ui.Neutral)
+							}
+						</span>
+						<span class="cand-item-preview">{ a.Answer }</span>
+					</summary>
+					<form method="post" action={ templ.URL("/answers/" + a.ID) } class="app-notes" data-dirty-guard>
+						@ui.Input(ui.InputProps{FieldProps: ui.FieldProps{ID: "f-question-" + a.ID, Name: "question", Label: T(ctx, "answers.question")},
+							Value: a.Question, MaxLength: 300})
+						@ui.Textarea(ui.TextareaProps{FieldProps: ui.FieldProps{ID: "f-answer-" + a.ID, Name: "answer", Label: T(ctx, "answers.answer")},
+							Value: a.Answer, MaxLength: 5000})
+						<div class="app-actions">
+							@ui.Button(ui.ButtonProps{Label: T(ctx, "profile.save"), Type: "submit", Variant: "primary", Icon: "check"})
+							<button { HX(ctx)... } type="submit" class="ui-btn ui-btn-ghost" formaction={ templ.URL("/answers/" + a.ID + "/delete") }
+								data-confirm={ T(ctx, "answers.delete_confirm") }>
+								@ui.Icon("trash")
+								<span>{ T(ctx, "passkey.remove") }</span>
+							</button>
+						</div>
+					</form>
+				</details>
 			}
+		</div>
+		@ui.Dialog(ui.DialogProps{ID: "dlg-answer", Title: T(ctx, "answers.add"), CloseLabel: T(ctx, "shell.close")}) {
+			<form method="post" action="/answers" class="app-notes" data-dirty-guard>
+				@ui.Input(ui.InputProps{FieldProps: ui.FieldProps{Name: "question", Label: T(ctx, "answers.question"), Hint: T(ctx, "answers.question_hint"),
+					Error: f.Errors["question"]}, Value: f.Values["question"], MaxLength: 300})
+				@ui.Textarea(ui.TextareaProps{FieldProps: ui.FieldProps{Name: "answer", Label: T(ctx, "answers.answer"), Error: f.Errors["answer"]},
+					Value: f.Values["answer"], MaxLength: 5000})
+				<div class="ui-dialog-actions">
+					@ui.Button(ui.ButtonProps{Label: T(ctx, "answers.save"), Type: "submit", Variant: "primary"})
+				</div>
+			</form>
 		}
 	}
 }
 
-templ languageSelect(id, value string) {
-	<div class="field">
-		<label for={ "f-language-" + id }>{ T(ctx, "documents.language") }</label>
-		<select id={ "f-language-" + id } name="language">
-			for _, l := range []string{"", "en", "de"} {
-				<option value={ l } selected?={ value == l }>{ T(ctx, "documents.language." + or(l, "any")) }</option>
-			}
-		</select>
-	</div>
+func languageOptions(ctx context.Context, cur string) []ui.Option {
+	var out []ui.Option
+	for _, l := range []string{"", "en", "de"} {
+		out = append(out, ui.Option{Value: l, Label: T(ctx, "documents.language."+or(l, "any")), Selected: cur == l})
+	}
+	return out
 }
 
-templ TextsPage(name string, f Form, texts []TextRow, placeholders []string) {
-	@Layout(Page{Title: T(ctx, "texts.title"), UserName: name}) {
-		@Section(T(ctx, "texts.title")) {
-			<p class="muted">{ T(ctx, "texts.text") }</p>
-			<p class="muted">{ T(ctx, "texts.placeholders", "list", "{" + strings.Join(placeholders, "}, {") + "}") }</p>
-			@formNotice(f)
-			<form method="post" action="/texts" class="stack">
-				<h2>{ T(ctx, "texts.add") }</h2>
-				@Field(FieldProps{Name: "name", Label: T(ctx, "texts.name"), Type: "text", Value: f.Values["name"], Error: f.Errors["name"], MaxLength: 100})
-				@languageSelect("new", f.Values["language"])
-				@TextArea(FieldProps{Name: "body", Label: T(ctx, "texts.body"), Value: f.Values["body"], Error: f.Errors["body"], MaxLength: 20000})
-				<button type="submit" class="primary">{ T(ctx, "answers.save") }</button>
-			</form>
+templ TextsPage(name string, h CandidateHead, f Form, texts []TextRow, placeholders []string) {
+	@candidatePage(T(ctx, "texts.title"), name, h) {
+		<p class="app-hint">{ T(ctx, "texts.text") }</p>
+		<p class="app-hint">{ T(ctx, "texts.placeholders", "list", "{" + strings.Join(placeholders, "}, {") + "}") }</p>
+		@formNotice(f)
+		<div class="cand-tools">
+			@ui.Button(ui.ButtonProps{Label: T(ctx, "texts.add"), Icon: "plus", Attrs: ui.OpenDialog("dlg-text")})
+		</div>
+		<div class="cand-list">
 			for _, t := range texts {
-				<form method="post" action={ templ.SafeURL("/texts/" + t.ID) } class="stack form-section">
-					@Field(FieldProps{Name: "name", ID: "f-name-" + t.ID, Label: T(ctx, "texts.name"), Type: "text", Value: t.Name, MaxLength: 100})
-					@languageSelect(t.ID, t.Language)
-					@TextArea(FieldProps{Name: "body", ID: "f-body-" + t.ID, Label: T(ctx, "texts.body"), Value: t.Body, MaxLength: 20000})
-					<button type="submit">{ T(ctx, "profile.save") }</button>
-					<button type="submit" class="link" formaction={ templ.SafeURL("/texts/" + t.ID + "/delete") }>{ T(ctx, "passkey.remove") }</button>
-				</form>
+				<details class="cand-item" data-text={ t.ID }>
+					<summary>
+						<span class="cand-item-title">{ t.Name }</span>
+						<span class="cand-item-meta">
+							if t.Language != "" {
+								@ui.Badge(strings.ToUpper(t.Language), ui.Neutral)
+							}
+						</span>
+						<span class="cand-item-preview">{ t.Body }</span>
+					</summary>
+					<form method="post" action={ templ.URL("/texts/" + t.ID) } class="app-notes" data-dirty-guard>
+						@ui.Input(ui.InputProps{FieldProps: ui.FieldProps{ID: "f-name-" + t.ID, Name: "name", Label: T(ctx, "texts.name")}, Value: t.Name, MaxLength: 100})
+						@ui.Select(ui.SelectProps{FieldProps: ui.FieldProps{ID: "f-language-" + t.ID, Name: "language", Label: T(ctx, "documents.language")},
+							Options: languageOptions(ctx, t.Language)})
+						@ui.Textarea(ui.TextareaProps{FieldProps: ui.FieldProps{ID: "f-body-" + t.ID, Name: "body", Label: T(ctx, "texts.body")}, Value: t.Body,
+							Rows: 8, MaxLength: 20000})
+						<div class="app-actions">
+							@ui.Button(ui.ButtonProps{Label: T(ctx, "profile.save"), Type: "submit", Variant: "primary", Icon: "check"})
+							<button { HX(ctx)... } type="submit" class="ui-btn ui-btn-ghost" formaction={ templ.URL("/texts/" + t.ID + "/delete") }
+								data-confirm={ T(ctx, "texts.delete_confirm") }>
+								@ui.Icon("trash")
+								<span>{ T(ctx, "passkey.remove") }</span>
+							</button>
+						</div>
+					</form>
+				</details>
 			}
+		</div>
+		@ui.Dialog(ui.DialogProps{ID: "dlg-text", Title: T(ctx, "texts.add"), CloseLabel: T(ctx, "shell.close")}) {
+			<form method="post" action="/texts" class="app-notes" data-dirty-guard>
+				@ui.Input(ui.InputProps{FieldProps: ui.FieldProps{Name: "name", Label: T(ctx, "texts.name"), Error: f.Errors["name"]}, Value: f.Values["name"], MaxLength: 100})
+				@ui.Select(ui.SelectProps{FieldProps: ui.FieldProps{ID: "f-language-new", Name: "language", Label: T(ctx, "documents.language")},
+					Options: languageOptions(ctx, f.Values["language"])})
+				@ui.Textarea(ui.TextareaProps{FieldProps: ui.FieldProps{Name: "body", Label: T(ctx, "texts.body"), Error: f.Errors["body"]}, Value: f.Values["body"],
+					Rows: 8, MaxLength: 20000})
+				<div class="ui-dialog-actions">
+					@ui.Button(ui.ButtonProps{Label: T(ctx, "answers.save"), Type: "submit", Variant: "primary"})
+				</div>
+			</form>
 		}
 	}
 }
