@@ -570,7 +570,7 @@ func TestProfilePages(t *testing.T) {
 	}
 	body := a.do(http.MethodGet, "/profile?saved=1", nil, session, nil).Body.String()
 	for _, want := range []string{`value="Mustermann"`, `value="https://github.com/maxmustermann"`, "Go\nPostgreSQL\nKubernetes",
-		"German: native\nEnglish: C1", `name="work_authorized_eu" type="checkbox" value="on" checked`, `name="version" value="1"`, "Saved."} {
+		"German: native\nEnglish: C1", `type="checkbox" id="f-work_authorized_eu" name="work_authorized_eu" value="on" checked`, `name="version" value="1"`, "Saved."} {
 		if !strings.Contains(body, want) {
 			t.Errorf("profile page lacks %q", want)
 		}
