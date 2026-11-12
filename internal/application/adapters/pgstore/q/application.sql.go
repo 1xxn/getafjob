@@ -672,7 +672,8 @@ WHERE a.state = 'queued'
     ) < coalesce(s.daily_limit, 5)))
   AND coalesce(s.runner_choice, 'server') = $4::text
   AND ($5::uuid IS NULL OR a.user_id = $5::uuid)
-ORDER BY a.updated_at, a.id
+  AND NOT a.queue_paused
+ORDER BY a.queue_pos NULLS LAST, a.id
 LIMIT 1
 FOR UPDATE OF a SKIP LOCKED
 `
@@ -692,7 +693,7 @@ type LeaseCandidateRow struct {
 	Host   string
 }
 
-// System role: the oldest queued application whose host has no active run and no lease within the gap,
+// System role: the first queued application (queue order, not paused) whose host has no active run and no lease within the gap,
 // whose user has free daily quota (both skipped when unlimited), that has no unfinished run itself, and that
 // matches the runner's choice.
 func (q *Queries) LeaseCandidate(ctx context.Context, arg LeaseCandidateParams) (LeaseCandidateRow, error) {
@@ -740,6 +741,39 @@ func (q *Queries) MarkHandoffWarned(ctx context.Context, arg MarkHandoffWarnedPa
 	return result.RowsAffected(), nil
 }
 
+const moveQueued = `-- name: MoveQueued :execrows
+WITH me AS (
+  SELECT m.id, m.queue_pos FROM applications m
+  WHERE m.user_id = $1 AND m.id = $2 AND m.state = 'queued' AND m.queue_pos IS NOT NULL
+  FOR UPDATE OF m
+), nb AS (
+  SELECT a.id, a.queue_pos FROM applications a, me
+  WHERE a.user_id = $1 AND a.state = 'queued' AND a.queue_pos IS NOT NULL AND a.id <> me.id
+    AND CASE WHEN $3::bool THEN a.queue_pos <= me.queue_pos ELSE a.queue_pos >= me.queue_pos END
+  ORDER BY CASE WHEN $3::bool THEN -a.queue_pos ELSE a.queue_pos END, a.id
+  LIMIT 1
+  FOR UPDATE OF a
+)
+UPDATE applications a SET queue_pos = CASE WHEN a.id = me.id THEN nb.queue_pos ELSE me.queue_pos END
+FROM me, nb
+WHERE a.user_id = $1 AND a.id IN (me.id, nb.id)
+`
+
+type MoveQueuedParams struct {
+	UserID uuid.UUID
+	ID     uuid.UUID
+	Up     bool
+}
+
+// Swaps the queue position of a queued application with its neighbour before (up) or after it.
+func (q *Queries) MoveQueued(ctx context.Context, arg MoveQueuedParams) (int64, error) {
+	result, err := q.db.Exec(ctx, moveQueued, arg.UserID, arg.ID, arg.Up)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
+}
+
 const parkReasons = `-- name: ParkReasons :many
 SELECT DISTINCT ON (e.application_id) e.application_id, coalesce(e.detail->>'reason', '')::text AS reason
 FROM application_events e
@@ -763,6 +797,48 @@ func (q *Queries) ParkReasons(ctx context.Context, userID uuid.UUID) ([]ParkReas
 	for rows.Next() {
 		var i ParkReasonsRow
 		if err := rows.Scan(&i.ApplicationID, &i.Reason); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const queuedApplications = `-- name: QueuedApplications :many
+SELECT a.id, a.job_id, j.title, j.company, a.queue_paused
+FROM applications a JOIN jobs j ON j.id = a.job_id
+WHERE a.user_id = $1 AND a.state = 'queued'
+ORDER BY a.queue_pos NULLS LAST, a.id
+`
+
+type QueuedApplicationsRow struct {
+	ID          uuid.UUID
+	JobID       int64
+	Title       string
+	Company     string
+	QueuePaused bool
+}
+
+// The user's queue in the order the runs start.
+func (q *Queries) QueuedApplications(ctx context.Context, userID uuid.UUID) ([]QueuedApplicationsRow, error) {
+	rows, err := q.db.Query(ctx, queuedApplications, userID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []QueuedApplicationsRow{}
+	for rows.Next() {
+		var i QueuedApplicationsRow
+		if err := rows.Scan(
+			&i.ID,
+			&i.JobID,
+			&i.Title,
+			&i.Company,
+			&i.QueuePaused,
+		); err != nil {
 			return nil, err
 		}
 		items = append(items, i)
@@ -966,6 +1042,24 @@ func (q *Queries) SetJobCvDocument(ctx context.Context, arg SetJobCvDocumentPara
 	var id uuid.UUID
 	err := row.Scan(&id)
 	return id, err
+}
+
+const setQueuePaused = `-- name: SetQueuePaused :execrows
+UPDATE applications SET queue_paused = $3 WHERE user_id = $1 AND id = $2 AND state = 'queued'
+`
+
+type SetQueuePausedParams struct {
+	UserID      uuid.UUID
+	ID          uuid.UUID
+	QueuePaused bool
+}
+
+func (q *Queries) SetQueuePaused(ctx context.Context, arg SetQueuePausedParams) (int64, error) {
+	result, err := q.db.Exec(ctx, setQueuePaused, arg.UserID, arg.ID, arg.QueuePaused)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
 }
 
 const setState = `-- name: SetState :execrows

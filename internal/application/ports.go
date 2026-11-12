@@ -265,6 +265,12 @@ type Store interface {
 	ParkReasons(ctx context.Context, userID uuid.UUID) (map[uuid.UUID]string, error)
 	// SubmitsPerDay counts the user's submitted applications per UTC day since the given time.
 	SubmitsPerDay(ctx context.Context, userID uuid.UUID, since time.Time) (map[time.Time]int, error)
+	// QueueItems lists the user's queued applications in the order their runs start.
+	QueueItems(ctx context.Context, userID uuid.UUID) ([]QueueItem, error)
+	// MoveQueued swaps a queued application with its neighbour before (up) or after it; false when nothing moved.
+	MoveQueued(ctx context.Context, userID, id uuid.UUID, up bool) (bool, error)
+	// PauseQueued pauses or resumes a queued application; false when it is no longer queued.
+	PauseQueued(ctx context.Context, userID, id uuid.UUID, paused bool) (bool, error)
 	// BookmarkJob saves a job to the user's applications in matched state.
 	BookmarkJob(ctx context.Context, userID uuid.UUID, jobID int64, now time.Time) (uuid.UUID, error)
 	// MarkExternalApplied marks a job as applied externally (state: submitted).

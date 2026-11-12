@@ -98,6 +98,14 @@ func (f *fakeTrackerStore) SaveNotes(_ context.Context, _, appID uuid.UUID, note
 	return nil
 }
 
+func (f *fakeTrackerStore) QueueItems(context.Context, uuid.UUID) ([]application.QueueItem, error) {
+	return nil, nil
+}
+
+func (f *fakeTrackerStore) MoveQueued(context.Context, uuid.UUID, uuid.UUID, bool) (bool, error) { return false, nil }
+
+func (f *fakeTrackerStore) PauseQueued(context.Context, uuid.UUID, uuid.UUID, bool) (bool, error) { return false, nil }
+
 func (f *fakeTrackerStore) BookmarkJob(_ context.Context, _ uuid.UUID, jobID int64, now time.Time) (uuid.UUID, error) {
 	f.bookmarked = append(f.bookmarked, jobID)
 	id := uuid.New()

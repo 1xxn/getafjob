@@ -36,6 +36,8 @@ type Application struct {
 	ApprovalReasons []string
 	ApprovedAt      *time.Time
 	CvDocumentID    *uuid.UUID
+	QueuePos        *int64
+	QueuePaused     bool
 }
 
 type ApplicationEvent struct {

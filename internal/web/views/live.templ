@@ -1,6 +1,10 @@
 package views
 
-import "github.com/1xxn/getafjob/internal/web/views/ui"
+import (
+	"context"
+
+	"github.com/1xxn/getafjob/internal/web/views/ui"
+)
 
 // LiveScreenProps describe one live view of a run's browser. The handoff island connects every [data-live-view]
 // on the page and closes the ones that leave it, so a page can show several (grid, focus view, dock).
@@ -63,6 +67,7 @@ templ LiveScreen(p LiveScreenProps) {
 type LiveData struct {
 	Name  string
 	Runs  []ActiveRunItem
+	Queue []QueueRow
 	Focus *ActiveRunItem
 }
 
@@ -90,6 +95,7 @@ templ LivePage(d LiveData) {
 			<h1>{ T(ctx, "live.title") }</h1>
 			<p class="live-lead">{ T(ctx, "live.lead") }</p>
 			@LiveGrid(d.Runs)
+			@LiveQueue(d.Queue)
 		}
 	}
 }
@@ -205,4 +211,59 @@ templ LiveDockRuns(runs []ActiveRunItem) {
 			</button>
 		</li>
 	}
+}
+
+// QueueRow is one queued run of the queue panel.
+type QueueRow struct {
+	AppID   string
+	JobID   int64
+	Title   string
+	Company string
+	Paused  bool
+}
+
+// queueAction posts an action of the queue panel and morphs the panel with the answer.
+func queueAction(ctx context.Context, id, action string) templ.Attributes {
+	return attrs(HX(ctx, "hx-post", "/live/queue/"+id+"/"+action, "hx-target", "#live-queue",
+		"hx-swap", "outerMorph transition:false"), templ.Attributes{"formaction": "/live/queue/" + id + "/" + action,
+		"data-queue-action": action})
+}
+
+// LiveQueue lists the queued runs in the order they start; the user moves, pauses or cancels them. It morphs on
+// live events, also when another tab changes the order.
+templ LiveQueue(items []QueueRow) {
+	<section id="live-queue" class="live-queue" aria-labelledby="live-queue-title" { HX(ctx, "hx-get", "/live/queue", "hx-trigger", "getafjob:app from:body delay:700ms", "hx-swap", "outerMorph transition:false")... }>
+		<h2 id="live-queue-title">{ T(ctx, "live.queue.title") }</h2>
+		if len(items) == 0 {
+			<p class="muted" data-queue-empty>{ T(ctx, "live.queue.empty") }</p>
+		} else {
+			<p class="muted">{ T(ctx, "live.queue.lead") }</p>
+			<ol class="live-queue-list">
+				for i, it := range items {
+					<li class="live-queue-item" data-queue-item data-id={ it.AppID } data-paused?={ it.Paused }>
+						<span class="live-queue-pos" aria-hidden="true">{ itoa(i + 1) }</span>
+						<div class="live-queue-text">
+							<a href={ templ.SafeURL("/jobs/" + i64(it.JobID)) }>{ or(it.Title, T(ctx, "live.queue.untitled")) }</a>
+							if it.Company != "" {
+								<span class="muted">{ it.Company }</span>
+							}
+							if it.Paused {
+								@ui.Badge(T(ctx, "live.queue.paused"), ui.Warning)
+							}
+						</div>
+						<form method="post" action="/live" class="live-queue-actions">
+							@ui.IconButton(ui.IconButtonProps{Icon: "chevron-up", Label: T(ctx, "live.queue.up"), Type: "submit", Disabled: i == 0, Attrs: queueAction(ctx, it.AppID, "up")})
+							@ui.IconButton(ui.IconButtonProps{Icon: "chevron-down", Label: T(ctx, "live.queue.down"), Type: "submit", Disabled: i == len(items)-1, Attrs: queueAction(ctx, it.AppID, "down")})
+							if it.Paused {
+								@ui.IconButton(ui.IconButtonProps{Icon: "play", Label: T(ctx, "live.queue.resume"), Type: "submit", Attrs: queueAction(ctx, it.AppID, "resume")})
+							} else {
+								@ui.IconButton(ui.IconButtonProps{Icon: "pause", Label: T(ctx, "live.queue.pause"), Type: "submit", Attrs: queueAction(ctx, it.AppID, "pause")})
+							}
+							@ui.IconButton(ui.IconButtonProps{Icon: "x", Label: T(ctx, "live.queue.cancel"), Type: "submit", Variant: "danger", Attrs: queueAction(ctx, it.AppID, "cancel")})
+						</form>
+					</li>
+				}
+			</ol>
+		}
+	</section>
 }

@@ -159,10 +159,9 @@ var FixturePages = []string{"posting.html", "greenhouse_like.html", "lever_appli
 	"personio_application.html", "smartrecruiters_application.html", "recruitee_application.html",
 	"teamtailor_application.html"}
 
-// questionPages are fixture pages whose form asks the demo users something their profile does not answer, so a
-// run there stops in needs input before it waits for the approval.
-var questionPages = []string{"posting.html", "greenhouse_like.html", "lever_application.html", "recruitee_application.html",
-	"teamtailor_application.html", "ashby_application.html"}
+// questionPages are fixture pages that always ask the user something no profile answers (a consent checkbox), so
+// a run there waits in needs input and stays live until it is answered or parked; an answered one asks for approval.
+var questionPages = []string{"posting.html", "recruitee_application.html"}
 
 // Companies returns the invented company names the postings use.
 func Companies() []string { return slices.Clone(companies) }

@@ -68,7 +68,7 @@ WHERE state = 'needs_input' AND handoff_until IS NOT NULL AND handoff_until < $1
 UPDATE applications SET handoff_warned = true WHERE id = $1 AND user_id = $2 AND state = 'needs_input' AND NOT handoff_warned;
 
 -- name: LeaseCandidate :one
--- System role: the oldest queued application whose host has no active run and no lease within the gap,
+-- System role: the first queued application (queue order, not paused) whose host has no active run and no lease within the gap,
 -- whose user has free daily quota (both skipped when unlimited), that has no unfinished run itself, and that
 -- matches the runner's choice.
 SELECT a.id, a.user_id, a.job_id,
@@ -90,7 +90,8 @@ WHERE a.state = 'queued'
     ) < coalesce(s.daily_limit, 5)))
   AND coalesce(s.runner_choice, 'server') = sqlc.arg(runner_choice)::text
   AND (sqlc.narg(user_id)::uuid IS NULL OR a.user_id = sqlc.narg(user_id)::uuid)
-ORDER BY a.updated_at, a.id
+  AND NOT a.queue_paused
+ORDER BY a.queue_pos NULLS LAST, a.id
 LIMIT 1
 FOR UPDATE OF a SKIP LOCKED;
 
@@ -236,3 +237,31 @@ GROUP BY 1;
 SELECT a.id, a.job_id, a.state, j.title, j.company
 FROM applications a JOIN jobs j ON j.id = a.job_id
 WHERE a.user_id = $1 AND a.id = ANY (sqlc.arg(ids)::uuid[]);
+
+-- name: QueuedApplications :many
+-- The user's queue in the order the runs start.
+SELECT a.id, a.job_id, j.title, j.company, a.queue_paused
+FROM applications a JOIN jobs j ON j.id = a.job_id
+WHERE a.user_id = $1 AND a.state = 'queued'
+ORDER BY a.queue_pos NULLS LAST, a.id;
+
+-- name: SetQueuePaused :execrows
+UPDATE applications SET queue_paused = $3 WHERE user_id = $1 AND id = $2 AND state = 'queued';
+
+-- name: MoveQueued :execrows
+-- Swaps the queue position of a queued application with its neighbour before (up) or after it.
+WITH me AS (
+  SELECT m.id, m.queue_pos FROM applications m
+  WHERE m.user_id = $1 AND m.id = $2 AND m.state = 'queued' AND m.queue_pos IS NOT NULL
+  FOR UPDATE OF m
+), nb AS (
+  SELECT a.id, a.queue_pos FROM applications a, me
+  WHERE a.user_id = $1 AND a.state = 'queued' AND a.queue_pos IS NOT NULL AND a.id <> me.id
+    AND CASE WHEN sqlc.arg(up)::bool THEN a.queue_pos <= me.queue_pos ELSE a.queue_pos >= me.queue_pos END
+  ORDER BY CASE WHEN sqlc.arg(up)::bool THEN -a.queue_pos ELSE a.queue_pos END, a.id
+  LIMIT 1
+  FOR UPDATE OF a
+)
+UPDATE applications a SET queue_pos = CASE WHEN a.id = me.id THEN nb.queue_pos ELSE me.queue_pos END
+FROM me, nb
+WHERE a.user_id = $1 AND a.id IN (me.id, nb.id);
