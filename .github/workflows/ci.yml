@@ -20,6 +20,8 @@ env:
 jobs:
   verify:
     name: verify
+    needs: changes
+    if: needs.changes.outputs.go == 'true'
     runs-on: ubuntu-26.04
     permissions:
       contents: read
@@ -61,6 +63,8 @@ jobs:
 
   lint:
     name: lint
+    needs: changes
+    if: needs.changes.outputs.go == 'true'
     runs-on: ubuntu-26.04
     permissions:
       contents: read
@@ -81,6 +85,8 @@ jobs:
 
   vuln:
     name: govulncheck
+    needs: changes
+    if: needs.changes.outputs.go == 'true'
     runs-on: ubuntu-26.04
     permissions:
       contents: read
@@ -96,8 +102,15 @@ jobs:
           go-version-file: go.mod
       - run: go tool govulncheck ./...
 
+  # Three shards in parallel: internal/web, the PostgreSQL adapters (testcontainers), everything else.
   test-linux:
-    name: test (linux)
+    name: test (linux, ${{ matrix.shard }})
+    needs: changes
+    if: needs.changes.outputs.go == 'true'
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [web, db, rest]
     runs-on: ubuntu-26.04
     permissions:
       contents: read
@@ -112,14 +125,20 @@ jobs:
         with:
           go-version-file: go.mod
       - name: unit + integration tests (race, shuffled)
-        run: go test -race -shuffle=on -coverprofile=coverage.out -covermode=atomic ./...
-      - name: coverage summary
-        run: go tool cover -func=coverage.out | tail -n 1
+        env:
+          SHARD: ${{ matrix.shard }}
+        run: |
+          # shellcheck disable=SC2046 # one argument per package
+          go test -race -shuffle=on -coverprofile=coverage.out -covermode=atomic $(.github/scripts/test-packages.sh "$SHARD")
+          go tool cover -func=coverage.out | tail -n 1
       - name: performance budgets (no race detector)
+        if: matrix.shard == 'rest'
         run: go tool task test:budget
 
   fuzz-plan:
     name: fuzz (plan)
+    needs: changes
+    if: needs.changes.outputs.go == 'true'
     runs-on: ubuntu-26.04
     permissions:
       contents: read
@@ -175,10 +194,10 @@ jobs:
           path: "**/testdata/fuzz/**"
           retention-days: 14
 
-  # The required check: green only when every fuzz job passed.
+  # The required check: green when every fuzz job passed or the change is documentation only.
   fuzz:
     name: fuzz
-    needs: [fuzz-plan, fuzz-run]
+    needs: [changes, fuzz-plan, fuzz-run]
     if: always()
     runs-on: ubuntu-26.04
     permissions: {}
@@ -187,10 +206,17 @@ jobs:
         env:
           PLAN: ${{ needs.fuzz-plan.result }}
           RUN: ${{ needs.fuzz-run.result }}
-        run: test "$PLAN" = success && test "$RUN" = success
+          CHANGES: ${{ needs.changes.result }}
+          GO: ${{ needs.changes.outputs.go }}
+        run: |
+          test "$CHANGES" = success
+          if [ "$GO" != true ]; then exit 0; fi # documentation only
+          test "$PLAN" = success && test "$RUN" = success
 
   test-other:
     name: test (${{ matrix.os }})
+    needs: changes
+    if: needs.changes.outputs.go == 'true'
     strategy:
       fail-fast: false
       matrix:
@@ -210,110 +236,36 @@ jobs:
       - name: unit tests
         run: go test -short -race -shuffle=on ./...
 
-  browser:
-    name: browser fixtures (runner image)
+  # The required check for the test matrices (a skipped matrix job reports no usable name): green when every shard
+  # and platform passed, or the change is documentation only.
+  tests:
+    name: tests
+    needs: [changes, test-linux, test-other]
+    if: always()
     runs-on: ubuntu-26.04
-    permissions:
-      contents: read
+    permissions: {}
     steps:
-      - uses: step-security/harden-runner@46b06cea07f9e64621fdf066ba77ac6915163d43 # v2.22.3
-        with:
-          egress-policy: audit
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with:
-          persist-credentials: false
-      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
-        with:
-          go-version-file: go.mod
-          cache: false # job builds an image
-      - uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4.4.1
-      - name: build runner image
-        uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7.4.0
-        with:
-          context: .
-          target: runner
-          tags: getafjob-runner:dev
-          load: true
-          cache-from: type=gha,scope=runner
-          cache-to: type=gha,scope=runner,mode=max
-      - name: browser tests inside the runner image (sandbox on, seccomp profile)
-        run: go tool task test:browser:run
-
-  e2e:
-    name: e2e journeys (dev stack)
-    runs-on: ubuntu-26.04
-    timeout-minutes: 30
-    permissions:
-      contents: read
-    steps:
-      - uses: step-security/harden-runner@46b06cea07f9e64621fdf066ba77ac6915163d43 # v2.22.3
-        with:
-          egress-policy: audit
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with:
-          persist-credentials: false
-      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
-        with:
-          go-version-file: go.mod
-          cache: false # zizmor: no Go cache in a job whose results gate main (cache poisoning)
-      - uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4.4.1
-      # The stack images reuse the layer cache of the images job. Only pushes to main write it (images job), so a pull
-      # request cannot put layers into the cache that main builds from.
-      - name: build the app image
-        uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7.4.0
-        with:
-          context: .
-          target: app
-          tags: getafjob:dev
-          load: true
-          cache-from: type=gha,scope=app
-      - name: build the runner image
-        uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7.4.0
-        with:
-          context: .
-          target: runner
-          tags: getafjob-runner:dev
-          load: true
-          cache-from: type=gha,scope=runner
-      - name: build the egress image
-        uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7.4.0
-        with:
-          context: .
-          target: egress
-          tags: getafjob-egress:dev
-          load: true
-          cache-from: type=gha,scope=egress
-      - name: start the dev stack
+      - env:
+          CHANGES: ${{ needs.changes.result }}
+          GO: ${{ needs.changes.outputs.go }}
+          LINUX: ${{ needs.test-linux.result }}
+          OTHER: ${{ needs.test-other.result }}
         run: |
-          go tool task dev:secrets
-          docker compose -f deploy/compose.yaml -f deploy/compose.dev.yaml --profile dev up -d --no-build --wait --wait-timeout 300
-      - name: demo data on the fixture site
-        run: >-
-          docker compose -f deploy/compose.yaml -f deploy/compose.dev.yaml exec -T serve
-          /usr/local/bin/getafjob admin demo -jobs 50 -fixtures http://fixtures:8080 -autonomy suggest
-      - name: journeys in the runner image (fresh invited user, sandbox on)
-        run: go tool task test:e2e
-      - name: screenshots
-        if: always()
-        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
-        with:
-          name: e2e-screenshots
-          path: bin/e2e/out
-          if-no-files-found: ignore
-          retention-days: 7
-      - name: stack logs
-        if: failure()
-        run: docker compose -f deploy/compose.yaml -f deploy/compose.dev.yaml --profile dev logs --no-color --tail 200
+          test "$CHANGES" = success
+          if [ "$GO" != true ]; then exit 0; fi # documentation only
+          test "$LINUX" = success && test "$OTHER" = success
 
-  images:
-    name: image (${{ matrix.target }})
-    strategy:
-      fail-fast: false
-      matrix:
-        target: [app, runner, egress]
+  # Which parts a pull request needs. Pushes to main run the Go checks here; the stack and the release snapshot run
+  # in main.yml after the merge. A skipped job counts as passed for the ruleset.
+  changes:
+    name: changes
     runs-on: ubuntu-26.04
     permissions:
       contents: read
+    outputs:
+      go: ${{ steps.diff.outputs.go }}
+      stack: ${{ steps.diff.outputs.stack }}
+      release: ${{ steps.diff.outputs.release }}
     steps:
       - uses: step-security/harden-runner@46b06cea07f9e64621fdf066ba77ac6915163d43 # v2.22.3
         with:
@@ -321,58 +273,55 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
-      - uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4.4.1
-      - name: build
-        uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7.4.0
-        with:
-          context: .
-          target: ${{ matrix.target }}
-          tags: getafjob-${{ matrix.target }}:ci
-          load: true
-          cache-from: type=gha,scope=${{ matrix.target }}
-          # Write the layer cache from main only; pull requests read it (the e2e job builds from it too).
-          cache-to: ${{ github.event_name == 'push' && format('type=gha,scope={0},mode=max', matrix.target) || '' }}
-      - name: trivy (fixable HIGH/CRITICAL fail the build)
-        uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
-        with:
-          image-ref: getafjob-${{ matrix.target }}:ci
-          severity: HIGH,CRITICAL
-          ignore-unfixed: true
-          exit-code: "1"
-          format: table
+          fetch-depth: 0
+      - id: diff
+        env:
+          EVENT: ${{ github.event_name }}
+          BASE: ${{ github.event.pull_request.base.sha }}
+          HEAD: ${{ github.event.pull_request.head.sha }}
+        run: |
+          if [ "$EVENT" != "pull_request" ]; then
+            printf 'go=true\nstack=false\nrelease=false\n' >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          files="$(git diff --name-only "$BASE...$HEAD")"
+          echo "$files"
+          has() { echo "$files" | grep -qE "$1" && echo true || echo false; }
+          {
+            # Anything but documentation runs the Go checks.
+            echo "go=$(echo "$files" | grep -qvE '^(docs/.*|.*\.md|LICENSE|\.github/ISSUE_TEMPLATE/.*)$' && echo true || echo false)"
+            # Images and what runs inside them: build, scan, browser fixtures, Compose rehearsals.
+            echo "stack=$(has '^(Dockerfile|\.dockerignore|go\.(mod|sum)|deploy/.*|internal/runner/.*|testdata/fixtures/.*|\.github/workflows/stack\.yml)$')"
+            echo "release=$(has '^(\.goreleaser\.ya?ml|Dockerfile|go\.(mod|sum)|\.github/workflows/(main|release)\.yml)$')"
+          } >> "$GITHUB_OUTPUT"
 
-  compose:
-    name: compose stack
-    runs-on: ubuntu-26.04
+  stack-run:
+    needs: changes
+    if: needs.changes.outputs.stack == 'true'
     permissions:
       contents: read
+    uses: ./.github/workflows/stack.yml
+    with:
+      e2e: false
+      write-cache: false
+
+  # The required check for the stack: passed when it ran green or was not needed.
+  stack:
+    name: stack
+    needs: [changes, stack-run]
+    if: always()
+    runs-on: ubuntu-26.04
+    permissions: {}
     steps:
-      - uses: step-security/harden-runner@46b06cea07f9e64621fdf066ba77ac6915163d43 # v2.22.3
-        with:
-          egress-policy: audit
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with:
-          persist-credentials: false
-      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
-        with:
-          go-version-file: go.mod
-      - name: start every service and wait until healthy
-        run: go tool task dev:up
-      - name: smoke test through caddy and the egress policy
-        run: deploy/smoke.sh
-      - name: "rehearsal: backup and restore into a fresh stack"
-        run: deploy/test-restore.sh
-      - name: "rehearsal: deploy and automatic rollback"
-        run: deploy/test-deploy.sh
-      - name: logs
-        if: failure()
-        run: docker compose -f deploy/compose.yaml logs --no-color
-      - name: stop
-        if: always()
-        run: docker compose -f deploy/compose.yaml down -v
+      - env:
+          CHANGES: ${{ needs.changes.result }}
+          STACK: ${{ needs.stack-run.result }}
+        run: test "$CHANGES" = success && { test "$STACK" = success || test "$STACK" = skipped; }
 
   release-snapshot:
     name: release (snapshot)
+    needs: changes
+    if: needs.changes.outputs.release == 'true'
     runs-on: ubuntu-26.04
     permissions:
       contents: read

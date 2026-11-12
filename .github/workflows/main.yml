@@ -1,0 +1,119 @@
+name: Main
+
+# After every push to main: the stack checks (images built once, browser fixtures, e2e journeys, Compose
+# rehearsals) and the release snapshot, then signed images tagged "sha-<commit>". Only the head of main moves the
+# "main" tag and goes to staging, so neither can fall back to an older commit (#266). A failure opens an issue.
+on:
+  push:
+    branches: [main]
+
+permissions: {}
+
+concurrency:
+  # One group per commit: no run of a main commit is ever dropped or cancelled.
+  group: main-${{ github.sha }}
+  cancel-in-progress: false
+
+env:
+  GORELEASER_VERSION: v2.20.0
+
+jobs:
+  stack:
+    permissions:
+      contents: read
+    uses: ./.github/workflows/stack.yml
+    with:
+      e2e: true
+      write-cache: true
+
+  release-snapshot:
+    name: release (snapshot)
+    runs-on: ubuntu-26.04
+    permissions:
+      contents: read
+    steps:
+      - uses: step-security/harden-runner@46b06cea07f9e64621fdf066ba77ac6915163d43 # v2.22.3
+        with:
+          egress-policy: audit
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          fetch-depth: 0
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version-file: go.mod
+          cache: false # release builds never use caches
+      - uses: anchore/sbom-action/download-syft@66cbf4bc1f1c0d2edc94016e65bc221b6bb0ad6c # v0.24.3
+      - uses: goreleaser/goreleaser-action@a4f02ab5355a589de60d917a659ce617ed19b3de # v7.3.0
+        with:
+          distribution: goreleaser
+          version: ${{ env.GORELEASER_VERSION }}
+          args: release --snapshot --clean --skip=sign
+
+  head:
+    name: head of main
+    needs: [stack, release-snapshot]
+    runs-on: ubuntu-26.04
+    permissions:
+      contents: read
+    outputs:
+      is-head: ${{ steps.check.outputs.is-head }}
+    steps:
+      - id: check
+        env:
+          GH_TOKEN: ${{ github.token }}
+          SHA: ${{ github.sha }}
+        run: |
+          head="$(gh api "repos/${GITHUB_REPOSITORY}/commits/main" --jq .sha)"
+          echo "is-head=$([ "$head" = "$SHA" ] && echo true || echo false)" >> "$GITHUB_OUTPUT"
+
+  publish:
+    needs: [head]
+    permissions:
+      contents: read
+      packages: write # push images to GHCR
+      id-token: write # keyless signing (cosign) and attestations via GitHub OIDC
+      attestations: write # build provenance attestations
+    uses: ./.github/workflows/images-publish.yml
+    with:
+      version: main-${{ github.sha }}
+      tags: ${{ needs.head.outputs.is-head == 'true' && 'type=raw,value=main' || '' }}
+
+  deploy-staging:
+    name: deploy (staging)
+    needs: [head, publish]
+    if: needs.head.outputs.is-head == 'true'
+    permissions:
+      contents: read
+    uses: ./.github/workflows/deploy.yml
+    with:
+      environment: staging
+      version: main-${{ github.sha }}
+    secrets:
+      DEPLOY_SSH_HOST: ${{ secrets.DEPLOY_SSH_HOST }}
+      DEPLOY_SSH_KEY: ${{ secrets.DEPLOY_SSH_KEY }}
+      DEPLOY_SSH_USER: ${{ secrets.DEPLOY_SSH_USER }}
+      DEPLOY_SSH_PORT: ${{ secrets.DEPLOY_SSH_PORT }}
+      DEPLOY_SSH_KNOWN_HOSTS: ${{ secrets.DEPLOY_SSH_KNOWN_HOSTS }}
+
+  report:
+    name: report failure
+    needs: [stack, release-snapshot, head, publish, deploy-staging]
+    if: failure()
+    runs-on: ubuntu-26.04
+    permissions:
+      issues: write # open or update the main-failure issue
+    steps:
+      - env:
+          GH_TOKEN: ${{ github.token }}
+          SHA: ${{ github.sha }}
+          RUN: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          title="main: checks after the merge failed"
+          open="$(gh issue list -R "$GITHUB_REPOSITORY" --state open --search "\"$title\" in:title" --json number --jq '.[0].number')"
+          body="Commit ${SHA}: ${RUN}"
+          if [ -n "$open" ]; then
+            gh issue comment "$open" -R "$GITHUB_REPOSITORY" --body "$body"
+          else
+            gh issue create -R "$GITHUB_REPOSITORY" --title "$title" --body "$body"
+          fi

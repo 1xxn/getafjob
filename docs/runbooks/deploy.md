@@ -16,7 +16,7 @@ getafjob runs as a containerized stack orchestrated by Docker Compose:
 
 | Attribute | Staging | Production |
 | :--- | :--- | :--- |
-| **Trigger** | Push to `main` branch (`images.yml`) | Push tag `v*` (`release.yml`) |
+| **Trigger** | Push to `main` branch (`main.yml`, after the stack checks) | Push tag `v*` (`release.yml`) |
 | **Approval Gate** | None (continuous deployment) | Required Reviewer approval in GitHub |
 | **Compose Project** | `getafjob-staging` | `getafjob` |
 | **Default Ports** | `8080` (HTTP), `8443` (HTTPS) | `80` (HTTP), `443` (HTTPS) |
@@ -185,7 +185,7 @@ Add the following secrets to each environment (or as repository secrets if shari
 
 ### Automated Workflows
 
-- **Staging Deployment:** When a pull request merges to `main`, `.github/workflows/images.yml` builds and signs container images (`ghcr.io/1xxn/getafjob:main-<sha>`), then dispatches to `deploy.yml` with `environment: staging`.
+- **Staging Deployment:** When a pull request merges to `main`, `.github/workflows/main.yml` runs the stack checks (e2e included), builds and signs container images (`ghcr.io/1xxn/getafjob:main-<sha>`), and when the commit is still the head of `main` dispatches to `deploy.yml` with `environment: staging`.
 - **Production Deployment:** When the maintainer pushes a tag (`v0.1.0`), `.github/workflows/release.yml` creates binaries, publishes signed container images, and requests approval for the `production` environment. Upon approval, `deploy.yml` deploys the release.
 
 ### Manual Deployment via GitHub Actions UI
