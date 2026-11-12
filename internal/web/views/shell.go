@@ -58,10 +58,11 @@ var navGroups = []navGroup{
 	{Key: "nav.group.discover", Items: []navItem{{Key: "nav.jobs", Href: "/jobs", Icon: "briefcase"}}},
 	{Key: "nav.group.apply", Items: []navItem{
 		{Key: "nav.live", Href: "/live", Icon: "live", Count: "running"},
+		{Key: "nav.needs_input", Href: "/needs-input", Icon: "inbox", Count: "needs_input"},
 		{Key: "nav.approvals", Href: "/approvals", Icon: "check-circle", Count: "approvals"},
 	}},
 	{Key: "nav.group.track", Items: []navItem{
-		{Key: "nav.applications", Href: "/applications", Icon: "send", Count: "needs_input"},
+		{Key: "nav.applications", Href: "/applications", Icon: "send"},
 		{Key: "nav.tracker", Href: "/tracker", Icon: "columns"},
 	}},
 	{Key: "nav.group.me", Items: []navItem{

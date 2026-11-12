@@ -172,7 +172,7 @@ RETURNING id;
 
 -- name: UserApplicationsWithPipeline :many
 SELECT a.id, a.job_id, a.state, a.version, a.created_at, a.updated_at,
-       a.approval_asked_at, a.approval_reasons, a.approved_at, a.cv_document_id,
+       a.approval_asked_at, a.approval_reasons, a.approved_at, a.cv_document_id, a.handoff_until,
        j.company, j.title, j.location, j.workplace, j.url, j.apply_url,
        COALESCE(m.score, 0)::integer AS score,
        COALESCE(n.notes, '')::text AS notes,

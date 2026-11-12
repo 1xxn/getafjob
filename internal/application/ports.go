@@ -290,6 +290,7 @@ type PipelineApplication struct {
 	ApprovalReasons []Reason
 	ApprovedAt      *time.Time
 	CvDocumentID    *uuid.UUID
+	HandoffUntil    *time.Time // when a waiting run gives up on the user
 	Company         string
 	Title           string
 	Location        string

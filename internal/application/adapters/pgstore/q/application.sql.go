@@ -1165,7 +1165,7 @@ func (q *Queries) UserApplications(ctx context.Context, userID uuid.UUID) ([]Use
 
 const userApplicationsWithPipeline = `-- name: UserApplicationsWithPipeline :many
 SELECT a.id, a.job_id, a.state, a.version, a.created_at, a.updated_at,
-       a.approval_asked_at, a.approval_reasons, a.approved_at, a.cv_document_id,
+       a.approval_asked_at, a.approval_reasons, a.approved_at, a.cv_document_id, a.handoff_until,
        j.company, j.title, j.location, j.workplace, j.url, j.apply_url,
        COALESCE(m.score, 0)::integer AS score,
        COALESCE(n.notes, '')::text AS notes,
@@ -1190,6 +1190,7 @@ type UserApplicationsWithPipelineRow struct {
 	ApprovalReasons []string
 	ApprovedAt      *time.Time
 	CvDocumentID    *uuid.UUID
+	HandoffUntil    *time.Time
 	Company         string
 	Title           string
 	Location        string
@@ -1223,6 +1224,7 @@ func (q *Queries) UserApplicationsWithPipeline(ctx context.Context, userID uuid.
 			&i.ApprovalReasons,
 			&i.ApprovedAt,
 			&i.CvDocumentID,
+			&i.HandoffUntil,
 			&i.Company,
 			&i.Title,
 			&i.Location,
