@@ -7,6 +7,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/go-rod/rod/lib/input"
 	"github.com/go-rod/rod/lib/proto"
 )
 
@@ -52,7 +53,9 @@ func TestCandidateHub(t *testing.T) {
 
 	// Save, then delete with the confirm dialog. The toast of the add would cover the button at the bottom: close it.
 	tab.Eval("document.querySelectorAll('.ui-toast').forEach(t => t.remove()); return true")
-	tab.Click(item + ` button[type="submit"]:not([formaction])`)
+	// Keyboard: the save button sits at the very bottom of a short page, so focus it and press Enter.
+	must(t, tab.El(item+` button[type="submit"]:not([formaction])`).Focus())
+	must(t, tab.Page.Keyboard.Type(input.Enter))
 	tab.WaitWithin(10*time.Second, "location.search.includes('saved') && !document.querySelector('.htmx-request')")
 	tab.Go("/answers?q=" + q)
 	tab.Click(item + " > summary")
