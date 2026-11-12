@@ -55,7 +55,7 @@ async function refreshCounts() {
 }
 document.body.addEventListener("getafjob:app", () => {
   window.clearTimeout(countTimer);
-  countTimer = window.setTimeout(() => void refreshCounts(), 400);
+  countTimer = window.setTimeout(() => refreshCounts().catch(() => void 0), 400);
 });
 function paletteParts() {
   const dialog = document.getElementById("palette");

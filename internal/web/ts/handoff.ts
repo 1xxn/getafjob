@@ -229,7 +229,7 @@ function bindViews(): void {
   if (push && !push.dataset.bound) {
     push.dataset.bound = '1';
     push.addEventListener('click', () => {
-      void enablePush();
+      enablePush().catch(() => undefined); // denied or cut off: the button stays, the user can try again
     });
   }
 }
