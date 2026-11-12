@@ -7,7 +7,7 @@ type PrivacyData struct {
 }
 
 templ Privacy(d PrivacyData) {
-	@Layout(Page{Title: T(ctx, "privacy.title"), UserName: d.UserName, Passkeys: d.Passkeys}) {
+	@Layout(Page{Title: T(ctx, "privacy.title"), UserName: d.UserName, Passkeys: d.Passkeys, Wide: d.UserName == ""}) {
 		@Section(T(ctx, "privacy.title")) {
 			<p>{ T(ctx, "privacy.intro") }</p>
 			<h2>{ T(ctx, "privacy.section.self_hosted.title") }</h2>

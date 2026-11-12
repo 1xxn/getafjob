@@ -3673,6 +3673,142 @@
     overflow-wrap: anywhere;
   }
 
+  /* pages without sign-in: login, invitation, sign-in link, errors */
+  body.pub {
+    min-height: 100dvh;
+    margin: 0;
+    background: var(--bg);
+  }
+
+  .pub-main {
+    display: grid;
+    gap: var(--space-5);
+    justify-items: center;
+    align-content: start;
+    max-width: none;
+    min-height: 100dvh;
+    padding: clamp(var(--space-5), 8vh, 6rem) var(--space-4) var(--space-5);
+  }
+
+  .pub-main:focus {
+    outline: none;
+  }
+
+  .pub-brand {
+    display: inline-flex;
+    gap: var(--space-2);
+    align-items: center;
+    color: var(--text);
+    font-size: var(--text-lg);
+    font-weight: 700;
+    text-decoration: none;
+  }
+
+  .pub-brand img {
+    border-radius: var(--radius-sm);
+  }
+
+  /* the card itself is .ui-card; the page sets its width and spacing */
+  .pub-card {
+    display: grid;
+    gap: var(--space-4);
+    width: min(100%, 26rem);
+  }
+
+  .pub-card-wide {
+    width: min(100%, 44rem);
+  }
+
+  .pub-head {
+    display: grid;
+    gap: var(--space-2);
+    justify-items: center;
+    text-align: center;
+  }
+
+  .pub-head h1 {
+    margin: 0;
+    font-size: var(--text-xl);
+  }
+
+  .pub-icon {
+    display: inline-grid;
+    place-items: center;
+    width: 3rem;
+    height: 3rem;
+    border-radius: 50%;
+    background: var(--accent-soft);
+    color: var(--accent-text);
+  }
+
+  .pub-text {
+    margin: 0;
+    color: var(--text-2);
+  }
+
+  .pub-form {
+    display: grid;
+    gap: var(--space-4);
+  }
+
+  .pub-form .ui-btn,
+  .pub-alt .ui-btn {
+    justify-content: center;
+    width: 100%;
+  }
+
+  .pub-alt {
+    display: grid;
+    gap: var(--space-3);
+  }
+
+  .pub-or {
+    display: flex;
+    gap: var(--space-3);
+    align-items: center;
+    margin: 0;
+    color: var(--text-2);
+    font-size: var(--text-sm);
+  }
+
+  .pub-or::before,
+  .pub-or::after {
+    content: "";
+    flex: 1;
+    border-top: 1px solid var(--border);
+  }
+
+  .pub-status {
+    margin: 0;
+    color: var(--text-2);
+    font-size: var(--text-sm);
+    text-align: center;
+  }
+
+  .pub-status:empty {
+    display: none;
+  }
+
+  .pub-links {
+    margin: 0;
+    text-align: center;
+  }
+
+  .pub-foot {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--space-2);
+    justify-content: center;
+    color: var(--text-2);
+    font-size: var(--text-sm);
+  }
+
+  .app-narrow {
+    display: grid;
+    gap: var(--space-3);
+    max-width: 36rem;
+  }
+
   /* onboarding wizard (#184) */
   .wiz {
     display: grid;

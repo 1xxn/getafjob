@@ -1124,5 +1124,9 @@
   "admin.system.passkeys": "Passkeys",
   "admin.system.on": "on",
   "admin.system.off": "off",
-  "documents.review_month_placeholder": "YYYY-MM"
+  "documents.review_month_placeholder": "YYYY-MM",
+  "login.or": "or",
+  "login.sent.again": "Use another address",
+  "problem.home": "To the overview",
+  "problem.login": "To sign in"
 }

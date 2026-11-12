@@ -109,6 +109,8 @@ function bind() {
     if (!run || btn.dataset.bound) continue;
     btn.dataset.bound = "1";
     btn.hidden = false;
+    const box = btn.closest("[data-passkey-box]");
+    if (box) box.hidden = false;
     btn.addEventListener("click", () => {
       btn.disabled = true;
       say(btn, "");

@@ -1124,5 +1124,9 @@
   "admin.system.passkeys": "Passkeys",
   "admin.system.on": "an",
   "admin.system.off": "aus",
-  "documents.review_month_placeholder": "JJJJ-MM"
+  "documents.review_month_placeholder": "JJJJ-MM",
+  "login.or": "oder",
+  "login.sent.again": "Andere Adresse verwenden",
+  "problem.home": "Zur Übersicht",
+  "problem.login": "Zur Anmeldung"
 }

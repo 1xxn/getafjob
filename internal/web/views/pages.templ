@@ -1,74 +1,85 @@
 package views
 
+import "github.com/1xxn/getafjob/internal/web/views/ui"
+
+// pubHead is the heading of a page without sign-in: an icon in a soft circle, the title and one line of text.
+templ pubHead(icon, title, text string) {
+	<div class="pub-head">
+		<span class="pub-icon">
+			@ui.Icon(icon)
+		</span>
+		<h1>{ title }</h1>
+		if text != "" {
+			<p class="pub-text">{ text }</p>
+		}
+	</div>
+}
+
 templ Login(email, notice string, passkeys bool) {
 	@Layout(Page{Title: T(ctx, "login.title"), Passkeys: passkeys}) {
-		@Section(T(ctx, "login.title")) {
-			<p>{ T(ctx, "login.text") }</p>
-			if notice != "" {
-				@Notice("error", notice)
-			}
-			<form method="post" action="/login" class="stack">
-				@Field(FieldProps{Name: "email", Label: T(ctx, "login.email_label"), Type: "email", Value: email,
-					Hint: T(ctx, "login.email_hint"), Autocomplete: "email", Required: true, MaxLength: 254})
-				<button type="submit" class="primary">{ T(ctx, "login.submit") }</button>
-			</form>
-			if passkeys {
-				<div class="stack">
-					<button type="button" hidden data-passkey="sign-in" data-status="passkey-status"
-						data-error={ T(ctx, "passkey.failed") }>{ T(ctx, "passkey.sign_in") }</button>
-					<p id="passkey-status" role="status" class="muted"></p>
-				</div>
-			}
+		@pubHead("lock", T(ctx, "login.title"), T(ctx, "login.text"))
+		if notice != "" {
+			@ui.Alert(ui.AlertProps{Tone: ui.Danger, Text: notice})
+		}
+		<form method="post" action="/login" class="pub-form" data-login>
+			@ui.Input(ui.InputProps{FieldProps: ui.FieldProps{Name: "email", Label: T(ctx, "login.email_label"),
+				Hint: T(ctx, "login.email_hint"), Required: true}, Type: "email", Value: email, Autocomplete: "email webauthn",
+				MaxLength: 254})
+			@ui.Button(ui.ButtonProps{Label: T(ctx, "login.submit"), Type: "submit", Variant: "primary", Icon: "send"})
+		</form>
+		if passkeys {
+			<div class="pub-alt" data-passkey-box hidden>
+				<p class="pub-or"><span>{ T(ctx, "login.or") }</span></p>
+				@ui.Button(ui.ButtonProps{Label: T(ctx, "passkey.sign_in"), Icon: "shield",
+					Attrs: templ.Attributes{"data-passkey": "sign-in", "data-status": "passkey-status", "data-error": T(ctx, "passkey.failed"), "hidden": true}})
+				<p id="passkey-status" role="status" class="pub-status"></p>
+			</div>
 		}
 	}
 }
 
 templ LoginSent() {
 	@Layout(Page{Title: T(ctx, "login.sent.title")}) {
-		@Section(T(ctx, "login.sent.title")) {
-			@Notice("info", T(ctx, "login.sent.text"))
-		}
+		@pubHead("send", T(ctx, "login.sent.title"), T(ctx, "login.sent.text"))
+		<p class="pub-links"><a href="/login">{ T(ctx, "login.sent.again") }</a></p>
 	}
 }
 
 // ConfirmLink asks for a click before a sign-in link is used, so mail scanners cannot use it up.
 templ ConfirmLink(action string) {
 	@Layout(Page{Title: T(ctx, "link.title")}) {
-		@Section(T(ctx, "link.title")) {
-			<p>{ T(ctx, "link.text") }</p>
-			<form method="post" action={ templ.SafeURL(action) }>
-				<button type="submit" class="primary">{ T(ctx, "link.submit") }</button>
-			</form>
-		}
+		@pubHead("lock", T(ctx, "link.title"), T(ctx, "link.text"))
+		<form method="post" action={ templ.SafeURL(action) } class="pub-form">
+			@ui.Button(ui.ButtonProps{Label: T(ctx, "link.submit"), Type: "submit", Variant: "primary", Icon: "chevron-right"})
+		</form>
 	}
 }
 
 templ Invite(action, email, name, nameError string) {
 	@Layout(Page{Title: T(ctx, "invite.title")}) {
-		@Section(T(ctx, "invite.title")) {
-			<p>{ T(ctx, "invite.text", "email", email) }</p>
-			<form method="post" action={ templ.SafeURL(action) } class="stack">
-				@Field(FieldProps{Name: "name", Label: T(ctx, "invite.name_label"), Type: "text", Value: name,
-					Hint: T(ctx, "invite.name_hint"), Error: nameError, Autocomplete: "name", Required: true, MaxLength: 200})
-				<div class="field">
-					<label for="f-locale">{ T(ctx, "invite.locale_label") }</label>
-					<select id="f-locale" name="locale">
-						<option value="en" selected?={ Locale(ctx) == "en" }>{ T(ctx, "locale.en") }</option>
-						<option value="de" selected?={ Locale(ctx) == "de" }>{ T(ctx, "locale.de") }</option>
-					</select>
-				</div>
-				<button type="submit" class="primary">{ T(ctx, "invite.submit") }</button>
-			</form>
-		}
+		@pubHead("user", T(ctx, "invite.title"), T(ctx, "invite.text", "email", email))
+		<form method="post" action={ templ.SafeURL(action) } class="pub-form">
+			@ui.Input(ui.InputProps{FieldProps: ui.FieldProps{Name: "name", Label: T(ctx, "invite.name_label"),
+				Hint: T(ctx, "invite.name_hint"), Error: nameError, Required: true}, Value: name, Autocomplete: "name", MaxLength: 200})
+			@ui.Select(ui.SelectProps{FieldProps: ui.FieldProps{ID: "f-locale", Name: "locale", Label: T(ctx, "invite.locale_label")},
+				Options: []ui.Option{{Value: "en", Label: T(ctx, "locale.en"), Selected: Locale(ctx) == "en"},
+					{Value: "de", Label: T(ctx, "locale.de"), Selected: Locale(ctx) == "de"}}})
+			@ui.Button(ui.ButtonProps{Label: T(ctx, "invite.submit"), Type: "submit", Variant: "primary", Icon: "check"})
+		</form>
 	}
 }
 
 // Problem is the page for errors and invalid links; text is already translated.
 templ Problem(title, text, userName string) {
 	@Layout(Page{Title: title, UserName: userName}) {
-		@Section(title) {
-			@Notice("error", text)
-			<p><a href="/">getafjob</a></p>
+		if userName != "" {
+			<div class="app-narrow">
+				@ui.EmptyState(ui.EmptyProps{Icon: "alert", Title: title, Text: text})
+				<p class="pub-links"><a href="/">{ T(ctx, "problem.home") }</a></p>
+			</div>
+		} else {
+			@pubHead("alert", title, text)
+			<p class="pub-links"><a href="/login">{ T(ctx, "problem.login") }</a></p>
 		}
 	}
 }
