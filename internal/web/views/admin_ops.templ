@@ -1,0 +1,231 @@
+package views
+
+import "github.com/1xxn/getafjob/internal/web/views/ui"
+
+// AdminRunnerRow is one runner; Quiet marks one without a run for a while.
+type AdminRunnerRow struct {
+	ID, LastLease                    string
+	Active, Runs, Submitted, Stopped int
+	Quiet                            bool
+}
+
+// AdminRunnersData is the runner page.
+type AdminRunnersData struct {
+	Name    string
+	Runners []AdminRunnerRow
+}
+
+// AdminSourceRow is one board.
+type AdminSourceRow struct {
+	ID, ATS, Slug, Company, LastCrawled, Error string
+	Enabled                                    bool
+}
+
+// AdminSourcesData is the sources page: a filter, the boards and the crawl.
+type AdminSourcesData struct {
+	Name, Query, State, Back, Notice string
+	Total                            int
+	Sources                          []AdminSourceRow
+	Crawl                            CrawlStatusData
+}
+
+// AdminQueueRow counts the jobs of one kind per state.
+type AdminQueueRow struct {
+	Kind   string
+	States map[string]int
+}
+
+// AdminQueueFailure is a failed job.
+type AdminQueueFailure struct {
+	ID, Kind, State, Error, At string
+	Attempt                    int
+}
+
+// AdminQueueData is the queue page.
+type AdminQueueData struct {
+	Name, Notice string
+	Kinds        []AdminQueueRow
+	Failures     []AdminQueueFailure
+}
+
+// queueStates are the columns of the queue table, in the order a job passes them.
+var queueStates = []string{"scheduled", "available", "running", "retryable", "completed", "discarded", "cancelled"}
+
+func switchAction(enabled bool) string {
+	if enabled {
+		return "disable"
+	}
+	return "enable"
+}
+
+func sourceName(s AdminSourceRow) string {
+	if s.Company != "" {
+		return s.Company
+	}
+	return s.Slug
+}
+
+templ adminDone(notice string) {
+	if notice != "" {
+		@ui.Alert(ui.AlertProps{Tone: ui.Success, Text: notice})
+	}
+}
+
+templ AdminRunnersPage(d AdminRunnersData) {
+	@adminPage(d.Name, "admin.runners", "/admin/runners") {
+		<p class="app-hint">{ T(ctx, "admin.runners.intro") }</p>
+		if len(d.Runners) == 0 {
+			@ui.EmptyState(ui.EmptyProps{Icon: "monitor", Title: T(ctx, "admin.runners.none"), Text: T(ctx, "admin.runners.none_text")})
+		} else {
+			<ul class="adm-list">
+				for _, r := range d.Runners {
+					<li class="adm-row" data-runner={ r.ID }>
+						<span class="adm-who">
+							<span class="adm-name">
+								{ r.ID }
+								if r.Active > 0 {
+									@ui.StatusPill(ui.StatusProps{Label: T(ctx, "admin.runners.busy", "n", r.Active), Tone: ui.Info, Live: true})
+								} else if r.Quiet {
+									@ui.StatusPill(ui.StatusProps{Label: T(ctx, "admin.runners.quiet"), Tone: ui.Warning})
+								} else {
+									@ui.StatusPill(ui.StatusProps{Label: T(ctx, "admin.runners.idle"), Tone: ui.Success})
+								}
+							</span>
+							<span class="adm-meta">{ T(ctx, "admin.runners.last", "time", r.LastLease) }</span>
+							<span class="adm-meta">{ T(ctx, "admin.runners.day", "runs", r.Runs, "submitted", r.Submitted, "stopped", r.Stopped) }</span>
+						</span>
+					</li>
+				}
+			</ul>
+		}
+	}
+}
+
+templ AdminSourcesPage(d AdminSourcesData) {
+	@adminPage(d.Name, "admin.sources", "/admin/sources") {
+		<p class="app-hint">{ T(ctx, "admin.sources.intro") }</p>
+		@adminDone(d.Notice)
+		<div class="adm-toolbar">
+			<form method="get" action="/admin/sources" class="adm-filter" role="search">
+				@ui.Input(ui.InputProps{FieldProps: ui.FieldProps{Name: "q", Label: T(ctx, "admin.sources.search"), HideLabel: true},
+					Type: "search", Value: d.Query, Placeholder: T(ctx, "admin.sources.search")})
+				@ui.Select(ui.SelectProps{FieldProps: ui.FieldProps{Name: "state", Label: T(ctx, "admin.sources.state"), HideLabel: true},
+					Options: []ui.Option{{Value: "", Label: T(ctx, "admin.sources.state.all"), Selected: d.State == ""},
+						{Value: "failing", Label: T(ctx, "admin.sources.state.failing"), Selected: d.State == "failing"},
+						{Value: "disabled", Label: T(ctx, "admin.sources.state.disabled"), Selected: d.State == "disabled"}}})
+				@ui.Button(ui.ButtonProps{Label: T(ctx, "admin.sources.filter"), Type: "submit", Icon: "filter"})
+			</form>
+			<form method="post" action="/admin/sources/crawl">
+				@ui.Button(ui.ButtonProps{Label: T(ctx, "jobs.crawl_button"), Type: "submit", Variant: "primary", Icon: "refresh",
+					Disabled: d.Crawl.Running || d.Crawl.Queued, Attrs: templ.Attributes{"data-crawl": ""}})
+			</form>
+		</div>
+		<p class="adm-meta">
+			if d.Crawl.Running {
+				{ T(ctx, "jobs.crawl_running") }
+			} else if d.Crawl.Queued {
+				{ T(ctx, "jobs.crawl_queued") }
+			} else if d.Crawl.LastRun != "" {
+				{ T(ctx, "jobs.crawl_last_run", "time", d.Crawl.LastRun) }
+			} else {
+				{ T(ctx, "jobs.crawl_never") }
+			}
+			{ " · " + T(ctx, "admin.sources.count", "shown", len(d.Sources), "total", d.Total) }
+		</p>
+		if len(d.Sources) == 0 {
+			@ui.EmptyState(ui.EmptyProps{Icon: "database", Title: T(ctx, "admin.sources.none"), Text: T(ctx, "admin.sources.none_text")})
+		} else {
+			<ul class="adm-list">
+				for _, s := range d.Sources {
+					<li class="adm-row" data-source={ s.ID }>
+						<span class="adm-who">
+							<span class="adm-name">
+								{ sourceName(s) }
+								@ui.Badge(s.ATS, ui.Neutral)
+								if !s.Enabled {
+									@ui.Badge(T(ctx, "admin.sources.off"), ui.Warning)
+								}
+							</span>
+							<span class="adm-meta">
+								{ s.Slug }
+								if s.LastCrawled != "" {
+									{ " · " + T(ctx, "admin.sources.crawled", "time", s.LastCrawled) }
+								}
+							</span>
+							if s.Error != "" {
+								<span class="adm-error">{ s.Error }</span>
+							}
+						</span>
+						<form method="post" action={ templ.SafeURL("/admin/sources/" + s.ID + "/" + switchAction(s.Enabled)) }>
+							<input type="hidden" name="back" value={ d.Back }/>
+							if s.Enabled {
+								@ui.Button(ui.ButtonProps{Label: T(ctx, "admin.sources.disable"), Type: "submit", Size: "sm", Icon: "pause"})
+							} else {
+								@ui.Button(ui.ButtonProps{Label: T(ctx, "admin.sources.enable"), Type: "submit", Size: "sm", Icon: "play"})
+							}
+						</form>
+					</li>
+				}
+			</ul>
+		}
+	}
+}
+
+templ AdminQueuePage(d AdminQueueData) {
+	@adminPage(d.Name, "admin.queue", "/admin/queue") {
+		<p class="app-hint">{ T(ctx, "admin.queue.intro") }</p>
+		@adminDone(d.Notice)
+		<div class="adm-table" role="region" tabindex="0" aria-label={ T(ctx, "admin.queue.table") }>
+			<table class="ui-table">
+				<thead>
+					<tr>
+						<th scope="col">{ T(ctx, "admin.queue.kind") }</th>
+						for _, st := range queueStates {
+							<th scope="col" class="num">{ T(ctx, "admin.queue.state." + st) }</th>
+						}
+					</tr>
+				</thead>
+				<tbody>
+					for _, k := range d.Kinds {
+						<tr data-kind={ k.Kind }>
+							<th scope="row">{ k.Kind }</th>
+							for _, st := range queueStates {
+								<td class="num">
+									if k.States[st] > 0 {
+										{ itoa(k.States[st]) }
+									}
+								</td>
+							}
+						</tr>
+					}
+				</tbody>
+			</table>
+		</div>
+		<section aria-labelledby="adm-failures">
+			<h2 id="adm-failures">{ T(ctx, "admin.queue.failures") }</h2>
+			if len(d.Failures) == 0 {
+				<p class="app-hint">{ T(ctx, "admin.queue.no_failures") }</p>
+			} else {
+				<ul class="adm-list">
+					for _, f := range d.Failures {
+						<li class="adm-row" data-job={ f.ID }>
+							<span class="adm-who">
+								<span class="adm-name">
+									{ f.Kind }
+									@ui.Badge(T(ctx, "admin.queue.state." + f.State), ui.Danger)
+								</span>
+								<span class="adm-meta">{ T(ctx, "admin.queue.attempt", "n", f.Attempt, "time", f.At) }</span>
+								if f.Error != "" {
+									<span class="adm-error">{ f.Error }</span>
+								}
+							</span>
+							<form method="post" action={ templ.SafeURL("/admin/queue/" + f.ID + "/retry") }>
+								@ui.Button(ui.ButtonProps{Label: T(ctx, "admin.queue.retry"), Type: "submit", Size: "sm", Icon: "refresh"})
+							</form>
+						</li>
+					}
+				</ul>
+			}
+		</section>
+	}
+}

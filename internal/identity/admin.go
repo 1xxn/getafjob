@@ -102,6 +102,11 @@ func (s *Service) RecordDeletion(ctx context.Context, by, userID uuid.UUID) erro
 	return s.admin().Audit(ctx, adminAudit(by, "admin.user_deleted", map[string]any{"user": userID}))
 }
 
+// RecordAdmin notes an admin action that is not about an account (sources, the job queue) on the admin's log.
+func (s *Service) RecordAdmin(ctx context.Context, by uuid.UUID, code string, params map[string]any) error {
+	return s.admin().Audit(ctx, adminAudit(by, code, params))
+}
+
 // AdminAudit returns the newest admin actions.
 func (s *Service) AdminAudit(ctx context.Context, limit int) ([]AuditEntry, error) {
 	return s.admin().AdminAudit(ctx, min(max(limit, 1), 200))

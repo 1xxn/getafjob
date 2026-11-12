@@ -119,6 +119,7 @@ type Server struct {
 	Events         *events.Hub   // live application changes; nil turns /events off
 	StyleGuide     bool          // serve /dev/styleguide (development builds only)
 	System         SystemService // nil: the system page shows the build only
+	Ops            AdminOps      // nil: no runner, source and queue pages
 	PushStore      webpush.Store
 	VAPIDPublicKey string
 	Logger         *slog.Logger
@@ -244,6 +245,13 @@ func (s *Server) Register(mux *http.ServeMux) {
 	mux.Handle("POST /admin/users/{id}/sign-out", s.adminOnly(s.adminSignOut))
 	mux.Handle("POST /admin/users/{id}/delete", s.adminOnly(s.adminDelete))
 	mux.Handle("GET /admin/system", s.adminOnly(s.adminSystem))
+	mux.Handle("GET /admin/runners", s.adminOnly(s.adminRunners))
+	mux.Handle("GET /admin/sources", s.adminOnly(s.adminSources))
+	mux.Handle("POST /admin/sources/crawl", s.limited(s.adminOnly(s.adminCrawl)))
+	mux.Handle("POST /admin/sources/{id}/enable", s.adminOnly(s.adminSourceSwitch(true)))
+	mux.Handle("POST /admin/sources/{id}/disable", s.adminOnly(s.adminSourceSwitch(false)))
+	mux.Handle("GET /admin/queue", s.adminOnly(s.adminQueue))
+	mux.Handle("POST /admin/queue/{id}/retry", s.adminOnly(s.adminRetry))
 	mux.Handle("GET /notifications/bell", s.page(s.bell))
 	mux.Handle("POST /notifications/read", s.page(s.markRead))
 	mux.Handle("GET /activity", s.page(s.activityPage))

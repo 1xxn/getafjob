@@ -63,7 +63,14 @@ func TestAdmin(t *testing.T) {
 	tab.Axe("/admin/system")
 
 	phone := OpenIn(t, Admin(t), 375, 812, "light")
-	for _, p := range []string{"/admin/users", "/admin/system"} {
+	for _, p := range []string{"/admin/runners", "/admin/sources", "/admin/queue"} {
+		tab.Go(p)
+		tab.El("#set-title")
+		tab.Axe(p)
+	}
+	tab.Shot("sources")
+
+	for _, p := range []string{"/admin/users", "/admin/system", "/admin/sources", "/admin/queue"} {
 		phone.Go(p)
 		phone.El("#set-title")
 		phone.NoOverflow(p)
