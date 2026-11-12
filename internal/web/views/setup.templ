@@ -99,7 +99,7 @@ templ setupButtons(step, primary string) {
 }
 
 templ SetupPage(d SetupData) {
-	@Layout(Page{Title: T(ctx, "setup.step." + d.Step), UserName: d.Name, Wide: true, Passkeys: d.Passkeys}) {
+	@Layout(Page{Title: T(ctx, "setup.step."+d.Step), UserName: d.Name, Wide: true, Passkeys: d.Passkeys}) {
 		<section class="wiz" data-setup-step={ d.Step } aria-labelledby="wiz-title">
 			@setupHead(d.Step)
 			<p class="app-hint">{ T(ctx, "setup.text." + d.Step) }</p>

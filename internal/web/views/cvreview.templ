@@ -39,7 +39,6 @@ templ DocumentReviewPage(p DocumentReviewProps) {
 			<form method="post" action={ templ.SafeURL("/documents/" + p.DocID + "/review") }>
 				<input type="hidden" name="exp_count" value={ fmt.Sprintf("%d", len(p.Experiences)) }/>
 				<input type="hidden" name="edu_count" value={ fmt.Sprintf("%d", len(p.Educations)) }/>
-
 				<div class="rv-section">
 					<h3>{ T(ctx, "documents.review_exp_title") }</h3>
 					if len(p.Experiences) == 0 {
@@ -48,7 +47,7 @@ templ DocumentReviewPage(p DocumentReviewProps) {
 						for i, exp := range p.Experiences {
 							<div class="card rv-item">
 								<div class="rv-row-head">
-									@rvCheck(fmt.Sprintf("include_exp_%d", i), T(ctx, "documents.review_include_position") + " #" + fmt.Sprint(i+1), true, true)
+									@rvCheck(fmt.Sprintf("include_exp_%d", i), T(ctx, "documents.review_include_position")+" #"+fmt.Sprint(i+1), true, true)
 								</div>
 								<div class="grid rv-grid">
 									@ui.Input(rvInput(ctx, "profile.station.company", fmt.Sprintf("exp_%d_company", i), exp.Company, 200, false))
@@ -68,7 +67,6 @@ templ DocumentReviewPage(p DocumentReviewProps) {
 						}
 					}
 				</div>
-
 				<div class="rv-section">
 					<h3>{ T(ctx, "documents.review_edu_title") }</h3>
 					if len(p.Educations) == 0 {
@@ -77,7 +75,7 @@ templ DocumentReviewPage(p DocumentReviewProps) {
 						for i, edu := range p.Educations {
 							<div class="card rv-item">
 								<div class="rv-row-head">
-									@rvCheck(fmt.Sprintf("include_edu_%d", i), T(ctx, "documents.review_include_education") + " #" + fmt.Sprint(i+1), true, true)
+									@rvCheck(fmt.Sprintf("include_edu_%d", i), T(ctx, "documents.review_include_education")+" #"+fmt.Sprint(i+1), true, true)
 								</div>
 								<div class="grid rv-grid">
 									@ui.Input(rvInput(ctx, "profile.station.institution", fmt.Sprintf("edu_%d_institution", i), edu.Institution, 200, false))
@@ -94,7 +92,6 @@ templ DocumentReviewPage(p DocumentReviewProps) {
 						}
 					}
 				</div>
-
 				<div class="card rv-box">
 					@rvCheck("include_profile", T(ctx, "documents.review_profile_include"), true, true)
 					if len(p.Profile.Skills) > 0 {
@@ -114,7 +111,6 @@ templ DocumentReviewPage(p DocumentReviewProps) {
 						</p>
 					}
 				</div>
-
 				<div class="rv-actions">
 					@ui.Button(ui.ButtonProps{Label: T(ctx, "documents.review_confirm"), Variant: "primary", Type: "submit"})
 					@ui.Button(ui.ButtonProps{Label: T(ctx, "actions.cancel"), Href: "/documents"})

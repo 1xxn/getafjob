@@ -1,69 +1,6 @@
 package views
 
-// Section groups content under a heading; layout uses headings and rules, not cards.
-templ Section(title string) {
-	<section class="section">
-		<h1>{ title }</h1>
-		{ children... }
-	</section>
-}
-
-// FieldProps describe a labelled input; hint and error are linked with aria-describedby.
-type FieldProps struct {
-	Name         string
-	ID           string // element id; empty: f-<Name>
-	Label        string
-	Type         string
-	Value        string
-	Hint         string
-	Error        string
-	Autocomplete string
-	Required     bool
-	MaxLength    int
-}
-
-templ Field(f FieldProps) {
-	<div class={ "field", templ.KV("field-invalid", f.Error != "") }>
-		<label for={ fieldID(f) }>{ f.Label }</label>
-		<input
-			id={ fieldID(f) }
-			name={ f.Name }
-			type={ f.Type }
-			value={ f.Value }
-			if f.Autocomplete != "" {
-				autocomplete={ f.Autocomplete }
-			}
-			if f.Required {
-				required
-			}
-			if f.MaxLength > 0 {
-				maxlength={ itoa(f.MaxLength) }
-			}
-			if f.Hint != "" || f.Error != "" {
-				aria-describedby={ describedBy(f) }
-			}
-			if f.Error != "" {
-				aria-invalid="true"
-			}
-		/>
-		if f.Hint != "" {
-			<p class="hint" id={ fieldID(f) + "-hint" }>{ f.Hint }</p>
-		}
-		if f.Error != "" {
-			<p class="error" id={ fieldID(f) + "-error" }>{ f.Error }</p>
-		}
-	</div>
-}
-
-// Notice is a short message; kind is info or error.
-templ Notice(kind, text string) {
-	<p class={ "notice", "notice-" + kind } role={ noticeRole(kind) }>{ text }</p>
-}
-
-// StatusLabel shows a status as glyph plus word, never as a coloured pill.
-templ StatusLabel(status string) {
-	<span class={ "status", "status-" + status }><span aria-hidden="true">{ statusGlyph(status) }</span> { T(ctx, "status." + status) }</span>
-}
+import "github.com/1xxn/getafjob/internal/web/views/ui"
 
 // StickyBar holds the primary actions at the bottom of long forms.
 templ StickyBar() {
@@ -74,43 +11,10 @@ templ StickyBar() {
 
 // PasskeyNudge asks users without a passkey to add one; the single accent of the page.
 templ PasskeyNudge() {
-	<p class="notice notice-info">
-		{ T(ctx, "passkey.nudge") }
-		<a href="/settings/account">{ T(ctx, "passkey.nudge_link") }</a>
-	</p>
-}
-
-// TextArea is a labelled multi-line field (one item per line where the hint says so).
-templ TextArea(f FieldProps) {
-	<div class={ "field", templ.KV("field-invalid", f.Error != "") }>
-		<label for={ fieldID(f) }>{ f.Label }</label>
-		<textarea
-			id={ fieldID(f) }
-			name={ f.Name }
-			rows="4"
-			if f.MaxLength > 0 {
-				maxlength={ itoa(f.MaxLength) }
-			}
-			if f.Hint != "" || f.Error != "" {
-				aria-describedby={ describedBy(f) }
-			}
-			if f.Error != "" {
-				aria-invalid="true"
-			}
-		>{ f.Value }</textarea>
-		if f.Hint != "" {
-			<p class="hint" id={ fieldID(f) + "-hint" }>{ f.Hint }</p>
-		}
-		if f.Error != "" {
-			<p class="error" id={ fieldID(f) + "-error" }>{ f.Error }</p>
-		}
-	</div>
-}
-
-// Check is a labelled checkbox.
-templ Check(name, label string, checked bool) {
-	<div class="field field-check">
-		<input id={ "f-" + name } name={ name } type="checkbox" value="on" checked?={ checked }/>
-		<label for={ "f-" + name }>{ label }</label>
-	</div>
+	@ui.Alert(ui.AlertProps{Tone: ui.Info}) {
+		<p>
+			{ T(ctx, "passkey.nudge") }
+			<a href="/settings/account">{ T(ctx, "passkey.nudge_link") }</a>
+		</p>
+	}
 }

@@ -20,9 +20,9 @@ type TextRow struct {
 
 // AnswersData fills the answer bank.
 type AnswersData struct {
-	Query   string
-	Rows    []AnswerRow
-	Total   int // before the search
+	Query string
+	Rows  []AnswerRow
+	Total int // before the search
 }
 
 templ AnswersPage(name string, h CandidateHead, f Form, d AnswersData) {
@@ -66,8 +66,13 @@ templ AnswersPage(name string, h CandidateHead, f Form, d AnswersData) {
 							Value: a.Answer, MaxLength: 5000})
 						<div class="app-actions">
 							@ui.Button(ui.ButtonProps{Label: T(ctx, "profile.save"), Type: "submit", Variant: "primary", Icon: "check"})
-							<button { HX(ctx)... } type="submit" class="ui-btn ui-btn-ghost" formaction={ templ.URL("/answers/" + a.ID + "/delete") }
-								data-confirm={ T(ctx, "answers.delete_confirm") }>
+							<button
+								{ HX(ctx)... }
+								type="submit"
+								class="ui-btn ui-btn-ghost"
+								formaction={ templ.URL("/answers/" + a.ID + "/delete") }
+								data-confirm={ T(ctx, "answers.delete_confirm") }
+							>
 								@ui.Icon("trash")
 								<span>{ T(ctx, "passkey.remove") }</span>
 							</button>
@@ -126,8 +131,13 @@ templ TextsPage(name string, h CandidateHead, f Form, texts []TextRow, placehold
 							Rows: 8, MaxLength: 20000})
 						<div class="app-actions">
 							@ui.Button(ui.ButtonProps{Label: T(ctx, "profile.save"), Type: "submit", Variant: "primary", Icon: "check"})
-							<button { HX(ctx)... } type="submit" class="ui-btn ui-btn-ghost" formaction={ templ.URL("/texts/" + t.ID + "/delete") }
-								data-confirm={ T(ctx, "texts.delete_confirm") }>
+							<button
+								{ HX(ctx)... }
+								type="submit"
+								class="ui-btn ui-btn-ghost"
+								formaction={ templ.URL("/texts/" + t.ID + "/delete") }
+								data-confirm={ T(ctx, "texts.delete_confirm") }
+							>
 								@ui.Icon("trash")
 								<span>{ T(ctx, "passkey.remove") }</span>
 							</button>

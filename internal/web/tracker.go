@@ -12,6 +12,7 @@ import (
 
 	"github.com/1xxn/getafjob/internal/identity"
 	"github.com/1xxn/getafjob/internal/web/views"
+	"github.com/1xxn/getafjob/internal/web/views/ui"
 )
 
 func (s *Server) trackerSaveNotes(w http.ResponseWriter, r *http.Request, u *identity.User) {
@@ -85,7 +86,7 @@ func (s *Server) jobBookmark(w http.ResponseWriter, r *http.Request, u *identity
 		return
 	}
 	if partial(r) {
-		s.render(w, r, http.StatusOK, views.Notice("success", views.T(r.Context(), "jobs.saved_to_tracker")))
+		s.render(w, r, http.StatusOK, ui.Alert(ui.AlertProps{Tone: ui.Success, Text: views.T(r.Context(), "jobs.saved_to_tracker")}))
 		return
 	}
 	http.Redirect(w, r, fmt.Sprintf("/jobs/%d", id), http.StatusSeeOther)

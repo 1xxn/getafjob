@@ -139,7 +139,7 @@ templ jobBadges(r JobRow) {
 	<span class="job-badges">
 		@ui.Badge(itoa(r.Score), scoreTone(r.Decision))
 		if r.State != "" {
-			@ui.Badge(T(ctx, "jobs.state." + r.State), stateTone(r.State))
+			@ui.Badge(T(ctx, "jobs.state."+r.State), stateTone(r.State))
 		}
 		if r.Blocked {
 			@ui.Badge(T(ctx, "jobs.blocked_badge"), ui.Danger)
@@ -200,7 +200,7 @@ templ jobsToolbar(d JobsData) {
 			<ul class="jobs-blocklist">
 				for _, b := range d.Blocklist {
 					<li>
-						@ui.Badge(T(ctx, "jobs.blocklist_kind_" + b.Kind), ui.Neutral)
+						@ui.Badge(T(ctx, "jobs.blocklist_kind_"+b.Kind), ui.Neutral)
 						<span class="jobs-blocklist-pattern">{ b.Pattern }</span>
 						<form method="post" action="/jobs/blocklist/delete">
 							<input type="hidden" name="id" value={ i64(b.ID) }/>
