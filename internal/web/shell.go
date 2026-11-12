@@ -28,6 +28,7 @@ var flashKeys = map[string]bool{"flash.language": true,
 	"flash.apps.park_partial": true, "flash.apps.park_none": true, "flash.apps.sent": true, "flash.apps.not_sent": true,
 	"flash.apps.unchanged": true, "flash.apps.notes": true,
 	"flash.approvals.approve": true, "flash.approvals.approve_partial": true, "flash.approvals.approve_none": true,
+	"flash.pl.external": true, "flash.pl.import_error": true,
 	"flash.approvals.reject": true, "flash.approvals.reject_partial": true, "flash.approvals.reject_none": true}
 
 // flash leaves a one-time message (a key of flashKeys) for the page the redirect leads to.
