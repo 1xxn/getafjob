@@ -473,6 +473,14 @@ func (f *fakeAppStore) PipelineApplications(_ context.Context, _ uuid.UUID) ([]a
 	return nil, nil
 }
 
+func (f *fakeAppStore) QueueItems(context.Context, uuid.UUID) ([]application.QueueItem, error) {
+	return nil, nil
+}
+
+func (f *fakeAppStore) MoveQueued(context.Context, uuid.UUID, uuid.UUID, bool) (bool, error) { return false, nil }
+
+func (f *fakeAppStore) PauseQueued(context.Context, uuid.UUID, uuid.UUID, bool) (bool, error) { return false, nil }
+
 func (f *fakeAppStore) BookmarkJob(_ context.Context, _ uuid.UUID, _ int64, _ time.Time) (uuid.UUID, error) {
 	return uuid.New(), nil
 }

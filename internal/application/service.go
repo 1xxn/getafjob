@@ -446,6 +446,31 @@ type Brief struct {
 	Company string
 }
 
+// QueueItem is one application waiting for a runner, in queue order; a paused one is skipped until resumed.
+type QueueItem struct {
+	ID      uuid.UUID
+	JobID   int64
+	Title   string
+	Company string
+	Paused  bool
+}
+
+// QueueItems lists the user's queued applications in the order their runs start.
+func (s *Service) QueueItems(ctx context.Context, userID uuid.UUID) ([]QueueItem, error) {
+	return s.store.QueueItems(ctx, userID)
+}
+
+// MoveQueued moves a queued application one place up or down; false when it is already at that end or no longer
+// queued.
+func (s *Service) MoveQueued(ctx context.Context, userID, id uuid.UUID, up bool) (bool, error) {
+	return s.store.MoveQueued(ctx, userID, id, up)
+}
+
+// PauseQueued pauses or resumes a queued application: the lease skips a paused one.
+func (s *Service) PauseQueued(ctx context.Context, userID, id uuid.UUID, paused bool) (bool, error) {
+	return s.store.PauseQueued(ctx, userID, id, paused)
+}
+
 // Briefs returns the user's applications with the given IDs (unknown IDs are missing), in one query.
 func (s *Service) Briefs(ctx context.Context, userID uuid.UUID, ids []uuid.UUID) ([]Brief, error) {
 	if len(ids) == 0 {

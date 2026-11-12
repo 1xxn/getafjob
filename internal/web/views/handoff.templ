@@ -42,7 +42,7 @@ templ questionControl(i int, q HandoffQuestion) {
 	<div class="ni-question" data-question={ n } data-input={ q.Input }>
 		<input type="hidden" name={ "question-" + n } value={ q.Question }/>
 		<input type="hidden" name={ "input-" + n } value={ q.Input }/>
-		switch {
+		switch  {
 			case q.Input == "checkbox" || q.Input == "aria_checkbox":
 				<input type="hidden" name={ name } value="No"/>
 				@ui.Checkbox(ui.CheckProps{ID: id, Name: name, Value: "Yes", Label: questionText(q.Question), Hint: hint, Checked: q.Draft == "Yes"})

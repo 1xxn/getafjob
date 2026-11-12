@@ -212,7 +212,7 @@ templ AdminQueuePage(d AdminQueueData) {
 							<span class="adm-who">
 								<span class="adm-name">
 									{ f.Kind }
-									@ui.Badge(T(ctx, "admin.queue.state." + f.State), ui.Danger)
+									@ui.Badge(T(ctx, "admin.queue.state."+f.State), ui.Danger)
 								</span>
 								<span class="adm-meta">{ T(ctx, "admin.queue.attempt", "n", f.Attempt, "time", f.At) }</span>
 								if f.Error != "" {

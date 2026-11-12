@@ -36,7 +36,6 @@ templ DocumentReviewPage(p DocumentReviewProps) {
 			<form method="post" action={ templ.SafeURL("/documents/" + p.DocID + "/review") }>
 				<input type="hidden" name="exp_count" value={ fmt.Sprintf("%d", len(p.Experiences)) }/>
 				<input type="hidden" name="edu_count" value={ fmt.Sprintf("%d", len(p.Educations)) }/>
-
 				<div class="rv-section">
 					<h3>{ T(ctx, "documents.review_exp_title") }</h3>
 					if len(p.Experiences) == 0 {
@@ -100,7 +99,6 @@ templ DocumentReviewPage(p DocumentReviewProps) {
 						}
 					}
 				</div>
-
 				<div class="rv-section">
 					<h3>{ T(ctx, "documents.review_edu_title") }</h3>
 					if len(p.Educations) == 0 {
@@ -150,7 +148,6 @@ templ DocumentReviewPage(p DocumentReviewProps) {
 						}
 					}
 				</div>
-
 				<div class="card rv-box">
 					<label class="rv-check rv-strong">
 						<input type="checkbox" name="include_profile" value="1" checked/>
@@ -173,7 +170,6 @@ templ DocumentReviewPage(p DocumentReviewProps) {
 						</p>
 					}
 				</div>
-
 				<div class="rv-actions">
 					<button type="submit" class="button primary">{ T(ctx, "documents.review_confirm") }</button>
 					<a href="/documents" class="button secondary">{ T(ctx, "actions.cancel") }</a>

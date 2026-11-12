@@ -214,6 +214,14 @@ func (f *fakePlannerStore) PipelineApplications(_ context.Context, _ uuid.UUID) 
 	return nil, nil
 }
 
+func (f *fakePlannerStore) QueueItems(context.Context, uuid.UUID) ([]application.QueueItem, error) {
+	return nil, nil
+}
+
+func (f *fakePlannerStore) MoveQueued(context.Context, uuid.UUID, uuid.UUID, bool) (bool, error) { return false, nil }
+
+func (f *fakePlannerStore) PauseQueued(context.Context, uuid.UUID, uuid.UUID, bool) (bool, error) { return false, nil }
+
 func (f *fakePlannerStore) BookmarkJob(_ context.Context, _ uuid.UUID, _ int64, _ time.Time) (uuid.UUID, error) {
 	return uuid.New(), nil
 }
