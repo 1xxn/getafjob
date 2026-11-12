@@ -237,8 +237,42 @@ jobs:
       - name: browser tests inside the runner image (sandbox on, seccomp profile)
         run: go tool task test:browser:run
 
+  changes:
+    name: changes
+    runs-on: ubuntu-26.04
+    permissions:
+      contents: read
+    outputs:
+      code: ${{ steps.diff.outputs.code }}
+    steps:
+      - uses: step-security/harden-runner@46b06cea07f9e64621fdf066ba77ac6915163d43 # v2.22.3
+        with:
+          egress-policy: audit
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          fetch-depth: 0
+      # A pull request that changes only documentation skips the e2e journeys; any other file runs them, and main
+      # always does. A skipped job counts as passed for the ruleset.
+      - id: diff
+        env:
+          EVENT: ${{ github.event_name }}
+          BASE: ${{ github.event.pull_request.base.sha }}
+          HEAD: ${{ github.event.pull_request.head.sha }}
+        run: |
+          if [ "$EVENT" != "pull_request" ]; then echo "code=true" >> "$GITHUB_OUTPUT"; exit 0; fi
+          files="$(git diff --name-only "$BASE...$HEAD")"
+          echo "$files"
+          if echo "$files" | grep -qvE '^(docs/.*|.*\.md|LICENSE|\.github/ISSUE_TEMPLATE/.*)$'; then
+            echo "code=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "code=false" >> "$GITHUB_OUTPUT"
+          fi
+
   e2e:
     name: e2e journeys (dev stack)
+    needs: changes
+    if: needs.changes.outputs.code == 'true'
     runs-on: ubuntu-26.04
     timeout-minutes: 30
     permissions:
