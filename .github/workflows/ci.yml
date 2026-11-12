@@ -285,12 +285,12 @@ jobs:
         run: |
           go tool task dev:secrets
           docker compose -f deploy/compose.yaml -f deploy/compose.dev.yaml --profile dev up -d --no-build --wait --wait-timeout 300
-      # 200 postings as in local runs: enough companies on the fixture site that the planner, which applies for the
-      # demo user on its own, leaves fresh jobs for the journeys (the company window allows one run per company).
+      # The demo users only get suggestions: the planner queues nothing on their behalf, so it neither takes the fixture
+      # jobs the journeys need nor fills the browser slots with runs waiting for a human.
       - name: demo data on the fixture site
         run: >-
           docker compose -f deploy/compose.yaml -f deploy/compose.dev.yaml exec -T serve
-          /usr/local/bin/getafjob admin demo -jobs 200 -fixtures http://fixtures:8080
+          /usr/local/bin/getafjob admin demo -jobs 200 -fixtures http://fixtures:8080 -autonomy suggest
       - name: journeys in the runner image (fresh invited user, sandbox on)
         run: go tool task test:e2e
       - name: screenshots
