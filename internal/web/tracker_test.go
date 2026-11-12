@@ -102,9 +102,13 @@ func (f *fakeTrackerStore) QueueItems(context.Context, uuid.UUID) ([]application
 	return nil, nil
 }
 
-func (f *fakeTrackerStore) MoveQueued(context.Context, uuid.UUID, uuid.UUID, bool) (bool, error) { return false, nil }
+func (f *fakeTrackerStore) MoveQueued(context.Context, uuid.UUID, uuid.UUID, bool) (bool, error) {
+	return false, nil
+}
 
-func (f *fakeTrackerStore) PauseQueued(context.Context, uuid.UUID, uuid.UUID, bool) (bool, error) { return false, nil }
+func (f *fakeTrackerStore) PauseQueued(context.Context, uuid.UUID, uuid.UUID, bool) (bool, error) {
+	return false, nil
+}
 
 func (f *fakeTrackerStore) BookmarkJob(_ context.Context, _ uuid.UUID, jobID int64, now time.Time) (uuid.UUID, error) {
 	f.bookmarked = append(f.bookmarked, jobID)
