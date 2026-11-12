@@ -196,7 +196,7 @@ templ liveDock() {
 					}
 				</div>
 				@ui.IconButton(ui.IconButtonProps{Icon: "columns", Label: T(ctx, "live.dock.side"), Attrs: templ.Attributes{"data-dock-side-toggle": true}})
-				@ui.IconButton(ui.IconButtonProps{Icon: "external", Label: T(ctx, "live.dock.detach"), Attrs: templ.Attributes{"data-dock-detach": true}})
+				@ui.IconButton(ui.IconButtonProps{Icon: "monitor", Label: T(ctx, "live.dock.detach"), Attrs: templ.Attributes{"data-dock-detach": true}})
 			</div>
 			<div class="dock-screen" data-dock-screen></div>
 			<ul class="dock-runs" data-dock-runs { HX(ctx, "hx-get", "/live/dock", "hx-trigger", "load, getafjob:app from:body delay:700ms", "hx-swap", "innerHTML transition:false")... }></ul>

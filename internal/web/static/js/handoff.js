@@ -319,7 +319,7 @@ function setLayout(side, size) {
   if (size) slot.dataset.dockSize = size;
   syncLayout();
   const body = new URLSearchParams({ side: slot.dataset.dockSide ?? "right", size: slot.dataset.dockSize ?? "md" });
-  void fetch("/live/dock/layout", { method: "POST", body, credentials: "same-origin" }).catch(() => {
+  void fetch("/live/dock/layout", { method: "POST", body, credentials: "same-origin" }).then((r) => r.text()).catch(() => {
   });
 }
 document.addEventListener("htmx:after:settle", () => {
