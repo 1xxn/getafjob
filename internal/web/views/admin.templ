@@ -208,7 +208,7 @@ templ AdminSystemPage(d AdminSystemData) {
 		<p class="app-hint">{ T(ctx, "admin.system.intro") }</p>
 		<dl class="adm-facts">
 			for _, r := range d.Rows {
-				<div>
+				<div data-fact={ r.Key }>
 					<dt>{ T(ctx, r.Key) }</dt>
 					<dd>
 						if r.Tone != "" {

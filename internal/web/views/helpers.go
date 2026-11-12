@@ -59,9 +59,11 @@ func or(s, fallback string) string {
 	return s
 }
 
-// Size formats a byte count (KB, MB with one decimal).
+// Size formats a byte count (KB; MB and GB with one decimal).
 func Size(n int) string {
 	switch {
+	case n >= 1<<30:
+		return strconv.FormatFloat(float64(n)/(1<<30), 'f', 1, 64) + " GB"
 	case n >= 1<<20:
 		return strconv.FormatFloat(float64(n)/(1<<20), 'f', 1, 64) + " MB"
 	case n >= 1<<10:

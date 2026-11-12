@@ -20,6 +20,7 @@ const adminUsage = `Usage:
   getafjob admin <command>
 
 Commands:
+  backup-done    record a finished backup for the system page (admin backup-done -bytes N)
   boards         company boards for the crawler (admin boards import | list)
   check-config   validate the configuration (prints variable names, never values)
   cleanup        run retention and token cleanup now
@@ -87,6 +88,8 @@ func admin(ctx context.Context, args []string, env Env) int {
 		return adminDeleteUser(ctx, args[1:], env)
 	case "export-user":
 		return adminExportUser(ctx, args[1:], env)
+	case "backup-done":
+		return adminBackupDone(ctx, args[1:], env)
 	case "cleanup":
 		return adminCleanup(ctx, args[1:], env)
 	case "gen-secret":
