@@ -1130,5 +1130,9 @@
   "profile.autosave.invalid": "Not saved, check: {fields}",
   "profile.autosave.conflict": "Changed in another window. Reload the page to see the newest state.",
   "profile.autosave.gone": "This entry does not exist any more. Reload the page.",
-  "profile.autosave.error": "Not saved. Try again in a moment."
+  "profile.autosave.error": "Not saved. Try again in a moment.",
+  "login.or": "or",
+  "login.sent.again": "Use another address",
+  "problem.home": "To the overview",
+  "problem.login": "To sign in"
 }

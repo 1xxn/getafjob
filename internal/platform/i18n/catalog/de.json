@@ -1130,5 +1130,9 @@
   "profile.autosave.invalid": "Nicht gespeichert, prüf: {fields}",
   "profile.autosave.conflict": "In einem anderen Fenster geändert. Lade die Seite neu, um den neuesten Stand zu sehen.",
   "profile.autosave.gone": "Diesen Eintrag gibt es nicht mehr. Lade die Seite neu.",
-  "profile.autosave.error": "Nicht gespeichert. Versuch es gleich noch einmal."
+  "profile.autosave.error": "Nicht gespeichert. Versuch es gleich noch einmal.",
+  "login.or": "oder",
+  "login.sent.again": "Andere Adresse verwenden",
+  "problem.home": "Zur Übersicht",
+  "problem.login": "Zur Anmeldung"
 }
