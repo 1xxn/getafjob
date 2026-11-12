@@ -106,7 +106,7 @@ templ shellTop(s Shell) {
 			@ui.Icon("menu")
 		</button>
 		<a class="shell-brand" href="/">getafjob</a>
-		<button type="button" class="shell-search" { ui.OpenDialog("palette")... }>
+		<button type="button" class="shell-search" aria-label={ T(ctx, "nav.search") } { ui.OpenDialog("palette")... }>
 			@ui.Icon("search")
 			<span>{ T(ctx, "nav.search") }</span>
 			<kbd aria-hidden="true">Ctrl K</kbd>

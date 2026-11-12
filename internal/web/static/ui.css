@@ -1725,6 +1725,15 @@
       padding-bottom: 4.5rem;
     }
 
+    /* the top bar holds menu, brand, search, bell and avatar: on a phone the chevron and gaps give way */
+    .shell-user > .ui-icon {
+      display: none;
+    }
+
+    .shell-actions {
+      gap: 0;
+    }
+
     .shell-bottom {
       position: fixed;
       inset: auto 0 0;
@@ -1765,6 +1774,16 @@
 
     .ui-toasts {
       bottom: 5rem;
+    }
+  }
+
+  @media (max-width: 26rem) {
+    .shell-search {
+      flex: 0 0 auto;
+    }
+
+    .shell-search span {
+      display: none;
     }
   }
 
