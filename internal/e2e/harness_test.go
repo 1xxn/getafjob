@@ -273,6 +273,33 @@ func (tab *Tab) Eval(js string) string {
 	return res.Value.Str()
 }
 
+// EvalAsync is Eval for an async function body (await allowed); it waits for the result.
+func (tab *Tab) EvalAsync(js string) string {
+	tab.t.Helper()
+	res, err := tab.Page.Timeout(actionTimeout).Eval("() => (async () => { " + js + " })().then(v => JSON.stringify(v))")
+	if err != nil {
+		tab.t.Fatalf("eval: %v", err)
+	}
+	return res.Value.Str()
+}
+
+// NoOverflow fails the test when the page scrolls sideways and names the elements that stick out.
+func (tab *Tab) NoOverflow(what string) {
+	tab.t.Helper()
+	got := tab.Eval(`const w = document.documentElement.clientWidth;
+		if (document.documentElement.scrollWidth <= w) return '';
+		return [...document.querySelectorAll('body *')].filter(el => {
+			const r = el.getBoundingClientRect();
+			if (r.width === 0 || r.right <= w + 1) return false;
+			for (let a = el; a; a = a.parentElement) if (getComputedStyle(a).position === 'fixed') return false;
+			return true;
+		}).slice(0, 5).map(el => el.tagName.toLowerCase() + (el.id ? '#' + el.id : '') + '.' + [...el.classList].join('.')).join(', ') || 'unknown'`)
+	if got != `""` {
+		tab.Shot("overflow")
+		tab.t.Errorf("%s: horizontal overflow from %s", what, got)
+	}
+}
+
 // Shot saves a screenshot of the viewport under the test's name.
 func (tab *Tab) Shot(name string) {
 	tab.t.Helper()

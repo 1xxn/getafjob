@@ -56,13 +56,9 @@ func TestApplications(t *testing.T) {
 	phone := OpenIn(t, Demo(t), 375, 812, "dark")
 	phone.Go("/applications")
 	phone.El("tr[data-app-row]")
-	if over := phone.Eval("return Math.max(0, document.documentElement.scrollWidth - document.documentElement.clientWidth)"); over != "0" {
-		t.Errorf("%s px horizontal overflow", over)
-	}
+	phone.NoOverflow("page")
 	phone.Go("/applications/" + app)
 	phone.El("#app-head")
-	if over := phone.Eval("return Math.max(0, document.documentElement.scrollWidth - document.documentElement.clientWidth)"); over != "0" {
-		t.Errorf("detail: %s px horizontal overflow", over)
-	}
+	phone.NoOverflow("detail")
 	phone.Shot("phone")
 }

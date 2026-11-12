@@ -5,7 +5,6 @@ package e2e
 import (
 	"encoding/json"
 	"math/rand/v2"
-	"strconv"
 	"strings"
 	"testing"
 	"time"
@@ -25,32 +24,36 @@ func (tab *Tab) WaitWithin(d time.Duration, cond string) {
 	tab.t.Fatalf("timed out after %s waiting for %s", d, cond)
 }
 
-// startRun applies to the first listed fixture job that has no application yet and returns the application id.
+// candidates finds fixture jobs that can be applied to now: it reads the list and the job pages with parallel
+// fetches in the browser instead of opening every page, which made the journeys slow.
+const candidates = `const ids = [];
+for (let page = 1; page <= 3; page++) {
+	const list = await (await fetch('/jobs?source=demo&decision=all&page=' + page, {headers: {Accept: 'text/html'}})).text();
+	ids.push(...[...list.matchAll(/data-job-row data-id="(\d+)" data-state="(new)?"/g)].map(m => m[1]));
+}
+const found = [];
+for (let i = 0; i < ids.length && found.length < 6; i += 8) {
+	const pages = await Promise.all(ids.slice(i, i + 8).map(async id =>
+		[id, await (await fetch('/jobs/' + id, {headers: {Accept: 'text/html'}})).text()]));
+	for (const [id, html] of pages) {
+		if (html.includes('data-action="apply"') && html.includes('href="http://fixtures:8080/')) found.push(id);
+	}
+}
+return found`
+
+// startRun applies to a fixture job without an application, through the job page and its preview drawer, and
+// returns the application id; without such a job it starts a parked fixture application again.
 func startRun(t *testing.T, tab *Tab) string {
 	t.Helper()
-	var hrefs []string
-	for page := 1; page <= 3; page++ {
-		tab.Go("/jobs?source=demo&decision=all&page=" + strconv.Itoa(page))
-		var more []string
-		if err := json.Unmarshal([]byte(tab.Eval(`return [...document.querySelectorAll('.job-row')]
-			.filter(r => !r.dataset.state || r.dataset.state === 'new').map(r => '/jobs/' + r.dataset.id)`)), &more); err != nil {
-			t.Fatal(err)
-		}
-		hrefs = append(hrefs, more...)
+	tab.Go("/jobs?source=demo")
+	var ids []string
+	if err := json.Unmarshal([]byte(tab.EvalAsync(candidates)), &ids); err != nil {
+		t.Fatal(err)
 	}
 	// A fresh stack (CI) starts at the top; locally the order is shuffled so older runs rarely get in the way.
-	rand.Shuffle(len(hrefs), func(i, j int) { hrefs[i], hrefs[j] = hrefs[j], hrefs[i] })
-	for _, h := range hrefs {
-		tab.Go(h)
-		if tab.Eval(`return !!document.querySelector('main a[href^="/applications/"]')`) == "true" {
-			continue // applied before: its state would decide the journey
-		}
-		if tab.Eval(`return !!document.querySelector('main a[href^="http://fixtures:8080/"]')`) != "true" {
-			continue // a crawled posting: the runner's egress policy blocks it in the dev stack
-		}
-		if tab.Eval(`return !!document.querySelector('.jd-actions [data-action="apply"]')`) != "true" {
-			continue // applied elsewhere, excluded by the search settings or not a form
-		}
+	rand.Shuffle(len(ids), func(i, j int) { ids[i], ids[j] = ids[j], ids[i] })
+	for _, id := range ids {
+		tab.Go("/jobs/" + id)
 		// Apply now opens the preview in a drawer; starting there leads to the run in focus.
 		tab.Click(`.jd-actions [data-action="apply"]`)
 		tab.WaitFor("document.getElementById('dlg-apply').open && document.querySelector('#apply-body [data-action=\"apply-confirm\"]')")
