@@ -81,7 +81,7 @@ func run(m *testing.M, invite string) (int, error) {
 	}
 	shared = b
 	defer func() { _ = b.Close(context.Background()) }()
-	if err := signIn(invite); err != nil {
+	if err := signIn(shared.Browser, invite); err != nil {
 		return 1, fmt.Errorf("sign in: %w", err)
 	}
 	code := m.Run()
@@ -113,12 +113,12 @@ func spkiPin(path string) (string, error) {
 }
 
 // signIn accepts the invitation with a display name; the session cookie stays in the shared browser profile.
-func signIn(invite string) error {
+func signIn(b *rod.Browser, invite string) error {
 	u, err := url.Parse(invite)
 	if err != nil {
 		return err
 	}
-	p, err := shared.Page(proto.TargetCreateTarget{})
+	p, err := b.Page(proto.TargetCreateTarget{})
 	if err != nil {
 		return err
 	}

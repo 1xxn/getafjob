@@ -127,3 +127,29 @@ DELETE FROM recoveries WHERE user_id = $1;
 
 -- name: SetUserLocale :execrows
 UPDATE users SET locale = $2 WHERE id = $1;
+
+-- name: ListUsers :many
+SELECT u.id, u.email, u.display_name, u.role, u.locale, u.created_at, u.disabled_at,
+  COALESCE((SELECT max(s.last_seen_at) FROM sessions s WHERE s.user_id = u.id), u.created_at)::timestamptz AS last_seen,
+  (SELECT count(*) FROM sessions s WHERE s.user_id = u.id AND s.expires_at > sqlc.arg(now))::bigint AS sessions,
+  EXISTS (SELECT 1 FROM passkeys p WHERE p.user_id = u.id) AS has_passkey
+FROM users u
+ORDER BY u.created_at, u.id;
+
+-- name: PendingInvitations :many
+SELECT id, email, role, created_at, expires_at FROM invitations
+WHERE accepted_at IS NULL AND expires_at > $1
+ORDER BY created_at DESC;
+
+-- name: RevokeInvitation :execrows
+DELETE FROM invitations WHERE id = $1 AND accepted_at IS NULL;
+
+-- name: LockAdmins :many
+SELECT id FROM users WHERE role = 'admin' AND disabled_at IS NULL FOR UPDATE;
+
+-- name: SetUserRole :execrows
+UPDATE users SET role = $2 WHERE id = $1;
+
+-- name: AdminAuditEvents :many
+SELECT id, user_id, actor, code, params, created_at FROM audit_events
+WHERE actor = 'admin' ORDER BY id DESC LIMIT $1;

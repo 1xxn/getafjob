@@ -116,8 +116,9 @@ type Server struct {
 	Privacy        PrivacyService
 	Shots          Screenshots
 	Handoffs       HandoffHub
-	Events         *events.Hub // live application changes; nil turns /events off
-	StyleGuide     bool        // serve /dev/styleguide (development builds only)
+	Events         *events.Hub   // live application changes; nil turns /events off
+	StyleGuide     bool          // serve /dev/styleguide (development builds only)
+	System         SystemService // nil: the system page shows the build only
 	PushStore      webpush.Store
 	VAPIDPublicKey string
 	Logger         *slog.Logger
@@ -230,6 +231,14 @@ func (s *Server) Register(mux *http.ServeMux) {
 	mux.Handle("POST /texts", s.page(s.textSave))
 	mux.Handle("POST /texts/{id}", s.page(s.textSave))
 	mux.Handle("POST /texts/{id}/delete", s.page(s.itemDelete(profile.ItemText, "/texts")))
+	mux.Handle("GET /admin", http.RedirectHandler("/admin/users", http.StatusSeeOther))
+	mux.Handle("GET /admin/users", s.adminOnly(s.adminUsers))
+	mux.Handle("POST /admin/invites", s.limited(s.adminOnly(s.adminInvite)))
+	mux.Handle("POST /admin/invites/{id}/revoke", s.adminOnly(s.adminRevoke))
+	mux.Handle("POST /admin/users/{id}/role", s.adminOnly(s.adminRole))
+	mux.Handle("POST /admin/users/{id}/sign-out", s.adminOnly(s.adminSignOut))
+	mux.Handle("POST /admin/users/{id}/delete", s.adminOnly(s.adminDelete))
+	mux.Handle("GET /admin/system", s.adminOnly(s.adminSystem))
 	mux.Handle("GET /notifications/bell", s.page(s.bell))
 	mux.Handle("POST /notifications/read", s.page(s.markRead))
 	mux.Handle("GET /activity", s.page(s.activityPage))
