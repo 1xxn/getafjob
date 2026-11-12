@@ -8,6 +8,7 @@ import (
 	"github.com/google/uuid"
 
 	"github.com/1xxn/getafjob/internal/notify"
+	"github.com/1xxn/getafjob/internal/platform/i18n"
 )
 
 func TestQuietHours(t *testing.T) {
@@ -86,20 +87,17 @@ func TestFormatSummary(t *testing.T) {
 		Rejections:         0,
 	}
 
-	title, body := stats.FormatSummary()
-	if title == "" || !strings.Contains(title, "Daily Summary") {
+	title, body := stats.FormatSummary(i18n.EN)
+	for _, want := range []string{"Applications sent: 3", "Waiting for your approval: 2", "Waiting for your answer: 1",
+		"Status suggestions from your mailbox: 4", "1 interviews, 2 confirmations, 0 rejections"} {
+		if !strings.Contains(body, want) {
+			t.Errorf("summary lacks %q: %s", want, body)
+		}
+	}
+	if title != "getafjob: your day" {
 		t.Errorf("title = %q", title)
 	}
-	if !strings.Contains(body, "Applications submitted: 3") {
-		t.Errorf("missing submitted count: %s", body)
-	}
-	if !strings.Contains(body, "Awaiting your approval: 2") {
-		t.Errorf("missing approvals count: %s", body)
-	}
-	if !strings.Contains(body, "Action required") {
-		t.Errorf("missing needs input: %s", body)
-	}
-	if !strings.Contains(body, "1 invitations") {
-		t.Errorf("missing invitations count: %s", body)
+	if title, body := stats.FormatSummary(i18n.DE); title != "getafjob: dein Tag" || !strings.Contains(body, "Gesendete Bewerbungen: 3") {
+		t.Errorf("German summary: %q %q", title, body)
 	}
 }

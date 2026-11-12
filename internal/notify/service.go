@@ -9,6 +9,8 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+
+	"github.com/1xxn/getafjob/internal/platform/i18n"
 )
 
 // Service dispatches notifications and generates daily summaries.
@@ -75,6 +77,14 @@ func (s *Service) Notify(ctx context.Context, n Notification) error {
 		prefs = DefaultPreferences(n.UserID, email)
 	}
 
+	if n.Key != "" {
+		l, err := s.store.UserLocale(ctx, n.UserID)
+		if err != nil {
+			l = i18n.Default
+		}
+		n.Title, n.Body = i18n.T(l, "notify."+n.Key+".title", n.Params), i18n.T(l, "notify."+n.Key+".body", n.Params)
+	}
+
 	// Quiet hours check: bypass for High or Urgent priority (e.g. CAPTCHAs, handoffs closing)
 	if n.Priority < PriorityHigh && prefs.InQuietHours(s.now()) {
 		s.logger.InfoContext(ctx, "notification skipped during quiet hours", "user_id", n.UserID, "event", n.Event)
@@ -136,7 +146,11 @@ func (s *Service) SendDailySummary(ctx context.Context, userID uuid.UUID) error 
 		return fmt.Errorf("aggregating daily stats: %w", err)
 	}
 
-	title, body := stats.FormatSummary()
+	l, err := s.store.UserLocale(ctx, userID)
+	if err != nil {
+		l = i18n.Default
+	}
+	title, body := stats.FormatSummary(l)
 	n := Notification{
 		UserID:    userID,
 		Event:     EventDailySummary,
@@ -182,9 +196,8 @@ func (s *Service) SendTestNotification(ctx context.Context, userID uuid.UUID) er
 	n := Notification{
 		UserID:    userID,
 		Event:     EventTest,
-		Title:     "getafjob · Test Notification",
-		Body:      "Your notification channels are working properly!",
-		URL:       "/preferences",
+		Key:       "test",
+		URL:       "/settings/notifications",
 		Priority:  PriorityHigh,
 		Tags:      []string{"bell", "white_check_mark"},
 		CreatedAt: now,

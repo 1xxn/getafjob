@@ -172,3 +172,61 @@ func TestPgstoreNotify(t *testing.T) {
 		t.Errorf("expected error or not found for u2 querying u1 without preferences")
 	}
 }
+
+func event(t *testing.T, pool *pgxpool.Pool, userID, appID uuid.UUID, from, to string, at time.Time) {
+	t.Helper()
+	if err := db.InSystemTx(t.Context(), pool, func(tx pgx.Tx) error {
+		_, err := tx.Exec(t.Context(), `INSERT INTO application_events (application_id, user_id, event, from_state, to_state, actor, at)
+			VALUES ($1, $2, 'transition', $3, $4, 'worker', $5)`, appID, userID, from, to, at)
+		return err
+	}); err != nil {
+		t.Fatal(err)
+	}
+}
+
+// The feed holds the notable state changes and mail suggestions of the user only, newest first; the read mark moves
+// forward only.
+func TestPgstoreActivity(t *testing.T) {
+	ctx := context.Background()
+	pool := dbtest.AppPool(t)
+	st := pgstore.New(pool)
+	u, other := user(t, pool, "feed@example.org"), user(t, pool, "other@example.org")
+	app := application(t, pool, u, job(t, pool, "Muster GmbH", "Platform Engineer"), "submitted")
+	otherApp := application(t, pool, other, job(t, pool, "Beispiel AG", "Backend Developer"), "submitted")
+	t0 := time.Date(2026, 11, 12, 9, 0, 0, 0, time.UTC)
+	event(t, pool, u, app, "queued", "running", t0)                             // not notable
+	event(t, pool, u, app, "running", "needs_input", t0.Add(time.Minute))       // notable
+	event(t, pool, u, app, "needs_input", "needs_input", t0.Add(2*time.Minute)) // no change
+	event(t, pool, u, app, "submitting", "submitted", t0.Add(3*time.Minute))
+	event(t, pool, other, otherApp, "submitting", "submitted", t0.Add(4*time.Minute))
+	suggestion(t, pool, u, app, "confirmation", t0.Add(5*time.Minute))
+
+	items, err := st.Activity(ctx, u, t0.Add(time.Hour), 10)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(items) != 3 || items[0].Kind != notify.KindSuggestion || items[1].State != "submitted" || items[2].State != "needs_input" ||
+		items[1].Title != "Platform Engineer" || items[1].Company != "Muster GmbH" || items[1].ApplicationID != app {
+		t.Fatalf("items = %+v", items)
+	}
+	if older, _ := st.Activity(ctx, u, items[1].At, 10); len(older) != 1 || older[0].State != "needs_input" {
+		t.Errorf("page before %v = %+v", items[1].At, older)
+	}
+	if seen, err := st.SeenAt(ctx, u); err != nil || !seen.IsZero() {
+		t.Fatalf("seen before marking = %v, %v", seen, err)
+	}
+	if n, _ := st.CountActivitySince(ctx, u, time.Time{}); n != 3 {
+		t.Errorf("unread = %d", n)
+	}
+	if err := st.MarkSeen(ctx, u, t0.Add(4*time.Minute)); err != nil {
+		t.Fatal(err)
+	}
+	_ = st.MarkSeen(ctx, u, t0) // never back
+	seen, _ := st.SeenAt(ctx, u)
+	if n, _ := st.CountActivitySince(ctx, u, seen); n != 1 || !seen.Equal(t0.Add(4*time.Minute)) {
+		t.Errorf("unread after mark = %d, seen %v", n, seen)
+	}
+	if l, err := st.UserLocale(ctx, u); err != nil || l != "en" {
+		t.Errorf("locale %q %v", l, err)
+	}
+}

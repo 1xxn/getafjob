@@ -70,3 +70,37 @@ SELECT category, count(*)::bigint AS count
 FROM tracking_suggestions
 WHERE user_id = $1 AND created_at >= $2
 GROUP BY category;
+
+-- name: GetUserLocale :one
+SELECT locale FROM users WHERE id = $1;
+
+-- name: Activity :many
+SELECT x.id, x.kind, x.state, x.application_id, x.title, x.company, x.at FROM (
+  SELECT e.id::text AS id, 'state'::text AS kind, e.to_state AS state, e.application_id, j.title, j.company, e.at
+  FROM application_events e
+  JOIN applications a ON a.id = e.application_id
+  JOIN jobs j ON j.id = a.job_id
+  WHERE e.user_id = sqlc.arg(user_id) AND e.to_state = ANY(sqlc.arg(states)::text[]) AND e.from_state <> e.to_state
+    AND e.at < sqlc.arg(before)
+  UNION ALL
+  SELECT s.id::text, 'suggestion'::text, s.suggested_state, s.application_id, j.title, j.company, s.created_at
+  FROM tracking_suggestions s
+  JOIN applications a ON a.id = s.application_id
+  JOIN jobs j ON j.id = a.job_id
+  WHERE s.user_id = sqlc.arg(user_id) AND s.created_at < sqlc.arg(before)
+) x
+ORDER BY x.at DESC, x.id DESC
+LIMIT sqlc.arg(lim);
+
+-- name: CountActivitySince :one
+SELECT ((SELECT count(*) FROM application_events e
+         WHERE e.user_id = sqlc.arg(user_id) AND e.to_state = ANY(sqlc.arg(states)::text[]) AND e.from_state <> e.to_state
+           AND e.at > sqlc.arg(since))
+      + (SELECT count(*) FROM tracking_suggestions s WHERE s.user_id = sqlc.arg(user_id) AND s.created_at > sqlc.arg(since)))::bigint;
+
+-- name: GetSeenAt :one
+SELECT seen_at FROM notify_reads WHERE user_id = $1;
+
+-- name: SetSeenAt :exec
+INSERT INTO notify_reads (user_id, seen_at) VALUES ($1, $2)
+ON CONFLICT (user_id) DO UPDATE SET seen_at = GREATEST(notify_reads.seen_at, EXCLUDED.seen_at);

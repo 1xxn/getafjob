@@ -1,0 +1,234 @@
+package views
+
+import (
+	"context"
+	"time"
+
+	"github.com/1xxn/getafjob/internal/web/views/ui"
+)
+
+// ActivityRow is one entry of the feed: a state change or a status suggestion from the mailbox.
+type ActivityRow struct {
+	Kind    string // state, suggestion
+	State   string
+	Link    string
+	Title   string
+	Company string
+	At      time.Time
+	Unread  bool
+}
+
+// BellData is the bell in the top bar: the unread count and the newest entries.
+type BellData struct {
+	Unread int
+	Items  []ActivityRow
+}
+
+// ActivityGroup is one day of the feed.
+type ActivityGroup struct {
+	Label string
+	Items []ActivityRow
+}
+
+// ActivityData is the feed page.
+type ActivityData struct {
+	Name   string
+	Unread int
+	Groups []ActivityGroup
+	Older  string // link to the next page, empty on the last
+	Self   string // the page's own address, for the live refresh
+}
+
+func activityLabel(ctx context.Context, a ActivityRow) string {
+	if a.Kind == "suggestion" {
+		return T(ctx, "activity.suggestion", "state", T(ctx, "apps.state."+a.State))
+	}
+	return T(ctx, "apps.state."+a.State)
+}
+
+func activityIcon(a ActivityRow) string {
+	if a.Kind == "suggestion" {
+		return "inbox"
+	}
+	switch a.State {
+	case "needs_input":
+		return "message"
+	case "submitted":
+		return "send"
+	case "confirmed":
+		return "check-circle"
+	case "interview", "offer":
+		return "star"
+	case "rejected":
+		return "x"
+	case "parked":
+		return "pause"
+	default:
+		return "alert"
+	}
+}
+
+func activityTone(a ActivityRow) string {
+	switch {
+	case a.Kind == "suggestion":
+		return "info"
+	case a.State == "needs_input" || a.State == "failed" || a.State == "submit_unknown":
+		return "warning"
+	case a.State == "rejected" || a.State == "parked":
+		return "neutral"
+	default:
+		return "success"
+	}
+}
+
+// shortWhen is the time of day for today (UTC) and the date before.
+func shortWhen(ctx context.Context, t, now time.Time) string {
+	if t.UTC().Format(time.DateOnly) == now.UTC().Format(time.DateOnly) {
+		return t.UTC().Format("15:04")
+	}
+	return dayLabel(ctx, t)
+}
+
+// BellCount is the badge text: the count, or 99+.
+func BellCount(n int) string {
+	if n > 99 {
+		return "99+"
+	}
+	return itoa(n)
+}
+
+func bellLabel(ctx context.Context, n int) string {
+	if n == 0 {
+		return T(ctx, "activity.bell")
+	}
+	return T(ctx, "activity.bell_unread", "n", n)
+}
+
+templ activityItem(a ActivityRow) {
+	<li>
+		<a
+			href={ templ.SafeURL(a.Link) }
+			class={ "act-item", templ.KV("is-unread", a.Unread) }
+			data-activity={ a.Kind }
+		>
+			<span class={ "act-icon", "ui-tone-" + activityTone(a) }>
+				@ui.Icon(activityIcon(a))
+			</span>
+			<span class="act-body">
+				<span class="act-title">{ activityLabel(ctx, a) }</span>
+				<span class="act-meta">{ a.Title } · { a.Company }</span>
+			</span>
+			<span class="act-side">
+				<time class="act-time" datetime={ a.At.UTC().Format(time.RFC3339) } title={ When(ctx, a.At) }>{ shortWhen(ctx, a.At, time.Now()) }</time>
+				if a.Unread {
+					<span class="act-dot" role="img" aria-label={ T(ctx, "activity.unread") }></span>
+				}
+			</span>
+		</a>
+	</li>
+}
+
+templ markReadForm(target string) {
+	<form
+		method="post"
+		action="/notifications/read"
+		if target != "" {
+			{ HX(ctx, "hx-post", "/notifications/read", "hx-target", target, "hx-swap", "outerMorph transition:false")... }
+		}
+	>
+		@ui.Button(ui.ButtonProps{Label: T(ctx, "activity.mark_read"), Type: "submit", Size: "sm", Variant: "ghost", Icon: "check",
+			Attrs: templ.Attributes{"data-mark-read": ""}})
+	</form>
+}
+
+// Bell is the notification menu of the top bar; it loads after the page and refreshes on every live event.
+templ Bell(d BellData) {
+	<div
+		id="bell"
+		class="ui-menu shell-bell"
+		data-unread={ itoa(d.Unread) }
+		{ HX(ctx, "hx-get", "/notifications/bell", "hx-trigger", "getafjob:app from:body delay:700ms", "hx-swap", "outerMorph transition:false")... }
+	>
+		<button type="button" class="ui-btn ui-btn-ghost ui-btn-icon shell-bell-btn" popovertarget="bell-menu" aria-label={ bellLabel(ctx, d.Unread) } title={ bellLabel(ctx, d.Unread) }>
+			@ui.Icon("bell")
+			if d.Unread > 0 {
+				<span class="shell-bell-count" aria-hidden="true">{ BellCount(d.Unread) }</span>
+			}
+		</button>
+		<div id="bell-menu" popover class="ui-menu-list ui-menu-end shell-bell-menu">
+			<div class="shell-bell-head">
+				<p class="ui-menu-heading">{ T(ctx, "activity.bell") }</p>
+				if d.Unread > 0 {
+					@markReadForm("#bell")
+				}
+			</div>
+			if len(d.Items) == 0 {
+				<p class="ui-menu-note">{ T(ctx, "activity.empty") }</p>
+			} else {
+				<ul class="act-list">
+					for _, a := range d.Items {
+						@activityItem(a)
+					}
+				</ul>
+			}
+			<hr/>
+			@ui.MenuItem(T(ctx, "activity.all"), "/activity", "list")
+		</div>
+	</div>
+}
+
+// bellSlot is what the page renders; the bell itself loads once the page is there.
+templ bellSlot() {
+	<div
+		id="bell"
+		class="ui-menu shell-bell"
+		{ HX(ctx, "hx-get", "/notifications/bell", "hx-trigger", "load, getafjob:app from:body delay:700ms", "hx-swap", "outerMorph transition:false")... }
+	>
+		<a href="/activity" class="ui-btn ui-btn-ghost ui-btn-icon shell-bell-btn" aria-label={ T(ctx, "activity.bell") } title={ T(ctx, "activity.bell") }>
+			@ui.Icon("bell")
+		</a>
+	</div>
+}
+
+templ ActivityPage(d ActivityData) {
+	@Layout(Page{Title: T(ctx, "activity.title"), UserName: d.Name, Wide: true}) {
+		<section class="act-page" aria-labelledby="act-title">
+			<header class="act-head">
+				<h1 id="act-title">{ T(ctx, "activity.title") }</h1>
+				if d.Unread > 0 {
+					@markReadForm("")
+				}
+			</header>
+			<p class="app-hint">{ T(ctx, "activity.intro") }</p>
+			@ActivityFeed(d)
+		</section>
+	}
+}
+
+// ActivityFeed is the live part of the page.
+templ ActivityFeed(d ActivityData) {
+	<div
+		id="act-feed"
+		class="act-feed"
+		{ HX(ctx, "hx-get", d.Self, "hx-trigger", "getafjob:app from:body delay:700ms", "hx-swap", "outerMorph transition:false")... }
+	>
+		if len(d.Groups) == 0 {
+			@ui.EmptyState(ui.EmptyProps{Icon: "bell", Title: T(ctx, "activity.empty"), Text: T(ctx, "activity.empty_text")})
+		}
+		for i, g := range d.Groups {
+			<section class="act-day" aria-labelledby={ "act-day-" + itoa(i) }>
+				<h2 id={ "act-day-" + itoa(i) }>{ g.Label }</h2>
+				<ul class="act-list">
+					for _, a := range g.Items {
+						@activityItem(a)
+					}
+				</ul>
+			</section>
+		}
+		if d.Older != "" {
+			<p>
+				@ui.Button(ui.ButtonProps{Label: T(ctx, "activity.older"), Href: d.Older, Icon: "chevron-down", Attrs: templ.Attributes{"data-older": ""}})
+			</p>
+		}
+	</div>
+}

@@ -12,6 +12,75 @@ import (
 	"github.com/google/uuid"
 )
 
+const activity = `-- name: Activity :many
+SELECT x.id, x.kind, x.state, x.application_id, x.title, x.company, x.at FROM (
+  SELECT e.id::text AS id, 'state'::text AS kind, e.to_state AS state, e.application_id, j.title, j.company, e.at
+  FROM application_events e
+  JOIN applications a ON a.id = e.application_id
+  JOIN jobs j ON j.id = a.job_id
+  WHERE e.user_id = $1 AND e.to_state = ANY($2::text[]) AND e.from_state <> e.to_state
+    AND e.at < $3
+  UNION ALL
+  SELECT s.id::text, 'suggestion'::text, s.suggested_state, s.application_id, j.title, j.company, s.created_at
+  FROM tracking_suggestions s
+  JOIN applications a ON a.id = s.application_id
+  JOIN jobs j ON j.id = a.job_id
+  WHERE s.user_id = $1 AND s.created_at < $3
+) x
+ORDER BY x.at DESC, x.id DESC
+LIMIT $4
+`
+
+type ActivityParams struct {
+	UserID uuid.UUID
+	States []string
+	Before time.Time
+	Lim    int32
+}
+
+type ActivityRow struct {
+	ID            string
+	Kind          string
+	State         string
+	ApplicationID uuid.UUID
+	Title         string
+	Company       string
+	At            time.Time
+}
+
+func (q *Queries) Activity(ctx context.Context, arg ActivityParams) ([]ActivityRow, error) {
+	rows, err := q.db.Query(ctx, activity,
+		arg.UserID,
+		arg.States,
+		arg.Before,
+		arg.Lim,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []ActivityRow{}
+	for rows.Next() {
+		var i ActivityRow
+		if err := rows.Scan(
+			&i.ID,
+			&i.Kind,
+			&i.State,
+			&i.ApplicationID,
+			&i.Title,
+			&i.Company,
+			&i.At,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const categoryCountsSince = `-- name: CategoryCountsSince :many
 SELECT category, count(*)::bigint AS count
 FROM tracking_suggestions
@@ -47,6 +116,26 @@ func (q *Queries) CategoryCountsSince(ctx context.Context, arg CategoryCountsSin
 		return nil, err
 	}
 	return items, nil
+}
+
+const countActivitySince = `-- name: CountActivitySince :one
+SELECT ((SELECT count(*) FROM application_events e
+         WHERE e.user_id = $1 AND e.to_state = ANY($2::text[]) AND e.from_state <> e.to_state
+           AND e.at > $3)
+      + (SELECT count(*) FROM tracking_suggestions s WHERE s.user_id = $1 AND s.created_at > $3))::bigint
+`
+
+type CountActivitySinceParams struct {
+	UserID uuid.UUID
+	States []string
+	Since  time.Time
+}
+
+func (q *Queries) CountActivitySince(ctx context.Context, arg CountActivitySinceParams) (int64, error) {
+	row := q.db.QueryRow(ctx, countActivitySince, arg.UserID, arg.States, arg.Since)
+	var column_1 int64
+	err := row.Scan(&column_1)
+	return column_1, err
 }
 
 const countNeedsInputApplications = `-- name: CountNeedsInputApplications :one
@@ -135,6 +224,17 @@ func (q *Queries) GetPreferences(ctx context.Context, userID uuid.UUID) (NotifyP
 	return i, err
 }
 
+const getSeenAt = `-- name: GetSeenAt :one
+SELECT seen_at FROM notify_reads WHERE user_id = $1
+`
+
+func (q *Queries) GetSeenAt(ctx context.Context, userID uuid.UUID) (time.Time, error) {
+	row := q.db.QueryRow(ctx, getSeenAt, userID)
+	var seen_at time.Time
+	err := row.Scan(&seen_at)
+	return seen_at, err
+}
+
 const getUserEmail = `-- name: GetUserEmail :one
 SELECT email FROM users WHERE id = $1
 `
@@ -144,6 +244,17 @@ func (q *Queries) GetUserEmail(ctx context.Context, id uuid.UUID) (string, error
 	var email string
 	err := row.Scan(&email)
 	return email, err
+}
+
+const getUserLocale = `-- name: GetUserLocale :one
+SELECT locale FROM users WHERE id = $1
+`
+
+func (q *Queries) GetUserLocale(ctx context.Context, id uuid.UUID) (string, error) {
+	row := q.db.QueryRow(ctx, getUserLocale, id)
+	var locale string
+	err := row.Scan(&locale)
+	return locale, err
 }
 
 const listEnabledDailySummaryUsers = `-- name: ListEnabledDailySummaryUsers :many
@@ -209,6 +320,21 @@ func (q *Queries) ListEnabledDailySummaryUsers(ctx context.Context) ([]ListEnabl
 		return nil, err
 	}
 	return items, nil
+}
+
+const setSeenAt = `-- name: SetSeenAt :exec
+INSERT INTO notify_reads (user_id, seen_at) VALUES ($1, $2)
+ON CONFLICT (user_id) DO UPDATE SET seen_at = GREATEST(notify_reads.seen_at, EXCLUDED.seen_at)
+`
+
+type SetSeenAtParams struct {
+	UserID uuid.UUID
+	SeenAt time.Time
+}
+
+func (q *Queries) SetSeenAt(ctx context.Context, arg SetSeenAtParams) error {
+	_, err := q.db.Exec(ctx, setSeenAt, arg.UserID, arg.SeenAt)
+	return err
 }
 
 const updateLastSummaryAt = `-- name: UpdateLastSummaryAt :exec
