@@ -17,6 +17,7 @@ import (
 	"github.com/1xxn/getafjob/internal/discovery/urlimport"
 	"github.com/1xxn/getafjob/internal/identity"
 	"github.com/1xxn/getafjob/internal/tracking"
+	"github.com/1xxn/getafjob/internal/web/views"
 )
 
 type fakeTrackerStore struct {
@@ -176,13 +177,20 @@ func (d *fakeDiscoverySvc) AddBoard(context.Context, string) (discovery.Board, e
 	return discovery.Board{}, nil
 }
 
-func TestTrackerPage_Unauthenticated(t *testing.T) {
+func TestPipelinePage_Unauthenticated(t *testing.T) {
 	srv := &Server{Logger: slog.Default()}
 	mux := http.NewServeMux()
 	srv.Register(mux)
 
+	// The old address answers 308 to the new one.
 	rec := httptest.NewRecorder()
-	req := httptest.NewRequest(http.MethodGet, "/tracker", nil)
+	mux.ServeHTTP(rec, httptest.NewRequest(http.MethodGet, "/tracker", nil))
+	if rec.Code != http.StatusPermanentRedirect || rec.Header().Get("Location") != "/pipeline" {
+		t.Fatalf("/tracker: %d %q, want 308 to /pipeline", rec.Code, rec.Header().Get("Location"))
+	}
+
+	rec = httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodGet, "/pipeline", nil)
 	mux.ServeHTTP(rec, req)
 
 	if rec.Code != http.StatusSeeOther {
@@ -193,7 +201,7 @@ func TestTrackerPage_Unauthenticated(t *testing.T) {
 	}
 }
 
-func TestTrackerPage_RendersFunnel(t *testing.T) {
+func TestPipelinePage_RendersStages(t *testing.T) {
 	max := uuid.MustParse("0192f3a4-5b6c-7d8e-9f01-23456789abcd")
 	app1 := uuid.MustParse("0192f3a4-5b6c-7d8e-9f01-000000000001")
 	app2 := uuid.MustParse("0192f3a4-5b6c-7d8e-9f01-000000000002")
@@ -263,44 +271,44 @@ func TestTrackerPage_RendersFunnel(t *testing.T) {
 
 	// 1. Full page request
 	rec := httptest.NewRecorder()
-	req := httptest.NewRequest(http.MethodGet, "/tracker", nil)
-	srv.trackerPage(rec, req, u)
+	req := httptest.NewRequest(http.MethodGet, "/pipeline", nil)
+	srv.pipelinePage(rec, req, u)
 
 	if rec.Code != http.StatusOK {
-		t.Fatalf("trackerPage status = %d, want 200", rec.Code)
+		t.Fatalf("pipelinePage status = %d, want 200", rec.Code)
 	}
 	body := rec.Body.String()
 	for _, expected := range []string{
-		"Senior Go Engineer",
-		"Acme Systems",
 		"Cloud Platform Architect",
 		"Globex Corp",
 		"Staff Engineer",
 		"Initech",
 		"95.000 €",
-		"Passed technical screening",
-		"tracker-board",
-		"tracker-column-saved",
-		"tracker-column-submitted",
-		"tracker-column-interview",
-		"badge-email-activity",
+		`id="pl-board"`,
+		`data-col="applied"`,
+		`data-col="interview"`,
+		`data-move="interview"`,
 	} {
 		if !strings.Contains(body, expected) {
 			t.Errorf("body missing expected snippet %q", expected)
 		}
 	}
+	// Saved jobs are not sent: they stay in Applications, not on the board.
+	if strings.Contains(body, "Senior Go Engineer") {
+		t.Error("an unsent application is on the board")
+	}
 
 	// 2. HTMX partial request
 	recPartial := httptest.NewRecorder()
-	reqPartial := httptest.NewRequest(http.MethodGet, "/tracker", nil)
+	reqPartial := httptest.NewRequest(http.MethodGet, "/pipeline", nil)
 	reqPartial.Header.Set("HX-Request", "true")
-	srv.trackerPage(recPartial, reqPartial, u)
+	srv.pipelinePage(recPartial, reqPartial, u)
 	if recPartial.Code != http.StatusOK {
 		t.Fatalf("partial status = %d, want 200", recPartial.Code)
 	}
 }
 
-func TestTrackerSetStage(t *testing.T) {
+func TestPipelineMove(t *testing.T) {
 	max := uuid.MustParse("0192f3a4-5b6c-7d8e-9f01-23456789abcd")
 	appID := uuid.MustParse("0192f3a4-5b6c-7d8e-9f01-000000000001")
 	now := time.Now()
@@ -326,18 +334,18 @@ func TestTrackerSetStage(t *testing.T) {
 	u := &identity.User{ID: max, Email: "max@example.org"}
 
 	form := url.Values{}
+	form.Set("id", appID.String())
 	form.Set("stage", "interview")
 
 	rec := httptest.NewRecorder()
-	req := httptest.NewRequest(http.MethodPost, "/tracker/"+appID.String()+"/stage", strings.NewReader(form.Encode()))
+	req := httptest.NewRequest(http.MethodPost, "/pipeline/move", strings.NewReader(form.Encode()))
 	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 	req.Header.Set("HX-Request", "true")
-	req.SetPathValue("id", appID.String())
 
-	srv.trackerSetStage(rec, req, u)
+	srv.pipelineMove(rec, req, u)
 
 	if rec.Code != http.StatusOK {
-		t.Fatalf("trackerSetStage status = %d, want 200", rec.Code)
+		t.Fatalf("pipelineMove status = %d, want 200", rec.Code)
 	}
 	if len(st.fired) != 1 || st.fired[0].ev != application.EvInterview {
 		t.Fatalf("fired = %+v, want EvInterview", st.fired)
@@ -455,13 +463,39 @@ func TestJobBookmarkAndApplyExternal(t *testing.T) {
 	reqAdd.Header.Set("HX-Request", "true")
 	srv.trackerAddExternal(recAdd, reqAdd, u)
 
-	if recAdd.Code != http.StatusOK {
-		t.Fatalf("trackerAddExternal status = %d, want 200", recAdd.Code)
+	if recAdd.Code != http.StatusSeeOther {
+		t.Fatalf("trackerAddExternal status = %d, want 303", recAdd.Code)
 	}
 	if disc.importedURL != "https://jobs.example.org/posting/123" {
 		t.Errorf("importedURL = %q", disc.importedURL)
 	}
 	if len(st.externalApplied) != 2 || st.externalApplied[1] != 123 {
 		t.Errorf("externalApplied = %v, want second item 123", st.externalApplied)
+	}
+}
+
+func TestPipelineMovesFollowTheStateMachine(t *testing.T) {
+	for st, want := range map[application.State]string{
+		application.Submitted: "interview offer rejected withdrawn",
+		application.Interview: "applied offer rejected withdrawn",
+		application.Offer:     "interview rejected withdrawn",
+		application.Withdrawn: "applied interview",
+		application.Matched:   "applied",
+	} {
+		if got := strings.Join(plMoves(st), " "); got != want {
+			t.Errorf("%s: moves %q, want %q", st, got, want)
+		}
+	}
+}
+
+func TestInterviewICS(t *testing.T) {
+	at := time.Date(2026, 11, 20, 13, 30, 0, 0, time.UTC)
+	c := views.PLCard{ID: "a1", Title: "Go, Platform; Lead", Company: "Initech", InterviewAt: &at}
+	ics := interviewICS(c, at)
+	for _, want := range []string{"BEGIN:VCALENDAR\r\n", "DTSTART:20261120T133000Z\r\n", "UID:a1@getafjob\r\n",
+		`SUMMARY:Interview: Go\, Platform\; Lead\, Initech`} {
+		if !strings.Contains(ics, want) {
+			t.Errorf("ics missing %q in %q", want, ics)
+		}
 	}
 }

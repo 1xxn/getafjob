@@ -2986,6 +2986,145 @@
       grid-column: auto;
     }
   }
+
+  /* pipeline */
+  .pl {
+    display: grid;
+    gap: var(--space-3);
+  }
+
+  .pl-jump {
+    display: flex;
+    gap: var(--space-1);
+    overflow-x: auto;
+  }
+
+  .pl-cols {
+    display: grid;
+    grid-auto-flow: column;
+    grid-auto-columns: minmax(15rem, 1fr);
+    gap: var(--space-3);
+    overflow-x: auto;
+    scroll-snap-type: x mandatory;
+    padding-bottom: var(--space-2);
+  }
+
+  .pl-col {
+    display: grid;
+    align-content: start;
+    gap: var(--space-2);
+    min-height: 12rem;
+    padding: var(--space-2);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-md);
+    background: var(--surface-2);
+    scroll-snap-align: start;
+  }
+
+  .pl-col-target {
+    border-style: dashed;
+    border-color: var(--accent);
+  }
+
+  .pl-col-over {
+    background: var(--surface);
+    box-shadow: inset 0 0 0 2px var(--accent);
+  }
+
+  .pl-col-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin: 0;
+    font-size: var(--text-sm);
+  }
+
+  .pl-cards {
+    display: grid;
+    gap: var(--space-2);
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
+
+  .pl-col,
+  .pl-card {
+    min-width: 0;
+  }
+
+  .pl-card .ui-badge {
+    white-space: normal;
+  }
+
+  .pl-card {
+    display: grid;
+    gap: var(--space-1);
+    padding: var(--space-2) var(--space-3);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-md);
+    background: var(--surface);
+  }
+
+  .pl-dragging {
+    position: relative;
+    z-index: var(--z-sticky);
+    box-shadow: var(--shadow-3);
+    opacity: 0.92;
+  }
+
+  .pl-card-top {
+    display: flex;
+    align-items: flex-start;
+    gap: var(--space-1);
+  }
+
+  .pl-handle {
+    display: inline-flex;
+    padding: var(--space-1);
+    color: var(--text-2);
+    cursor: grab;
+    touch-action: none;
+  }
+
+  .pl-dragging .pl-handle {
+    cursor: grabbing;
+  }
+
+  .pl-card-title {
+    flex: 1;
+    min-width: 0;
+    padding: 0;
+    border: 0;
+    background: none;
+    color: inherit;
+    font: inherit;
+    font-weight: 600;
+    text-align: start;
+    overflow-wrap: anywhere;
+    cursor: pointer;
+  }
+
+  .pl-card-title:hover {
+    color: var(--accent);
+  }
+
+  @media (min-width: 64rem) {
+    .pl-jump {
+      display: none;
+    }
+
+    .pl-cols {
+      grid-auto-flow: row;
+      grid-template-columns: repeat(5, minmax(0, 1fr));
+      overflow-x: visible;
+    }
+  }
+
+  @media (max-width: 63.99rem) {
+    .pl-cols {
+      grid-auto-columns: minmax(16rem, 85%);
+    }
+  }
 }
 
 

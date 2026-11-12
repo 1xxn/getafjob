@@ -496,6 +496,10 @@ func (s *Server) suggestionAccept(w http.ResponseWriter, r *http.Request, u *ide
 		s.failed(w, r, u, err)
 		return
 	}
+	if r.PostFormValue("back") == "/pipeline" {
+		http.Redirect(w, r, "/pipeline", http.StatusSeeOther)
+		return
+	}
 	http.Redirect(w, r, "/applications/"+appID.String(), http.StatusSeeOther) //nolint:gosec // G710: appID is a parsed UUID
 }
 
@@ -516,6 +520,10 @@ func (s *Server) suggestionDismiss(w http.ResponseWriter, r *http.Request, u *id
 	}
 	if err := s.Tracking.DismissSuggestion(r.Context(), u.ID, sugID); err != nil {
 		s.failed(w, r, u, err)
+		return
+	}
+	if r.PostFormValue("back") == "/pipeline" {
+		http.Redirect(w, r, "/pipeline", http.StatusSeeOther)
 		return
 	}
 	http.Redirect(w, r, "/applications/"+appID.String(), http.StatusSeeOther) //nolint:gosec // G710: appID is a parsed UUID

@@ -63,7 +63,7 @@ var navGroups = []navGroup{
 	}},
 	{Key: "nav.group.track", Items: []navItem{
 		{Key: "nav.applications", Href: "/applications", Icon: "send"},
-		{Key: "nav.tracker", Href: "/tracker", Icon: "columns"},
+		{Key: "nav.pipeline", Href: "/pipeline", Icon: "columns"},
 	}},
 	{Key: "nav.group.me", Items: []navItem{
 		{Key: "nav.profile", Href: "/profile", Icon: "user"},
@@ -82,7 +82,7 @@ var bottomNav = []navItem{
 	{Key: "nav.home", Href: "/", Icon: "home"},
 	{Key: "nav.jobs", Href: "/jobs", Icon: "briefcase"},
 	{Key: "nav.approvals", Href: "/approvals", Icon: "check-circle", Count: "approvals"},
-	{Key: "nav.tracker", Href: "/tracker", Icon: "columns"},
+	{Key: "nav.pipeline", Href: "/pipeline", Icon: "columns"},
 }
 
 // active reports whether the navigation item is the current page or one of its sub pages.

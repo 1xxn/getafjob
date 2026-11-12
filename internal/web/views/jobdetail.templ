@@ -87,7 +87,7 @@ templ JobPage(d JobData) {
 						</a>
 					}
 					if d.ApplicationState != "" {
-						<a href="/tracker" class="ui-menu-item">
+						<a href="/pipeline" class="ui-menu-item">
 							@ui.Icon("columns")
 							<span>{ T(ctx, "jobs.view_in_tracker") }</span>
 						</a>

@@ -145,7 +145,7 @@ templ DashboardBody(d DashboardData) {
 				@ui.KPI(ui.KPIProps{Label: T(ctx, "dash.kpi.new"), Value: itoa(d.NewMatches), Icon: "briefcase", Tone: ui.Info,
 					Hint: T(ctx, "dash.kpi.new_hint"), Href: "/jobs?freshness=7d&sort=newest", LinkLabel: T(ctx, "dash.kpi.new_link")})
 				@ui.KPI(ui.KPIProps{Label: T(ctx, "dash.kpi.sent"), Value: itoa(d.Sent30), Icon: "send", Tone: ui.Success,
-					Hint: T(ctx, "dash.kpi.sent_hint"), Href: "/tracker", LinkLabel: T(ctx, "dash.kpi.sent_link")})
+					Hint: T(ctx, "dash.kpi.sent_hint"), Href: "/pipeline", LinkLabel: T(ctx, "dash.kpi.sent_link")})
 			</section>
 			<div class="dash-grid">
 				<section class="dash-panel" id="dash-actions" aria-labelledby="dash-actions-title">
@@ -182,7 +182,7 @@ templ DashboardBody(d DashboardData) {
 							}
 						</ul>
 						if d.Parked > 5 {
-							<p class="dash-more"><a href="/tracker">{ T(ctx, "dash.parked_more", "n", d.Parked-5) }</a></p>
+							<p class="dash-more"><a href="/pipeline">{ T(ctx, "dash.parked_more", "n", d.Parked-5) }</a></p>
 						}
 					}
 				</section>

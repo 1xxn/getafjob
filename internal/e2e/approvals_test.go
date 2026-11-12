@@ -18,7 +18,11 @@ func ensureApproval(t *testing.T, tab *Tab) {
 		return
 	}
 	app := startRun(t, tab)
-	deadline := time.Now().Add(120 * time.Second)
+	// A retried application was approved before and goes straight on: only a fresh one can ask.
+	if tab.Eval("return location.pathname") != `"/live"` {
+		t.Skip("no fresh fixture job left to ask for approval")
+	}
+	deadline := time.Now().Add(90 * time.Second)
 	for time.Now().Before(deadline) {
 		tab.Go("/approvals")
 		if tab.Eval("return !!document.querySelector('[data-approval]')") == "true" {

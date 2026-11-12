@@ -3,9 +3,25 @@ package views
 import (
 	"maps"
 	"strings"
+	"time"
 
 	"github.com/a-h/templ"
 )
+
+// plDateTime and plDate format optional times for datetime-local and date inputs (stored in UTC).
+func plDateTime(t *time.Time) string {
+	if t == nil {
+		return ""
+	}
+	return t.UTC().Format("2006-01-02T15:04")
+}
+
+func plDate(t *time.Time) string {
+	if t == nil {
+		return ""
+	}
+	return t.UTC().Format("2006-01-02")
+}
 
 // sourceKey names where a filled value came from (its provenance) in words; the raw source stays internal.
 func sourceKey(source string) string {

@@ -1,0 +1,270 @@
+package views
+
+import (
+	"strings"
+	"time"
+
+	"github.com/1xxn/getafjob/internal/web/views/ui"
+)
+
+// PipelineData fills the pipeline of sent applications.
+type PipelineData struct {
+	Name    string
+	View    string // board, compact or table
+	Columns []PLColumn
+	Total   int
+	Status  string // what the last move did, read out by screen readers
+}
+
+// PLColumn is one stage of the pipeline.
+type PLColumn struct {
+	Key   string // applied, interview, offer, rejected, withdrawn
+	Cards []PLCard
+}
+
+// PLCard is one sent application on the board.
+type PLCard struct {
+	ID          string
+	JobID       int64
+	Title       string
+	Company     string
+	Location    string
+	State       string
+	Col         string
+	Moves       []string // stages it may move to
+	Score       int
+	Salary      string
+	Notes       string
+	InterviewAt *time.Time
+	FollowUpAt  *time.Time
+	Mail        string // catalog key of a pending mail suggestion
+	MailID      string
+	MailFrom    string
+	MailSubject string
+	URL         string
+	Updated     time.Time
+}
+
+func plViewHref(view string) string {
+	if view == "board" {
+		return "/pipeline"
+	}
+	return "/pipeline?view=" + view
+}
+
+templ plMoveMenu(c PLCard) {
+	if len(c.Moves) > 0 {
+		@ui.Menu(ui.MenuProps{ID: "move-" + c.ID, Label: T(ctx, "pl.move", "title", c.Title), Icon: "arrow-up-down", IconOnly: true, AlignEnd: true}) {
+			for _, m := range c.Moves {
+				<form method="post" action="/pipeline/move" { HX(ctx, "hx-post", "/pipeline/move", "hx-target", "#pl-board", "hx-swap", "outerMorph transition:false")... }>
+					<input type="hidden" name="id" value={ c.ID }/>
+					<button type="submit" name="stage" value={ m } class="ui-menu-item" data-move={ m }>
+						<span>{ T(ctx, "pl.to", "stage", T(ctx, "pl.col."+m)) }</span>
+					</button>
+				</form>
+			}
+		}
+	}
+}
+
+templ plCard(c PLCard, compact bool) {
+	<li
+		class={ "pl-card", templ.KV("pl-card-compact", compact) }
+		data-card
+		data-id={ c.ID }
+		data-job={ i64(c.JobID) }
+		data-state={ c.State }
+		data-moves={ strings.Join(c.Moves, " ") }
+	>
+		<div class="pl-card-top">
+			<span class="pl-handle" data-drag-handle aria-hidden="true">
+				@ui.Icon("more")
+			</span>
+			<button type="button" class="pl-card-title" { attrs(ui.OpenDialog("dlg-card"), HX(ctx, "hx-get", "/pipeline/"+c.ID+"/card", "hx-target", "#card-body", "hx-swap", "innerHTML transition:false"))... }>
+				{ c.Title }
+			</button>
+			@plMoveMenu(c)
+		</div>
+		<span class="apps-company">{ c.Company }</span>
+		if !compact {
+			<span class="ni-item-meta">
+				if c.InterviewAt != nil {
+					@ui.Badge(T(ctx, "pl.interview_at", "when", When(ctx, *c.InterviewAt)), ui.Accent)
+				}
+				if c.Salary != "" {
+					<span>{ c.Salary }</span>
+				}
+				if c.Mail != "" {
+					@ui.Badge(T(ctx, c.Mail), ui.Info)
+				}
+				<time datetime={ c.Updated.UTC().Format(time.RFC3339) }>{ When(ctx, c.Updated) }</time>
+			</span>
+		}
+	</li>
+}
+
+// PipelinePage shows sent applications by stage; cards move by drag and drop or by their menu.
+templ PipelinePage(d PipelineData) {
+	@Layout(Page{Title: T(ctx, "pl.title"), UserName: d.Name, Wide: true}) {
+		<div class="jobs-head">
+			<h1>{ T(ctx, "pl.title") }</h1>
+			<div class="app-actions">
+				@ui.Button(ui.ButtonProps{Label: T(ctx, "pl.add_external"), Icon: "plus", Attrs: ui.OpenDialog("dlg-external")})
+			</div>
+		</div>
+		<nav class="ui-tabs" aria-label={ T(ctx, "pl.views") }>
+			for _, v := range []string{"board", "compact", "table"} {
+				<a
+					href={ templ.URL(plViewHref(v)) }
+					class="ui-tab"
+					data-view={ v }
+					if d.View == v {
+						aria-current="page"
+					}
+				>{ T(ctx, "pl.view."+v) }</a>
+			}
+		</nav>
+		@PipelineBoard(d)
+		@ui.Dialog(ui.DialogProps{ID: "dlg-card", Title: T(ctx, "pl.card_title"), CloseLabel: T(ctx, "shell.close"), Drawer: true}) {
+			<div id="card-body">
+				@ui.Skeleton(T(ctx, "jobs.apply_preview.loading"), 5)
+			</div>
+		}
+		@ui.Dialog(ui.DialogProps{ID: "dlg-external", Title: T(ctx, "pl.add_external"), CloseLabel: T(ctx, "shell.close")}) {
+			<p class="jobs-dialog-text">{ T(ctx, "pl.add_external_text") }</p>
+			<form method="post" action="/tracker/external" class="app-notes">
+				@ui.Input(ui.InputProps{FieldProps: ui.FieldProps{ID: "ext-url", Name: "url", Label: T(ctx, "jobs.import_label"), Required: true},
+					Type: "url", MaxLength: 500, Placeholder: "https://"})
+				<div class="ui-dialog-actions">
+					@ui.Button(ui.ButtonProps{Label: T(ctx, "pl.add_external"), Type: "submit", Variant: "primary"})
+				</div>
+			</form>
+		}
+	}
+}
+
+// PipelineBoard is the part that moves and live changes replace.
+templ PipelineBoard(d PipelineData) {
+	<div
+		id="pl-board"
+		class={ "pl", "pl-" + d.View }
+		data-view={ d.View }
+		{ HX(ctx, "hx-get", plViewHref(d.View), "hx-trigger", "getafjob:app from:body delay:700ms", "hx-swap", "outerMorph transition:false")... }
+	>
+		<p id="pl-status" class="ui-sr" role="status" data-t-moved={ T(ctx, "pl.moved_to", "stage", "{stage}") }>{ d.Status }</p>
+		if d.Total == 0 {
+			@ui.EmptyState(ui.EmptyProps{Icon: "columns", Title: T(ctx, "pl.empty"), Text: T(ctx, "pl.empty_hint")}) {
+				@ui.Button(ui.ButtonProps{Label: T(ctx, "apps.title"), Href: "/applications"})
+			}
+		} else if d.View == "table" {
+			@ui.Table(ui.TableProps{Caption: T(ctx, "pl.title"), CaptionHidden: true, Columns: []ui.Column{
+				{Label: T(ctx, "apps.col.job")}, {Label: T(ctx, "pl.stage")}, {Label: T(ctx, "pl.interview"), Narrow: true},
+				{Label: T(ctx, "apps.col.updated"), Narrow: true, Align: "end"}, {Label: T(ctx, "pl.actions")}}}) {
+				for _, col := range d.Columns {
+					for _, c := range col.Cards {
+						<tr data-card data-id={ c.ID } data-state={ c.State }>
+							<td>
+								<a href={ templ.URL("/applications/" + c.ID) } class="apps-title">{ c.Title }</a>
+								<span class="apps-company">{ c.Company }</span>
+							</td>
+							<td>{ T(ctx, "pl.col." + col.Key) }</td>
+							<td class="ui-narrow">
+								if c.InterviewAt != nil {
+									{ When(ctx, *c.InterviewAt) }
+								}
+							</td>
+							<td class="ui-narrow ui-end apps-when">{ When(ctx, c.Updated) }</td>
+							<td>
+								@plMoveMenu(c)
+							</td>
+						</tr>
+					}
+				}
+			}
+		} else {
+			<nav class="pl-jump" aria-label={ T(ctx, "pl.stages") }>
+				for _, col := range d.Columns {
+					<a href={ templ.URL("#col-" + col.Key) } class="ui-tab">
+						{ T(ctx, "pl.col." + col.Key) }
+						<span class="ui-count">{ itoa(len(col.Cards)) }</span>
+					</a>
+				}
+			</nav>
+			<div class="pl-cols" data-pl-board>
+				for _, col := range d.Columns {
+					<section id={ "col-" + col.Key } class="pl-col" data-col={ col.Key } aria-labelledby={ "colh-" + col.Key }>
+						<h2 id={ "colh-" + col.Key } class="pl-col-head">
+							<span>{ T(ctx, "pl.col." + col.Key) }</span>
+							<span class="ui-count">{ itoa(len(col.Cards)) }</span>
+						</h2>
+						<ol class="pl-cards">
+							for _, c := range col.Cards {
+								@plCard(c, d.View == "compact")
+							}
+						</ol>
+					</section>
+				}
+			</div>
+			<form id="pl-drop" method="post" action="/pipeline/move" hidden { HX(ctx, "hx-post", "/pipeline/move", "hx-target", "#pl-board", "hx-swap", "outerMorph transition:false")... }>
+				<input type="hidden" name="id" value=""/>
+				<input type="hidden" name="stage" value=""/>
+				<input type="hidden" name="view" value={ d.View }/>
+			</form>
+		}
+	</div>
+}
+
+// PipelineCardDetail is one card in the drawer: mail suggestion, notes, interview and links.
+templ PipelineCardDetail(c PLCard, notice string) {
+	<div class="jd-preview" data-card-detail={ c.ID }>
+		<div class="app-head-top">
+			<div>
+				<h3 class="app-title">{ c.Title }</h3>
+				<p class="app-company">{ c.Company }</p>
+			</div>
+			@ui.Badge(T(ctx, "pl.col."+c.Col), ui.Neutral)
+		</div>
+		if notice != "" {
+			@ui.Alert(ui.AlertProps{Tone: ui.Success, Text: notice})
+		}
+		if c.MailID != "" {
+			@ui.Alert(ui.AlertProps{Tone: ui.Info, Title: T(ctx, c.Mail), Text: c.MailSubject}) {
+				<p class="app-hint">{ c.MailFrom }</p>
+				<div class="app-actions">
+					<form method="post" action={ templ.URL("/applications/" + c.ID + "/suggestions/" + c.MailID + "/accept") }>
+						<input type="hidden" name="back" value="/pipeline"/>
+						@ui.Button(ui.ButtonProps{Label: T(ctx, "handoff.suggestion.accept"), Type: "submit", Size: "sm", Variant: "primary"})
+					</form>
+					<form method="post" action={ templ.URL("/applications/" + c.ID + "/suggestions/" + c.MailID + "/dismiss") }>
+						<input type="hidden" name="back" value="/pipeline"/>
+						@ui.Button(ui.ButtonProps{Label: T(ctx, "handoff.suggestion.dismiss"), Type: "submit", Size: "sm", Variant: "ghost"})
+					</form>
+				</div>
+			}
+		}
+		<form
+			method="post"
+			action={ templ.URL("/tracker/" + c.ID + "/notes") }
+			class="app-notes"
+			{ HX(ctx, "hx-post", "/tracker/" + c.ID + "/notes", "hx-target", "#card-body", "hx-swap", "innerHTML transition:false")... }
+		>
+			<input type="hidden" name="back" value="/pipeline"/>
+			@ui.Textarea(ui.TextareaProps{FieldProps: ui.FieldProps{ID: "card-notes", Name: "notes", Label: T(ctx, "apps.notes.text")}, Value: c.Notes, Rows: 5, MaxLength: 10000})
+			@ui.Input(ui.InputProps{FieldProps: ui.FieldProps{ID: "card-salary", Name: "salary", Label: T(ctx, "apps.notes.salary")}, Value: c.Salary, MaxLength: 200})
+			@ui.Input(ui.InputProps{FieldProps: ui.FieldProps{ID: "card-interview", Name: "interview_at", Label: T(ctx, "apps.notes.interview")}, Type: "datetime-local", Value: plDateTime(c.InterviewAt)})
+			@ui.Input(ui.InputProps{FieldProps: ui.FieldProps{ID: "card-follow", Name: "follow_up_at", Label: T(ctx, "apps.notes.follow_up")}, Type: "date", Value: plDate(c.FollowUpAt)})
+			@ui.Button(ui.ButtonProps{Label: T(ctx, "apps.notes.save"), Type: "submit", Variant: "primary", Icon: "check"})
+		</form>
+		<div class="app-actions">
+			if c.InterviewAt != nil {
+				@ui.Button(ui.ButtonProps{Label: T(ctx, "pl.ics"), Href: "/pipeline/" + c.ID + "/interview.ics", Icon: "calendar", Variant: "ghost",
+					Attrs: attrs(HX(ctx, "hx-boost", "false"), templ.Attributes{"download": "interview.ics"})})
+			}
+			@ui.Button(ui.ButtonProps{Label: T(ctx, "ni.details"), Href: "/applications/" + c.ID, Variant: "ghost"})
+			if c.URL != "" {
+				@ui.Button(ui.ButtonProps{Label: T(ctx, "jobs.open_posting"), Href: c.URL, Variant: "ghost", Icon: "external",
+					Attrs: templ.Attributes{"rel": "noopener noreferrer external", "target": "_blank"}})
+			}
+		</div>
+	</div>
+}
