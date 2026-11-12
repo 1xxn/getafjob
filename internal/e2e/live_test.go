@@ -5,6 +5,7 @@ package e2e
 import (
 	"encoding/json"
 	"math/rand/v2"
+	"strconv"
 	"strings"
 	"testing"
 	"time"
@@ -27,11 +28,15 @@ func (tab *Tab) WaitWithin(d time.Duration, cond string) {
 // startRun applies to the first listed fixture job that has no application yet and returns the application id.
 func startRun(t *testing.T, tab *Tab) string {
 	t.Helper()
-	tab.Go("/jobs?source=demo")
 	var hrefs []string
-	if err := json.Unmarshal([]byte(tab.Eval(`return [...document.querySelectorAll('.job-row')]
-		.filter(r => !r.dataset.state || r.dataset.state === 'new').map(r => '/jobs/' + r.dataset.id)`)), &hrefs); err != nil {
-		t.Fatal(err)
+	for page := 1; page <= 3; page++ {
+		tab.Go("/jobs?source=demo&decision=all&page=" + strconv.Itoa(page))
+		var more []string
+		if err := json.Unmarshal([]byte(tab.Eval(`return [...document.querySelectorAll('.job-row')]
+			.filter(r => !r.dataset.state || r.dataset.state === 'new').map(r => '/jobs/' + r.dataset.id)`)), &more); err != nil {
+			t.Fatal(err)
+		}
+		hrefs = append(hrefs, more...)
 	}
 	// A fresh stack (CI) starts at the top; locally the order is shuffled so older runs rarely get in the way.
 	rand.Shuffle(len(hrefs), func(i, j int) { hrefs[i], hrefs[j] = hrefs[j], hrefs[i] })
@@ -43,13 +48,18 @@ func startRun(t *testing.T, tab *Tab) string {
 		if tab.Eval(`return !!document.querySelector('main a[href^="http://fixtures:8080/"]')`) != "true" {
 			continue // a crawled posting: the runner's egress policy blocks it in the dev stack
 		}
-		tab.Go(h + "/apply")
-		if tab.Eval(`return !!document.querySelector('main form[method="post"][action$="/apply"] button[type="submit"]:not([disabled])')`) != "true" {
-			continue
+		if tab.Eval(`return !!document.querySelector('.jd-actions [data-action="apply"]')`) != "true" {
+			continue // applied elsewhere, excluded by the search settings or not a form
 		}
-		tab.Click(`main form[method="post"][action$="/apply"] button[type="submit"]`)
-		tab.WaitWithin(15*time.Second, "location.pathname.startsWith('/applications/')")
-		return strings.TrimPrefix(strings.Trim(tab.Eval("return location.pathname"), `"`), "/applications/")
+		// Apply now opens the preview in a drawer; starting there leads to the run in focus.
+		tab.Click(`.jd-actions [data-action="apply"]`)
+		tab.WaitFor("document.getElementById('dlg-apply').open && document.querySelector('#apply-body [data-action=\"apply-confirm\"]')")
+		if tab.Eval(`return document.querySelector('#apply-body [data-action="apply-confirm"]').disabled`) == "true" {
+			continue // a guard stops it (company window, duplicate)
+		}
+		tab.Click(`#apply-body [data-action="apply-confirm"]`)
+		tab.WaitWithin(15*time.Second, "location.pathname === '/live' && location.search.startsWith('?run=')")
+		return strings.TrimPrefix(strings.Trim(tab.Eval("return location.search"), `"`), "?run=")
 	}
 	if app := retryRun(t, tab); app != "" {
 		return app

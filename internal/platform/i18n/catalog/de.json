@@ -1040,5 +1040,12 @@
   "ni.next": "Nächster wartender Lauf",
   "ni.suggested": "Vorschlag aus deiner Antwortbank",
   "ni.save_bank": "In meiner Antwortbank speichern",
-  "ni.closing": "Läuft gleich ab"
+  "ni.closing": "Läuft gleich ab",
+  "jobs.apply_preview.answers": "{count} Antworten aus deiner Antwortbank",
+  "jobs.apply_preview.loading": "Vorschau wird geladen",
+  "jobs.apply_preview.open_page": "Vorschau als Seite öffnen",
+  "jobs.apply_preview.questions_hint": "Fragen, die das Formular darüber hinaus stellt, gehen an dich, bevor etwas gesendet wird.",
+  "jobs.apply_preview.stations": "Werdegang: {work} Stationen, {edu} Ausbildungen",
+  "jobs.apply_preview.website": "Website",
+  "jobs.apply_preview.error_other": "Eine Sicherheitsprüfung hält diese Bewerbung auf. Öffne die Stelle für Details."
 }

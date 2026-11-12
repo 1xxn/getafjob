@@ -1,0 +1,386 @@
+package views
+
+import (
+	"strings"
+
+	"github.com/1xxn/getafjob/internal/web/views/ui"
+)
+
+func jobExcluded(d JobData) bool {
+	for _, r := range d.Reasons {
+		if r.Hard {
+			return true
+		}
+	}
+	return false
+}
+
+func jobApplying(state string) bool {
+	return state == "queued" || state == "running" || state == "needs_input" || state == "submitting"
+}
+
+func jobSent(state string) bool {
+	return state == "submitted" || state == "confirmed" || state == "interview" || state == "offer"
+}
+
+templ jobAction(id int64, back, action, icon, variant string) {
+	<form method="post" action="/jobs/bulk">
+		<input type="hidden" name="back" value={ back }/>
+		<input type="hidden" name="ids" value={ i64(id) }/>
+		@ui.Button(ui.ButtonProps{Label: T(ctx, "jobs.action."+action), Type: "submit", Icon: icon, Variant: variant,
+			Attrs: templ.Attributes{"name": "action", "value": action, "data-action": action}})
+	</form>
+}
+
+// JobPage is one job: what it is, why it scores as it does, and how to apply.
+templ JobPage(d JobData) {
+	{{ self := "/jobs/" + i64(d.Row.ID) }}
+	@Layout(Page{Title: d.Row.Title, UserName: d.Name, Wide: true}) {
+		<article class="jd" data-job-id={ i64(d.Row.ID) } data-apply-mode={ d.ApplyMode } data-app-state={ d.ApplicationState }>
+			<p class="app-crumbs"><a href={ templ.URL(d.Back) }>{ T(ctx, "jobs.title") }</a></p>
+			<header class="jd-head">
+				@jobBadges(d.Row)
+				<h1 class="app-title">{ d.Row.Title }</h1>
+				@jobFacts(d.Row)
+			</header>
+			if !d.Open {
+				@ui.Alert(ui.AlertProps{Tone: ui.Info, Text: T(ctx, "jobs.closed")})
+			}
+			if d.Notice != "" {
+				@ui.Alert(ui.AlertProps{Tone: ui.Success, Text: d.Notice})
+			}
+			<div class="jd-actions">
+				switch {
+					case jobApplying(d.ApplicationState):
+						@ui.Button(ui.ButtonProps{Label: T(ctx, "apps.action.watch"), Href: "/applications/" + d.ApplicationID + "?tab=live", Variant: "primary", Icon: "live"})
+						@ui.Button(ui.ButtonProps{Label: T(ctx, "jobs.view_application"), Href: "/applications/" + d.ApplicationID})
+					case jobSent(d.ApplicationState):
+						@ui.Button(ui.ButtonProps{Label: T(ctx, "jobs.applied_status"), Href: "/applications/" + d.ApplicationID, Variant: "primary", Icon: "check"})
+					case jobExcluded(d):
+						@ui.Alert(ui.AlertProps{Tone: ui.Warning, Text: T(ctx, "jobs.panel_excluded")}) {
+							<p><a href="/preferences">{ T(ctx, "jobs.panel_excluded_link") }</a></p>
+						}
+					case d.ApplyMode == "form":
+						@ui.Button(ui.ButtonProps{Label: T(ctx, "jobs.apply_now"), Variant: "primary", Icon: "send",
+							Attrs: attrs(ui.OpenDialog("dlg-apply"), HX(ctx, "hx-get", self+"/apply", "hx-target", "#apply-body", "hx-swap", "innerHTML transition:false"),
+								templ.Attributes{"data-action": "apply"})})
+					case d.URL != "" || d.ApplyURL != "":
+						@ui.Button(ui.ButtonProps{Label: T(ctx, "apply.open_external"), Href: or(d.ApplyURL, d.URL), Variant: "primary", Icon: "external",
+							Attrs: templ.Attributes{"rel": "noopener noreferrer external", "target": "_blank"}})
+				}
+				if d.ApplicationState == "" || d.ApplicationState == "matched" {
+					if d.ApplyMode != "form" || !jobExcluded(d) {
+						<form method="post" action={ templ.URL(self + "/apply-external") }>
+							@ui.Button(ui.ButtonProps{Label: T(ctx, "apply.mark_applied"), Type: "submit", Variant: "ghost", Icon: "check"})
+						</form>
+					}
+					if d.ApplicationState == "" {
+						@jobAction(d.Row.ID, self, "save", "bookmark", "ghost")
+					}
+					@jobAction(d.Row.ID, self, "skip", "x", "ghost")
+				}
+				@ui.Menu(ui.MenuProps{ID: "job-more", Label: T(ctx, "jobs.more"), Icon: "more", AlignEnd: true}) {
+					if d.URL != "" {
+						<a href={ templ.URL(d.URL) } class="ui-menu-item" rel="noopener noreferrer external" target="_blank">
+							@ui.Icon("external")
+							<span>{ T(ctx, "jobs.open_posting") }</span>
+						</a>
+					}
+					if d.ApplicationState != "" {
+						<a href="/tracker" class="ui-menu-item">
+							@ui.Icon("columns")
+							<span>{ T(ctx, "jobs.view_in_tracker") }</span>
+						</a>
+					}
+					if d.Row.Blocked {
+						<form method="post" action="/jobs/blocklist/delete">
+							<input type="hidden" name="kind" value="company"/>
+							<input type="hidden" name="pattern" value={ d.Row.Company }/>
+							<button type="submit" class="ui-menu-item">
+								@ui.Icon("check")
+								<span>{ T(ctx, "jobs.unblock") }</span>
+							</button>
+						</form>
+					} else {
+						<form method="post" action="/jobs/blocklist">
+							<input type="hidden" name="kind" value="company"/>
+							<input type="hidden" name="pattern" value={ d.Row.Company }/>
+							<button type="submit" class="ui-menu-item">
+								@ui.Icon("ban")
+								<span>{ T(ctx, "jobs.block_company") }</span>
+							</button>
+						</form>
+					}
+				}
+			</div>
+			<div class="jd-grid">
+				<div class="jd-main">
+					if (d.ApplyMode == "portal" || d.ApplyMode == "email") && d.ApplicationState == "" {
+						@ExternalApply(d.ApplyMode, d.ApplyHost, or(d.ApplyURL, d.URL), d.Row.ID)
+					}
+					@ui.Card(ui.CardProps{Title: T(ctx, "jobs.reasons"), Subtitle: T(ctx, "jobs.computed", "when", d.Computed)}) {
+						<ul class="job-reasons">
+							for _, rs := range d.Reasons {
+								<li class={ templ.KV("job-reason-hard", rs.Hard) }>
+									<span>{ rs.Text }</span>
+									<span class="job-reason-points">
+										if rs.Hard {
+											{ T(ctx, "jobs.reason_filter") }
+										} else {
+											{ points(rs.Points) }
+										}
+									</span>
+								</li>
+							}
+						</ul>
+					}
+					if d.Description != "" {
+						@ui.Card(ui.CardProps{Title: T(ctx, "jobs.description")}) {
+							<div class="jd-text">
+								for _, b := range descBlocks(d.Description) {
+									if b.List {
+										<ul>
+											for _, it := range b.Items {
+												<li>{ it }</li>
+											}
+										</ul>
+									} else {
+										<p>{ b.Text }</p>
+									}
+								}
+							</div>
+						}
+					}
+				</div>
+				<aside class="jd-side" aria-label={ T(ctx, "jobs.fit.title") }>
+					@FitInspector(d.Fit)
+					@CVVariantSwitcher(d.CV)
+				</aside>
+			</div>
+			@ui.Dialog(ui.DialogProps{ID: "dlg-apply", Title: T(ctx, "jobs.apply_preview.title"), CloseLabel: T(ctx, "shell.close"), Drawer: true}) {
+				<div id="apply-body">
+					@ui.Skeleton(T(ctx, "jobs.apply_preview.loading"), 6)
+					<p><a href={ templ.URL(self + "/apply") }>{ T(ctx, "jobs.apply_preview.open_page") }</a></p>
+				</div>
+			}
+		</article>
+	}
+}
+
+// ExternalApply explains a posting that is applied for outside getafjob and offers the way there (#159).
+templ ExternalApply(mode, host, link string, jobID int64) {
+	if mode == "email" {
+		@ui.Alert(ui.AlertProps{Tone: ui.Info, Title: T(ctx, "apply.email.title"), Text: T(ctx, "apply.email.text")}) {
+			@externalActions(link, jobID)
+		}
+	} else {
+		@ui.Alert(ui.AlertProps{Tone: ui.Info, Title: T(ctx, "apply.portal.title", "host", host), Text: T(ctx, "apply.portal.text")}) {
+			@externalActions(link, jobID)
+		}
+	}
+}
+
+templ externalActions(link string, jobID int64) {
+	<div class="app-actions">
+		if link != "" {
+			@ui.Button(ui.ButtonProps{Label: T(ctx, "apply.open_external"), Href: link, Icon: "external",
+				Attrs: templ.Attributes{"rel": "noopener noreferrer external", "target": "_blank"}})
+		}
+		<form method="post" action={ templ.URL("/jobs/" + i64(jobID) + "/apply-external") }>
+			@ui.Button(ui.ButtonProps{Label: T(ctx, "apply.mark_applied"), Type: "submit", Variant: "ghost", Icon: "check"})
+		</form>
+	</div>
+}
+
+templ FitInspector(d FitData) {
+	<div id="fit-inspector">
+		@ui.Card(ui.CardProps{Title: T(ctx, "jobs.fit.title"), Subtitle: T(ctx, "match.decision."+d.Decision) + " · " + T(ctx, "jobs.score", "score", d.Score)}) {
+			if d.AddedSkill != "" {
+				@ui.Alert(ui.AlertProps{Tone: ui.Success, Text: T(ctx, "jobs.fit.skill_added", "skill", d.AddedSkill)})
+			}
+			<h3 class="job-panel-sub">{ T(ctx, "jobs.fit.matching_skills") }</h3>
+			if len(d.MatchingSkills) == 0 {
+				<p class="app-hint">{ T(ctx, "jobs.fit.no_matching_skills") }</p>
+			} else {
+				<ul class="jd-skills">
+					for _, s := range d.MatchingSkills {
+						<li>
+							@ui.Badge(s, ui.Success)
+						</li>
+					}
+				</ul>
+			}
+			<h3 class="job-panel-sub">{ T(ctx, "jobs.fit.missing_skills") }</h3>
+			if len(d.MissingSkills) == 0 {
+				<p class="app-hint">{ T(ctx, "jobs.fit.no_missing_skills") }</p>
+			} else {
+				<p class="app-hint">{ T(ctx, "jobs.fit.missing_skills_hint") }</p>
+				<ul class="jd-skills">
+					for _, s := range d.MissingSkills {
+						<li>
+							<form
+								method="post"
+								action={ templ.URL("/jobs/" + i64(d.JobID) + "/skills") }
+								{ HX(ctx, "hx-post", "/jobs/" + i64(d.JobID) + "/skills", "hx-target", "#fit-inspector", "hx-swap", "outerHTML transition:false")... }
+							>
+								<input type="hidden" name="skill" value={ s }/>
+								@ui.Button(ui.ButtonProps{Label: s, Type: "submit", Size: "sm", Variant: "ghost", Icon: "plus",
+									Attrs: templ.Attributes{"title": T(ctx, "jobs.fit.add_skill_hint", "skill", s), "data-skill": s}})
+							</form>
+						</li>
+					}
+				</ul>
+			}
+			<h3 class="job-panel-sub">{ T(ctx, "jobs.fit.breakdown_title") }</h3>
+			<ul class="jd-breakdown">
+				for i, b := range d.Breakdown {
+					<li>
+						if b.Max > 0 {
+							@ui.ProgressBar(ui.ProgressProps{ID: "fit-" + itoa(i), Label: b.Label, Value: max(0, b.Points), Max: b.Max,
+								ValueText: itoa(b.Points) + " / " + itoa(b.Max)})
+						} else {
+							<p class="jd-break-row"><span>{ b.Label }</span><span>{ points(b.Points) }</span></p>
+						}
+						if b.Detail != "" {
+							<p class="app-hint">{ b.Detail }</p>
+						}
+					</li>
+				}
+			</ul>
+		}
+	</div>
+}
+
+templ CVVariantSwitcher(d CVVariantData) {
+	<div id="cv-switcher">
+		@ui.Card(ui.CardProps{Title: T(ctx, "jobs.cv_switcher.title"), Subtitle: T(ctx, "jobs.cv_switcher.hint")}) {
+			if d.Notice != "" {
+				@ui.Alert(ui.AlertProps{Tone: ui.Success, Text: d.Notice})
+			}
+			if len(d.Variants) == 0 {
+				<p class="app-hint">{ T(ctx, "jobs.cv_switcher.empty") } <a href="/documents">{ T(ctx, "nav.documents") }</a></p>
+			} else {
+				<form
+					method="post"
+					action={ templ.URL("/jobs/" + i64(d.JobID) + "/cv") }
+					{ HX(ctx, "hx-post", "/jobs/" + i64(d.JobID) + "/cv", "hx-target", "#cv-switcher", "hx-swap", "outerHTML transition:false", "hx-trigger", "change")... }
+				>
+					<fieldset class="ui-fieldset">
+						<legend class="ui-sr">{ T(ctx, "jobs.cv_switcher.title") }</legend>
+						<div class="ui-options">
+							for i, v := range d.Variants {
+								<div class="ui-check ui-radio">
+									<input type="radio" id={ "cv-" + itoa(i) } name="cv_id" value={ v.ID } checked?={ v.Selected }/>
+									<label for={ "cv-" + itoa(i) }>
+										{ or(v.Label, v.Name) }
+										if v.Recommended {
+											@ui.Badge(T(ctx, "jobs.cv_switcher.recommended"), ui.Accent)
+										}
+										if v.Language != "" {
+											@ui.Badge(strings.ToUpper(v.Language), ui.Neutral)
+										}
+									</label>
+									if len(v.Focus) > 0 || (v.Label != "" && v.Name != "") {
+										<p class="ui-hint">{ strings.Join(append(nonEmpty(v.Name, v.Label), v.Focus...), " · ") }</p>
+									}
+								</div>
+							}
+						</div>
+					</fieldset>
+					<noscript>
+						@ui.Button(ui.ButtonProps{Label: T(ctx, "jobs.cv_switcher.save"), Type: "submit", Size: "sm"})
+					</noscript>
+				</form>
+			}
+		}
+	</div>
+}
+
+templ previewRow(label, value, sourceKey string) {
+	<tr>
+		<th scope="row">{ label }</th>
+		<td class="app-value">{ value }</td>
+		<td class="ui-narrow">
+			@ui.Badge(T(ctx, sourceKey), ui.Neutral)
+		</td>
+	</tr>
+}
+
+// ApplyPreview shows what the run will fill in and where each value comes from, then starts it.
+templ ApplyPreview(d ApplyPreviewData) {
+	<div id="apply-preview" class="jd-preview" data-job-id={ i64(d.JobID) }>
+		<p class="app-hint">{ T(ctx, "jobs.apply_preview.guarantee_desc") }</p>
+		if d.Guard.Allowed {
+			@ui.Alert(ui.AlertProps{Tone: ui.Success, Text: T(ctx, "jobs.apply_preview.guards_passed")})
+		} else {
+			@ui.Alert(ui.AlertProps{Tone: ui.Danger, Text: d.Guard.Reason})
+		}
+		@ui.Table(ui.TableProps{Caption: T(ctx, "jobs.apply_preview.contact_section"), Columns: []ui.Column{
+			{Label: T(ctx, "evidence.fields.field")}, {Label: T(ctx, "evidence.fields.value")}, {Label: T(ctx, "evidence.fields.source"), Narrow: true}}}) {
+			@previewRow(T(ctx, "jobs.apply_preview.name"), d.CandidateName, "apps.source.profile")
+			@previewRow(T(ctx, "jobs.apply_preview.email"), d.CandidateEmail, "apps.source.profile")
+			if d.CandidatePhone != "" {
+				@previewRow(T(ctx, "jobs.apply_preview.phone"), d.CandidatePhone, "apps.source.profile")
+			}
+			if d.CandidateLocation != "" {
+				@previewRow(T(ctx, "jobs.apply_preview.location"), d.CandidateLocation, "apps.source.profile")
+			}
+			if d.CandidateLinkedIn != "" {
+				@previewRow("LinkedIn", d.CandidateLinkedIn, "apps.source.profile")
+			}
+			if d.CandidateGitHub != "" {
+				@previewRow("GitHub", d.CandidateGitHub, "apps.source.profile")
+			}
+			if d.CandidatePortfolio != "" {
+				@previewRow(T(ctx, "jobs.apply_preview.website"), d.CandidatePortfolio, "apps.source.profile")
+			}
+			@previewRow(T(ctx, "jobs.apply_preview.cv_section"), or(d.SelectedCVName, T(ctx, "jobs.apply_preview.default_cv")), "apps.source.document")
+		}
+		if len(d.WorkExperiences) > 0 || len(d.Educations) > 0 {
+			<details class="jd-more">
+				<summary>{ T(ctx, "jobs.apply_preview.stations", "work", len(d.WorkExperiences), "edu", len(d.Educations)) }</summary>
+				<ul class="app-list">
+					for _, e := range d.WorkExperiences {
+						<li>{ e.Title } · { e.Company } <span class="apps-company">{ e.Dates }</span></li>
+					}
+					for _, e := range d.Educations {
+						<li>{ strings.Join(nonEmpty(e.Degree, e.Field), ", ") } · { e.Institution } <span class="apps-company">{ e.Dates }</span></li>
+					}
+				</ul>
+			</details>
+		}
+		if len(d.Answers) > 0 {
+			<details class="jd-more">
+				<summary>{ T(ctx, "jobs.apply_preview.answers", "count", len(d.Answers)) }</summary>
+				<dl class="jd-answers">
+					for _, a := range d.Answers {
+						<div>
+							<dt>{ a.Question }</dt>
+							<dd>{ a.Answer }</dd>
+						</div>
+					}
+				</dl>
+			</details>
+		}
+		<p class="app-hint">{ T(ctx, "jobs.apply_preview.questions_hint") }</p>
+		<form method="post" action={ templ.URL("/jobs/" + i64(d.JobID) + "/apply") } class="app-actions">
+			if d.Guard.Allowed {
+				@ui.Button(ui.ButtonProps{Label: T(ctx, "jobs.apply_preview.confirm_start"), Type: "submit", Variant: "primary", Icon: "send",
+					Attrs: templ.Attributes{"data-action": "apply-confirm"}})
+			} else {
+				@ui.Button(ui.ButtonProps{Label: T(ctx, "jobs.apply_preview.blocked_by_guard"), Type: "submit", Variant: "primary", Icon: "ban",
+					Disabled: true, Attrs: templ.Attributes{"data-action": "apply-confirm"}})
+			}
+		</form>
+	</div>
+}
+
+// ApplyPreviewPage is the preview on its own page (links, no script).
+templ ApplyPreviewPage(d ApplyPreviewData) {
+	@Layout(Page{Title: T(ctx, "jobs.apply_preview.title") + " · " + d.Title, UserName: d.Name, Wide: true}) {
+		<p class="app-crumbs"><a href={ templ.URL("/jobs/" + i64(d.JobID)) }>{ d.Title }</a></p>
+		<h1 class="app-title">{ T(ctx, "jobs.apply_preview.title") }</h1>
+		<p class="app-company">{ d.Company }</p>
+		@ApplyPreview(d)
+	}
+}

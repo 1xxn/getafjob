@@ -1040,5 +1040,12 @@
   "ni.next": "Next waiting run",
   "ni.suggested": "Suggested from your answer bank",
   "ni.save_bank": "Save to my answer bank",
-  "ni.closing": "Closing now"
+  "ni.closing": "Closing now",
+  "jobs.apply_preview.answers": "{count} answers from your answer bank",
+  "jobs.apply_preview.loading": "Loading the preview",
+  "jobs.apply_preview.open_page": "Open the preview as a page",
+  "jobs.apply_preview.questions_hint": "Questions the form asks beyond this go to you before anything is sent.",
+  "jobs.apply_preview.stations": "Work history: {work} jobs, {edu} schools",
+  "jobs.apply_preview.website": "Website",
+  "jobs.apply_preview.error_other": "A safety check stops this application. Open the job for details."
 }

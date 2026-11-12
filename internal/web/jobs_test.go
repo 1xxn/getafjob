@@ -486,7 +486,7 @@ func TestFitInspectorAndCVVariantSwitcher(t *testing.T) {
 	if !strings.Contains(addSkillBody, "Added &#34;Docker&#34; to your profile") {
 		t.Fatalf("add skill success notice missing in body:\n%s", addSkillBody)
 	}
-	if !strings.Contains(addSkillBody, "✓ Docker") {
+	if !strings.Contains(addSkillBody, `ui-tone-success">Docker<`) {
 		t.Fatalf("Docker not in matching skills badge list:\n%s", addSkillBody)
 	}
 
@@ -727,10 +727,10 @@ func TestJobApply_PreviewAndSubmit(t *testing.T) {
 		t.Fatalf("apply submit code: got %d, want %d", submitRec.Code, http.StatusSeeOther)
 	}
 	loc := submitRec.Header().Get("Location")
-	if !strings.HasPrefix(loc, "/applications/") {
-		t.Fatalf("apply submit redirect Location = %q, want /applications/{id}", loc)
+	if !strings.HasPrefix(loc, "/live?run=") {
+		t.Fatalf("apply submit redirect Location = %q, want /live?run={id}", loc)
 	}
-	appIDStr := strings.TrimPrefix(loc, "/applications/")
+	appIDStr := strings.TrimPrefix(loc, "/live?run=")
 	appID, err := uuid.Parse(appIDStr)
 	if err != nil {
 		t.Fatalf("invalid application UUID in Location: %v", err)
