@@ -56,3 +56,24 @@ func TestPointAtUsesOnlyTheFixtureSite(t *testing.T) {
 		t.Fatalf("urls must stay unique: %d of %d", len(seen), len(ps))
 	}
 }
+
+func TestFreshPostingsHaveCompaniesOfTheirOwn(t *testing.T) {
+	base, _ := url.Parse("http://fixtures:8080")
+	got := Fresh(8, "t1", base, time.Now())
+	seen := map[string]bool{}
+	for _, p := range got {
+		if seen[p.Company] || seen[p.ExternalID] {
+			t.Errorf("duplicate company or id: %+v", p)
+		}
+		seen[p.Company], seen[p.ExternalID] = true, true
+		if slices.Contains(Companies(), p.Company) {
+			t.Errorf("%s is a regular demo company", p.Company)
+		}
+		if !strings.HasPrefix(p.URL, "http://fixtures:8080/") {
+			t.Errorf("url %s is not on the fixture site", p.URL)
+		}
+	}
+	if again := Fresh(1, "t2", base, time.Now()); again[0].Company == got[0].Company {
+		t.Error("another tag reuses a company")
+	}
+}

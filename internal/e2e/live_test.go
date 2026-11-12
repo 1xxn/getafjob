@@ -3,11 +3,13 @@
 package e2e
 
 import (
-	"encoding/json"
-	"math/rand/v2"
+	"os"
 	"strings"
+	"sync"
 	"testing"
 	"time"
+
+	"github.com/go-rod/rod"
 )
 
 // WaitWithin polls a JavaScript condition for up to d.
@@ -24,84 +26,42 @@ func (tab *Tab) WaitWithin(d time.Duration, cond string) {
 	tab.t.Fatalf("timed out after %s waiting for %s", d, cond)
 }
 
-// candidates finds fixture jobs that can be applied to now: it reads the list and the job pages with parallel
-// fetches in the browser instead of opening every page, which made the journeys slow.
-const candidates = `const ids = [];
-for (let page = 1; page <= 3; page++) {
-	const list = await (await fetch('/jobs?source=demo&decision=all&page=' + page, {headers: {Accept: 'text/html'}})).text();
-	ids.push(...[...list.matchAll(/data-job-row data-id="(\d+)" data-state="(new)?"/g)].map(m => m[1]));
-}
-const found = [];
-for (let i = 0; i < ids.length && found.length < 6; i += 8) {
-	const pages = await Promise.all(ids.slice(i, i + 8).map(async id =>
-		[id, await (await fetch('/jobs/' + id, {headers: {Accept: 'text/html'}})).text()]));
-	for (const [id, html] of pages) {
-		if (html.includes('data-action="apply"') && html.includes('href="http://fixtures:8080/')) found.push(id);
-	}
-}
-return found`
+// freshJobs are fixture jobs of their own for the journeys that start a run (admin demo -fresh, see test:e2e):
+// each at a new company, so neither the company window nor another journey's application stands in the way.
+var (
+	freshMu   sync.Mutex
+	freshJobs = strings.FieldsFunc(os.Getenv("GETAFJOB_E2E_JOBS"), func(r rune) bool { return r == ',' })
+)
 
-// startRun applies to a fixture job without an application, through the job page and its preview drawer, and
-// returns the application id; without such a job it starts a parked fixture application again.
+// startRun applies to a fixture job of its own through the job page and its preview drawer and returns the
+// application id. The run is parked when the test ends, so it does not hold a browser slot for the next journey.
 func startRun(t *testing.T, tab *Tab) string {
 	t.Helper()
-	tab.Go("/jobs?source=demo")
-	var ids []string
-	if err := json.Unmarshal([]byte(tab.EvalAsync(candidates)), &ids); err != nil {
-		t.Fatal(err)
+	freshMu.Lock()
+	if len(freshJobs) == 0 {
+		freshMu.Unlock()
+		t.Fatal("no fixture job left: GETAFJOB_E2E_JOBS lists too few (admin demo -fresh, see test:e2e)")
 	}
-	// A fresh stack (CI) starts at the top; locally the order is shuffled so older runs rarely get in the way.
-	rand.Shuffle(len(ids), func(i, j int) { ids[i], ids[j] = ids[j], ids[i] })
-	for _, id := range ids {
-		tab.Go("/jobs/" + id)
-		if tab.Eval(`return !!document.querySelector('.jd-actions [data-action="apply"]')`) != "true" {
-			continue // taken meanwhile (a run of the planner, another journey)
-		}
-		// Apply now opens the preview in a drawer; starting there leads to the run in focus.
-		tab.Click(`.jd-actions [data-action="apply"]`)
-		tab.WaitFor("document.getElementById('dlg-apply').open && document.querySelector('#apply-body [data-action=\"apply-confirm\"]')")
-		if tab.Eval(`return document.querySelector('#apply-body [data-action="apply-confirm"]').disabled`) == "true" {
-			continue // a guard stops it (company window, duplicate)
-		}
-		tab.Click(`#apply-body [data-action="apply-confirm"]`)
-		// The planner may have queued the job a moment earlier (the demo user applies on its own): then the job page
-		// comes back with its application instead of the live view, and the next job is tried.
-		tab.WaitWithin(15*time.Second, "(location.pathname === '/live' && location.search.startsWith('?run=')) || "+
-			"(location.pathname.startsWith('/jobs/') && !document.getElementById('dlg-apply')?.open && "+
-			"!!document.querySelector('.jd-actions a[href^=\"/applications/\"]'))")
-		if tab.Eval("return location.pathname") != `"/live"` {
-			continue
-		}
-		return strings.TrimPrefix(strings.Trim(tab.Eval("return location.search"), `"`), "?run=")
-	}
-	if app := retryRun(t, tab); app != "" {
-		return app
-	}
-	t.Fatal("no fixture job without an application and no parked fixture application (reset the dev database)")
-	return ""
-}
+	id := freshJobs[0]
+	freshJobs = freshJobs[1:]
+	freshMu.Unlock()
 
-// retryRun starts a parked application on the fixture site again: a fresh stack has one fixture job per company
-// that the company window lets through, fewer than the journeys need.
-func retryRun(t *testing.T, tab *Tab) string {
-	t.Helper()
-	tab.Go("/applications?group=attention")
-	var ids []string
-	if err := json.Unmarshal([]byte(tab.Eval(`return [...document.querySelectorAll('tr[data-app-row]')]
-		.filter(r => r.dataset.state === 'parked' || r.dataset.state === 'failed').map(r => r.dataset.id)`)), &ids); err != nil {
-		t.Fatal(err)
+	tab.Go("/jobs/" + id)
+	tab.Click(`.jd-actions [data-action="apply"]`)
+	tab.WaitFor("document.getElementById('dlg-apply').open && document.querySelector('#apply-body [data-action=\"apply-confirm\"]')")
+	if tab.Eval(`return document.querySelector('#apply-body [data-action="apply-confirm"]').disabled`) == "true" {
+		tab.Shot("apply-blocked")
+		t.Fatalf("a guard stops the application to fixture job %s", id)
 	}
-	for _, id := range ids {
-		tab.Go("/applications/" + id)
-		if tab.Eval(`return !!document.querySelector('#app-head a[href^="http://fixtures:8080/"]') &&
-			!!document.querySelector('#app-head [data-action="apps.action.retry"]')`) != "true" {
-			continue
-		}
-		tab.Click(`#app-head [data-action="apps.action.retry"]`)
-		tab.WaitWithin(15*time.Second, "document.getElementById('app-head')?.dataset.state !== 'parked'")
-		return id
-	}
-	return ""
+	tab.Click(`#apply-body [data-action="apply-confirm"]`)
+	tab.WaitWithin(15*time.Second, "location.pathname === '/live' && location.search.startsWith('?run=')")
+	app := strings.TrimPrefix(strings.Trim(tab.Eval("return location.search"), `"`), "?run=")
+	t.Cleanup(func() {
+		// Parking an application that is already done is refused; that is fine here.
+		_, _ = tab.Page.Timeout(10 * time.Second).Evaluate(rod.Eval(
+			`id => fetch('/applications/' + id + '/park', {method: 'POST'}).then(r => r.status)`, app).ByPromise())
+	})
+	return app
 }
 
 // A run started on the fixture site shows in the live center, opens in focus without a reload, plays in the dock

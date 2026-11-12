@@ -18,10 +18,6 @@ func ensureApproval(t *testing.T, tab *Tab) {
 		return
 	}
 	app := startRun(t, tab)
-	// A retried application was approved before and goes straight on: only a fresh one can ask.
-	if tab.Eval("return location.pathname") != `"/live"` {
-		t.Skip("no fresh fixture job left to ask for approval")
-	}
 	deadline := time.Now().Add(90 * time.Second)
 	for time.Now().Before(deadline) {
 		tab.Go("/approvals")
@@ -36,7 +32,8 @@ func ensureApproval(t *testing.T, tab *Tab) {
 		}
 		time.Sleep(2 * time.Second)
 	}
-	t.Skip("the fixture run did not ask for approval")
+	tab.Shot("no-approval")
+	t.Fatal("the fixture run did not ask for approval")
 }
 
 // Waiting approvals can be reviewed in a drawer with the source of every value, selected with the keyboard and

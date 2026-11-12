@@ -32,11 +32,8 @@ func TestJobDetail(t *testing.T) {
 	}
 
 	app := startRun(t, tab)
-	// A fresh application lands in the live focus; a retried one (no fresh fixture job left) stays on its page.
-	if tab.Eval("return location.pathname") == `"/live"` {
-		tab.WaitWithin(30*time.Second, "document.querySelector('.live-screen-full')")
-		tab.Shot("focus")
-	}
+	tab.WaitWithin(30*time.Second, "document.querySelector('.live-screen-full')")
+	tab.Shot("focus")
 
 	// Clean up: park the run from its application page.
 	tab.Go("/applications/" + app)
