@@ -291,7 +291,11 @@ func (tab *Tab) NoOverflow(what string) {
 		return [...document.querySelectorAll('body *')].filter(el => {
 			const r = el.getBoundingClientRect();
 			if (r.width === 0 || r.right <= w + 1) return false;
-			for (let a = el; a; a = a.parentElement) if (getComputedStyle(a).position === 'fixed') return false;
+			for (let a = el; a; a = a.parentElement) {
+				const cs = getComputedStyle(a);
+				if (cs.position === 'fixed') return false;
+				if (a !== el && a !== document.body && a !== document.documentElement && cs.overflowX !== 'visible') return false; // clipped or scrolls on its own
+			}
 			return true;
 		}).slice(0, 5).map(el => el.tagName.toLowerCase() + (el.id ? '#' + el.id : '') + '.' + [...el.classList].join('.')).join(', ') || 'unknown'`)
 	if got != `""` {

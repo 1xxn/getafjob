@@ -72,8 +72,8 @@ var navGroups = []navGroup{
 		{Key: "nav.texts", Href: "/texts", Icon: "type"},
 	}},
 	{Key: "nav.group.settings", Items: []navItem{
-		{Key: "nav.preferences", Href: "/preferences", Icon: "settings"},
-		{Key: "nav.account", Href: "/account", Icon: "lock"},
+		{Key: "nav.preferences", Href: "/settings/search", Icon: "settings"},
+		{Key: "nav.account", Href: "/settings/account", Icon: "lock"},
 	}},
 }
 
@@ -89,6 +89,9 @@ var bottomNav = []navItem{
 func (n navItem) active(path string) bool {
 	if n.Href == "/" {
 		return path == "/"
+	}
+	if n.Href == "/settings/search" { // the settings sections share one entry; the account has its own
+		return strings.HasPrefix(path, "/settings/") && path != "/settings/account"
 	}
 	return path == n.Href || strings.HasPrefix(path, n.Href+"/")
 }

@@ -56,7 +56,7 @@ func (tab *Tab) Click(selector string) {
 }
 
 var pages = []string{"/", "/jobs", "/applications", "/needs-input", "/approvals", "/pipeline", "/profile", "/documents", "/answers", "/texts",
-	"/preferences", "/account", "/privacy"}
+	"/settings/search", "/settings/automation", "/settings/notifications", "/settings/integrations", "/settings/account", "/privacy"}
 
 // Every page renders in the shell with a heading, without console errors and without horizontal scrolling.
 func TestPagesRender(t *testing.T) {

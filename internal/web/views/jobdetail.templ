@@ -58,7 +58,7 @@ templ JobPage(d JobData) {
 						@ui.Button(ui.ButtonProps{Label: T(ctx, "jobs.applied_status"), Href: "/applications/" + d.ApplicationID, Variant: "primary", Icon: "check"})
 					case jobExcluded(d):
 						@ui.Alert(ui.AlertProps{Tone: ui.Warning, Text: T(ctx, "jobs.panel_excluded")}) {
-							<p><a href="/preferences">{ T(ctx, "jobs.panel_excluded_link") }</a></p>
+							<p><a href="/settings/search">{ T(ctx, "jobs.panel_excluded_link") }</a></p>
 						}
 					case d.ApplyMode == "form":
 						@ui.Button(ui.ButtonProps{Label: T(ctx, "jobs.apply_now"), Variant: "primary", Icon: "send",

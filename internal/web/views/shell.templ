@@ -56,7 +56,7 @@ templ userMenu(s Shell) {
 		<div id="user-menu" popover class="ui-menu-list ui-menu-end">
 			<p class="ui-menu-note">{ T(ctx, "nav.signed_in_as", "name", s.UserName) }</p>
 			@ui.MenuItem(T(ctx, "nav.profile"), "/profile", "user")
-			@ui.MenuItem(T(ctx, "nav.account"), "/account", "lock")
+			@ui.MenuItem(T(ctx, "nav.account"), "/settings/account", "lock")
 			@ui.MenuItem(T(ctx, "nav.privacy"), "/privacy", "shield")
 			<hr/>
 			<form method="post" action="/settings/theme" { HX(ctx, "hx-boost", "false")... }>

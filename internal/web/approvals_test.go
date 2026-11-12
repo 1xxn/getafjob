@@ -217,7 +217,8 @@ func TestPreferencesAutonomySettings(t *testing.T) {
 
 	// 1. GET /preferences includes autonomy values
 	rec := httptest.NewRecorder()
-	req := httptest.NewRequest(http.MethodGet, "/preferences", nil)
+	req := httptest.NewRequest(http.MethodGet, "/settings/automation", nil)
+	req.SetPathValue("section", "automation")
 	srv.preferencesPage(rec, req, u)
 	if rec.Code != http.StatusOK {
 		t.Fatalf("preferencesPage status = %d, want 200", rec.Code)
@@ -226,8 +227,13 @@ func TestPreferencesAutonomySettings(t *testing.T) {
 	if !strings.Contains(body, `name="autonomy_level"`) || !strings.Contains(body, `name="min_score"`) || !strings.Contains(body, `name="runner_choice"`) {
 		t.Fatalf("preferencesPage missing autonomy inputs:\n%s", body)
 	}
-	if !strings.Contains(body, `/preferences/runner/token`) {
-		t.Fatalf("preferencesPage missing runner token action:\n%s", body)
+	// The own runner's token lives with the integrations.
+	recInt := httptest.NewRecorder()
+	reqInt := httptest.NewRequest(http.MethodGet, "/settings/integrations", nil)
+	reqInt.SetPathValue("section", "integrations")
+	srv.preferencesPage(recInt, reqInt, u)
+	if !strings.Contains(recInt.Body.String(), `/preferences/runner/token`) {
+		t.Fatalf("integrations missing runner token action:\n%s", recInt.Body.String())
 	}
 
 	// 2. POST /preferences saves autonomy values
@@ -257,8 +263,8 @@ func TestPreferencesAutonomySettings(t *testing.T) {
 		t.Fatalf("runnerToken status = %d, want 303", rec.Code)
 	}
 	loc := rec.Header().Get("Location")
-	if !strings.HasPrefix(loc, "/preferences?runner_token=") {
-		t.Fatalf("runnerToken redirect = %q, want /preferences?runner_token=...", loc)
+	if !strings.HasPrefix(loc, "/settings/integrations?runner_token=") {
+		t.Fatalf("runnerToken redirect = %q, want /settings/integrations?runner_token=...", loc)
 	}
 	if len(st.tokenHash) != 32 {
 		t.Fatalf("expected 32-byte token hash, got %d bytes", len(st.tokenHash))
@@ -322,7 +328,8 @@ func TestPreferencesEasyApply(t *testing.T) {
 
 	// 1. GET /preferences renders Easy Apply and notice warning
 	rec := httptest.NewRecorder()
-	req := httptest.NewRequest(http.MethodGet, "/preferences", nil)
+	req := httptest.NewRequest(http.MethodGet, "/settings/automation", nil)
+	req.SetPathValue("section", "automation")
 	srv.preferencesPage(rec, req, u)
 	if rec.Code != http.StatusOK {
 		t.Fatalf("preferencesPage status = %d, want 200", rec.Code)
@@ -446,7 +453,8 @@ func TestPreferencesAI(t *testing.T) {
 
 	// 1. GET /preferences includes AI section and budget
 	rec := httptest.NewRecorder()
-	req := httptest.NewRequest(http.MethodGet, "/preferences", nil)
+	req := httptest.NewRequest(http.MethodGet, "/settings/integrations", nil)
+	req.SetPathValue("section", "integrations")
 	srv.preferencesPage(rec, req, u)
 	if rec.Code != http.StatusOK {
 		t.Fatalf("preferencesPage status = %d, want 200", rec.Code)
@@ -489,5 +497,44 @@ func TestPreferencesAI(t *testing.T) {
 	}
 	if !aiSvc.clearedKey {
 		t.Fatalf("expected clearedKey = true")
+	}
+}
+
+// A section form carries only its own fields: saving the search must not reset the automation, and the reverse.
+func TestSettingsSectionsSaveOnlyTheirFields(t *testing.T) {
+	u := &identity.User{ID: uuid.New(), DisplayName: "Max Mustermann", Email: "max@example.org"}
+	profSvc := profile.NewService(&fakeProfileStore{}, nil)
+	st := &fakeAutonomyStore{settings: application.Settings{Level: application.LevelAutonomous, RunnerChoice: application.RunnerHomeRunner,
+		MinScore: 85, DailyLimit: 10}}
+	srv := &Server{Profile: profSvc, Apps: application.NewService(st), Logger: slog.Default()}
+	post := func(form url.Values) string {
+		t.Helper()
+		rec := httptest.NewRecorder()
+		req := httptest.NewRequest(http.MethodPost, "/preferences", strings.NewReader(form.Encode()))
+		req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+		srv.preferencesSave(rec, req, u)
+		if rec.Code != http.StatusSeeOther {
+			t.Fatalf("save %v: status %d", form, rec.Code)
+		}
+		return rec.Header().Get("Location")
+	}
+
+	if loc := post(url.Values{"section": {"search"}, "titles": {"Go Engineer"}}); loc != "/settings/search?saved=1" {
+		t.Errorf("search saved to %q", loc)
+	}
+	if st.settings.Level != application.LevelAutonomous || st.settings.MinScore != 85 || st.settings.DailyLimit != 10 {
+		t.Fatalf("saving the search changed the automation: %+v", st.settings)
+	}
+	snap, err := profSvc.Get(t.Context(), u.ID)
+	if err != nil || len(snap.Preferences.Titles) != 1 {
+		t.Fatalf("search not saved: %+v %v", snap.Preferences, err)
+	}
+
+	post(url.Values{"section": {"automation"}, "autonomy_level": {"approve"}, "min_score": {"70"}, "daily_limit": {"3"}})
+	if st.settings.Level != application.LevelApprove || st.settings.MinScore != 70 {
+		t.Fatalf("automation not saved: %+v", st.settings)
+	}
+	if snap, _ := profSvc.Get(t.Context(), u.ID); len(snap.Preferences.Titles) != 1 || snap.Preferences.Titles[0] != "Go Engineer" {
+		t.Fatalf("saving the automation changed the search: %+v", snap.Preferences)
 	}
 }
