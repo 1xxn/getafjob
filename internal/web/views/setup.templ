@@ -1,33 +1,37 @@
 package views
 
 import (
-	"context"
 	"strconv"
+
+	"github.com/1xxn/getafjob/internal/web/views/ui"
 )
 
-// SetupSteps are the steps of the setup assistant in order.
-var SetupSteps = []string{"cv", "contact", "work", "history", "search", "done"}
-
-// ExperienceRow and EducationRow are editable entries of the history step (an empty one is appended).
-type ExperienceRow struct {
-	Title, Company, Start, End, Location, Highlights string
-}
-
-// EducationRow is one degree in the history step.
-type EducationRow struct {
-	Degree, Institution, Start, End, Grade string
-}
+// SetupSteps are the steps of the onboarding in order.
+var SetupSteps = []string{"cv", "profile", "search", "automation", "matches"}
 
 // SetupData is what a step shows.
 type SetupData struct {
-	Name       string
-	Step       string
-	Form       Form
-	CVs        []DocumentRow // cv step
-	Experience []ExperienceRow
-	Education  []EducationRow
-	Missing    []string // done step: field names without a value
-	Passkeys   bool     // done step: the user has a passkey
+	Name     string
+	Step     string
+	Form     Form
+	CVs      []DocumentRow // cv step: CVs already uploaded
+	Stations []string      // profile step: positions found in the CV, "title, company"
+	Matches  SetupMatchesData
+	Passkeys bool // matches step: the user has a passkey
+}
+
+// SetupMatchesData is the live part of the last step: the first ranked jobs while the search runs.
+type SetupMatchesData struct {
+	Top     []DashJob
+	Total   int
+	Rated   bool // the user has ratings at all
+	Crawl   CrawlStatusData
+	Started bool // a crawl ran or is on its way
+}
+
+// waiting reports whether the list may still change on its own, so it refreshes itself.
+func (d SetupMatchesData) waiting() bool {
+	return d.Crawl.Running || d.Crawl.Queued || !d.Rated
 }
 
 func stepIndex(step string) int {
@@ -53,152 +57,213 @@ func prevStep(step string) string {
 	return step
 }
 
-templ setupNav(step string) {
-	<nav aria-label={ T(ctx, "setup.progress") }>
-		<ol class="steps">
-			for i, s := range SetupSteps {
-				<li>
-					if s == step {
-						<span aria-current="step"><strong>{ strconv.Itoa(i+1) }. { T(ctx, "setup.step." + s) }</strong></span>
-					} else {
-						<a href={ templ.SafeURL("/setup/" + s) }>{ strconv.Itoa(i+1) }. { T(ctx, "setup.step." + s) }</a>
-					}
-				</li>
-			}
-		</ol>
-	</nav>
+templ setupHead(step string) {
+	<header class="wiz-head">
+		<p class="wiz-kicker">{ T(ctx, "setup.title") }</p>
+		<h1 id="wiz-title">{ T(ctx, "setup.step." + step) }</h1>
+		@ui.ProgressBar(ui.ProgressProps{ID: "wiz-progress", Label: T(ctx, "setup.progress"), Value: stepIndex(step) + 1,
+			Max: len(SetupSteps), ValueText: T(ctx, "setup.step_of", "n", stepIndex(step)+1, "total", len(SetupSteps))})
+		<nav aria-label={ T(ctx, "setup.steps") }>
+			<ol class="wiz-steps">
+				for i, s := range SetupSteps {
+					<li
+						if i < stepIndex(step) {
+							class="wiz-step is-past"
+						} else {
+							class="wiz-step"
+						}
+					>
+						if s == step {
+							<span aria-current="step"><span class="wiz-num">{ strconv.Itoa(i + 1) }</span> { T(ctx, "setup.nav." + s) }</span>
+						} else {
+							<a href={ templ.SafeURL("/setup/" + s) }><span class="wiz-num">{ strconv.Itoa(i + 1) }</span> { T(ctx, "setup.nav." + s) }</a>
+						}
+					</li>
+				}
+			</ol>
+		</nav>
+	</header>
 }
 
-templ setupButtons(step string) {
-	@StickyBar() {
+// setupButtons: continue saves the step; skip moves on without saving; later leaves for the dashboard.
+templ setupButtons(step, primary string) {
+	<div class="wiz-actions">
 		if step != "cv" {
-			<a href={ templ.SafeURL("/setup/" + prevStep(step)) }>{ T(ctx, "setup.back") }</a>
+			@ui.Button(ui.ButtonProps{Label: T(ctx, "setup.back"), Href: "/setup/" + prevStep(step), Variant: "ghost", Icon: "chevron-left"})
 		}
-		<a href={ templ.SafeURL("/setup/" + nextStep(step)) }>{ T(ctx, "setup.skip") }</a>
-		<button type="submit" class="primary">{ T(ctx, "setup.next") }</button>
-	}
+		<span class="wiz-gap"></span>
+		@ui.Button(ui.ButtonProps{Label: T(ctx, "setup.later"), Href: "/", Variant: "ghost", Attrs: templ.Attributes{"data-setup-later": ""}})
+		@ui.Button(ui.ButtonProps{Label: T(ctx, "setup.skip"), Href: "/setup/" + nextStep(step), Attrs: templ.Attributes{"data-setup-skip": ""}})
+		@ui.Button(ui.ButtonProps{Label: primary, Type: "submit", Variant: "primary", Attrs: templ.Attributes{"data-setup-next": ""}})
+	</div>
 }
 
 templ SetupPage(d SetupData) {
-	@Layout(Page{Title: T(ctx, "setup.title"), UserName: d.Name}) {
-		@Section(T(ctx, "setup.title") + ": " + T(ctx, "setup.step." + d.Step)) {
-			@setupNav(d.Step)
-			<p class="muted">{ T(ctx, "setup.text." + d.Step) }</p>
+	@Layout(Page{Title: T(ctx, "setup.step." + d.Step), UserName: d.Name, Wide: true, Passkeys: d.Passkeys}) {
+		<section class="wiz" data-setup-step={ d.Step } aria-labelledby="wiz-title">
+			@setupHead(d.Step)
+			<p class="app-hint">{ T(ctx, "setup.text." + d.Step) }</p>
 			@formNotice(d.Form)
 			switch d.Step {
 				case "cv":
-					for _, c := range d.CVs {
-						<form method="post" action={ templ.SafeURL("/setup/cv/import/" + c.ID) }>
-							<button type="submit">{ T(ctx, "setup.cv.use", "name", c.Name) }</button>
-						</form>
+					if len(d.CVs) > 0 {
+						<div class="wiz-card">
+							<h2>{ T(ctx, "setup.cv.existing") }</h2>
+							<ul class="wiz-list">
+								for _, c := range d.CVs {
+									<li>
+										<form method="post" action={ templ.SafeURL("/setup/cv/import/" + c.ID) }>
+											@ui.Button(ui.ButtonProps{Label: T(ctx, "setup.cv.use", "name", c.Name), Type: "submit", Icon: "file",
+												Attrs: templ.Attributes{"data-setup-cv": c.ID}})
+										</form>
+									</li>
+								}
+							</ul>
+						</div>
 					}
-					<form method="post" action="/setup/cv" enctype="multipart/form-data" class="stack">
+					<form method="post" action="/setup/cv" enctype="multipart/form-data" class="wiz-card stack">
 						<input type="hidden" name="kind" value="cv"/>
 						<div class="field">
 							<label for="f-file">{ T(ctx, "setup.cv.file") }</label>
 							<input id="f-file" name="file" type="file" required accept=".pdf,.docx,application/pdf" aria-describedby="f-file-hint"/>
 							<p class="hint" id="f-file-hint">{ T(ctx, "setup.cv.hint") }</p>
 						</div>
-						@setupButtons(d.Step)
+						@setupButtons(d.Step, T(ctx, "setup.cv.upload"))
 					</form>
-				case "contact":
-					<form method="post" action="/setup/contact" class="stack" novalidate>
+				case "profile":
+					<form method="post" action="/setup/profile" class="wiz-card stack" novalidate data-dirty-guard data-t-unsaved={ T(ctx, "cand.unsaved") }>
 						<input type="hidden" name="version" value={ d.Form.Version }/>
-						@Field(input(ctx, d.Form, "first_name", "text", "given-name", 200))
-						@Field(input(ctx, d.Form, "last_name", "text", "family-name", 200))
-						@Field(input(ctx, d.Form, "email", "email", "email", 254))
-						@Field(input(ctx, d.Form, "phone", "tel", "tel", 30))
-						@Field(input(ctx, d.Form, "postal_code", "text", "postal-code", 12))
-						@Field(input(ctx, d.Form, "city", "text", "address-level2", 200))
-						@Field(input(ctx, d.Form, "linkedin", "url", "url", 200))
-						@Field(input(ctx, d.Form, "github", "url", "url", 200))
-						@setupButtons(d.Step)
-					</form>
-				case "work":
-					<form method="post" action="/setup/work" class="stack" novalidate>
-						<input type="hidden" name="version" value={ d.Form.Version }/>
-						@Field(input(ctx, d.Form, "current_title", "text", "organization-title", 200))
-						@Field(input(ctx, d.Form, "years_total", "text", "", 200))
-						@Field(input(ctx, d.Form, "notice_period", "text", "", 200))
-						@Field(input(ctx, d.Form, "earliest_start", "text", "", 200))
-						@Field(input(ctx, d.Form, "salary_expectation", "text", "", 200))
+						<h2>{ T(ctx, "setup.profile.contact") }</h2>
+						<div class="wiz-grid">
+							@Field(input(ctx, d.Form, "first_name", "text", "given-name", 200))
+							@Field(input(ctx, d.Form, "last_name", "text", "family-name", 200))
+							@Field(input(ctx, d.Form, "email", "email", "email", 254))
+							@Field(input(ctx, d.Form, "phone", "tel", "tel", 30))
+							@Field(input(ctx, d.Form, "postal_code", "text", "postal-code", 12))
+							@Field(input(ctx, d.Form, "city", "text", "address-level2", 200))
+						</div>
+						<h2>{ T(ctx, "setup.profile.work") }</h2>
+						<div class="wiz-grid">
+							@Field(input(ctx, d.Form, "current_title", "text", "organization-title", 200))
+							@Field(input(ctx, d.Form, "years_total", "text", "", 200))
+							@Field(input(ctx, d.Form, "notice_period", "text", "", 200))
+							@Field(input(ctx, d.Form, "earliest_start", "text", "", 200))
+							@Field(input(ctx, d.Form, "salary_expectation", "text", "", 200))
+						</div>
 						@Check("work_authorized_eu", T(ctx, "profile.field.work_authorized_eu"), d.Form.Checks["work_authorized_eu"])
-						@Check("needs_sponsorship", T(ctx, "profile.field.needs_sponsorship"), d.Form.Checks["needs_sponsorship"])
 						@TextArea(area(ctx, d.Form, "skills", 12000))
-						@TextArea(area(ctx, d.Form, "languages", 3000))
-						@setupButtons(d.Step)
-					</form>
-				case "history":
-					<form method="post" action="/setup/history" class="stack" novalidate>
-						<input type="hidden" name="version" value={ d.Form.Version }/>
-						<input type="hidden" name="exp-count" value={ strconv.Itoa(len(d.Experience)) }/>
-						<input type="hidden" name="edu-count" value={ strconv.Itoa(len(d.Education)) }/>
-						<h2>{ T(ctx, "setup.history.experience") }</h2>
-						for i, e := range d.Experience {
-							<fieldset class="stack form-section">
-								<legend>{ T(ctx, "setup.history.position_n", "n", i+1) }</legend>
-								@Field(hist(ctx, "exp", i, "title", e.Title))
-								@Field(hist(ctx, "exp", i, "company", e.Company))
-								@Field(hist(ctx, "exp", i, "start", e.Start))
-								@Field(hist(ctx, "exp", i, "end", e.End))
-								@Field(hist(ctx, "exp", i, "location", e.Location))
-								@TextArea(FieldProps{Name: histName("exp", i, "highlights"), Label: T(ctx, "setup.history.highlights"),
-									Hint: T(ctx, "profile.hint.certifications"), Value: e.Highlights, MaxLength: 5000})
-								if e.Title != "" || e.Company != "" {
-									@Check(histName("exp", i, "remove"), T(ctx, "setup.history.remove"), false)
+						<h2>{ T(ctx, "setup.profile.stations") }</h2>
+						if len(d.Stations) == 0 {
+							<p class="app-hint">{ T(ctx, "setup.profile.no_stations") }</p>
+						} else {
+							<ul class="wiz-found" data-setup-stations>
+								for _, s := range d.Stations {
+									<li>
+										@ui.Icon("check")
+										<span>{ s }</span>
+									</li>
 								}
-							</fieldset>
+							</ul>
 						}
-						<h2 class="form-section">{ T(ctx, "setup.history.education") }</h2>
-						for i, e := range d.Education {
-							<fieldset class="stack form-section">
-								<legend>{ T(ctx, "setup.history.degree_n", "n", i+1) }</legend>
-								@Field(hist(ctx, "edu", i, "degree", e.Degree))
-								@Field(hist(ctx, "edu", i, "institution", e.Institution))
-								@Field(hist(ctx, "edu", i, "start", e.Start))
-								@Field(hist(ctx, "edu", i, "end", e.End))
-								@Field(hist(ctx, "edu", i, "grade", e.Grade))
-								if e.Degree != "" || e.Institution != "" {
-									@Check(histName("edu", i, "remove"), T(ctx, "setup.history.remove"), false)
-								}
-							</fieldset>
-						}
-						@setupButtons(d.Step)
+						<p><a href="/profile#stations">{ T(ctx, "setup.profile.edit_stations") }</a></p>
+						@setupButtons(d.Step, T(ctx, "setup.next"))
 					</form>
 				case "search":
-					<form method="post" action="/setup/search" class="stack" novalidate>
+					<form method="post" action="/setup/search" class="wiz-card stack" novalidate data-dirty-guard data-t-unsaved={ T(ctx, "cand.unsaved") }>
 						@TextArea(area(ctx, d.Form, "titles", 12000))
 						@TextArea(area(ctx, d.Form, "locations", 12000))
 						@Check("remote", T(ctx, "profile.field.remote"), d.Form.Checks["remote"])
 						@Field(input(ctx, d.Form, "min_salary", "number", "", 9))
-						@setupButtons(d.Step)
+						@setupButtons(d.Step, T(ctx, "setup.next"))
 					</form>
-				case "done":
-					if len(d.Missing) > 0 {
-						<p>{ T(ctx, "setup.done.missing") }</p>
-						<ul>
-							for _, m := range d.Missing {
-								<li>{ T(ctx, "profile.field." + m) }</li>
-							}
-						</ul>
-						<p><a href="/profile">{ T(ctx, "setup.done.to_profile") }</a></p>
-					} else {
-						@Notice("info", T(ctx, "setup.done.complete"))
-					}
+				case "automation":
+					<form method="post" action="/setup/automation" class="wiz-card stack" novalidate>
+						<fieldset class="ui-fieldset">
+							<legend class="ui-label">{ T(ctx, "profile.field.autonomy_level") }</legend>
+							<div class="ui-options">
+								for _, v := range []string{"suggest", "approve", "autonomous"} {
+									<div class="ui-check ui-radio">
+										<input
+											type="radio"
+											id={ "f-autonomy-" + v }
+											name="autonomy_level"
+											value={ v }
+											checked?={ d.Form.Values["autonomy_level"] == v }
+											aria-describedby={ "f-autonomy-" + v + "-hint" }
+										/>
+										<label for={ "f-autonomy-" + v }>{ T(ctx, "profile.autonomy." + v) }</label>
+										<p class="ui-hint" id={ "f-autonomy-" + v + "-hint" }>{ T(ctx, "settings.autonomy." + v) }</p>
+									</div>
+								}
+							</div>
+						</fieldset>
+						<p class="app-hint">{ T(ctx, "setup.automation.later") }</p>
+						@setupButtons(d.Step, T(ctx, "setup.automation.start"))
+					</form>
+				case "matches":
+					@SetupMatches(d.Matches)
 					if !d.Passkeys {
 						@PasskeyNudge()
 					}
-					<p><a href="/" class="primary">{ T(ctx, "setup.done.home") }</a></p>
+					<div class="wiz-actions">
+						@ui.Button(ui.ButtonProps{Label: T(ctx, "setup.back"), Href: "/setup/automation", Variant: "ghost", Icon: "chevron-left"})
+						<span class="wiz-gap"></span>
+						@ui.Button(ui.ButtonProps{Label: T(ctx, "setup.matches.home"), Href: "/"})
+						@ui.Button(ui.ButtonProps{Label: T(ctx, "setup.matches.all"), Href: "/jobs", Variant: "primary", Attrs: templ.Attributes{"data-setup-jobs": ""}})
+					</div>
 			}
-		}
+		</section>
 	}
 }
 
-func histName(group string, i int, field string) string {
-	return group + "-" + strconv.Itoa(i) + "-" + field
-}
-
-// hist builds a field of the history step, labelled with setup.history.<field>.
-func hist(ctx context.Context, group string, i int, field, value string) FieldProps {
-	return FieldProps{Name: histName(group, i, field), Label: T(ctx, "setup.history."+field), Type: "text", Value: value, MaxLength: 200}
+// SetupMatches lists the best jobs so far; while a crawl runs or nothing is rated yet it reloads itself.
+templ SetupMatches(d SetupMatchesData) {
+	<div
+		id="setup-matches"
+		class="wiz-card wiz-matches"
+		data-setup-matches={ strconv.Itoa(d.Total) }
+		if d.waiting() {
+			{ HX(ctx, "hx-get", "/setup/matches", "hx-trigger", "every 4s", "hx-swap", "outerMorph transition:false")... }
+		}
+	>
+		<div class="wiz-crawl" role="status">
+			if d.Crawl.Running {
+				@ui.StatusPill(ui.StatusProps{Label: T(ctx, "jobs.crawl_running"), Tone: ui.Info, Live: true})
+			} else if d.Crawl.Queued {
+				@ui.StatusPill(ui.StatusProps{Label: T(ctx, "jobs.crawl_queued"), Tone: ui.Info, Live: true})
+			} else if d.Crawl.LastRun != "" {
+				<span class="app-hint">{ T(ctx, "jobs.crawl_last_run", "time", d.Crawl.LastRun) }</span>
+			} else {
+				<span class="app-hint">{ T(ctx, "jobs.crawl_never") }</span>
+			}
+			if !d.Started {
+				<form method="post" action="/setup/crawl">
+					@ui.Button(ui.ButtonProps{Label: T(ctx, "setup.matches.crawl"), Type: "submit", Size: "sm", Icon: "search",
+						Attrs: templ.Attributes{"data-setup-crawl": ""}})
+				</form>
+			}
+		</div>
+		if len(d.Top) == 0 {
+			if d.waiting() {
+				@ui.EmptyState(ui.EmptyProps{Icon: "clock", Title: T(ctx, "setup.matches.wait"), Text: T(ctx, "setup.matches.wait_text")})
+			} else {
+				@ui.EmptyState(ui.EmptyProps{Icon: "search", Title: T(ctx, "setup.matches.none"), Text: T(ctx, "setup.matches.none_text")})
+			}
+		} else {
+			<h2>{ T(ctx, "setup.matches.found", "n", d.Total) }</h2>
+			<ul class="dash-list">
+				for _, j := range d.Top {
+					<li>
+						<a href={ templ.SafeURL("/jobs/" + i64(j.ID)) } class="dash-item" data-setup-match={ i64(j.ID) }>
+							<span class="dash-item-body">
+								<span class="dash-item-title">{ j.Title }</span>
+								<span class="dash-item-meta">{ j.Company }</span>
+							</span>
+							@ui.Badge(itoa(j.Score), ui.Success)
+						</a>
+					</li>
+				}
+			</ul>
+		}
+	</div>
 }

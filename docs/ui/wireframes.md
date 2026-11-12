@@ -141,8 +141,15 @@ Cards move by drag and drop or by a stage menu on each card (keyboard). Phone: o
 ## Setup `/setup` (wizard)
 
 ```
-| Set up getafjob                                  Step 2 of 5  [=====-----]        |
-| Upload your CV                                                                   |
-| [ Choose file ]                                                                  |
-| [Back]                                      [Skip for now]   [Continue]          |
+| Setup                                                                            |
+| Check your details                                         Step 2 of 5           |
+| [==========----------------]                                                     |
+| (1) CV  (2) Details  (3) Search  (4) Automation  (5) Matches                     |
+| Contact, work facts, skills; positions found in the CV                           |
+| [< Back]                     [Finish later]   [Skip]   [Save and continue]       |
 ```
+
+Steps: CV, details found by the import, search, automation level, first matches (live while the crawl and the
+rating run). `/setup` resumes at the first step that still lacks something: a CV, a field forms ask for, a job
+title. Skip moves on without saving; Finish later goes to the dashboard, which links back until the profile is
+complete.

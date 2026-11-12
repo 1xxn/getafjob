@@ -1,6 +1,7 @@
 package web
 
 import (
+	"context"
 	"errors"
 	"net/http"
 	"slices"
@@ -10,6 +11,7 @@ import (
 	"github.com/1xxn/getafjob/internal/ai"
 	"github.com/1xxn/getafjob/internal/application"
 	"github.com/1xxn/getafjob/internal/identity"
+	"github.com/1xxn/getafjob/internal/matching"
 	"github.com/1xxn/getafjob/internal/notify"
 	"github.com/1xxn/getafjob/internal/profile"
 	"github.com/1xxn/getafjob/internal/profile/cvimport"
@@ -17,13 +19,50 @@ import (
 	"github.com/1xxn/getafjob/internal/web/views"
 )
 
-// maxHistory bounds the entries the history step accepts.
-const maxHistory = 30
+// setupTop is how many ranked jobs the last step shows.
+const setupTop = 5
+
+// oldSetupSteps lead bookmarks of the earlier assistant to the step that holds their fields now.
+var oldSetupSteps = map[string]string{"contact": "profile", "work": "profile", "history": "profile", "done": "matches"}
 
 func validStep(step string) bool { return slices.Contains(views.SetupSteps, step) }
 
-func (s *Server) setupStart(w http.ResponseWriter, r *http.Request, _ *identity.User) {
-	http.Redirect(w, r, "/setup/cv", http.StatusSeeOther)
+// setupStart resumes the onboarding at the first step that still lacks something: a CV, the fields forms ask
+// for, a job title to look for. With all of that in place it shows the matches.
+func (s *Server) setupStart(w http.ResponseWriter, r *http.Request, u *identity.User) {
+	if u == nil {
+		http.Redirect(w, r, "/login", http.StatusSeeOther)
+		return
+	}
+	http.Redirect(w, r, "/setup/"+s.resumeStep(r.Context(), u), http.StatusSeeOther)
+}
+
+func (s *Server) resumeStep(ctx context.Context, u *identity.User) string {
+	if !s.hasCV(ctx, u) {
+		return "cv"
+	}
+	snap, err := s.Profile.Get(ctx, u.ID)
+	if err != nil {
+		return "cv"
+	}
+	if len(snap.Profile.Missing()) > 0 {
+		return "profile"
+	}
+	if len(snap.Preferences.Titles) == 0 {
+		return "search"
+	}
+	return "matches"
+}
+
+func (s *Server) hasCV(ctx context.Context, u *identity.User) bool {
+	if s.Documents == nil {
+		return true
+	}
+	docs, err := s.Documents.List(ctx, u.ID)
+	if err != nil {
+		return false
+	}
+	return slices.ContainsFunc(docs, func(d profile.Document) bool { return d.Kind == profile.KindCV })
 }
 
 // setupPage shows one step with the stored data.
@@ -33,11 +72,29 @@ func (s *Server) setupPage(w http.ResponseWriter, r *http.Request, u *identity.U
 		return
 	}
 	step := r.PathValue("step")
+	if to, ok := oldSetupSteps[step]; ok {
+		http.Redirect(w, r, "/setup/"+to, http.StatusPermanentRedirect)
+		return
+	}
 	if !validStep(step) {
 		s.notFound(w, r, u)
 		return
 	}
+	if step == "matches" && partial(r) {
+		s.render(w, r, http.StatusOK, views.SetupMatches(s.setupMatches(r.Context(), u)))
+		return
+	}
 	s.renderSetup(w, r, u, step, http.StatusOK, views.Form{})
+}
+
+func (s *Server) automation(ctx context.Context, u *identity.User) application.Settings {
+	st := application.DefaultSettings
+	if s.Apps != nil {
+		if cfg, err := s.Apps.Settings(ctx, u.ID); err == nil {
+			st = cfg
+		}
+	}
+	return st
 }
 
 func (s *Server) renderSetup(w http.ResponseWriter, r *http.Request, u *identity.User, step string, status int, override views.Form) {
@@ -46,16 +103,10 @@ func (s *Server) renderSetup(w http.ResponseWriter, r *http.Request, u *identity
 		s.failed(w, r, u, err)
 		return
 	}
-	d := views.SetupData{Name: u.DisplayName, Step: step}
+	d := views.SetupData{Name: u.DisplayName, Step: step, Passkeys: true}
 	switch step {
-	case "search":
-		st := application.DefaultSettings
-		if s.Apps != nil {
-			if cfg, err := s.Apps.Settings(r.Context(), u.ID); err == nil {
-				st = cfg
-			}
-		}
-		d.Form = preferencesForm(snap.Preferences, st, tracking.MailboxAccount{}, notify.Preferences{}, nil, false, ai.UserSettings{}, false)
+	case "search", "automation":
+		d.Form = preferencesForm(snap.Preferences, s.automation(r.Context(), u), tracking.MailboxAccount{}, notify.Preferences{}, nil, false, ai.UserSettings{}, false)
 	default:
 		d.Form = profileForm(snap)
 	}
@@ -78,19 +129,19 @@ func (s *Server) renderSetup(w http.ResponseWriter, r *http.Request, u *identity
 				d.CVs = append(d.CVs, views.DocumentRow{ID: doc.ID.String(), Name: doc.Name})
 			}
 		}
-	case "history":
-		for _, e := range snap.Profile.Experience {
-			d.Experience = append(d.Experience, views.ExperienceRow{Title: e.Title, Company: e.Company, Start: e.Start, End: e.End,
-				Location: e.Location, Highlights: strings.Join(e.Highlights, "\n")})
+	case "profile":
+		if s.Stations != nil {
+			exps, err := s.Stations.WorkExperiences(r.Context(), u.ID)
+			if err != nil {
+				s.failed(w, r, u, err)
+				return
+			}
+			for _, e := range exps {
+				d.Stations = append(d.Stations, strings.Trim(e.Title+", "+e.Company, ", "))
+			}
 		}
-		for _, e := range snap.Profile.Education {
-			d.Education = append(d.Education, views.EducationRow{Degree: e.Degree, Institution: e.Institution, Start: e.Start,
-				End: e.End, Grade: e.Grade})
-		}
-		d.Experience = append(d.Experience, views.ExperienceRow{}) // room for one more
-		d.Education = append(d.Education, views.EducationRow{})
-	case "done":
-		d.Missing = snap.Profile.Missing()
+	case "matches":
+		d.Matches = s.setupMatches(r.Context(), u)
 		if s.Identity.PasskeysEnabled() {
 			keys, err := s.Identity.Passkeys(r.Context(), u.ID)
 			if err != nil {
@@ -98,11 +149,50 @@ func (s *Server) renderSetup(w http.ResponseWriter, r *http.Request, u *identity
 				return
 			}
 			d.Passkeys = len(keys) > 0
-		} else {
-			d.Passkeys = true // nothing to nudge about
 		}
 	}
 	s.render(w, r, status, views.SetupPage(d))
+}
+
+// setupMatches reads the best rated jobs and the state of the crawl.
+func (s *Server) setupMatches(ctx context.Context, u *identity.User) views.SetupMatchesData {
+	var d views.SetupMatchesData
+	if s.Jobs != nil {
+		l, err := s.Jobs.List(ctx, u.ID, matching.Filter{Decisions: []matching.Decision{matching.Match, matching.Maybe},
+			Sort: "match", Page: 1})
+		if err == nil {
+			d.Total, d.Rated = l.Total, len(l.Counts) > 0 || l.BlockedCount > 0
+			for _, it := range l.Items[:min(setupTop, len(l.Items))] {
+				d.Top = append(d.Top, views.DashJob{ID: it.JobID, Title: it.Title, Company: it.Company, Score: it.Score})
+			}
+		}
+	} else {
+		d.Rated = true
+	}
+	if s.Discovery != nil {
+		if st, err := s.Discovery.CrawlStatus(ctx); err == nil {
+			d.Crawl = toCrawlStatusData(ctx, st)
+			d.Started = st.Running || st.Queued || (st.LastRunAt != nil && !st.LastRunAt.IsZero())
+		}
+	} else {
+		d.Started = true
+	}
+	return d
+}
+
+// setupCrawl starts the first crawl when none ran yet and shows the matches step again.
+func (s *Server) setupCrawl(w http.ResponseWriter, r *http.Request, u *identity.User) {
+	if u == nil {
+		http.Redirect(w, r, "/login", http.StatusSeeOther)
+		return
+	}
+	if s.Discovery != nil {
+		if _, err := s.Discovery.TriggerCrawl(r.Context()); err != nil {
+			s.failed(w, r, u, err)
+			return
+		}
+	}
+	http.Redirect(w, r, "/setup/matches", http.StatusSeeOther)
 }
 
 // setupSave stores one step and moves on; errors show the step again with the typed values.
@@ -112,43 +202,71 @@ func (s *Server) setupSave(w http.ResponseWriter, r *http.Request, u *identity.U
 		return
 	}
 	step := r.PathValue("step")
-	if !validStep(step) || step == "cv" || step == "done" {
+	if !validStep(step) || step == "cv" || step == "matches" {
 		s.notFound(w, r, u)
 		return
 	}
 	next := "/setup/" + views.SetupSteps[slices.Index(views.SetupSteps, step)+1]
-	if step == "search" {
-		p := profile.Preferences{Titles: profile.Lines(r.PostFormValue("titles")), Locations: profile.Lines(r.PostFormValue("locations")),
-			Remote: r.PostFormValue("remote") == "on"}
-		snap, err := s.Profile.Get(r.Context(), u.ID)
+	switch step {
+	case "search":
+		s.setupSaveSearch(w, r, u, next)
+	case "automation":
+		s.setupSaveAutomation(w, r, u, next)
+	default:
+		s.setupSaveProfile(w, r, u, next)
+	}
+}
+
+func (s *Server) setupSaveSearch(w http.ResponseWriter, r *http.Request, u *identity.User, next string) {
+	snap, err := s.Profile.Get(r.Context(), u.ID)
+	if err != nil {
+		s.failed(w, r, u, err)
+		return
+	}
+	keep := snap.Preferences
+	keep.Titles, keep.Locations = profile.Lines(r.PostFormValue("titles")), profile.Lines(r.PostFormValue("locations"))
+	keep.Remote = r.PostFormValue("remote") == "on"
+	var serr error
+	keep.MinSalary = 0
+	if v := strings.TrimSpace(r.PostFormValue("min_salary")); v != "" {
+		n, err := strconv.Atoi(v)
 		if err != nil {
+			serr = &profile.ValidationError{Fields: []profile.FieldError{{Field: "min_salary", Code: "profile.error.invalid"}}}
+		}
+		keep.MinSalary = n
+	}
+	if serr == nil {
+		serr = s.Profile.SavePreferences(r.Context(), u.ID, keep)
+	}
+	f := preferencesForm(keep, s.automation(r.Context(), u), tracking.MailboxAccount{}, notify.Preferences{}, nil, false, ai.UserSettings{}, false)
+	if serr != nil {
+		f.Values["min_salary"] = r.PostFormValue("min_salary")
+	}
+	s.setupSaved(w, r, u, "search", next, serr, f)
+}
+
+// setupSaveAutomation stores the level only; the other automation settings stay as they are.
+func (s *Server) setupSaveAutomation(w http.ResponseWriter, r *http.Request, u *identity.User, next string) {
+	st := s.automation(r.Context(), u)
+	switch level := application.Level(r.PostFormValue("autonomy_level")); level {
+	case application.LevelSuggest, application.LevelApprove, application.LevelAutonomous:
+		st.Level = level
+	default:
+		s.renderSetup(w, r, u, "automation", http.StatusUnprocessableEntity, views.Form{
+			Errors: map[string]string{"autonomy_level": views.T(r.Context(), "profile.error.invalid")},
+			Notice: views.T(r.Context(), "profile.invalid"), Failed: true})
+		return
+	}
+	if s.Apps != nil {
+		if err := s.Apps.SaveSettings(r.Context(), u.ID, st); err != nil {
 			s.failed(w, r, u, err)
 			return
 		}
-		keep := snap.Preferences
-		keep.Titles, keep.Locations, keep.Remote = p.Titles, p.Locations, p.Remote
-		var serr error
-		if v := strings.TrimSpace(r.PostFormValue("min_salary")); v != "" {
-			n, err := strconv.Atoi(v)
-			if err != nil {
-				serr = &profile.ValidationError{Fields: []profile.FieldError{{Field: "min_salary", Code: "profile.error.invalid"}}}
-			}
-			keep.MinSalary = n
-		} else {
-			keep.MinSalary = 0
-		}
-		if serr == nil {
-			serr = s.Profile.SavePreferences(r.Context(), u.ID, keep)
-		}
-		st := application.DefaultSettings
-		if s.Apps != nil {
-			if cfg, err := s.Apps.Settings(r.Context(), u.ID); err == nil {
-				st = cfg
-			}
-		}
-		s.setupSaved(w, r, u, step, next, serr, preferencesForm(keep, st, tracking.MailboxAccount{}, notify.Preferences{}, nil, false, ai.UserSettings{}, false))
-		return
 	}
+	http.Redirect(w, r, next, http.StatusSeeOther)
+}
+
+func (s *Server) setupSaveProfile(w http.ResponseWriter, r *http.Request, u *identity.User, next string) {
 	snap, err := s.Profile.Get(r.Context(), u.ID)
 	if err != nil {
 		s.failed(w, r, u, err)
@@ -157,29 +275,15 @@ func (s *Server) setupSave(w http.ResponseWriter, r *http.Request, u *identity.U
 	version, _ := strconv.ParseInt(r.PostFormValue("version"), 10, 64)
 	p := snap.Profile
 	v := func(name string) string { return strings.TrimSpace(r.PostFormValue(name)) }
-	switch step {
-	case "contact":
-		pe := &p.Personal
-		pe.FirstName, pe.LastName, pe.Email, pe.Phone = v("first_name"), v("last_name"), v("email"), v("phone")
-		pe.PostalCode, pe.City, pe.LinkedIn, pe.GitHub = v("postal_code"), v("city"), v("linkedin"), v("github")
-	case "work":
-		wk := &p.Work
-		wk.CurrentTitle, wk.YearsTotal, wk.NoticePeriod = v("current_title"), v("years_total"), v("notice_period")
-		wk.EarliestStart, wk.SalaryExpectation = v("earliest_start"), v("salary_expectation")
-		wk.WorkAuthorizedEU, wk.NeedsSponsorship = r.PostFormValue("work_authorized_eu") == "on", r.PostFormValue("needs_sponsorship") == "on"
-		p.Skills = profile.Lines(r.PostFormValue("skills"))
-		p.Languages = nil
-		for _, l := range strings.Split(r.PostFormValue("languages"), "\n") {
-			if name, level, _ := strings.Cut(l, ":"); strings.TrimSpace(name) != "" {
-				p.Languages = append(p.Languages, profile.Language{Name: strings.TrimSpace(name), Level: strings.TrimSpace(level)})
-			}
-		}
-	case "history":
-		p.Experience, p.Education = readHistory(r)
-	}
+	pe, wk := &p.Personal, &p.Work
+	pe.FirstName, pe.LastName, pe.Email, pe.Phone = v("first_name"), v("last_name"), v("email"), v("phone")
+	pe.PostalCode, pe.City = v("postal_code"), v("city")
+	wk.CurrentTitle, wk.YearsTotal, wk.NoticePeriod = v("current_title"), v("years_total"), v("notice_period")
+	wk.EarliestStart, wk.SalaryExpectation = v("earliest_start"), v("salary_expectation")
+	wk.WorkAuthorizedEU = r.PostFormValue("work_authorized_eu") == "on"
+	p.Skills = profile.Lines(r.PostFormValue("skills"))
 	err = s.Profile.SaveProfile(r.Context(), u.ID, p, version)
-	f := profileForm(profile.Snapshot{Profile: p, Version: version})
-	s.setupSaved(w, r, u, step, next, err, f)
+	s.setupSaved(w, r, u, "profile", next, err, profileForm(profile.Snapshot{Profile: p, Version: version}))
 }
 
 func (s *Server) setupSaved(w http.ResponseWriter, r *http.Request, u *identity.User, step, next string, err error, f views.Form) {
@@ -194,36 +298,6 @@ func (s *Server) setupSaved(w http.ResponseWriter, r *http.Request, u *identity.
 	default:
 		s.failed(w, r, u, err)
 	}
-}
-
-// readHistory reads the repeated fieldsets; empty and removed entries are dropped.
-func readHistory(r *http.Request) ([]profile.Experience, []profile.Education) {
-	count := func(name string) int {
-		n, _ := strconv.Atoi(r.PostFormValue(name))
-		return min(max(n, 0), maxHistory)
-	}
-	f := func(group string, i int, field string) string {
-		return strings.TrimSpace(r.PostFormValue(group + "-" + strconv.Itoa(i) + "-" + field))
-	}
-	var exp []profile.Experience
-	for i := range count("exp-count") {
-		e := profile.Experience{Title: f("exp", i, "title"), Company: f("exp", i, "company"), Start: f("exp", i, "start"),
-			End: f("exp", i, "end"), Location: f("exp", i, "location"), Highlights: lines(r.PostFormValue("exp-" + strconv.Itoa(i) + "-highlights"))}
-		if f("exp", i, "remove") == "on" || (e.Title == "" && e.Company == "") {
-			continue
-		}
-		exp = append(exp, e)
-	}
-	var edu []profile.Education
-	for i := range count("edu-count") {
-		e := profile.Education{Degree: f("edu", i, "degree"), Institution: f("edu", i, "institution"), Start: f("edu", i, "start"),
-			End: f("edu", i, "end"), Grade: f("edu", i, "grade")}
-		if f("edu", i, "remove") == "on" || (e.Degree == "" && e.Institution == "") {
-			continue
-		}
-		edu = append(edu, e)
-	}
-	return exp, edu
 }
 
 // setupCVUpload stores an uploaded CV and fills the profile from it.
@@ -268,13 +342,13 @@ func (s *Server) setupImport(w http.ResponseWriter, r *http.Request, u *identity
 	r.SetPathValue("id", rawID)
 	id, ok := docID(r)
 	if !ok || s.Importer == nil {
-		http.Redirect(w, r, "/setup/contact", http.StatusSeeOther)
+		http.Redirect(w, r, "/setup/profile", http.StatusSeeOther)
 		return
 	}
 	_, err := s.Importer.Import(r.Context(), u.ID, id)
 	switch {
 	case err == nil:
-		http.Redirect(w, r, "/setup/contact?imported=1", http.StatusSeeOther)
+		http.Redirect(w, r, "/setup/profile?imported=1", http.StatusSeeOther)
 	case errors.Is(err, profile.ErrNotFound):
 		s.notFound(w, r, u)
 	case errors.Is(err, cvimport.ErrNoText):
@@ -284,15 +358,4 @@ func (s *Server) setupImport(w http.ResponseWriter, r *http.Request, u *identity
 	default:
 		s.failed(w, r, u, err)
 	}
-}
-
-// lines splits a textarea at line breaks only (highlights may contain commas).
-func lines(s string) []string {
-	var out []string
-	for _, l := range strings.Split(s, "\n") {
-		if l = strings.Join(strings.Fields(l), " "); l != "" && len(out) < 20 {
-			out = append(out, l)
-		}
-	}
-	return out
 }
