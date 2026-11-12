@@ -3840,13 +3840,8 @@
   }
 }
 
-
 @layer utilities {
   .inline {
     display: inline;
-  }
-
-  .ms-2 {
-    margin-inline-start: var(--space-2);
   }
 }

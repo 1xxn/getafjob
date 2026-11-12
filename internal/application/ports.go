@@ -259,6 +259,8 @@ type Store interface {
 	AnswerUsage(ctx context.Context, userID uuid.UUID) (map[string]int, error)
 	// StatesByJob returns the state of the user's application per job, for the given jobs that have one.
 	StatesByJob(ctx context.Context, userID uuid.UUID, jobIDs []int64) (map[int64]State, error)
+	// Briefs returns state, job and title of the user's applications with the given IDs, in one query.
+	Briefs(ctx context.Context, userID uuid.UUID, ids []uuid.UUID) ([]Brief, error)
 	// ParkReasons returns the reason of the last park per parked application of the user.
 	ParkReasons(ctx context.Context, userID uuid.UUID) (map[uuid.UUID]string, error)
 	// SubmitsPerDay counts the user's submitted applications per UTC day since the given time.

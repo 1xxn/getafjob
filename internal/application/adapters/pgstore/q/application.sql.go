@@ -48,6 +48,51 @@ func (q *Queries) AnswerUsage(ctx context.Context, userID uuid.UUID) ([]AnswerUs
 	return items, nil
 }
 
+const applicationBriefs = `-- name: ApplicationBriefs :many
+SELECT a.id, a.job_id, a.state, j.title, j.company
+FROM applications a JOIN jobs j ON j.id = a.job_id
+WHERE a.user_id = $1 AND a.id = ANY ($2::uuid[])
+`
+
+type ApplicationBriefsParams struct {
+	UserID uuid.UUID
+	Ids    []uuid.UUID
+}
+
+type ApplicationBriefsRow struct {
+	ID      uuid.UUID
+	JobID   int64
+	State   string
+	Title   string
+	Company string
+}
+
+func (q *Queries) ApplicationBriefs(ctx context.Context, arg ApplicationBriefsParams) ([]ApplicationBriefsRow, error) {
+	rows, err := q.db.Query(ctx, applicationBriefs, arg.UserID, arg.Ids)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []ApplicationBriefsRow{}
+	for rows.Next() {
+		var i ApplicationBriefsRow
+		if err := rows.Scan(
+			&i.ID,
+			&i.JobID,
+			&i.State,
+			&i.Title,
+			&i.Company,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const applicationCheckpoints = `-- name: ApplicationCheckpoints :many
 SELECT c.id, c.run_id, c.step, c.page, c.url, c.data, c.screenshot, c.at
 FROM run_checkpoints c JOIN runs r ON r.id = c.run_id

@@ -437,6 +437,23 @@ func (s *Service) Overview(ctx context.Context, userID uuid.UUID) (Overview, err
 	return Overview{Apps: apps, ParkReasons: reasons, SubmitsByDay: days, Since: since}, nil
 }
 
+// Brief is an application with its state and the job's title, for lists of live runs.
+type Brief struct {
+	ID      uuid.UUID
+	JobID   int64
+	State   State
+	Title   string
+	Company string
+}
+
+// Briefs returns the user's applications with the given IDs (unknown IDs are missing), in one query.
+func (s *Service) Briefs(ctx context.Context, userID uuid.UUID, ids []uuid.UUID) ([]Brief, error) {
+	if len(ids) == 0 {
+		return nil, nil
+	}
+	return s.store.Briefs(ctx, userID, ids)
+}
+
 // StatesByJob returns the state of the user's application per job (jobs without one are missing).
 func (s *Service) StatesByJob(ctx context.Context, userID uuid.UUID, jobIDs []int64) (map[int64]State, error) {
 	if len(jobIDs) == 0 {

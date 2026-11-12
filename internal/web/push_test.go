@@ -646,6 +646,10 @@ func (f *fakeAppStore) SubmitsPerDay(context.Context, uuid.UUID, time.Time) (map
 	return nil, nil
 }
 
+func (f *fakeAppStore) Briefs(context.Context, uuid.UUID, []uuid.UUID) ([]application.Brief, error) {
+	return nil, nil
+}
+
 func (f *fakeAppStore) StatesByJob(context.Context, uuid.UUID, []int64) (map[int64]application.State, error) {
 	return nil, nil
 }

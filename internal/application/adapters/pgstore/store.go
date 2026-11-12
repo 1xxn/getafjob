@@ -1078,6 +1078,21 @@ func (s *Store) SubmitsPerDay(ctx context.Context, userID uuid.UUID, since time.
 }
 
 // StatesByJob returns the state of the user's application per job.
+// Briefs returns the applications with the given IDs and their job titles.
+func (s *Store) Briefs(ctx context.Context, userID uuid.UUID, ids []uuid.UUID) ([]application.Brief, error) {
+	var out []application.Brief
+	err := s.user(ctx, userID, func(qs *q.Queries) error {
+		rows, err := qs.ApplicationBriefs(ctx, q.ApplicationBriefsParams{UserID: userID, Ids: ids})
+		for _, r := range rows {
+			out = append(out, application.Brief{ID: r.ID, JobID: r.JobID, State: application.State(r.State), Title: r.Title,
+				Company: r.Company})
+		}
+		return err
+	})
+	return out, err
+}
+
+// StatesByJob returns the state per job.
 func (s *Store) StatesByJob(ctx context.Context, userID uuid.UUID, jobIDs []int64) (map[int64]application.State, error) {
 	out := map[int64]application.State{}
 	err := s.user(ctx, userID, func(qs *q.Queries) error {

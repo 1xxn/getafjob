@@ -64,6 +64,11 @@ tasks:
     cmds:
       - go test -short -shuffle=on ./...
 
+  test:budget:
+    desc: "Performance budgets without the race detector: page p95 under 150 ms on 2000 postings, JS and CSS under 100 KB gzip"
+    cmds:
+      - go test -count=1 -run 'TestJobListLatency|TestAssetBudget' ./internal/web/
+
   test:load:
     desc: "Run the concurrent load test (SLO: p95 < 200 ms on 2000 postings)"
     cmds:

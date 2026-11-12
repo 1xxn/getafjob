@@ -113,6 +113,8 @@ jobs:
         run: go test -race -shuffle=on -coverprofile=coverage.out -covermode=atomic ./...
       - name: coverage summary
         run: go tool cover -func=coverage.out | tail -n 1
+      - name: performance budgets (no race detector)
+        run: go tool task test:budget
 
   fuzz-plan:
     name: fuzz (plan)
