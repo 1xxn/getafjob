@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"math/rand/v2"
 	"net/url"
+	"slices"
 	"strings"
 	"time"
 
@@ -157,6 +158,9 @@ func description(r *rand.Rand, ro role, company string, german bool) string {
 var FixturePages = []string{"posting.html", "greenhouse_like.html", "lever_application.html", "ashby_application.html",
 	"personio_application.html", "smartrecruiters_application.html", "recruitee_application.html",
 	"teamtailor_application.html"}
+
+// Companies returns the invented company names the postings use.
+func Companies() []string { return slices.Clone(companies) }
 
 // PointAt lets the postings link to the fixture site at base, so runs in development apply to fixtures only.
 func PointAt(postings []discovery.Posting, base *url.URL) {
