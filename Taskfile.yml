@@ -52,7 +52,7 @@ tasks:
       - >-
         docker run --rm -v "{{.ROOT_DIR}}:/src" -w /src
         -v getafjob-golangci-cache:/root/.cache
-        golangci/golangci-lint:{{.GOLANGCI_LINT_VERSION}} golangci-lint run --build-tags browser ./...
+        golangci/golangci-lint:{{.GOLANGCI_LINT_VERSION}} golangci-lint run --build-tags browser,e2e ./...
 
   test:
     desc: Unit + integration tests (integration needs Docker) with race detector and shuffled order
@@ -89,14 +89,16 @@ tasks:
     cmds:
       - go test -c -tags browser -o bin/browser-tests/ ./internal/runner/...
       - >-
-        docker run --rm --read-only --tmpfs /tmp:rw,size=512m --shm-size=512m
+        docker run --rm --read-only --tmpfs /tmp:rw,size=1g --shm-size=1g
         --cap-drop ALL --security-opt no-new-privileges
         --security-opt seccomp=deploy/seccomp/chromium.json
         -v "{{.ROOT_DIR}}/bin/browser-tests:/tests:ro"
         -v "{{.ROOT_DIR}}/testdata:/testdata:ro"
         -e GETAFJOB_FIXTURES_DIR=/testdata/fixtures/site
         --entrypoint /bin/sh {{.RUNNER_IMAGE}} -c
-        'set -e; for t in /tests/*.test; do echo "== $t"; "$t" -test.v -test.shuffle=on {{.CLI_ARGS}}; done'
+        'pids=""; for t in /tests/*.test; do "$t" -test.v -test.shuffle=on {{.CLI_ARGS}} > "/tmp/$(basename "$t").log" 2>&1 &
+        pids="$pids $!"; done; rc=0; for p in $pids; do wait "$p" || rc=1; done;
+        for t in /tests/*.test; do echo "== $t"; cat "/tmp/$(basename "$t").log"; done; exit $rc'
 
   test:e2e:
     desc: >-
