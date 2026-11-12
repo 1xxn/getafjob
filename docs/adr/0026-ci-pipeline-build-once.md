@@ -38,7 +38,19 @@ Stages of `ci.yml` (pull requests and pushes to main):
 2. **Build**: `images` builds app, runner and egress once (one job, one Buildx builder, layer cache from main
    only), runs trivy on each, and uploads them as one `docker save` artifact (`images`, kept one day).
 3. **Test** (needs `images`, loads the artifact, never builds): `test (linux)` split in two shards by package,
-   `browser fixtures`, `e2e journeys` (target: under five minutes), `compose stack` (`dev:up --no-build`).
+   `browser fixtures`, `e2e journeys`, `compose stack` (`dev:up --no-build`).
+
+E2E stays a required check only if it is cheap and deterministic; otherwise it moves out of the gate:
+
+- It runs only when a pull request touches what it tests (`internal/web`, `internal/runner`, `internal/application`,
+  `db/migrations`, `deploy`, the e2e package); other pull requests skip it.
+- No builds and no waiting in the job: images from the artifact, `compose up --no-build`, demo data without
+  matching every job (small `-jobs`), fresh fixture jobs per journey (#267), no fixed sleeps.
+- The journeys run in two or three parallel shards (`-test.run` by group), each with its own stack, so wall time
+  is stack start (about one minute) plus the slowest shard.
+- Budget: the e2e check ends within four minutes wall time. If the measured time stays above that after the
+  rebuild, e2e leaves the required checks and runs on main after merge and nightly, where a failure opens an issue
+  and the next main commit must fix it.
 4. **Release snapshot**: only when release inputs change (`.goreleaser.yaml`, `Dockerfile`, `go.mod`) or on main;
    otherwise the job is skipped, which counts as passed.
 
@@ -54,7 +66,8 @@ is still the head of main (#266). Release and nightly keep their own workflows.
 ### Consequences
 
 - Good, because the images are built once per run and the tested image is the scanned one.
-- Good, because e2e starts with the stack after about one minute instead of four.
+- Good, because e2e starts with the stack after about one minute instead of four, and most pull requests skip it.
+- Bad, because sharded e2e needs one stack per shard (more runner minutes for less wall time).
 - Good, because staging only ever gets commits with green CI.
 - Bad, because the artifact upload and download add about 30 seconds to each test job.
 - Bad, because required check names change once (ruleset update, allowed by the maintainer).
