@@ -31,7 +31,8 @@ func TestCandidateHub(t *testing.T) {
 	tab.Click(`#dlg-answer button[type="submit"]`)
 	tab.WaitWithin(10*time.Second, "!document.getElementById('dlg-answer').open")
 	must(t, tab.El(`.cand-tools input[name="q"]`).Input(q))
-	tab.WaitWithin(10*time.Second, "document.querySelectorAll('#answer-list [data-answer]').length === 1")
+	// Wait for the last search: an earlier one with half the term can already show one hit.
+	tab.WaitWithin(10*time.Second, "new URLSearchParams(location.search).get('q') === '"+q+"' && !document.querySelector('.htmx-request') && document.querySelectorAll('#answer-list [data-answer]').length === 1")
 	item := "#answer-list [data-answer]"
 	tab.Click(item + " > summary")
 	tab.Shot("answer")
