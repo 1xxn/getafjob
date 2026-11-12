@@ -56,7 +56,9 @@ type AdminSystemData struct {
 }
 
 var adminSections = []struct{ Key, Href, Icon string }{
-	{"admin.users", "/admin/users", "users"}, {"admin.system", "/admin/system", "server"},
+	{"admin.users", "/admin/users", "users"}, {"admin.runners", "/admin/runners", "monitor"},
+	{"admin.sources", "/admin/sources", "database"}, {"admin.queue", "/admin/queue", "list"},
+	{"admin.system", "/admin/system", "server"},
 }
 
 templ adminPage(name, title, current string) {

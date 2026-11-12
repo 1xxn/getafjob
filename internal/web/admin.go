@@ -126,6 +126,12 @@ func auditText(ctx context.Context, a identity.AuditEntry, emails map[uuid.UUID]
 		return views.T(ctx, "admin.audit.signed_out", "user", who())
 	case "admin.user_deleted":
 		return views.T(ctx, "admin.audit.deleted")
+	case "admin.source_enabled", "admin.source_disabled":
+		return views.T(ctx, "admin.audit."+strings.TrimPrefix(a.Code, "admin."), "source", fmt.Sprint(a.Params["source"]))
+	case "admin.crawl_started":
+		return views.T(ctx, "admin.audit.crawl_started")
+	case "admin.job_retried":
+		return views.T(ctx, "admin.audit.job_retried", "job", fmt.Sprint(a.Params["job"]))
 	}
 	return ""
 }
