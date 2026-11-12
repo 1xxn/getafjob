@@ -31,9 +31,10 @@ func (tab *Tab) Click(selector string) {
 	must(tab.t, tab.El(selector).Timeout(actionTimeout).WaitVisible())
 	deadline := time.Now().Add(10 * time.Second)
 	for {
-		// Look the element up on every try: htmx may swap it for a new node (history restore, live refresh).
+		// Look the element up on every try: htmx may swap it for a new node (history restore, live refresh); wait
+		// while a request runs, a click then can be dropped or undone by the swap.
 		res, err := tab.El(selector).Timeout(actionTimeout).Eval(`function () {
-			if (document.activeViewTransition || !this.isConnected) return null;
+			if (document.activeViewTransition || !this.isConnected || document.querySelector('.htmx-request')) return null;
 			this.scrollIntoView({block: 'center', inline: 'nearest'});
 			const r = this.getBoundingClientRect();
 			const x = r.left + r.width / 2, y = r.top + r.height / 2;
