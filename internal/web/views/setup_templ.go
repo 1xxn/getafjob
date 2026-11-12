@@ -420,27 +420,27 @@ func SetupPage(d SetupData) templ.Component {
 						return templ_7745c5c3_Err
 					}
 				}
-				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 32, " <form method=\"post\" action=\"/setup/cv\" enctype=\"multipart/form-data\" class=\"wiz-card stack\"><input type=\"hidden\" name=\"kind\" value=\"cv\"><div class=\"field\"><label for=\"f-file\">")
+				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 32, " <form method=\"post\" action=\"/setup/cv\" enctype=\"multipart/form-data\" class=\"wiz-card stack\"><input type=\"hidden\" name=\"kind\" value=\"cv\"><div class=\"ui-field\"><label for=\"f-file\" class=\"ui-label\">")
 				if templ_7745c5c3_Err != nil {
 					return templ_7745c5c3_Err
 				}
 				var templ_7745c5c3_Var17 string
 				templ_7745c5c3_Var17, templ_7745c5c3_Err = templ.JoinStringErrs(T(ctx, "setup.cv.file"))
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `setup.templ`, Line: 127, Col: 52}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `setup.templ`, Line: 127, Col: 69}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var17))
 				if templ_7745c5c3_Err != nil {
 					return templ_7745c5c3_Err
 				}
-				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 33, "</label> <input id=\"f-file\" name=\"file\" type=\"file\" required accept=\".pdf,.docx,application/pdf\" aria-describedby=\"f-file-hint\"><p class=\"hint\" id=\"f-file-hint\">")
+				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 33, "</label> <input id=\"f-file\" name=\"file\" type=\"file\" class=\"ui-input\" required accept=\".pdf,.docx,application/pdf\" aria-describedby=\"f-file-hint\"><p class=\"ui-hint\" id=\"f-file-hint\">")
 				if templ_7745c5c3_Err != nil {
 					return templ_7745c5c3_Err
 				}
 				var templ_7745c5c3_Var18 string
 				templ_7745c5c3_Var18, templ_7745c5c3_Err = templ.JoinStringErrs(T(ctx, "setup.cv.hint"))
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `setup.templ`, Line: 129, Col: 65}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `setup.templ`, Line: 129, Col: 68}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var18))
 				if templ_7745c5c3_Err != nil {
@@ -502,27 +502,27 @@ func SetupPage(d SetupData) templ.Component {
 				if templ_7745c5c3_Err != nil {
 					return templ_7745c5c3_Err
 				}
-				templ_7745c5c3_Err = Field(input(ctx, d.Form, "first_name", "text", "given-name", 200)).Render(ctx, templ_7745c5c3_Buffer)
+				templ_7745c5c3_Err = ui.Input(input(ctx, d.Form, "first_name", "text", "given-name", 200)).Render(ctx, templ_7745c5c3_Buffer)
 				if templ_7745c5c3_Err != nil {
 					return templ_7745c5c3_Err
 				}
-				templ_7745c5c3_Err = Field(input(ctx, d.Form, "last_name", "text", "family-name", 200)).Render(ctx, templ_7745c5c3_Buffer)
+				templ_7745c5c3_Err = ui.Input(input(ctx, d.Form, "last_name", "text", "family-name", 200)).Render(ctx, templ_7745c5c3_Buffer)
 				if templ_7745c5c3_Err != nil {
 					return templ_7745c5c3_Err
 				}
-				templ_7745c5c3_Err = Field(input(ctx, d.Form, "email", "email", "email", 254)).Render(ctx, templ_7745c5c3_Buffer)
+				templ_7745c5c3_Err = ui.Input(input(ctx, d.Form, "email", "email", "email", 254)).Render(ctx, templ_7745c5c3_Buffer)
 				if templ_7745c5c3_Err != nil {
 					return templ_7745c5c3_Err
 				}
-				templ_7745c5c3_Err = Field(input(ctx, d.Form, "phone", "tel", "tel", 30)).Render(ctx, templ_7745c5c3_Buffer)
+				templ_7745c5c3_Err = ui.Input(input(ctx, d.Form, "phone", "tel", "tel", 30)).Render(ctx, templ_7745c5c3_Buffer)
 				if templ_7745c5c3_Err != nil {
 					return templ_7745c5c3_Err
 				}
-				templ_7745c5c3_Err = Field(input(ctx, d.Form, "postal_code", "text", "postal-code", 12)).Render(ctx, templ_7745c5c3_Buffer)
+				templ_7745c5c3_Err = ui.Input(input(ctx, d.Form, "postal_code", "text", "postal-code", 12)).Render(ctx, templ_7745c5c3_Buffer)
 				if templ_7745c5c3_Err != nil {
 					return templ_7745c5c3_Err
 				}
-				templ_7745c5c3_Err = Field(input(ctx, d.Form, "city", "text", "address-level2", 200)).Render(ctx, templ_7745c5c3_Buffer)
+				templ_7745c5c3_Err = ui.Input(input(ctx, d.Form, "city", "text", "address-level2", 200)).Render(ctx, templ_7745c5c3_Buffer)
 				if templ_7745c5c3_Err != nil {
 					return templ_7745c5c3_Err
 				}
@@ -543,23 +543,23 @@ func SetupPage(d SetupData) templ.Component {
 				if templ_7745c5c3_Err != nil {
 					return templ_7745c5c3_Err
 				}
-				templ_7745c5c3_Err = Field(input(ctx, d.Form, "current_title", "text", "organization-title", 200)).Render(ctx, templ_7745c5c3_Buffer)
+				templ_7745c5c3_Err = ui.Input(input(ctx, d.Form, "current_title", "text", "organization-title", 200)).Render(ctx, templ_7745c5c3_Buffer)
 				if templ_7745c5c3_Err != nil {
 					return templ_7745c5c3_Err
 				}
-				templ_7745c5c3_Err = Field(input(ctx, d.Form, "years_total", "text", "", 200)).Render(ctx, templ_7745c5c3_Buffer)
+				templ_7745c5c3_Err = ui.Input(input(ctx, d.Form, "years_total", "text", "", 200)).Render(ctx, templ_7745c5c3_Buffer)
 				if templ_7745c5c3_Err != nil {
 					return templ_7745c5c3_Err
 				}
-				templ_7745c5c3_Err = Field(input(ctx, d.Form, "notice_period", "text", "", 200)).Render(ctx, templ_7745c5c3_Buffer)
+				templ_7745c5c3_Err = ui.Input(input(ctx, d.Form, "notice_period", "text", "", 200)).Render(ctx, templ_7745c5c3_Buffer)
 				if templ_7745c5c3_Err != nil {
 					return templ_7745c5c3_Err
 				}
-				templ_7745c5c3_Err = Field(input(ctx, d.Form, "earliest_start", "text", "", 200)).Render(ctx, templ_7745c5c3_Buffer)
+				templ_7745c5c3_Err = ui.Input(input(ctx, d.Form, "earliest_start", "text", "", 200)).Render(ctx, templ_7745c5c3_Buffer)
 				if templ_7745c5c3_Err != nil {
 					return templ_7745c5c3_Err
 				}
-				templ_7745c5c3_Err = Field(input(ctx, d.Form, "salary_expectation", "text", "", 200)).Render(ctx, templ_7745c5c3_Buffer)
+				templ_7745c5c3_Err = ui.Input(input(ctx, d.Form, "salary_expectation", "text", "", 200)).Render(ctx, templ_7745c5c3_Buffer)
 				if templ_7745c5c3_Err != nil {
 					return templ_7745c5c3_Err
 				}
@@ -567,11 +567,11 @@ func SetupPage(d SetupData) templ.Component {
 				if templ_7745c5c3_Err != nil {
 					return templ_7745c5c3_Err
 				}
-				templ_7745c5c3_Err = Check("work_authorized_eu", T(ctx, "profile.field.work_authorized_eu"), d.Form.Checks["work_authorized_eu"]).Render(ctx, templ_7745c5c3_Buffer)
+				templ_7745c5c3_Err = ui.Checkbox(check(ctx, d.Form, "work_authorized_eu")).Render(ctx, templ_7745c5c3_Buffer)
 				if templ_7745c5c3_Err != nil {
 					return templ_7745c5c3_Err
 				}
-				templ_7745c5c3_Err = TextArea(area(ctx, d.Form, "skills", 12000)).Render(ctx, templ_7745c5c3_Buffer)
+				templ_7745c5c3_Err = ui.Textarea(area(ctx, d.Form, "skills", 12000)).Render(ctx, templ_7745c5c3_Buffer)
 				if templ_7745c5c3_Err != nil {
 					return templ_7745c5c3_Err
 				}
@@ -690,19 +690,19 @@ func SetupPage(d SetupData) templ.Component {
 				if templ_7745c5c3_Err != nil {
 					return templ_7745c5c3_Err
 				}
-				templ_7745c5c3_Err = TextArea(area(ctx, d.Form, "titles", 12000)).Render(ctx, templ_7745c5c3_Buffer)
+				templ_7745c5c3_Err = ui.Textarea(area(ctx, d.Form, "titles", 12000)).Render(ctx, templ_7745c5c3_Buffer)
 				if templ_7745c5c3_Err != nil {
 					return templ_7745c5c3_Err
 				}
-				templ_7745c5c3_Err = TextArea(area(ctx, d.Form, "locations", 12000)).Render(ctx, templ_7745c5c3_Buffer)
+				templ_7745c5c3_Err = ui.Textarea(area(ctx, d.Form, "locations", 12000)).Render(ctx, templ_7745c5c3_Buffer)
 				if templ_7745c5c3_Err != nil {
 					return templ_7745c5c3_Err
 				}
-				templ_7745c5c3_Err = Check("remote", T(ctx, "profile.field.remote"), d.Form.Checks["remote"]).Render(ctx, templ_7745c5c3_Buffer)
+				templ_7745c5c3_Err = ui.Checkbox(check(ctx, d.Form, "remote")).Render(ctx, templ_7745c5c3_Buffer)
 				if templ_7745c5c3_Err != nil {
 					return templ_7745c5c3_Err
 				}
-				templ_7745c5c3_Err = Field(input(ctx, d.Form, "min_salary", "number", "", 9)).Render(ctx, templ_7745c5c3_Buffer)
+				templ_7745c5c3_Err = ui.Input(input(ctx, d.Form, "min_salary", "number", "", 9)).Render(ctx, templ_7745c5c3_Buffer)
 				if templ_7745c5c3_Err != nil {
 					return templ_7745c5c3_Err
 				}
