@@ -51,6 +51,7 @@ func TestAdmin(t *testing.T) {
 	if link := tab.Eval("return document.querySelector('[data-invite-link] input').value"); !strings.Contains(link, "/invite/") {
 		t.Fatalf("invitation link %s", link)
 	}
+	tab.Axe("/admin/users")
 	tab.Shot("invited")
 	tab.Click(`[data-invite-row="` + email + `"] button[type="submit"]`)
 	tab.WaitFor("document.getElementById('confirm-dialog').open")
@@ -59,6 +60,7 @@ func TestAdmin(t *testing.T) {
 
 	tab.Go("/admin/system")
 	tab.El(".adm-facts dd")
+	tab.Axe("/admin/system")
 
 	phone := OpenIn(t, Admin(t), 375, 812, "light")
 	for _, p := range []string{"/admin/users", "/admin/system"} {

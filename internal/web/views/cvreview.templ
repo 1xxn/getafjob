@@ -79,11 +79,11 @@ templ DocumentReviewPage(p DocumentReviewProps) {
 									</div>
 									<div class="field">
 										<label>{ T(ctx, "profile.station.start_date") }</label>
-										<input type="text" name={ fmt.Sprintf("exp_%d_start", i) } value={ exp.StartDate } placeholder="YYYY-MM" maxlength="30"/>
+										<input type="text" name={ fmt.Sprintf("exp_%d_start", i) } value={ exp.StartDate } placeholder={ T(ctx, "documents.review_month_placeholder") } maxlength="30"/>
 									</div>
 									<div class="field">
 										<label>{ T(ctx, "profile.station.end_date") }</label>
-										<input type="text" name={ fmt.Sprintf("exp_%d_end", i) } value={ exp.EndDate } placeholder="YYYY-MM" maxlength="30"/>
+										<input type="text" name={ fmt.Sprintf("exp_%d_end", i) } value={ exp.EndDate } placeholder={ T(ctx, "documents.review_month_placeholder") } maxlength="30"/>
 									</div>
 								</div>
 								<div class="rv-mt-sm">
@@ -133,11 +133,11 @@ templ DocumentReviewPage(p DocumentReviewProps) {
 									</div>
 									<div class="field">
 										<label>{ T(ctx, "profile.station.start_date") }</label>
-										<input type="text" name={ fmt.Sprintf("edu_%d_start", i) } value={ edu.StartDate } placeholder="YYYY-MM" maxlength="30"/>
+										<input type="text" name={ fmt.Sprintf("edu_%d_start", i) } value={ edu.StartDate } placeholder={ T(ctx, "documents.review_month_placeholder") } maxlength="30"/>
 									</div>
 									<div class="field">
 										<label>{ T(ctx, "profile.station.end_date") }</label>
-										<input type="text" name={ fmt.Sprintf("edu_%d_end", i) } value={ edu.EndDate } placeholder="YYYY-MM" maxlength="30"/>
+										<input type="text" name={ fmt.Sprintf("edu_%d_end", i) } value={ edu.EndDate } placeholder={ T(ctx, "documents.review_month_placeholder") } maxlength="30"/>
 									</div>
 								</div>
 								<div class="rv-mt-sm">

@@ -22,6 +22,7 @@ func TestActivity(t *testing.T) {
 			t.Errorf("bell entry links to %s", href)
 		}
 	}
+	tab.Axe("bell menu")
 	tab.Shot("bell")
 
 	// A live event morphs the bell: the page stays, the menu stays open.

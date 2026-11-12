@@ -2,6 +2,7 @@ package i18n
 
 import (
 	"reflect"
+	"regexp"
 	"strings"
 	"testing"
 )
@@ -81,4 +82,16 @@ func FuzzFromAcceptLanguage(f *testing.F) {
 			t.Fatalf("unsupported locale %q", l)
 		}
 	})
+}
+
+// TestGermanSaysDu: the German catalog speaks to the reader with "du". "Sie" stays only where it means "they" or
+// "it" (files, a page), listed here.
+func TestGermanSaysDu(t *testing.T) {
+	formal := regexp.MustCompile(`\b(Sie|Ihnen|Ihr|Ihre|Ihren|Ihrem|Ihrer|Ihres)\b`)
+	third := map[string]bool{"documents.text": true, "jobs.import_error.fetch": true}
+	for k, msg := range catalogs[DE] {
+		if formal.MatchString(msg) && !third[k] {
+			t.Errorf("de: %q uses the formal address: %s", k, msg)
+		}
+	}
 }

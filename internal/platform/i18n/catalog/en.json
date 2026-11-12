@@ -586,8 +586,7 @@
   "jobs.view_application": "View Application",
   "jobs.applied_status": "Applied",
   "jobs.apply_preview.title": "Instant Apply Preview",
-  "jobs.apply_preview.guarantee_title": "getafjob Guarantee",
-  "jobs.apply_preview.guarantee_desc": "Zero AI cover letters generated. Zero fabricated facts. All personal data is envelope-encrypted. You retain full control before submission.",
+  "jobs.apply_preview.guarantee_desc": "No cover letter from an AI, no made up facts. Your data is stored encrypted. You decide before anything is sent.",
   "jobs.apply_preview.guards_passed": "Safety guards passed: no duplicate submissions, company limit respected.",
   "jobs.apply_preview.contact_section": "Contact Information",
   "jobs.apply_preview.name": "Full Name",
@@ -1214,5 +1213,6 @@
   "admin.system.mail": "Mail",
   "admin.system.passkeys": "Passkeys",
   "admin.system.on": "on",
-  "admin.system.off": "off"
+  "admin.system.off": "off",
+  "documents.review_month_placeholder": "YYYY-MM"
 }

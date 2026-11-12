@@ -21,6 +21,12 @@ How it runs:
   `devtools` network). Mail links are limited to 3 per 15 minutes; after many local reruns, wait.
 - A journey opens a tab with `Open(t, width, height, scheme)` and fails on console errors, CSP violations, script
   exceptions and a document status other than 200.
+- `tab.Axe(name)` runs axe-core (pinned 4.10.3, embedded from `internal/e2e/testdata/axe`, hash checked) and fails
+  on every WCAG 2.0 to 2.2 A/AA violation. `TestPagesRender` checks every page at phone and desktop size,
+  `TestAccessibility` the demo user's pages at tablet size; the bell menu and the admin pages are checked in their
+  journeys.
+- `Admin(t)` is a browser signed in as an invited admin (`GETAFJOB_E2E_ADMIN_INVITE`). Journeys never open a page
+  that answers 404 on purpose: the harness counts it as a problem.
 
 Write journeys against roles and visible texts where possible, keep them independent of each other, and take a
 screenshot (`tab.Shot`) of every state worth looking at in review.

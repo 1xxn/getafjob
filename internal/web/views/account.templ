@@ -1,4 +1,5 @@
 package views
+import "github.com/1xxn/getafjob/internal/web/views/ui"
 
 // SessionRow is one signed-in browser on the account page.
 type SessionRow struct {
@@ -135,7 +136,7 @@ templ Account(d AccountData) {
 				<h3>{ T(ctx, "account.privacy.delete_title") }</h3>
 				<p class="muted">{ T(ctx, "account.privacy.delete_text") }</p>
 				<form method="post" action="/account/delete" data-confirm={ T(ctx, "account.privacy.delete_confirm") }>
-					<button type="submit" class="danger">{ T(ctx, "account.privacy.delete_button") }</button>
+					@ui.Button(ui.ButtonProps{Label: T(ctx, "account.privacy.delete_button"), Type: "submit", Variant: "danger", Icon: "trash"})
 				</form>
 			</div>
 		}
