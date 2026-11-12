@@ -365,7 +365,7 @@ function setLayout(side: string | undefined, size: string | undefined): void {
   if (size) slot.dataset.dockSize = size;
   syncLayout();
   const body = new URLSearchParams({ side: slot.dataset.dockSide ?? 'right', size: slot.dataset.dockSize ?? 'md' });
-  void fetch('/live/dock/layout', { method: 'POST', body, credentials: 'same-origin' }).catch(() => {
+  void fetch('/live/dock/layout', { method: 'POST', body, credentials: 'same-origin' }).then((r) => r.text()).catch(() => {
     // offline: the layout holds on this page and is saved with the next change
   });
 }

@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/go-rod/rod"
+	"github.com/go-rod/rod/lib/input"
 )
 
 // WaitWithin polls a JavaScript condition for up to d.
@@ -103,7 +104,26 @@ func TestLiveCenter(t *testing.T) {
 		t.Fatalf("the dock reconnected after navigation (mode %s before)", before)
 	}
 	tab.Shot("dock")
-	tab.Click("[data-dock-toggle]")
+
+	// Layout: large and on the left, with the keyboard; it is saved for the user and comes back after a reload.
+	must(t, tab.El(`[data-dock-size-set="lg"]`).Focus())
+	must(t, tab.Page.Keyboard.Type(input.Enter))
+	must(t, tab.El(`[data-dock-side-toggle]`).Focus())
+	must(t, tab.Page.Keyboard.Type(input.Enter))
+	tab.WaitFor("document.getElementById('live-dock').dataset.dockSide === 'left' && document.getElementById('live-dock').dataset.dockSize === 'lg'")
+	// A timing entry appears once a save has finished.
+	tab.WaitFor("performance.getEntriesByName(location.origin + '/live/dock/layout').length >= 2")
+	tab.Go("/applications")
+	tab.WaitFor("document.getElementById('live-dock').dataset.dockSide === 'left' && document.getElementById('live-dock').dataset.dockSize === 'lg' && " +
+		"document.querySelector('[data-dock-size-set=\"lg\"]')?.getAttribute('aria-pressed') === 'true'")
+	tab.Shot("dock-left")
+	// Back to the default for the other journeys.
+	tab.Eval("document.querySelector('[data-dock-size-set=\"md\"]').click(); document.querySelector('[data-dock-side-toggle]').click(); return true")
+	tab.WaitFor("document.getElementById('live-dock').dataset.dockSide === 'right' && " +
+		"performance.getEntriesByName(location.origin + '/live/dock/layout').length >= 2")
+	if tab.Eval("return document.querySelector('[data-dock-toggle]').getAttribute('aria-expanded')") == `"true"` {
+		tab.Click("[data-dock-toggle]")
+	}
 
 	// Park the run from the focus view; the confirm dialog guards it.
 	tab.Go("/live?run=" + app)

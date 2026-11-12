@@ -177,6 +177,7 @@ func (s *Server) liveDockLayout(w http.ResponseWriter, r *http.Request, u *ident
 		s.Logger.WarnContext(r.Context(), "dock layout", "err", err)
 		w.WriteHeader(http.StatusInternalServerError)
 	default:
-		w.WriteHeader(http.StatusNoContent)
+		// 200, not 204: the proxy's compression turns an empty 204 into an HTTP/2 protocol error in Chrome.
+		w.WriteHeader(http.StatusOK)
 	}
 }

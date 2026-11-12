@@ -1018,7 +1018,7 @@ func liveDock() templ.Component {
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		templ_7745c5c3_Err = ui.IconButton(ui.IconButtonProps{Icon: "external", Label: T(ctx, "live.dock.detach"), Attrs: templ.Attributes{"data-dock-detach": true}}).Render(ctx, templ_7745c5c3_Buffer)
+		templ_7745c5c3_Err = ui.IconButton(ui.IconButtonProps{Icon: "monitor", Label: T(ctx, "live.dock.detach"), Attrs: templ.Attributes{"data-dock-detach": true}}).Render(ctx, templ_7745c5c3_Buffer)
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
