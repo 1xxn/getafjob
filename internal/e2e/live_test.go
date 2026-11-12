@@ -44,7 +44,7 @@ func startRun(t *testing.T, tab *Tab) string {
 			continue // a crawled posting: the runner's egress policy blocks it in the dev stack
 		}
 		tab.Go(h + "/apply")
-		if tab.Eval(`return !!document.querySelector('main form[method="post"][action$="/apply"] button[type="submit"]')`) != "true" {
+		if tab.Eval(`return !!document.querySelector('main form[method="post"][action$="/apply"] button[type="submit"]:not([disabled])')`) != "true" {
 			continue
 		}
 		tab.Click(`main form[method="post"][action$="/apply"] button[type="submit"]`)
