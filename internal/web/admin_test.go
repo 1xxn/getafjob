@@ -1,15 +1,18 @@
 package web_test
 
 import (
+	"context"
 	"errors"
 	"net/http"
 	"net/url"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/google/uuid"
 
 	"github.com/1xxn/getafjob/internal/identity"
+	"github.com/1xxn/getafjob/internal/web"
 )
 
 func signedInAs(t *testing.T, a *app, email string, role identity.Role) string {
@@ -101,5 +104,36 @@ func TestAdminConsole(t *testing.T) {
 	}
 	if sys := a.do(http.MethodGet, "/admin/system", nil, admin, nil).Body.String(); !strings.Contains(sys, "Passkeys") {
 		t.Errorf("system page: %s", sys)
+	}
+}
+
+type facts struct{ f web.SystemFacts }
+
+func (f facts) Facts(context.Context) (web.SystemFacts, error) { return f.f, nil }
+
+// The system page says whether the egress proxy answers and warns when the last backup is old or missing.
+func TestAdminSystemBackupAndProxy(t *testing.T) {
+	down := false
+	cases := []struct {
+		name  string
+		facts web.SystemFacts
+		want  []string
+	}{
+		{"nothing yet", web.SystemFacts{EgressProxy: true, EgressReachable: &down},
+			[]string{"Not reachable", "None recorded"}},
+		{"old backup", web.SystemFacts{LastBackup: time.Now().Add(-48 * time.Hour), LastBackupBytes: 3 << 30},
+			[]string{"Last backup", "3.0 GB"}},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			a := newApp(t, func(s *web.Server) { s.System = facts{tc.facts} })
+			admin := signedInAs(t, a, "admin@example.org", identity.RoleAdmin)
+			body := a.do(http.MethodGet, "/admin/system", nil, admin, nil).Body.String()
+			for _, w := range tc.want {
+				if !strings.Contains(body, w) {
+					t.Errorf("page lacks %q", w)
+				}
+			}
+		})
 	}
 }

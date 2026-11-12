@@ -8,6 +8,7 @@ import (
 	"slices"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/google/uuid"
 
@@ -22,12 +23,18 @@ var errDeleteAdmin = errors.New("web: delete an admin only after taking the role
 
 // SystemFacts describe the running installation for the admin system page.
 type SystemFacts struct {
-	Postgres    string
-	Migration   int64
-	EgressProxy bool
-	Mail        bool
-	PublicURL   string
+	Postgres        string
+	Migration       int64
+	EgressProxy     bool
+	EgressReachable *bool // nil: not checked (no proxy configured)
+	Mail            bool
+	PublicURL       string
+	LastBackup      time.Time // zero: no backup recorded
+	LastBackupBytes int64
 }
+
+// backupMaxAge is how old the last backup may be before the system page warns.
+const backupMaxAge = 24 * time.Hour
 
 // SystemService reports SystemFacts.
 type SystemService interface {
@@ -270,12 +277,26 @@ func (s *Server) adminSystem(w http.ResponseWriter, r *http.Request, u *identity
 			return
 		}
 		proxy, proxyTone := yes(f.EgressProxy)
+		if f.EgressReachable != nil && *f.EgressReachable {
+			proxy, proxyTone = views.T(ctx, "admin.system.reachable"), ui.Success
+		} else if f.EgressReachable != nil {
+			proxy, proxyTone = views.T(ctx, "admin.system.unreachable"), ui.Danger
+		}
+		backup, backupTone := views.T(ctx, "admin.system.backup_none"), ui.Warning
+		if !f.LastBackup.IsZero() {
+			backup = views.T(ctx, "admin.system.backup_at", "when", views.When(ctx, f.LastBackup),
+				"size", views.Size(int(f.LastBackupBytes)))
+			if backupTone = ui.Success; time.Since(f.LastBackup) > backupMaxAge {
+				backupTone = ui.Warning
+			}
+		}
 		mail, mailTone := yes(f.Mail)
 		rows = append(rows,
 			views.AdminSystemRow{Key: "admin.system.postgres", Value: f.Postgres},
 			views.AdminSystemRow{Key: "admin.system.migration", Value: strconv.FormatInt(f.Migration, 10)},
 			views.AdminSystemRow{Key: "admin.system.url", Value: f.PublicURL},
 			views.AdminSystemRow{Key: "admin.system.egress", Value: proxy, Tone: proxyTone},
+			views.AdminSystemRow{Key: "admin.system.backup", Value: backup, Tone: backupTone},
 			views.AdminSystemRow{Key: "admin.system.mail", Value: mail, Tone: mailTone})
 	}
 	passkeys, tone := yes(s.Identity.PasskeysEnabled())

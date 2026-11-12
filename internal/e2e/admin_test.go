@@ -60,6 +60,11 @@ func TestAdmin(t *testing.T) {
 
 	tab.Go("/admin/system")
 	tab.El(".adm-facts dd")
+	// The dev stack runs the egress proxy: the probe reaches it. Its backups are not recorded, so the page warns.
+	if tab.Eval(`return !!document.querySelector('[data-fact="admin.system.egress"] .ui-tone-success')`) != "true" {
+		t.Error("egress proxy not shown as reachable")
+	}
+	tab.El(`[data-fact="admin.system.backup"] .ui-tone-warning`)
 	tab.Axe("/admin/system")
 
 	phone := OpenIn(t, Admin(t), 375, 812, "light")

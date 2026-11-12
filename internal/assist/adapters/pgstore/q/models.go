@@ -101,6 +101,12 @@ type AutonomySetting struct {
 	EasyApplyTermsAcceptedAt *time.Time
 }
 
+type Backup struct {
+	ID         int64
+	FinishedAt time.Time
+	Bytes      int64
+}
+
 type Board struct {
 	ID            int64
 	Ats           string

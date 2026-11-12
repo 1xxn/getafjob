@@ -201,4 +201,9 @@ if [ "$DO_PRUNE" = "1" ]; then
     --prune --quiet
 fi
 
+# The admin system page shows the last backup; a failure here does not fail the backup itself.
+backup_bytes="$(du -sk "$staging_dir" | cut -f1)"
+"${compose[@]}" exec -T serve /usr/local/bin/getafjob admin backup-done -bytes "$((backup_bytes * 1024))" ||
+  echo "WARNING: could not record the backup for the system page" >&2
+
 echo "=== Backup completed successfully ==="
