@@ -123,10 +123,10 @@ templ SetupPage(d SetupData) {
 					}
 					<form method="post" action="/setup/cv" enctype="multipart/form-data" class="wiz-card stack">
 						<input type="hidden" name="kind" value="cv"/>
-						<div class="field">
-							<label for="f-file">{ T(ctx, "setup.cv.file") }</label>
-							<input id="f-file" name="file" type="file" required accept=".pdf,.docx,application/pdf" aria-describedby="f-file-hint"/>
-							<p class="hint" id="f-file-hint">{ T(ctx, "setup.cv.hint") }</p>
+						<div class="ui-field">
+							<label for="f-file" class="ui-label">{ T(ctx, "setup.cv.file") }</label>
+							<input id="f-file" name="file" type="file" class="ui-input" required accept=".pdf,.docx,application/pdf" aria-describedby="f-file-hint"/>
+							<p class="ui-hint" id="f-file-hint">{ T(ctx, "setup.cv.hint") }</p>
 						</div>
 						@setupButtons(d.Step, T(ctx, "setup.cv.upload"))
 					</form>
@@ -135,23 +135,23 @@ templ SetupPage(d SetupData) {
 						<input type="hidden" name="version" value={ d.Form.Version }/>
 						<h2>{ T(ctx, "setup.profile.contact") }</h2>
 						<div class="wiz-grid">
-							@Field(input(ctx, d.Form, "first_name", "text", "given-name", 200))
-							@Field(input(ctx, d.Form, "last_name", "text", "family-name", 200))
-							@Field(input(ctx, d.Form, "email", "email", "email", 254))
-							@Field(input(ctx, d.Form, "phone", "tel", "tel", 30))
-							@Field(input(ctx, d.Form, "postal_code", "text", "postal-code", 12))
-							@Field(input(ctx, d.Form, "city", "text", "address-level2", 200))
+							@ui.Input(input(ctx, d.Form, "first_name", "text", "given-name", 200))
+							@ui.Input(input(ctx, d.Form, "last_name", "text", "family-name", 200))
+							@ui.Input(input(ctx, d.Form, "email", "email", "email", 254))
+							@ui.Input(input(ctx, d.Form, "phone", "tel", "tel", 30))
+							@ui.Input(input(ctx, d.Form, "postal_code", "text", "postal-code", 12))
+							@ui.Input(input(ctx, d.Form, "city", "text", "address-level2", 200))
 						</div>
 						<h2>{ T(ctx, "setup.profile.work") }</h2>
 						<div class="wiz-grid">
-							@Field(input(ctx, d.Form, "current_title", "text", "organization-title", 200))
-							@Field(input(ctx, d.Form, "years_total", "text", "", 200))
-							@Field(input(ctx, d.Form, "notice_period", "text", "", 200))
-							@Field(input(ctx, d.Form, "earliest_start", "text", "", 200))
-							@Field(input(ctx, d.Form, "salary_expectation", "text", "", 200))
+							@ui.Input(input(ctx, d.Form, "current_title", "text", "organization-title", 200))
+							@ui.Input(input(ctx, d.Form, "years_total", "text", "", 200))
+							@ui.Input(input(ctx, d.Form, "notice_period", "text", "", 200))
+							@ui.Input(input(ctx, d.Form, "earliest_start", "text", "", 200))
+							@ui.Input(input(ctx, d.Form, "salary_expectation", "text", "", 200))
 						</div>
-						@Check("work_authorized_eu", T(ctx, "profile.field.work_authorized_eu"), d.Form.Checks["work_authorized_eu"])
-						@TextArea(area(ctx, d.Form, "skills", 12000))
+						@ui.Checkbox(check(ctx, d.Form, "work_authorized_eu"))
+						@ui.Textarea(area(ctx, d.Form, "skills", 12000))
 						<h2>{ T(ctx, "setup.profile.stations") }</h2>
 						if len(d.Stations) == 0 {
 							<p class="app-hint">{ T(ctx, "setup.profile.no_stations") }</p>
@@ -170,10 +170,10 @@ templ SetupPage(d SetupData) {
 					</form>
 				case "search":
 					<form method="post" action="/setup/search" class="wiz-card stack" novalidate data-dirty-guard data-t-unsaved={ T(ctx, "cand.unsaved") }>
-						@TextArea(area(ctx, d.Form, "titles", 12000))
-						@TextArea(area(ctx, d.Form, "locations", 12000))
-						@Check("remote", T(ctx, "profile.field.remote"), d.Form.Checks["remote"])
-						@Field(input(ctx, d.Form, "min_salary", "number", "", 9))
+						@ui.Textarea(area(ctx, d.Form, "titles", 12000))
+						@ui.Textarea(area(ctx, d.Form, "locations", 12000))
+						@ui.Checkbox(check(ctx, d.Form, "remote"))
+						@ui.Input(input(ctx, d.Form, "min_salary", "number", "", 9))
 						@setupButtons(d.Step, T(ctx, "setup.next"))
 					</form>
 				case "automation":
