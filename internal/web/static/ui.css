@@ -2873,6 +2873,35 @@
     gap: var(--space-4);
   }
 
+  .jd-fields {
+    margin: 0;
+    border-top: 1px solid var(--border);
+  }
+
+  .jd-field {
+    display: grid;
+    grid-template-columns: minmax(6rem, 2fr) 3fr;
+    gap: var(--space-2);
+    padding: var(--space-2) 0;
+    border-bottom: 1px solid var(--border);
+  }
+
+  .jd-field dt {
+    color: var(--text-2);
+    font-size: var(--text-sm);
+    overflow-wrap: anywhere;
+  }
+
+  .jd-field dd {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: var(--space-1);
+    margin: 0;
+    min-width: 0;
+  }
+
   .jd-more summary {
     cursor: pointer;
     font-weight: 600;
@@ -2892,6 +2921,70 @@
   .jd-answers dd {
     margin: 0;
     overflow-wrap: anywhere;
+  }
+
+  /* approvals */
+  .appr-all {
+    margin: 0;
+  }
+
+  .appr-rows {
+    display: grid;
+    gap: var(--space-2);
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
+
+  .appr-row {
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr);
+    gap: var(--space-3);
+    align-items: start;
+    padding: var(--space-3);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-md);
+    background: var(--surface);
+  }
+
+  .appr-row .job-check {
+    margin-top: var(--space-1);
+  }
+
+  .appr-main {
+    display: grid;
+    gap: var(--space-1);
+    min-width: 0;
+  }
+
+  .appr-reasons {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--space-1);
+    margin: var(--space-1) 0;
+    padding: 0;
+    list-style: none;
+  }
+
+  .appr-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--space-2);
+    grid-column: 2;
+  }
+
+  .appr-actions form {
+    margin: 0;
+  }
+
+  @media (min-width: 48rem) {
+    .appr-row {
+      grid-template-columns: auto minmax(0, 1fr) auto;
+    }
+
+    .appr-actions {
+      grid-column: auto;
+    }
   }
 }
 

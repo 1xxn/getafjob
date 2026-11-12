@@ -166,6 +166,8 @@ func (s *Server) Register(mux *http.ServeMux) {
 	mux.Handle("POST /tracker/{id}/stage", s.page(s.trackerSetStage))
 	mux.Handle("POST /tracker/{id}/notes", s.page(s.trackerSaveNotes))
 	mux.Handle("GET /approvals", s.page(s.approvalsPage))
+	mux.Handle("POST /approvals/bulk", s.page(s.approvalsBulk))
+	mux.Handle("GET /approvals/{id}/review", s.page(s.approvalReview))
 	mux.Handle("POST /approvals/{id}/approve", s.page(s.approvalApprove))
 	mux.Handle("POST /approvals/{id}/cv", s.page(s.approvalSetCV))
 	mux.Handle("GET /needs-input", s.page(s.needsInputPage))

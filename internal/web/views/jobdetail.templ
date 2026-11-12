@@ -296,14 +296,15 @@ templ CVVariantSwitcher(d CVVariantData) {
 	</div>
 }
 
-templ previewRow(label, value, sourceKey string) {
-	<tr>
-		<th scope="row">{ label }</th>
-		<td class="app-value">{ value }</td>
-		<td class="ui-narrow">
+// fieldItem is one value that a run fills in, with where it comes from.
+templ fieldItem(label, value, sourceKey string) {
+	<div class="jd-field">
+		<dt>{ label }</dt>
+		<dd>
+			<span class="app-value">{ value }</span>
 			@ui.Badge(T(ctx, sourceKey), ui.Neutral)
-		</td>
-	</tr>
+		</dd>
+	</div>
 }
 
 // ApplyPreview shows what the run will fill in and where each value comes from, then starts it.
@@ -315,27 +316,27 @@ templ ApplyPreview(d ApplyPreviewData) {
 		} else {
 			@ui.Alert(ui.AlertProps{Tone: ui.Danger, Text: d.Guard.Reason})
 		}
-		@ui.Table(ui.TableProps{Caption: T(ctx, "jobs.apply_preview.contact_section"), Columns: []ui.Column{
-			{Label: T(ctx, "evidence.fields.field")}, {Label: T(ctx, "evidence.fields.value")}, {Label: T(ctx, "evidence.fields.source"), Narrow: true}}}) {
-			@previewRow(T(ctx, "jobs.apply_preview.name"), d.CandidateName, "apps.source.profile")
-			@previewRow(T(ctx, "jobs.apply_preview.email"), d.CandidateEmail, "apps.source.profile")
+		<h4 class="job-panel-sub">{ T(ctx, "jobs.apply_preview.contact_section") }</h4>
+		<dl class="jd-fields">
+			@fieldItem(T(ctx, "jobs.apply_preview.name"), d.CandidateName, "apps.source.profile")
+			@fieldItem(T(ctx, "jobs.apply_preview.email"), d.CandidateEmail, "apps.source.profile")
 			if d.CandidatePhone != "" {
-				@previewRow(T(ctx, "jobs.apply_preview.phone"), d.CandidatePhone, "apps.source.profile")
+				@fieldItem(T(ctx, "jobs.apply_preview.phone"), d.CandidatePhone, "apps.source.profile")
 			}
 			if d.CandidateLocation != "" {
-				@previewRow(T(ctx, "jobs.apply_preview.location"), d.CandidateLocation, "apps.source.profile")
+				@fieldItem(T(ctx, "jobs.apply_preview.location"), d.CandidateLocation, "apps.source.profile")
 			}
 			if d.CandidateLinkedIn != "" {
-				@previewRow("LinkedIn", d.CandidateLinkedIn, "apps.source.profile")
+				@fieldItem("LinkedIn", d.CandidateLinkedIn, "apps.source.profile")
 			}
 			if d.CandidateGitHub != "" {
-				@previewRow("GitHub", d.CandidateGitHub, "apps.source.profile")
+				@fieldItem("GitHub", d.CandidateGitHub, "apps.source.profile")
 			}
 			if d.CandidatePortfolio != "" {
-				@previewRow(T(ctx, "jobs.apply_preview.website"), d.CandidatePortfolio, "apps.source.profile")
+				@fieldItem(T(ctx, "jobs.apply_preview.website"), d.CandidatePortfolio, "apps.source.profile")
 			}
-			@previewRow(T(ctx, "jobs.apply_preview.cv_section"), or(d.SelectedCVName, T(ctx, "jobs.apply_preview.default_cv")), "apps.source.document")
-		}
+			@fieldItem(T(ctx, "jobs.apply_preview.cv_section"), or(d.SelectedCVName, T(ctx, "jobs.apply_preview.default_cv")), "apps.source.document")
+		</dl>
 		if len(d.WorkExperiences) > 0 || len(d.Educations) > 0 {
 			<details class="jd-more">
 				<summary>{ T(ctx, "jobs.apply_preview.stations", "work", len(d.WorkExperiences), "edu", len(d.Educations)) }</summary>

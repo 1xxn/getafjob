@@ -1,6 +1,10 @@
 package views
 
-import "time"
+import (
+	"time"
+
+	"github.com/1xxn/getafjob/internal/web/views/ui"
+)
 
 // ApprovalRow is one application awaiting human approval.
 type ApprovalRow struct {
@@ -17,54 +21,126 @@ type ApprovalRow struct {
 
 // ApprovalsData fills the approval list page.
 type ApprovalsData struct {
-	Name   string
-	Rows   []ApprovalRow
-	Notice string
+	Name string
+	Rows []ApprovalRow
 }
 
+// ApprovalsPage lists applications that wait for the user's approval before they are sent.
 templ ApprovalsPage(d ApprovalsData) {
-	@Layout(Page{Title: T(ctx, "approvals.title"), UserName: d.Name}) {
-		@Section(T(ctx, "approvals.title")) {
-			<p class="muted">{ T(ctx, "approvals.text") }</p>
-			if d.Notice != "" {
-				@Notice("info", d.Notice)
-			}
-			if len(d.Rows) == 0 {
-				<p>{ T(ctx, "approvals.empty") }</p>
-			} else {
-				<ol class="jobs">
-					for _, r := range d.Rows {
-						<li>
-							<h2><a href={ templ.SafeURL("/applications/" + r.ID) }>{ r.Title }</a></h2>
-							<p class="meta">
-								<strong>{ r.Company }</strong>
-								<span> • </span>
-								<span>{ T(ctx, "approvals.score", "score", r.Score) }</span>
-								if r.CVVariant != "" {
-									<span> • </span>
-									<span class="badge badge-variant">{ T(ctx, "approvals.cv_variant", "variant", r.CVVariant) }</span>
-								}
-								<span> • </span>
-								<span class="muted">{ T(ctx, "approvals.asked", "when", When(ctx, r.AskedAt)) }</span>
-							</p>
-							<div class="approval-reasons">
-								<strong>{ T(ctx, "approvals.reasons_title") }</strong>
-								<ul class="reasons">
-									for _, re := range r.Reasons {
-										<li>{ re }</li>
-									}
-								</ul>
-							</div>
-							<div class="actions">
-								<form method="post" action={ templ.SafeURL("/approvals/" + r.ID + "/approve") }>
-									<button type="submit" class="primary">{ T(ctx, "approvals.approve") }</button>
-								</form>
-								<a href={ templ.SafeURL("/applications/" + r.ID) } class="button secondary">{ T(ctx, "approvals.view_evidence") }</a>
-							</div>
-						</li>
-					}
-				</ol>
-			}
+	@Layout(Page{Title: T(ctx, "approvals.title"), UserName: d.Name, Wide: true}) {
+		<div class="jobs-head">
+			<h1>{ T(ctx, "approvals.title") }</h1>
+		</div>
+		<p class="app-hint">{ T(ctx, "approvals.text") }</p>
+		@ApprovalsList(d)
+		@ui.Dialog(ui.DialogProps{ID: "dlg-review", Title: T(ctx, "approvals.review_title"), CloseLabel: T(ctx, "shell.close"), Drawer: true}) {
+			<div id="review-body">
+				@ui.Skeleton(T(ctx, "jobs.apply_preview.loading"), 6)
+			</div>
 		}
 	}
+}
+
+// ApprovalsList is the part that follows live changes.
+templ ApprovalsList(d ApprovalsData) {
+	<div
+		id="approvals"
+		class="appr"
+		{ HX(ctx, "hx-get", "/approvals", "hx-trigger", "getafjob:app from:body delay:700ms", "hx-swap", "outerMorph transition:false")... }
+	>
+		if len(d.Rows) == 0 {
+			@ui.EmptyState(ui.EmptyProps{Icon: "check-circle", Title: T(ctx, "approvals.empty"), Text: T(ctx, "approvals.empty_hint")}) {
+				@ui.Button(ui.ButtonProps{Label: T(ctx, "apps.title"), Href: "/applications"})
+			}
+		} else {
+			<form id="bulk" method="post" action="/approvals/bulk" class="jobs-bulk" data-bulk>
+				<div class="ui-check appr-all">
+					<input type="checkbox" id="appr-all" form="bulk" data-select-all/>
+					<label for="appr-all">{ T(ctx, "approvals.select_all", "count", len(d.Rows)) }</label>
+				</div>
+				<span class="jobs-bulk-count" data-bulk-count data-t-none={ T(ctx, "approvals.bulk.none") } data-t-some={ T(ctx, "apps.bulk.some", "n", "{n}") }>{ T(ctx, "approvals.bulk.none") }</span>
+				<div class="jobs-bulk-actions">
+					@ui.Button(ui.ButtonProps{Label: T(ctx, "approvals.approve"), Type: "submit", Size: "sm", Variant: "primary", Icon: "check", Attrs: templ.Attributes{"name": "action", "value": "approve"}})
+					@ui.Button(ui.ButtonProps{Label: T(ctx, "approvals.reject"), Type: "submit", Size: "sm", Variant: "ghost", Icon: "x", Attrs: templ.Attributes{"name": "action", "value": "reject"}})
+				</div>
+			</form>
+			<ol class="appr-rows" aria-label={ T(ctx, "approvals.title") }>
+				for _, r := range d.Rows {
+					<li class="appr-row" data-approval data-id={ r.ID }>
+						<input type="checkbox" name="ids" value={ r.ID } form="bulk" class="job-check" aria-label={ T(ctx, "apps.select", "title", r.Title) }/>
+						<div class="appr-main">
+							<a href={ templ.URL("/applications/" + r.ID) } class="apps-title">{ r.Title }</a>
+							<span class="apps-company">{ r.Company }</span>
+							<ul class="appr-reasons" aria-label={ T(ctx, "approvals.reasons_title") }>
+								for _, re := range r.Reasons {
+									<li>
+										@ui.Badge(re, ui.Warning)
+									</li>
+								}
+							</ul>
+							<span class="ni-item-meta">
+								@ui.Badge(T(ctx, "approvals.score", "score", r.Score), ui.Neutral)
+								if r.CVVariant != "" {
+									<span>{ T(ctx, "approvals.cv_variant", "variant", r.CVVariant) }</span>
+								}
+								<time datetime={ r.AskedAt.UTC().Format(time.RFC3339) }>{ T(ctx, "approvals.asked", "when", When(ctx, r.AskedAt)) }</time>
+							</span>
+						</div>
+						<div class="appr-actions">
+							@ui.Button(ui.ButtonProps{Label: T(ctx, "approvals.review"), Size: "sm", Icon: "eye",
+								Attrs: attrs(ui.OpenDialog("dlg-review"), HX(ctx, "hx-get", "/approvals/"+r.ID+"/review", "hx-target", "#review-body", "hx-swap", "innerHTML transition:false"),
+									templ.Attributes{"data-action": "review"})})
+							<form method="post" action={ templ.URL("/approvals/" + r.ID + "/approve") }>
+								@ui.Button(ui.ButtonProps{Label: T(ctx, "approvals.approve"), Type: "submit", Size: "sm", Variant: "primary", Icon: "check",
+									Attrs: templ.Attributes{"data-action": "approve"}})
+							</form>
+						</div>
+					</li>
+				}
+			</ol>
+		}
+	</div>
+}
+
+// ApprovalReview shows what will be sent: why it waits, the filled fields with their source, and the CV.
+templ ApprovalReview(d AppDetailData, cv CVVariantData) {
+	<div class="jd-preview" data-review={ d.AppID }>
+		<h3 class="app-title">{ d.JobTitle }</h3>
+		<p class="app-company">{ d.Company }</p>
+		if len(d.ApprovalReasons) > 0 {
+			@ui.Alert(ui.AlertProps{Tone: ui.Warning, Title: T(ctx, "approvals.reasons_title")}) {
+				<ul class="app-list">
+					for _, r := range d.ApprovalReasons {
+						<li>{ r }</li>
+					}
+				</ul>
+			}
+		}
+		if len(d.Fields) == 0 {
+			<p class="app-hint">{ T(ctx, "evidence.fields.empty") }</p>
+		} else {
+			<h4 class="job-panel-sub">{ T(ctx, "evidence.fields.title") }</h4>
+			<dl class="jd-fields">
+				for _, f := range d.Fields {
+					@fieldItem(f.Label, f.Value, sourceKey(f.Source))
+				}
+			</dl>
+		}
+		@CVVariantSwitcher(cv)
+		<p class="app-hint">
+			{ T(ctx, "approvals.edit_hint") }
+			<a href="/answers">{ T(ctx, "nav.answers") }</a>
+		</p>
+		<div class="app-actions">
+			<form method="post" action={ templ.URL("/approvals/" + d.AppID + "/approve") }>
+				@ui.Button(ui.ButtonProps{Label: T(ctx, "approvals.approve"), Type: "submit", Variant: "primary", Icon: "check",
+					Attrs: templ.Attributes{"data-action": "review-approve"}})
+			</form>
+			<form method="post" action="/approvals/bulk">
+				<input type="hidden" name="ids" value={ d.AppID }/>
+				@ui.Button(ui.ButtonProps{Label: T(ctx, "approvals.reject"), Type: "submit", Variant: "ghost", Icon: "x",
+					Attrs: templ.Attributes{"name": "action", "value": "reject"}})
+			</form>
+		</div>
+	</div>
 }
