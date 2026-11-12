@@ -46,10 +46,15 @@ func TestJobsFilterOpenQueue(t *testing.T) {
 	}
 	tab.Shot("panel")
 
-	// The back button leaves this job, forward returns to it.
+	// The back button leaves this job, forward returns to it. Both restore the page from history with a request of
+	// their own; a click during it gets lost, so wait until the network is quiet.
+	idle := tab.Page.WaitRequestIdle(500*time.Millisecond, nil, []string{"/events"}, nil)
 	must(t, tab.Page.NavigateBack())
+	idle()
 	tab.WaitWithin(10*time.Second, "!location.search.includes('job="+id+"')")
+	idle = tab.Page.WaitRequestIdle(500*time.Millisecond, nil, []string{"/events"}, nil)
 	must(t, tab.Page.NavigateForward())
+	idle()
 	tab.WaitWithin(10*time.Second, "location.search.includes('job="+id+"') && document.querySelector('#job-panel [data-job-id]')")
 
 	// Queue it: back on the list with a toast, the row now applying.
