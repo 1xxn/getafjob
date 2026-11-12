@@ -467,7 +467,7 @@ func buildFitData(ctx context.Context, jobID int64, fit matching.FitInspection, 
 
 	locDetail := ""
 	if fit.LocationReason != "" {
-		locDetail = views.T(ctx, "match.reason."+fit.LocationReason)
+		locDetail = reasonText(ctx, matching.Reason{Code: fit.LocationReason, Params: fit.LocationParams})
 	}
 	d.Breakdown = append(d.Breakdown, views.FitBreakdownItem{
 		Dimension: "location",
