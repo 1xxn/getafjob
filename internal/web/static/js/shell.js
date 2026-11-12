@@ -187,7 +187,18 @@ window.addEventListener("beforeunload", (e) => {
   if (dirty()) e.preventDefault();
 });
 var running = /* @__PURE__ */ new Set();
+var leaving = false;
+window.addEventListener("beforeunload", () => {
+  if (!dirty()) leaving = true;
+});
+window.addEventListener("pageshow", () => {
+  leaving = false;
+});
 document.addEventListener("htmx:before:request", (e) => {
+  if (leaving) {
+    e.preventDefault();
+    return;
+  }
   const ctx = e.detail?.ctx;
   if (ctx) running.add(ctx);
 });

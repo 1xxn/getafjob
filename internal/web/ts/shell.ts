@@ -238,7 +238,20 @@ interface RequestCtx {
   request?: { abort?: () => void };
 }
 const running = new Set<RequestCtx>();
+// A live event between beforeunload and the new page would start a request that nothing aborts: once the page is
+// being left (and no unsaved form holds it), no new request starts. A page restored from the cache runs again.
+let leaving = false;
+window.addEventListener('beforeunload', () => {
+  if (!dirty()) leaving = true;
+});
+window.addEventListener('pageshow', () => {
+  leaving = false;
+});
 document.addEventListener('htmx:before:request', (e) => {
+  if (leaving) {
+    e.preventDefault();
+    return;
+  }
   const ctx = (e as CustomEvent<{ ctx?: RequestCtx }>).detail?.ctx;
   if (ctx) running.add(ctx);
 });
