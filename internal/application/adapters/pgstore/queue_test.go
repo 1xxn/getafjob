@@ -8,7 +8,7 @@ import (
 	"github.com/1xxn/getafjob/internal/application"
 )
 
-// The queue lists runs in the order they were queued; moving swaps neighbours, a paused run is skipped by the lease
+// The queue lists runs in the order they were queued; moving swaps neighbors, a paused run is skipped by the lease
 // and a run queued again goes to the end.
 func TestQueueOrderAndPause(t *testing.T) {
 	pool, st, svc, _ := setup(t)

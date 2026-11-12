@@ -765,7 +765,7 @@ type MoveQueuedParams struct {
 	Up     bool
 }
 
-// Swaps the queue position of a queued application with its neighbour before (up) or after it.
+// Swaps the queue position of a queued application with its neighbor before (up) or after it.
 func (q *Queries) MoveQueued(ctx context.Context, arg MoveQueuedParams) (int64, error) {
 	result, err := q.db.Exec(ctx, moveQueued, arg.UserID, arg.ID, arg.Up)
 	if err != nil {

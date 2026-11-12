@@ -1106,7 +1106,7 @@ func (s *Store) QueueItems(ctx context.Context, userID uuid.UUID) ([]application
 	return out, err
 }
 
-// MoveQueued swaps a queued application with its neighbour.
+// MoveQueued swaps a queued application with its neighbor.
 func (s *Store) MoveQueued(ctx context.Context, userID, id uuid.UUID, up bool) (bool, error) {
 	var n int64
 	err := s.user(ctx, userID, func(qs *q.Queries) error {

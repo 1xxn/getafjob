@@ -267,7 +267,7 @@ type Store interface {
 	SubmitsPerDay(ctx context.Context, userID uuid.UUID, since time.Time) (map[time.Time]int, error)
 	// QueueItems lists the user's queued applications in the order their runs start.
 	QueueItems(ctx context.Context, userID uuid.UUID) ([]QueueItem, error)
-	// MoveQueued swaps a queued application with its neighbour before (up) or after it; false when nothing moved.
+	// MoveQueued swaps a queued application with its neighbor before (up) or after it; false when nothing moved.
 	MoveQueued(ctx context.Context, userID, id uuid.UUID, up bool) (bool, error)
 	// PauseQueued pauses or resumes a queued application; false when it is no longer queued.
 	PauseQueued(ctx context.Context, userID, id uuid.UUID, paused bool) (bool, error)
