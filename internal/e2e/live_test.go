@@ -51,7 +51,33 @@ func startRun(t *testing.T, tab *Tab) string {
 		tab.WaitWithin(15*time.Second, "location.pathname.startsWith('/applications/')")
 		return strings.TrimPrefix(strings.Trim(tab.Eval("return location.pathname"), `"`), "/applications/")
 	}
-	t.Fatal("no fixture job without an application on the first page (reset the dev database or run admin demo again)")
+	if app := retryRun(t, tab); app != "" {
+		return app
+	}
+	t.Fatal("no fixture job without an application and no parked fixture application (reset the dev database)")
+	return ""
+}
+
+// retryRun starts a parked application on the fixture site again: a fresh stack has one fixture job per company
+// that the company window lets through, fewer than the journeys need.
+func retryRun(t *testing.T, tab *Tab) string {
+	t.Helper()
+	tab.Go("/applications?group=attention")
+	var ids []string
+	if err := json.Unmarshal([]byte(tab.Eval(`return [...document.querySelectorAll('tr[data-app-row]')]
+		.filter(r => r.dataset.state === 'parked' || r.dataset.state === 'failed').map(r => r.dataset.id)`)), &ids); err != nil {
+		t.Fatal(err)
+	}
+	for _, id := range ids {
+		tab.Go("/applications/" + id)
+		if tab.Eval(`return !!document.querySelector('#app-head a[href^="http://fixtures:8080/"]') &&
+			!!document.querySelector('#app-head [data-action="apps.action.retry"]')`) != "true" {
+			continue
+		}
+		tab.Click(`#app-head [data-action="apps.action.retry"]`)
+		tab.WaitWithin(15*time.Second, "document.getElementById('app-head')?.dataset.state !== 'parked'")
+		return id
+	}
 	return ""
 }
 
