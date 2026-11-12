@@ -1,0 +1,56 @@
+name: Go with a build cache per job
+description: >-
+  Sets up Go and restores the module and build cache of one job role, so jobs that build different things (race
+  tests, vet and generators, Windows) do not overwrite one shared cache. Call it again with save "true" as the last
+  step of the job: only pushes to main save, so a pull request never writes a cache that main reads.
+inputs:
+  key:
+    description: Job role, for example test-web or verify
+    required: true
+  save:
+    description: '"true" saves the cache (last step of the job; main only) instead of setting up Go'
+    required: false
+    default: "false"
+runs:
+  using: composite
+  steps:
+    - if: inputs.save != 'true'
+      uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+      with:
+        go-version-file: go.mod
+        cache: false
+    - id: dirs
+      shell: bash
+      env:
+        SUM: ${{ hashFiles('go.sum') }}
+      run: |
+        {
+          echo "build=$(go env GOCACHE)"
+          echo "mod=$(go env GOMODCACHE)"
+          echo "sum=$SUM"
+        } >> "$GITHUB_OUTPUT"
+    - if: inputs.save != 'true'
+      uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+      with:
+        path: |
+          ${{ steps.dirs.outputs.build }}
+          ${{ steps.dirs.outputs.mod }}
+        key: go-${{ runner.os }}-${{ inputs.key }}-${{ steps.dirs.outputs.sum }}
+        restore-keys: go-${{ runner.os }}-${{ inputs.key }}-
+    # One cache per role and go.sum: the first main run after a dependency change saves it, later runs skip the save.
+    - id: saved
+      if: inputs.save == 'true' && github.event_name == 'push' && github.ref == 'refs/heads/main'
+      uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+      with:
+        path: |
+          ${{ steps.dirs.outputs.build }}
+          ${{ steps.dirs.outputs.mod }}
+        key: go-${{ runner.os }}-${{ inputs.key }}-${{ steps.dirs.outputs.sum }}
+        lookup-only: true
+    - if: inputs.save == 'true' && github.event_name == 'push' && github.ref == 'refs/heads/main' && steps.saved.outputs.cache-hit != 'true'
+      uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+      with:
+        path: |
+          ${{ steps.dirs.outputs.build }}
+          ${{ steps.dirs.outputs.mod }}
+        key: go-${{ runner.os }}-${{ inputs.key }}-${{ steps.dirs.outputs.sum }}

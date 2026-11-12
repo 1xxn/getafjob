@@ -58,11 +58,11 @@ func demoCookies() string { return filepath.Join(outDir, "..", "demo-session.jso
 func resumeDemo() (*rod.Browser, error) {
 	raw, err := os.ReadFile(demoCookies())
 	if err != nil {
-		return nil, nil //nolint:nilerr // no stored session: sign in with a mail link
+		return nil, nil // no stored session: sign in with a mail link
 	}
 	var cookies []*proto.NetworkCookieParam
 	if err := json.Unmarshal(raw, &cookies); err != nil {
-		return nil, nil //nolint:nilerr // unreadable: sign in again
+		return nil, nil // unreadable: sign in again
 	}
 	b, err := shared.Incognito()
 	if err != nil {
@@ -85,7 +85,7 @@ func resumeDemo() (*rod.Browser, error) {
 	}
 	if ok, _, err := p.Has(`body.shell`); err != nil || !ok {
 		_ = b.Close()
-		return nil, nil //nolint:nilerr // expired session: sign in again
+		return nil, nil // expired session: sign in again
 	}
 	return b, nil
 }
@@ -182,7 +182,7 @@ type mailpitList struct {
 func mailLink(mailpit, email string, since time.Time) (string, error) {
 	c := &http.Client{Timeout: 5 * time.Second}
 	get := func(path string, v any) error {
-		res, err := c.Get(mailpit + path) //nolint:noctx // test helper with a client timeout
+		res, err := c.Get(mailpit + path) // test helper with a client timeout
 		if err != nil {
 			return err
 		}
