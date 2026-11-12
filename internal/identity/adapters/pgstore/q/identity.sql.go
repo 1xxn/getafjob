@@ -12,6 +12,38 @@ import (
 	"github.com/google/uuid"
 )
 
+const adminAuditEvents = `-- name: AdminAuditEvents :many
+SELECT id, user_id, actor, code, params, created_at FROM audit_events
+WHERE actor = 'admin' ORDER BY id DESC LIMIT $1
+`
+
+func (q *Queries) AdminAuditEvents(ctx context.Context, limit int32) ([]AuditEvent, error) {
+	rows, err := q.db.Query(ctx, adminAuditEvents, limit)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []AuditEvent{}
+	for rows.Next() {
+		var i AuditEvent
+		if err := rows.Scan(
+			&i.ID,
+			&i.UserID,
+			&i.Actor,
+			&i.Code,
+			&i.Params,
+			&i.CreatedAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const cancelRecovery = `-- name: CancelRecovery :execrows
 DELETE FROM recoveries WHERE user_id = $1
 `
@@ -476,6 +508,83 @@ func (q *Queries) InsertPasskey(ctx context.Context, arg InsertPasskeyParams) er
 	return err
 }
 
+const listUsers = `-- name: ListUsers :many
+SELECT u.id, u.email, u.display_name, u.role, u.locale, u.created_at, u.disabled_at,
+  COALESCE((SELECT max(s.last_seen_at) FROM sessions s WHERE s.user_id = u.id), u.created_at)::timestamptz AS last_seen,
+  (SELECT count(*) FROM sessions s WHERE s.user_id = u.id AND s.expires_at > $1)::bigint AS sessions,
+  EXISTS (SELECT 1 FROM passkeys p WHERE p.user_id = u.id) AS has_passkey
+FROM users u
+ORDER BY u.created_at, u.id
+`
+
+type ListUsersRow struct {
+	ID          uuid.UUID
+	Email       string
+	DisplayName string
+	Role        string
+	Locale      string
+	CreatedAt   time.Time
+	DisabledAt  *time.Time
+	LastSeen    time.Time
+	Sessions    int64
+	HasPasskey  bool
+}
+
+func (q *Queries) ListUsers(ctx context.Context, now time.Time) ([]ListUsersRow, error) {
+	rows, err := q.db.Query(ctx, listUsers, now)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []ListUsersRow{}
+	for rows.Next() {
+		var i ListUsersRow
+		if err := rows.Scan(
+			&i.ID,
+			&i.Email,
+			&i.DisplayName,
+			&i.Role,
+			&i.Locale,
+			&i.CreatedAt,
+			&i.DisabledAt,
+			&i.LastSeen,
+			&i.Sessions,
+			&i.HasPasskey,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const lockAdmins = `-- name: LockAdmins :many
+SELECT id FROM users WHERE role = 'admin' AND disabled_at IS NULL FOR UPDATE
+`
+
+func (q *Queries) LockAdmins(ctx context.Context) ([]uuid.UUID, error) {
+	rows, err := q.db.Query(ctx, lockAdmins)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []uuid.UUID{}
+	for rows.Next() {
+		var id uuid.UUID
+		if err := rows.Scan(&id); err != nil {
+			return nil, err
+		}
+		items = append(items, id)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const markInvitationAccepted = `-- name: MarkInvitationAccepted :execrows
 UPDATE invitations SET accepted_at = $2, accepted_user = $3 WHERE id = $1 AND accepted_at IS NULL
 `
@@ -492,6 +601,46 @@ func (q *Queries) MarkInvitationAccepted(ctx context.Context, arg MarkInvitation
 		return 0, err
 	}
 	return result.RowsAffected(), nil
+}
+
+const pendingInvitations = `-- name: PendingInvitations :many
+SELECT id, email, role, created_at, expires_at FROM invitations
+WHERE accepted_at IS NULL AND expires_at > $1
+ORDER BY created_at DESC
+`
+
+type PendingInvitationsRow struct {
+	ID        uuid.UUID
+	Email     string
+	Role      string
+	CreatedAt time.Time
+	ExpiresAt time.Time
+}
+
+func (q *Queries) PendingInvitations(ctx context.Context, expiresAt time.Time) ([]PendingInvitationsRow, error) {
+	rows, err := q.db.Query(ctx, pendingInvitations, expiresAt)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []PendingInvitationsRow{}
+	for rows.Next() {
+		var i PendingInvitationsRow
+		if err := rows.Scan(
+			&i.ID,
+			&i.Email,
+			&i.Role,
+			&i.CreatedAt,
+			&i.ExpiresAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
 }
 
 const replaceSession = `-- name: ReplaceSession :one
@@ -526,6 +675,18 @@ func (q *Queries) ReplaceSession(ctx context.Context, arg ReplaceSessionParams) 
 	return i, err
 }
 
+const revokeInvitation = `-- name: RevokeInvitation :execrows
+DELETE FROM invitations WHERE id = $1 AND accepted_at IS NULL
+`
+
+func (q *Queries) RevokeInvitation(ctx context.Context, id uuid.UUID) (int64, error) {
+	result, err := q.db.Exec(ctx, revokeInvitation, id)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
+}
+
 const setUserLocale = `-- name: SetUserLocale :execrows
 UPDATE users SET locale = $2 WHERE id = $1
 `
@@ -537,6 +698,23 @@ type SetUserLocaleParams struct {
 
 func (q *Queries) SetUserLocale(ctx context.Context, arg SetUserLocaleParams) (int64, error) {
 	result, err := q.db.Exec(ctx, setUserLocale, arg.ID, arg.Locale)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
+}
+
+const setUserRole = `-- name: SetUserRole :execrows
+UPDATE users SET role = $2 WHERE id = $1
+`
+
+type SetUserRoleParams struct {
+	ID   uuid.UUID
+	Role string
+}
+
+func (q *Queries) SetUserRole(ctx context.Context, arg SetUserRoleParams) (int64, error) {
+	result, err := q.db.Exec(ctx, setUserRole, arg.ID, arg.Role)
 	if err != nil {
 		return 0, err
 	}

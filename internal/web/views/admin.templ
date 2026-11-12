@@ -1,0 +1,222 @@
+package views
+
+import "github.com/1xxn/getafjob/internal/web/views/ui"
+
+// AdminUserRow is one account in the admin list.
+type AdminUserRow struct {
+	ID       string
+	Email    string
+	Name     string
+	Role     string
+	Created  string
+	LastSeen string
+	Sessions int
+	Passkey  bool
+	Self     bool // the admin looking at the page
+}
+
+// AdminInviteRow is an open invitation.
+type AdminInviteRow struct {
+	ID      string
+	Email   string
+	Role    string
+	Expires string
+}
+
+// AdminAuditRow is one admin action, already in words.
+type AdminAuditRow struct {
+	At   string
+	Text string
+}
+
+// AdminUsersData is the user page of the admin console.
+type AdminUsersData struct {
+	Name        string
+	Users       []AdminUserRow
+	Invites     []AdminInviteRow
+	Audit       []AdminAuditRow
+	Form        Form   // invite form: email, role
+	Link        string // a new invitation link, shown once
+	LinkExpires string
+	Notice      string // result of the last action
+	Failed      bool
+}
+
+// AdminSystemRow is one fact on the system page.
+type AdminSystemRow struct {
+	Key   string // catalog key of the label
+	Value string
+	Tone  ui.Tone
+}
+
+// AdminSystemData is the system page.
+type AdminSystemData struct {
+	Name string
+	Rows []AdminSystemRow
+}
+
+var adminSections = []struct{ Key, Href, Icon string }{
+	{"admin.users", "/admin/users", "users"}, {"admin.system", "/admin/system", "server"},
+}
+
+templ adminPage(name, title, current string) {
+	@Layout(Page{Title: T(ctx, title), UserName: name, Wide: true}) {
+		<div class="set adm" data-admin={ current }>
+			<nav class="set-nav" aria-label={ T(ctx, "admin.title") }>
+				<p class="set-nav-title">{ T(ctx, "admin.title") }</p>
+				<ul>
+					for _, s := range adminSections {
+						<li>
+							<a
+								href={ templ.SafeURL(s.Href) }
+								class="shell-link"
+								if s.Href == current {
+									aria-current="page"
+								}
+							>
+								@ui.Icon(s.Icon)
+								<span>{ T(ctx, s.Key) }</span>
+							</a>
+						</li>
+					}
+				</ul>
+			</nav>
+			<section class="set-main" aria-labelledby="set-title">
+				<h1 id="set-title">{ T(ctx, title) }</h1>
+				{ children... }
+			</section>
+		</div>
+	}
+}
+
+templ AdminUsersPage(d AdminUsersData) {
+	@adminPage(d.Name, "admin.users", "/admin/users") {
+		<p class="app-hint">{ T(ctx, "admin.users.intro") }</p>
+		if d.Notice != "" {
+			if d.Failed {
+				@ui.Alert(ui.AlertProps{Tone: ui.Danger, Text: d.Notice})
+			} else {
+				@ui.Alert(ui.AlertProps{Tone: ui.Success, Text: d.Notice})
+			}
+		}
+		if d.Link != "" {
+			<div class="adm-link" data-invite-link>
+				@ui.Alert(ui.AlertProps{Tone: ui.Info, Title: T(ctx, "admin.invite.created"), Text: T(ctx, "admin.invite.created_text", "expires", d.LinkExpires)})
+				<label class="ui-label" for="invite-link">{ T(ctx, "admin.invite.link") }</label>
+				<input id="invite-link" class="ui-input" type="text" readonly value={ d.Link }/>
+			</div>
+		}
+		<form method="post" action="/admin/invites" class="set-form stack adm-invite" novalidate>
+			<h2>{ T(ctx, "admin.invite.title") }</h2>
+			<div class="adm-invite-fields">
+				@Field(FieldProps{Name: "email", Label: T(ctx, "admin.invite.email"), Type: "email", Value: d.Form.Values["email"],
+					Error: d.Form.Errors["email"], MaxLength: 254, Autocomplete: "off"})
+				<div class="field">
+					<label for="f-role">{ T(ctx, "admin.role") }</label>
+					<select id="f-role" name="role">
+						for _, r := range []string{"user", "admin"} {
+							<option value={ r } selected?={ d.Form.Values["role"] == r }>{ T(ctx, "admin.role." + r) }</option>
+						}
+					</select>
+				</div>
+			</div>
+			<p class="app-hint">{ T(ctx, "admin.invite.hint") }</p>
+			<div class="app-actions">
+				@ui.Button(ui.ButtonProps{Label: T(ctx, "admin.invite.create"), Type: "submit", Variant: "primary", Icon: "plus",
+					Attrs: templ.Attributes{"data-invite": ""}})
+			</div>
+		</form>
+		if len(d.Invites) > 0 {
+			<section aria-labelledby="adm-invites">
+				<h2 id="adm-invites">{ T(ctx, "admin.invites") }</h2>
+				<ul class="adm-list">
+					for _, i := range d.Invites {
+						<li class="adm-row" data-invite-row={ i.Email }>
+							<span class="adm-who">
+								<span class="adm-name">{ i.Email }</span>
+								<span class="adm-meta">{ T(ctx, "admin.role." + i.Role) } · { T(ctx, "admin.invite.expires", "time", i.Expires) }</span>
+							</span>
+							<form method="post" action={ templ.SafeURL("/admin/invites/" + i.ID + "/revoke") } data-confirm={ T(ctx, "admin.invite.revoke_confirm", "email", i.Email) }>
+								@ui.Button(ui.ButtonProps{Label: T(ctx, "admin.invite.revoke"), Type: "submit", Size: "sm", Variant: "ghost", Icon: "x"})
+							</form>
+						</li>
+					}
+				</ul>
+			</section>
+		}
+		<section aria-labelledby="adm-users">
+			<h2 id="adm-users">{ T(ctx, "admin.users.list", "n", len(d.Users)) }</h2>
+			<ul class="adm-list">
+				for _, u := range d.Users {
+					<li class="adm-row" data-user={ u.Email }>
+						@ui.Avatar(u.Name)
+						<span class="adm-who">
+							<span class="adm-name">
+								{ u.Name }
+								if u.Role == "admin" {
+									@ui.Badge(T(ctx, "admin.role.admin"), ui.Accent)
+								}
+							</span>
+							<span class="adm-meta">{ u.Email }</span>
+							<span class="adm-meta">{ T(ctx, "admin.users.seen", "time", u.LastSeen, "n", u.Sessions) }</span>
+						</span>
+						if u.Self {
+							<span class="adm-meta">{ T(ctx, "admin.users.you") }</span>
+						} else {
+							<div class="adm-actions">
+								<form method="post" action={ templ.SafeURL("/admin/users/" + u.ID + "/role") }>
+									if u.Role == "admin" {
+										<input type="hidden" name="role" value="user"/>
+										@ui.Button(ui.ButtonProps{Label: T(ctx, "admin.users.make_user"), Type: "submit", Size: "sm"})
+									} else {
+										<input type="hidden" name="role" value="admin"/>
+										@ui.Button(ui.ButtonProps{Label: T(ctx, "admin.users.make_admin"), Type: "submit", Size: "sm"})
+									}
+								</form>
+								<form method="post" action={ templ.SafeURL("/admin/users/" + u.ID + "/sign-out") }>
+									@ui.Button(ui.ButtonProps{Label: T(ctx, "admin.users.sign_out"), Type: "submit", Size: "sm", Icon: "logout",
+										Disabled: u.Sessions == 0, Attrs: templ.Attributes{"data-sign-out": ""}})
+								</form>
+								<form method="post" action={ templ.SafeURL("/admin/users/" + u.ID + "/delete") } data-confirm={ T(ctx, "admin.users.delete_confirm", "email", u.Email) }>
+									@ui.Button(ui.ButtonProps{Label: T(ctx, "admin.users.delete"), Type: "submit", Size: "sm", Variant: "danger", Icon: "trash"})
+								</form>
+							</div>
+						}
+					</li>
+				}
+			</ul>
+		</section>
+		<section aria-labelledby="adm-audit">
+			<h2 id="adm-audit">{ T(ctx, "admin.audit") }</h2>
+			if len(d.Audit) == 0 {
+				<p class="app-hint">{ T(ctx, "admin.audit.none") }</p>
+			} else {
+				<ul class="adm-audit">
+					for _, a := range d.Audit {
+						<li><time>{ a.At }</time> <span>{ a.Text }</span></li>
+					}
+				</ul>
+			}
+		</section>
+	}
+}
+
+templ AdminSystemPage(d AdminSystemData) {
+	@adminPage(d.Name, "admin.system", "/admin/system") {
+		<p class="app-hint">{ T(ctx, "admin.system.intro") }</p>
+		<dl class="adm-facts">
+			for _, r := range d.Rows {
+				<div>
+					<dt>{ T(ctx, r.Key) }</dt>
+					<dd>
+						if r.Tone != "" {
+							@ui.Badge(r.Value, r.Tone)
+						} else {
+							{ r.Value }
+						}
+					</dd>
+				</div>
+			}
+		</dl>
+	}
+}

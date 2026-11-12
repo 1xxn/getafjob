@@ -24,7 +24,9 @@ templ navLink(it navItem, path string, counts *NavCounts) {
 templ shellNav(prefix string, s Shell, counts *NavCounts) {
 	<nav class="shell-nav" aria-label={ T(ctx, "nav.main") }>
 		for gi, g := range navGroups {
-			if g.Key != "" {
+			if g.Admin && !s.Admin {
+				// admins only
+			} else if g.Key != "" {
 				<p class="shell-group" id={ prefix + "-g" + itoa(gi) }>{ T(ctx, g.Key) }</p>
 				<ul aria-labelledby={ prefix + "-g" + itoa(gi) }>
 					for _, it := range g.Items {
@@ -142,12 +144,16 @@ templ palette(s Shell) {
 		<ul id="palette-list" class="palette-list" role="listbox" aria-label={ T(ctx, "nav.palette.title") }>
 			for gi, g := range navGroups {
 				for ii, it := range g.Items {
-					<li role="option" id={ "pal-" + itoa(gi) + "-" + itoa(ii) } aria-selected="false">
-						<a href={ templ.SafeURL(it.Href) } tabindex="-1">
-							@ui.Icon(it.Icon)
-							<span>{ T(ctx, it.Key) }</span>
-						</a>
-					</li>
+					if g.Admin && !s.Admin {
+						// admins only
+					} else {
+						<li role="option" id={ "pal-" + itoa(gi) + "-" + itoa(ii) } aria-selected="false">
+							<a href={ templ.SafeURL(it.Href) } tabindex="-1">
+								@ui.Icon(it.Icon)
+								<span>{ T(ctx, it.Key) }</span>
+							</a>
+						</li>
+					}
 				}
 			}
 			<li role="option" id="pal-jobs" aria-selected="false" data-template={ T(ctx, "nav.palette.jobs", "q", "{q}") } hidden>

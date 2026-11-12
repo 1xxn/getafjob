@@ -50,6 +50,7 @@ type navItem struct {
 type navGroup struct {
 	Key   string // catalog key of the heading; empty: no heading
 	Items []navItem
+	Admin bool // shown to admins only
 }
 
 // navGroups follow docs/ui/sitemap.md; pages that do not exist yet join their group when they are built.
@@ -74,6 +75,10 @@ var navGroups = []navGroup{
 	{Key: "nav.group.settings", Items: []navItem{
 		{Key: "nav.preferences", Href: "/settings/search", Icon: "settings"},
 		{Key: "nav.account", Href: "/settings/account", Icon: "lock"},
+	}},
+	{Key: "nav.group.admin", Admin: true, Items: []navItem{
+		{Key: "admin.users", Href: "/admin/users", Icon: "users"},
+		{Key: "admin.system", Href: "/admin/system", Icon: "server"},
 	}},
 }
 

@@ -3560,6 +3560,119 @@
     background: var(--surface);
   }
 
+  /* admin console (#183) */
+  .adm-invite-fields {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    gap: var(--space-3) var(--space-4);
+  }
+
+  @media (min-width: 40rem) {
+    .adm-invite-fields {
+      grid-template-columns: minmax(0, 2fr) minmax(0, 1fr);
+    }
+  }
+
+  .adm-invite h2,
+  .set-main h2 {
+    margin: 0;
+    font-size: var(--text-md);
+  }
+
+  .adm-link {
+    display: grid;
+    gap: var(--space-2);
+  }
+
+  .adm-list {
+    display: grid;
+    margin: var(--space-2) 0 0;
+    padding: 0;
+    border: 1px solid var(--border);
+    border-radius: var(--radius-md);
+    background: var(--surface);
+    list-style: none;
+  }
+
+  .adm-row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--space-2) var(--space-3);
+    align-items: center;
+    padding: var(--space-3);
+  }
+
+  .adm-row + .adm-row {
+    border-top: 1px solid var(--border);
+  }
+
+  .adm-who {
+    display: grid;
+    flex: 1 1 14rem;
+    min-width: 0;
+  }
+
+  .adm-name {
+    display: flex;
+    gap: var(--space-2);
+    align-items: center;
+    font-weight: 600;
+    overflow-wrap: anywhere;
+  }
+
+  .adm-meta {
+    color: var(--text-2);
+    font-size: var(--text-sm);
+    overflow-wrap: anywhere;
+  }
+
+  .adm-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--space-2);
+  }
+
+  .adm-audit {
+    display: grid;
+    gap: var(--space-1);
+    margin: var(--space-2) 0 0;
+    padding: 0;
+    list-style: none;
+    font-size: var(--text-sm);
+  }
+
+  .adm-audit time {
+    color: var(--text-2);
+  }
+
+  .adm-facts {
+    display: grid;
+    margin: 0;
+    border: 1px solid var(--border);
+    border-radius: var(--radius-md);
+    background: var(--surface);
+  }
+
+  .adm-facts > div {
+    display: grid;
+    grid-template-columns: minmax(0, 2fr) minmax(0, 3fr);
+    gap: var(--space-3);
+    padding: var(--space-2) var(--space-3);
+  }
+
+  .adm-facts > div + div {
+    border-top: 1px solid var(--border);
+  }
+
+  .adm-facts dt {
+    color: var(--text-2);
+  }
+
+  .adm-facts dd {
+    margin: 0;
+    overflow-wrap: anywhere;
+  }
+
   /* onboarding wizard (#184) */
   .wiz {
     display: grid;
