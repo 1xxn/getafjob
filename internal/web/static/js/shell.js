@@ -186,8 +186,18 @@ document.addEventListener("submit", (e) => {
 window.addEventListener("beforeunload", (e) => {
   if (dirty()) e.preventDefault();
 });
+var running = /* @__PURE__ */ new Set();
+document.addEventListener("htmx:before:request", (e) => {
+  const ctx = e.detail?.ctx;
+  if (ctx) running.add(ctx);
+});
+document.addEventListener("htmx:finally:request", (e) => {
+  const ctx = e.detail?.ctx;
+  if (ctx) running.delete(ctx);
+});
 window.addEventListener("pagehide", () => {
-  document.querySelectorAll(".htmx-request").forEach((el) => el.dispatchEvent(new Event("htmx:abort")));
+  for (const ctx of running) ctx.request?.abort?.();
+  running.clear();
 });
 document.addEventListener(
   "click",
