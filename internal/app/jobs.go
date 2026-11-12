@@ -7,7 +7,9 @@ import (
 	"slices"
 	"time"
 
+	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/riverqueue/river"
 	"github.com/riverqueue/river/rivertype"
 	"go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp"
@@ -16,6 +18,7 @@ import (
 	"github.com/1xxn/getafjob/internal/discovery"
 	"github.com/1xxn/getafjob/internal/discovery/adapters/sources"
 	"github.com/1xxn/getafjob/internal/platform/config"
+	"github.com/1xxn/getafjob/internal/platform/events"
 	"github.com/1xxn/getafjob/internal/platform/netguard"
 	"github.com/1xxn/getafjob/internal/platform/queue"
 	"github.com/1xxn/getafjob/internal/privacy"
@@ -48,6 +51,19 @@ type crawlWorker struct {
 	logger  *slog.Logger
 	timeout time.Duration
 	metrics *crawlMetrics
+	notify  notifier
+}
+
+// notifier tells open pages about progress (crawl, rating); uuid.Nil reaches every user.
+type notifier func(ctx context.Context, topic, event string, user uuid.UUID)
+
+// pageNotifier sends progress over the event channel; a failure only costs a live refresh, so it is logged.
+func pageNotifier(pool *pgxpool.Pool, logger *slog.Logger) notifier {
+	return func(ctx context.Context, topic, event string, user uuid.UUID) {
+		if err := events.Notify(context.WithoutCancel(ctx), pool, topic, event, user); err != nil {
+			logger.WarnContext(ctx, "page event not sent", "topic", topic, "err", err)
+		}
+	}
 }
 
 // Timeout bounds one crawl (a crawl with detail requests takes minutes, not hours).
@@ -55,6 +71,10 @@ func (w *crawlWorker) Timeout(*river.Job[CrawlArgs]) time.Duration { return w.ti
 
 func (w *crawlWorker) Work(ctx context.Context, _ *river.Job[CrawlArgs]) error {
 	start := time.Now()
+	if w.notify != nil {
+		w.notify(ctx, events.TopicCrawl, "started", uuid.Nil)
+		defer w.notify(ctx, events.TopicCrawl, "finished", uuid.Nil)
+	}
 	terms, err := w.terms(ctx)
 	if err != nil {
 		return err

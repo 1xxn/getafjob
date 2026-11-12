@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/1xxn/getafjob/internal/identity"
+	"github.com/1xxn/getafjob/internal/platform/events"
 )
 
 // eventHeartbeat keeps proxies from closing an idle stream.
@@ -35,12 +36,12 @@ func (s *Server) eventStream(w http.ResponseWriter, r *http.Request, u *identity
 	last, _ := strconv.ParseUint(r.Header.Get("Last-Event-ID"), 10, 64)
 	past, ch, cancel := s.Events.Subscribe(u.ID, last)
 	defer cancel()
-	send := func(id uint64, data any) bool {
+	send := func(id uint64, data events.Event) bool {
 		b, err := json.Marshal(data)
 		if err != nil {
 			return true
 		}
-		if _, err := fmt.Fprintf(w, "id: %d\nevent: app\ndata: %s\n\n", id, b); err != nil {
+		if _, err := fmt.Fprintf(w, "id: %d\nevent: %s\ndata: %s\n\n", id, eventName(data), b); err != nil {
 			return false
 		}
 		return rc.Flush() == nil
@@ -70,4 +71,13 @@ func (s *Server) eventStream(w http.ResponseWriter, r *http.Request, u *identity
 			}
 		}
 	}
+}
+
+// eventName is the SSE event type: "jobs" for the crawl and new ratings (job lists, the dashboard), "app" for
+// application changes and mailbox suggestions.
+func eventName(e events.Event) string {
+	if e.Topic == events.TopicCrawl || e.Topic == events.TopicMatches {
+		return "jobs"
+	}
+	return "app"
 }

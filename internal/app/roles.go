@@ -228,8 +228,9 @@ func worker(ctx context.Context, cfg config.Config, logger *slog.Logger) error {
 	pstore := profilestore.New(pool)
 	mstore := matchingstore.New(pool)
 	river.AddWorker(workers, &crawlWorker{svc: discovery.NewService(store), boards: store, states: store, client: client,
-		terms: preferenceTerms(pstore, logger), logger: logger, timeout: 90 * time.Minute, metrics: metrics})
-	river.AddWorker(workers, &matchWorker{logger: logger, svc: matching.NewService(
+		terms: preferenceTerms(pstore, logger), logger: logger, timeout: 90 * time.Minute, metrics: metrics,
+		notify: pageNotifier(pool, logger)})
+	river.AddWorker(workers, &matchWorker{logger: logger, notify: pageNotifier(pool, logger), svc: matching.NewService(
 		profileCriteria{svc: profile.NewService(pstore, env), store: pstore}, mstore, mstore)})
 	river.AddWorker(workers, &boardDiscoveryWorker{
 		discovery: discovery.NewBoardDiscovery(store, store, sources.NewFinder(client)), logger: logger, metrics: metrics})

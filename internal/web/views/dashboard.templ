@@ -127,7 +127,7 @@ templ Dashboard(d DashboardData) {
 
 // DashboardBody is the live part of the dashboard; it morphs on live events, so running pictures keep playing.
 templ DashboardBody(d DashboardData) {
-	<div id="dashboard" class="dash" { HX(ctx, "hx-get", "/dashboard", "hx-trigger", "getafjob:app from:body delay:700ms", "hx-swap", "outerMorph transition:false")... }>
+	<div id="dashboard" class="dash" { HX(ctx, "hx-get", "/dashboard", "hx-trigger", "getafjob:app from:body delay:700ms, getafjob:jobs from:body delay:700ms", "hx-swap", "outerMorph transition:false")... }>
 		if d.fresh() {
 			@ui.EmptyState(ui.EmptyProps{Icon: "briefcase", Title: T(ctx, "dash.start.title"), Text: T(ctx, "dash.start.text")}) {
 				if d.ProfileMissing > 0 {
