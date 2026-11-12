@@ -1,4 +1,4 @@
-// Job list island: the bulk bar counts the selected jobs, and the list answers single keys while focus is inside
+// Job list island (also the bulk bars of applications and approvals): the bulk bar counts the selected rows, and the list answers single keys while focus is inside
 // it (j/k move, a apply, s save, x skip), so the keys never fire elsewhere (WCAG 2.1.4). Texts come from the page.
 
 function rows(list: Element): HTMLElement[] {
@@ -15,7 +15,14 @@ function updateCount(): void {
 }
 
 document.addEventListener('change', (e) => {
-  if ((e.target as Element).matches?.('input.job-check')) updateCount();
+  const target = e.target as HTMLInputElement;
+  // "Select all" ticks every row checkbox that belongs to the same bulk form.
+  if (target.matches?.('input[data-select-all]')) {
+    for (const box of document.querySelectorAll<HTMLInputElement>(`input.job-check[form="${target.getAttribute('form') ?? ''}"]`)) {
+      box.checked = target.checked;
+    }
+  }
+  if (target.matches?.('input.job-check, input[data-select-all]')) updateCount();
 });
 
 function act(row: HTMLElement, action: string): void {

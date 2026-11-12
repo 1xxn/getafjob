@@ -11,7 +11,13 @@ function updateCount() {
   bulk.classList.toggle("jobs-bulk-active", n > 0);
 }
 document.addEventListener("change", (e) => {
-  if (e.target.matches?.("input.job-check")) updateCount();
+  const target = e.target;
+  if (target.matches?.("input[data-select-all]")) {
+    for (const box of document.querySelectorAll(`input.job-check[form="${target.getAttribute("form") ?? ""}"]`)) {
+      box.checked = target.checked;
+    }
+  }
+  if (target.matches?.("input.job-check, input[data-select-all]")) updateCount();
 });
 function act(row, action) {
   const form = document.getElementById("row-action");

@@ -2,9 +2,11 @@ package web
 
 import (
 	"net/http"
+	"slices"
 
 	"github.com/google/uuid"
 
+	"github.com/1xxn/getafjob/internal/application"
 	"github.com/1xxn/getafjob/internal/identity"
 	"github.com/1xxn/getafjob/internal/web/views"
 )
@@ -56,15 +58,12 @@ func (s *Server) approvalsPage(w http.ResponseWriter, r *http.Request, u *identi
 			})
 		}
 	}
-	notice := ""
-	if r.URL.Query().Get("approved") == "1" {
-		notice = views.T(r.Context(), "approvals.approved")
+	d := views.ApprovalsData{Name: u.DisplayName, Rows: rows}
+	if partial(r) {
+		s.render(w, r, http.StatusOK, views.ApprovalsList(d))
+		return
 	}
-	s.render(w, r, http.StatusOK, views.ApprovalsPage(views.ApprovalsData{
-		Name:   u.DisplayName,
-		Rows:   rows,
-		Notice: notice,
-	}))
+	s.render(w, r, http.StatusOK, views.ApprovalsPage(d))
 }
 
 func (s *Server) approvalApprove(w http.ResponseWriter, r *http.Request, u *identity.User) {
@@ -77,13 +76,88 @@ func (s *Server) approvalApprove(w http.ResponseWriter, r *http.Request, u *iden
 		s.notFound(w, r, u)
 		return
 	}
+	key := "flash.approvals.approve"
 	if s.Apps != nil {
 		if _, err := s.Apps.Approve(r.Context(), u.ID, appID); err != nil {
-			s.failed(w, r, u, err)
-			return
+			key = "flash.approvals.approve_none" // it moved on meanwhile
 		}
 	}
-	http.Redirect(w, r, "/approvals?approved=1", http.StatusSeeOther)
+	s.flash(w, key)
+	http.Redirect(w, r, "/approvals", http.StatusSeeOther)
+}
+
+// approvalBulkActions are the actions of the approval list's bulk bar.
+var approvalBulkActions = map[string]string{"approve": "approve", "reject": "reject"}
+
+// approvalsBulk approves the selected applications, or rejects them: a rejected one is skipped and never sent.
+func (s *Server) approvalsBulk(w http.ResponseWriter, r *http.Request, u *identity.User) {
+	if u == nil {
+		http.Redirect(w, r, "/login", http.StatusSeeOther)
+		return
+	}
+	if err := r.ParseForm(); err != nil {
+		http.Error(w, "bad request", http.StatusBadRequest)
+		return
+	}
+	action, known := approvalBulkActions[r.PostFormValue("action")]
+	var ids []uuid.UUID
+	for _, v := range r.PostForm["ids"] {
+		if id, err := uuid.Parse(v); err == nil && !slices.Contains(ids, id) {
+			ids = append(ids, id)
+		}
+	}
+	if !known || len(ids) == 0 || len(ids) > appsPageSize || s.Apps == nil {
+		http.Redirect(w, r, "/approvals", http.StatusSeeOther)
+		return
+	}
+	done := 0
+	for _, id := range ids {
+		var err error
+		if action == "approve" {
+			_, err = s.Apps.Approve(r.Context(), u.ID, id)
+		} else {
+			_, err = s.Apps.Fire(r.Context(), u.ID, id, application.EvSkip, application.ActorUser,
+				map[string]any{"reason": "rejected at approval"})
+		}
+		if err != nil {
+			s.Logger.DebugContext(r.Context(), "approval refused", "action", action, "app", id, "err", err)
+			continue
+		}
+		done++
+	}
+	key := "flash.approvals." + action
+	switch {
+	case done == 0:
+		key += "_none"
+	case done < len(ids):
+		key += "_partial"
+	}
+	s.flash(w, key)
+	http.Redirect(w, r, "/approvals", http.StatusSeeOther)
+}
+
+// approvalReview renders what an approval would send, for the review drawer.
+func (s *Server) approvalReview(w http.ResponseWriter, r *http.Request, u *identity.User) {
+	if u == nil {
+		http.Error(w, "unauthorized", http.StatusUnauthorized)
+		return
+	}
+	appID, err := uuid.Parse(r.PathValue("id"))
+	if err != nil {
+		s.notFound(w, r, u)
+		return
+	}
+	d, ok := s.applicationDetail(w, r, u, appID)
+	if !ok {
+		return
+	}
+	var cv views.CVVariantData
+	if s.Jobs != nil {
+		if j, err := s.Jobs.Detail(r.Context(), u.ID, d.JobID); err == nil {
+			cv = s.buildCVVariantData(r.Context(), u.ID, j, "")
+		}
+	}
+	s.render(w, r, http.StatusOK, views.ApprovalReview(d, cv))
 }
 
 func (s *Server) approvalSetCV(w http.ResponseWriter, r *http.Request, u *identity.User) {

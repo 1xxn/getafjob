@@ -26,7 +26,9 @@ var flashKeys = map[string]bool{"flash.language": true,
 	"flash.jobs.not_queued.company": true, "flash.jobs.not_queued.excluded": true, "flash.jobs.not_queued.other": true,
 	"flash.apps.retry": true, "flash.apps.retry_partial": true, "flash.apps.retry_none": true, "flash.apps.park": true,
 	"flash.apps.park_partial": true, "flash.apps.park_none": true, "flash.apps.sent": true, "flash.apps.not_sent": true,
-	"flash.apps.unchanged": true, "flash.apps.notes": true}
+	"flash.apps.unchanged": true, "flash.apps.notes": true,
+	"flash.approvals.approve": true, "flash.approvals.approve_partial": true, "flash.approvals.approve_none": true,
+	"flash.approvals.reject": true, "flash.approvals.reject_partial": true, "flash.approvals.reject_none": true}
 
 // flash leaves a one-time message (a key of flashKeys) for the page the redirect leads to.
 func (s *Server) flash(w http.ResponseWriter, key string) {
