@@ -19,6 +19,9 @@ import (
 	"github.com/1xxn/getafjob/internal/web/views/ui"
 )
 
+// bulkActions are the actions of the job list's bulk bar.
+var bulkActions = map[string]string{"queue": "queue", "save": "save", "skip": "skip", "block": "block"}
+
 // maxBulk bounds one bulk action (one page of the list).
 const maxBulk = matching.PageSize
 
@@ -355,14 +358,14 @@ func (s *Server) jobsBulk(w http.ResponseWriter, r *http.Request, u *identity.Us
 	if !strings.HasPrefix(back, "/jobs") {
 		back = "/jobs"
 	}
-	action := r.PostFormValue("action")
+	action, known := bulkActions[r.PostFormValue("action")] // the constant, never the request's text
 	var ids []int64
 	for _, v := range r.PostForm["ids"] {
 		if id, err := strconv.ParseInt(v, 10, 64); err == nil && id > 0 && !slices.Contains(ids, id) {
 			ids = append(ids, id)
 		}
 	}
-	if len(ids) == 0 || len(ids) > maxBulk || !slices.Contains([]string{"queue", "save", "skip", "block"}, action) ||
+	if len(ids) == 0 || len(ids) > maxBulk || !known ||
 		s.Apps == nil {
 		http.Redirect(w, r, back, http.StatusSeeOther) //nolint:gosec // localBack keeps only paths on this site
 		return
