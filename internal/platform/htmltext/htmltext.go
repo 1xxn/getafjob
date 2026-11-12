@@ -41,7 +41,12 @@ func Text(raw string) string {
 	var b strings.Builder
 	skip := 0
 	for {
-		switch z.Next() {
+		tt := z.Next()
+		// A dropped tag must not join a "<" before it with the text after it into a new tag ("<<a>script").
+		if tt != xhtml.TextToken && tt != xhtml.ErrorToken && strings.HasSuffix(b.String(), "<") {
+			b.WriteByte(' ')
+		}
+		switch tt {
 		case xhtml.ErrorToken:
 			out := spaces.ReplaceAllString(b.String(), " ")
 			out = blank.ReplaceAllString(out, "\n\n")
