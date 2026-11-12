@@ -31,8 +31,11 @@ func TestApplications(t *testing.T) {
 	tab.WaitFor("location.pathname === '/applications/" + app + "'")
 	tab.WaitFor("document.getElementById('app-head')?.dataset.state === 'parked'")
 	tab.Shot("parked")
+	// Retry posts and loads the page again: wait for the new page, not for a live update of the old one.
+	tab.Eval("document.body.dataset.e2e = 'old'; return true")
 	tab.Click(`#app-head [data-action="apps.action.retry"]`)
-	tab.WaitWithin(15*time.Second, "['queued', 'running', 'needs_input'].includes(document.getElementById('app-head')?.dataset.state)")
+	tab.WaitWithin(15*time.Second, "document.readyState === 'complete' && document.body.dataset.e2e !== 'old' && "+
+		"['queued', 'running', 'needs_input'].includes(document.getElementById('app-head')?.dataset.state)")
 	tab.Eval("window.__e2e = 1; return true")
 	tab.WaitWithin(60*time.Second, "document.getElementById('app-head')?.dataset.state !== 'queued'")
 	if tab.Eval("return window.__e2e") != "1" {

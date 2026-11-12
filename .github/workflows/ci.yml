@@ -290,7 +290,7 @@ jobs:
       - name: demo data on the fixture site
         run: >-
           docker compose -f deploy/compose.yaml -f deploy/compose.dev.yaml exec -T serve
-          /usr/local/bin/getafjob admin demo -jobs 50 -fixtures http://fixtures:8080
+          /usr/local/bin/getafjob admin demo -jobs 50 -fixtures http://fixtures:8080 -autonomy suggest
       - name: journeys in the runner image (fresh invited user, sandbox on)
         run: go tool task test:e2e
       - name: screenshots

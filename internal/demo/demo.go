@@ -159,12 +159,33 @@ var FixturePages = []string{"posting.html", "greenhouse_like.html", "lever_appli
 	"personio_application.html", "smartrecruiters_application.html", "recruitee_application.html",
 	"teamtailor_application.html"}
 
+// questionPages are fixture pages whose form asks the demo users something their profile does not answer, so a
+// run there stops in needs input before it waits for the approval.
+var questionPages = []string{"posting.html", "greenhouse_like.html", "lever_application.html", "recruitee_application.html",
+	"teamtailor_application.html", "ashby_application.html"}
+
 // Companies returns the invented company names the postings use.
 func Companies() []string { return slices.Clone(companies) }
+
+// Fresh returns n postings on the fixture site at base, each at a company of its own named after tag, so no
+// company window or earlier application stands in the way: one per end to end journey that starts a run.
+func Fresh(n int, tag string, base *url.URL, now time.Time) []discovery.Posting {
+	out := make([]discovery.Posting, n)
+	for i := range out {
+		company := fmt.Sprintf("Fixture %s-%d GmbH", tag, i+1)
+		ro := roles[1] // Go Developer: a match for every demo user who looks for Go, excluded for nobody
+		out[i] = discovery.Posting{Source: Source, ExternalID: fmt.Sprintf("fresh-%s-%d", tag, i+1), Company: company,
+			Title: ro.en, Location: "Remote - Germany", Workplace: discovery.WorkplaceRemote,
+			URL:         base.JoinPath(questionPages[i%len(questionPages)]).String() + fmt.Sprintf("?job=fresh-%s-%d", tag, i+1),
+			Description: description(rand.New(rand.NewPCG(uint64(i), 1)), ro, company, false), //nolint:gosec // demo data
+			Posted:      now.Format(time.DateOnly)}
+	}
+	return out
+}
 
 // PointAt lets the postings link to the fixture site at base, so runs in development apply to fixtures only.
 func PointAt(postings []discovery.Posting, base *url.URL) {
 	for i := range postings {
-		postings[i].URL = base.JoinPath(FixturePages[i%len(FixturePages)]).String() + "?job=" + postings[i].ExternalID
+		postings[i].URL = base.JoinPath(questionPages[i%len(questionPages)]).String() + "?job=" + postings[i].ExternalID
 	}
 }

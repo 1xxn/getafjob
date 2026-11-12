@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"io"
 	"net/url"
+	"strconv"
 	"strings"
 	"time"
 
@@ -31,7 +32,10 @@ import (
 	profilestore "github.com/1xxn/getafjob/internal/profile/adapters/pgstore"
 )
 
-const maxDemoJobs = 50_000
+const (
+	maxDemoJobs = 50_000
+	maxFresh    = 100
+)
 
 // adminDemo fills a development database with invented users, profiles and jobs and matches them.
 func adminDemo(ctx context.Context, args []string, env Env) int {
@@ -42,8 +46,10 @@ func adminDemo(ctx context.Context, args []string, env Env) int {
 	force := fs.Bool("force", false, "also run when GETAFJOB_PUBLIC_URL is not a local address")
 	fixtures := fs.String("fixtures", "", "point the postings at this fixture site (development stack: http://fixtures:8080)")
 	autonomy := fs.String("autonomy", "", "autonomy level of the demo users: suggest, approve or autonomous (empty: keep)")
-	if err := fs.Parse(args); err != nil || fs.NArg() != 0 || *jobs < 0 || *jobs > maxDemoJobs || !validLevel(*autonomy) {
-		_, _ = fmt.Fprintln(env.Stderr, "usage: getafjob admin demo [-jobs 2000] [-seed 1] [-fixtures URL] [-autonomy suggest|approve|autonomous] [-force]")
+	fresh := fs.Int("fresh", 0, "also add this many fixture postings, each at a new company, and print their ids (needs -fixtures)")
+	if err := fs.Parse(args); err != nil || fs.NArg() != 0 || *jobs < 0 || *jobs > maxDemoJobs || !validLevel(*autonomy) ||
+		*fresh < 0 || *fresh > maxFresh || (*fresh > 0 && *fixtures == "") {
+		_, _ = fmt.Fprintln(env.Stderr, "usage: getafjob admin demo [-jobs 2000] [-seed 1] [-fixtures URL [-fresh 8]] [-autonomy suggest|approve|autonomous] [-force]")
 		return ExitUsage
 	}
 	level := application.Level(*autonomy)
@@ -84,7 +90,7 @@ func adminDemo(ctx context.Context, args []string, env Env) int {
 		}
 		docs = profile.NewDocuments(profilestore.New(pool), blob.NewSealed(files, envelope), envelope)
 	}
-	st, err := seedDemo(ctx, pool, envelope, cfg.PublicURL, *jobs, *seed, time.Now(), site, docs, level, env.Stdout)
+	st, err := seedDemo(ctx, pool, envelope, cfg.PublicURL, *jobs, *seed, time.Now(), site, *fresh, docs, level, env.Stdout)
 	if err != nil {
 		_, _ = fmt.Fprintln(env.Stderr, "demo failed:", err)
 		return ExitError
@@ -115,7 +121,7 @@ func localURL(u *url.URL) bool {
 
 // seedDemo creates the demo users (or reuses them), saves their profiles, upserts the postings and matches them.
 func seedDemo(ctx context.Context, pool *pgxpool.Pool, sealer profile.Sealer, public *url.URL, jobs int, seed uint64,
-	now time.Time, fixtures *url.URL, docs *profile.Documents, level application.Level, out io.Writer,
+	now time.Time, fixtures *url.URL, fresh int, docs *profile.Documents, level application.Level, out io.Writer,
 ) (matching.Stats, error) {
 	apps := application.NewService(applicationstore.New(pool))
 	ids := identity.NewService(pgstore.New(pool), nil, public)
@@ -178,6 +184,15 @@ func seedDemo(ctx context.Context, pool *pgxpool.Pool, sealer profile.Sealer, pu
 		return matching.Stats{}, err
 	}
 	_, _ = fmt.Fprintf(out, "postings: %d (%d new)\n", stats.Fetched, stats.Changes[discovery.ChangeNew])
+	if fresh > 0 {
+		for _, p := range demo.Fresh(fresh, strconv.FormatInt(now.UnixNano(), 36), fixtures, now) {
+			id, _, err := ds.UpsertPosting(ctx, p, now)
+			if err != nil {
+				return matching.Stats{}, err
+			}
+			_, _ = fmt.Fprintf(out, "fixture job %d\n", id)
+		}
+	}
 
 	ms := matchingstore.New(pool)
 	return matching.NewService(profileCriteria{svc: profiles, store: pstore}, ms, ms).Run(ctx, users)

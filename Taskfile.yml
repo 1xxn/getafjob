@@ -100,8 +100,9 @@ tasks:
 
   test:e2e:
     desc: >-
-      End to end journeys against the running dev stack (dev:up and admin demo first): a fresh invited user, the
-      runner image's Chromium on the internal edge network, screenshots in bin/e2e/out
+      End to end journeys against the running dev stack (dev:up and admin demo -autonomy suggest first): a fresh
+      invited user, fresh fixture jobs for the journeys that start runs, the runner image's Chromium on the internal
+      edge network, screenshots in bin/e2e/out
     env:
       CGO_ENABLED: "0"
       GOOS: linux
@@ -118,13 +119,15 @@ tasks:
           -email "e2e-$(date +%s)@example.org" | head -n 1)" &&
           admin_invite="$({{.COMPOSE}} exec -T serve /usr/local/bin/getafjob admin invite -role admin
           -email "e2e-admin-$(date +%s)@example.org" | head -n 1)" &&
+          jobs="$({{.COMPOSE}} exec -T serve /usr/local/bin/getafjob admin demo -jobs 0 -fresh 8
+          -fixtures http://fixtures:8080 | sed -n 's/^fixture job //p' | paste -sd, -)" &&
           id="$(docker create --read-only --tmpfs /tmp:rw,size=512m --shm-size=512m
           --cap-drop ALL --security-opt no-new-privileges
           --security-opt seccomp=deploy/seccomp/chromium.json
           --network getafjob_edge
           -v "{{.ROOT_DIR}}/bin/e2e:/e2e"
           -e GETAFJOB_E2E_INVITE="$invite" -e GETAFJOB_E2E_ADMIN_INVITE="$admin_invite" -e GETAFJOB_E2E_DOCS="{{.DOCS}}" -e GETAFJOB_E2E_CA=/e2e/caddy-intermediate.crt -e GETAFJOB_E2E_OUT=/e2e/out
-          -e GETAFJOB_E2E_MAILPIT=http://mailpit:8025
+          -e GETAFJOB_E2E_MAILPIT=http://mailpit:8025 -e GETAFJOB_E2E_JOBS="$jobs"
           --entrypoint /e2e/e2e.test {{.RUNNER_IMAGE}} -test.v {{.CLI_ARGS}})" &&
           docker network connect getafjob_devtools "$id" &&
           { docker start -a "$id"; rc=$?; docker rm "$id" > /dev/null; exit $rc; }
