@@ -222,3 +222,12 @@ ORDER BY 1;
 
 -- name: StatesByJob :many
 SELECT job_id, state FROM applications WHERE user_id = $1 AND job_id = ANY (sqlc.arg(job_ids)::bigint[]);
+
+-- name: AnswerUsage :many
+-- How many applications used each answer of the bank (provenance "answer#<id>" in the filled fields).
+SELECT substring(f->>'source' from 8)::text AS answer_id, count(DISTINCT r.application_id)::integer AS n
+FROM run_checkpoints c
+JOIN runs r ON r.id = c.run_id
+CROSS JOIN LATERAL jsonb_array_elements(CASE WHEN jsonb_typeof(c.data->'filled') = 'array' THEN c.data->'filled' ELSE '[]'::jsonb END) f
+WHERE c.user_id = $1 AND f->>'source' LIKE 'answer#%'
+GROUP BY 1;

@@ -157,7 +157,7 @@ func (s *Server) profilePage(w http.ResponseWriter, r *http.Request, u *identity
 		s.failed(w, r, u, err)
 		return
 	}
-	s.render(w, r, http.StatusOK, views.ProfilePage(u.DisplayName, f, expRows, eduRows))
+	s.render(w, r, http.StatusOK, views.ProfilePage(u.DisplayName, s.candidateHead(r.Context(), u, "profile"), f, expRows, eduRows))
 }
 
 func (s *Server) profileSave(w http.ResponseWriter, r *http.Request, u *identity.User) {
@@ -180,11 +180,11 @@ func (s *Server) profileSave(w http.ResponseWriter, r *http.Request, u *identity
 	case errors.Is(err, profile.ErrInvalid):
 		f := profileForm(profile.Snapshot{Profile: p, Version: version})
 		f.Errors, f.Notice, f.Failed = fieldErrors(r, err), views.T(r.Context(), "profile.invalid"), true
-		s.render(w, r, http.StatusUnprocessableEntity, views.ProfilePage(u.DisplayName, f, expRows, eduRows))
+		s.render(w, r, http.StatusUnprocessableEntity, views.ProfilePage(u.DisplayName, s.candidateHead(r.Context(), u, "profile"), f, expRows, eduRows))
 	case errors.Is(err, profile.ErrConflict):
 		f := profileForm(snap)
 		f.Notice, f.Failed = views.T(r.Context(), "profile.conflict"), true
-		s.render(w, r, http.StatusConflict, views.ProfilePage(u.DisplayName, f, expRows, eduRows))
+		s.render(w, r, http.StatusConflict, views.ProfilePage(u.DisplayName, s.candidateHead(r.Context(), u, "profile"), f, expRows, eduRows))
 	default:
 		s.failed(w, r, u, err)
 	}

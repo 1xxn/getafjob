@@ -13,6 +13,41 @@ import (
 	"github.com/jackc/pgx/v5/pgtype"
 )
 
+const answerUsage = `-- name: AnswerUsage :many
+SELECT substring(f->>'source' from 8)::text AS answer_id, count(DISTINCT r.application_id)::integer AS n
+FROM run_checkpoints c
+JOIN runs r ON r.id = c.run_id
+CROSS JOIN LATERAL jsonb_array_elements(CASE WHEN jsonb_typeof(c.data->'filled') = 'array' THEN c.data->'filled' ELSE '[]'::jsonb END) f
+WHERE c.user_id = $1 AND f->>'source' LIKE 'answer#%'
+GROUP BY 1
+`
+
+type AnswerUsageRow struct {
+	AnswerID string
+	N        int32
+}
+
+// How many applications used each answer of the bank (provenance "answer#<id>" in the filled fields).
+func (q *Queries) AnswerUsage(ctx context.Context, userID uuid.UUID) ([]AnswerUsageRow, error) {
+	rows, err := q.db.Query(ctx, answerUsage, userID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []AnswerUsageRow{}
+	for rows.Next() {
+		var i AnswerUsageRow
+		if err := rows.Scan(&i.AnswerID, &i.N); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const applicationCheckpoints = `-- name: ApplicationCheckpoints :many
 SELECT c.id, c.run_id, c.step, c.page, c.url, c.data, c.screenshot, c.at
 FROM run_checkpoints c JOIN runs r ON r.id = c.run_id

@@ -151,7 +151,7 @@ document.addEventListener(
   "submit",
   (e) => {
     const form = e.target;
-    const text = form.dataset.confirm;
+    const text = e.submitter?.dataset.confirm || form.dataset.confirm;
     if (!text || confirmed === form) {
       confirmed = null;
       return;
@@ -170,6 +170,34 @@ document.addEventListener(
       form.requestSubmit(submitter instanceof HTMLButtonElement ? submitter : void 0);
     };
     dialog.showModal();
+  },
+  true
+);
+function dirty() {
+  return !!document.querySelector("form[data-dirty-guard][data-dirty]");
+}
+document.addEventListener("input", (e) => {
+  const form = e.target.closest?.("form[data-dirty-guard]");
+  if (form) form.dataset.dirty = "1";
+});
+document.addEventListener("submit", (e) => {
+  delete e.target.dataset.dirty;
+});
+window.addEventListener("beforeunload", (e) => {
+  if (dirty()) e.preventDefault();
+});
+document.addEventListener(
+  "click",
+  (e) => {
+    const link = e.target.closest?.("a[href]");
+    if (!link || !dirty() || link.getAttribute("href")?.startsWith("#")) return;
+    const text = document.querySelector("[data-t-unsaved]")?.dataset.tUnsaved ?? "";
+    if (window.confirm(text)) {
+      for (const f of document.querySelectorAll("form[data-dirty]")) delete f.dataset.dirty;
+      return;
+    }
+    e.preventDefault();
+    e.stopImmediatePropagation();
   },
   true
 );

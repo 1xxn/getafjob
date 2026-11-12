@@ -30,27 +30,27 @@ templ DocumentReviewPage(p DocumentReviewProps) {
 					@Notice("info", p.Notice)
 				}
 			}
-			<div class="card" style="margin-bottom: 1.5rem; background: var(--bg-surface, #f8f9fa); padding: 0.75rem 1rem; border-radius: 6px;">
+			<div class="card rv-intro">
 				<strong>{ T(ctx, "documents.file") }:</strong> { p.DocName }
 			</div>
 			<form method="post" action={ templ.SafeURL("/documents/" + p.DocID + "/review") }>
 				<input type="hidden" name="exp_count" value={ fmt.Sprintf("%d", len(p.Experiences)) }/>
 				<input type="hidden" name="edu_count" value={ fmt.Sprintf("%d", len(p.Educations)) }/>
 
-				<div style="margin-bottom: 2rem;">
+				<div class="rv-section">
 					<h3>{ T(ctx, "documents.review_exp_title") }</h3>
 					if len(p.Experiences) == 0 {
 						<p class="muted">{ T(ctx, "documents.review_exp_empty") }</p>
 					} else {
 						for i, exp := range p.Experiences {
-							<div class="card" style="margin-bottom: 1.25rem; border: 1px solid var(--border, #e5e7eb); padding: 1rem; border-radius: 6px;">
-								<div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 0.75rem;">
-									<label style="font-weight: 600; display: flex; align-items: center; gap: 0.5rem; cursor: pointer;">
+							<div class="card rv-item">
+								<div class="rv-row-head">
+									<label class="rv-check rv-strong">
 										<input type="checkbox" name={ fmt.Sprintf("include_exp_%d", i) } value="1" checked/>
 										{ T(ctx, "documents.review_include_position") } #{ fmt.Sprintf("%d", i+1) }
 									</label>
 								</div>
-								<div class="grid" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 0.75rem;">
+								<div class="grid rv-grid">
 									<div class="field">
 										<label>{ T(ctx, "profile.station.company") }</label>
 										<input type="text" name={ fmt.Sprintf("exp_%d_company", i) } value={ exp.Company } maxlength="200"/>
@@ -86,13 +86,13 @@ templ DocumentReviewPage(p DocumentReviewProps) {
 										<input type="text" name={ fmt.Sprintf("exp_%d_end", i) } value={ exp.EndDate } placeholder="YYYY-MM" maxlength="30"/>
 									</div>
 								</div>
-								<div style="margin-top: 0.5rem;">
-									<label style="display: flex; align-items: center; gap: 0.5rem; cursor: pointer;">
+								<div class="rv-mt-sm">
+									<label class="rv-check">
 										<input type="checkbox" name={ fmt.Sprintf("exp_%d_current", i) } value="1" checked?={ exp.IsCurrent }/>
 										{ T(ctx, "profile.station.is_current") }
 									</label>
 								</div>
-								<div class="field" style="margin-top: 0.75rem;">
+								<div class="field rv-mt">
 									<label>{ T(ctx, "profile.station.bullets") }</label>
 									<textarea name={ fmt.Sprintf("exp_%d_bullets", i) } rows="3" placeholder={ T(ctx, "documents.review_bullets_hint") }>{ strings.Join(exp.DescriptionBullets, "\n") }</textarea>
 								</div>
@@ -101,20 +101,20 @@ templ DocumentReviewPage(p DocumentReviewProps) {
 					}
 				</div>
 
-				<div style="margin-bottom: 2rem;">
+				<div class="rv-section">
 					<h3>{ T(ctx, "documents.review_edu_title") }</h3>
 					if len(p.Educations) == 0 {
 						<p class="muted">{ T(ctx, "documents.review_edu_empty") }</p>
 					} else {
 						for i, edu := range p.Educations {
-							<div class="card" style="margin-bottom: 1.25rem; border: 1px solid var(--border, #e5e7eb); padding: 1rem; border-radius: 6px;">
-								<div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 0.75rem;">
-									<label style="font-weight: 600; display: flex; align-items: center; gap: 0.5rem; cursor: pointer;">
+							<div class="card rv-item">
+								<div class="rv-row-head">
+									<label class="rv-check rv-strong">
 										<input type="checkbox" name={ fmt.Sprintf("include_edu_%d", i) } value="1" checked/>
 										{ T(ctx, "documents.review_include_education") } #{ fmt.Sprintf("%d", i+1) }
 									</label>
 								</div>
-								<div class="grid" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 0.75rem;">
+								<div class="grid rv-grid">
 									<div class="field">
 										<label>{ T(ctx, "profile.station.institution") }</label>
 										<input type="text" name={ fmt.Sprintf("edu_%d_institution", i) } value={ edu.Institution } maxlength="200"/>
@@ -140,8 +140,8 @@ templ DocumentReviewPage(p DocumentReviewProps) {
 										<input type="text" name={ fmt.Sprintf("edu_%d_end", i) } value={ edu.EndDate } placeholder="YYYY-MM" maxlength="30"/>
 									</div>
 								</div>
-								<div style="margin-top: 0.5rem;">
-									<label style="display: flex; align-items: center; gap: 0.5rem; cursor: pointer;">
+								<div class="rv-mt-sm">
+									<label class="rv-check">
 										<input type="checkbox" name={ fmt.Sprintf("edu_%d_current", i) } value="1" checked?={ edu.IsCurrent }/>
 										{ T(ctx, "profile.station.is_current_edu") }
 									</label>
@@ -151,18 +151,18 @@ templ DocumentReviewPage(p DocumentReviewProps) {
 					}
 				</div>
 
-				<div class="card" style="margin-bottom: 2rem; padding: 1rem; border: 1px solid var(--border, #e5e7eb); border-radius: 6px;">
-					<label style="font-weight: 600; display: flex; align-items: center; gap: 0.5rem; cursor: pointer;">
+				<div class="card rv-box">
+					<label class="rv-check rv-strong">
 						<input type="checkbox" name="include_profile" value="1" checked/>
 						{ T(ctx, "documents.review_profile_include") }
 					</label>
 					if len(p.Profile.Skills) > 0 {
-						<p style="margin: 0.5rem 0 0 1.5rem; font-size: 0.9rem;" class="muted">
+						<p class="muted rv-note rv-note-first">
 							<strong>{ T(ctx, "profile.field.skills") }:</strong> { strings.Join(p.Profile.Skills, ", ") }
 						</p>
 					}
 					if len(p.Profile.Languages) > 0 {
-						<p style="margin: 0.25rem 0 0 1.5rem; font-size: 0.9rem;" class="muted">
+						<p class="muted rv-note">
 							<strong>{ T(ctx, "profile.field.languages") }:</strong>
 							for j, lang := range p.Profile.Languages {
 								if j > 0 {
@@ -174,7 +174,7 @@ templ DocumentReviewPage(p DocumentReviewProps) {
 					}
 				</div>
 
-				<div style="display: flex; gap: 1rem; align-items: center;">
+				<div class="rv-actions">
 					<button type="submit" class="button primary">{ T(ctx, "documents.review_confirm") }</button>
 					<a href="/documents" class="button secondary">{ T(ctx, "actions.cancel") }</a>
 				</div>

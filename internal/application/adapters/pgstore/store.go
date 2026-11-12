@@ -945,6 +945,22 @@ func (s *Store) SaveNotes(ctx context.Context, userID, appID uuid.UUID, notes, s
 	})
 }
 
+// AnswerUsage counts per answer bank entry the applications that used it.
+func (s *Store) AnswerUsage(ctx context.Context, userID uuid.UUID) (out map[string]int, err error) {
+	err = s.user(ctx, userID, func(qs *q.Queries) error {
+		rows, err := qs.AnswerUsage(ctx, userID)
+		if err != nil {
+			return err
+		}
+		out = make(map[string]int, len(rows))
+		for _, r := range rows {
+			out[r.AnswerID] = int(r.N)
+		}
+		return nil
+	})
+	return out, err
+}
+
 // PipelineApplications returns all applications for a user with their pipeline information.
 func (s *Store) PipelineApplications(ctx context.Context, userID uuid.UUID) (out []application.PipelineApplication, err error) {
 	err = s.user(ctx, userID, func(qs *q.Queries) error {

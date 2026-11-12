@@ -490,3 +490,8 @@ func (s *Service) ParkReason(ctx context.Context, userID, id uuid.UUID) (string,
 func (s *Service) Retry(ctx context.Context, userID, id uuid.UUID) (State, error) {
 	return s.Fire(ctx, userID, id, EvRequeue, ActorUser, map[string]any{"reason": "retried by user"})
 }
+
+// AnswerUsage counts per answer bank entry (by id) the applications that used it.
+func (s *Service) AnswerUsage(ctx context.Context, userID uuid.UUID) (map[string]int, error) {
+	return s.store.AnswerUsage(ctx, userID)
+}
