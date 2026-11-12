@@ -211,7 +211,7 @@ templ AppShell(s Shell, wide bool) {
 	@confirmDialog()
 	@ui.ToastRegion() {
 		if s.Flash != "" {
-			@ui.Toast(ui.Success, T(ctx, s.Flash), T(ctx, "shell.close"))
+			@ui.Toast(flashTone(s.Flash), T(ctx, s.Flash), T(ctx, "shell.close"))
 		}
 	}
 	<div id="live-dock" class="shell-dock" { HX(ctx, "hx-preserve", "true")... }>

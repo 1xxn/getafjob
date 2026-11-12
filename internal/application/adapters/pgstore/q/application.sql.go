@@ -950,6 +950,40 @@ func (q *Queries) StaleSubmitting(ctx context.Context, updatedAt time.Time) ([]S
 	return items, nil
 }
 
+const statesByJob = `-- name: StatesByJob :many
+SELECT job_id, state FROM applications WHERE user_id = $1 AND job_id = ANY ($2::bigint[])
+`
+
+type StatesByJobParams struct {
+	UserID uuid.UUID
+	JobIds []int64
+}
+
+type StatesByJobRow struct {
+	JobID int64
+	State string
+}
+
+func (q *Queries) StatesByJob(ctx context.Context, arg StatesByJobParams) ([]StatesByJobRow, error) {
+	rows, err := q.db.Query(ctx, statesByJob, arg.UserID, arg.JobIds)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []StatesByJobRow{}
+	for rows.Next() {
+		var i StatesByJobRow
+		if err := rows.Scan(&i.JobID, &i.State); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const submitsPerDay = `-- name: SubmitsPerDay :many
 SELECT (e.at AT TIME ZONE 'UTC')::date AS day, count(*)::integer AS n
 FROM application_events e

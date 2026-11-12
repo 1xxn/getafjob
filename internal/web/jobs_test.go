@@ -88,7 +88,7 @@ func TestJobPages(t *testing.T) {
 	if !strings.Contains(list, `hx-nonce="`) || !strings.Contains(list, `name="htmx-config"`) {
 		t.Fatal("list without htmx")
 	}
-	if !strings.Contains(list, `href="/jobs/`) || !strings.Contains(list, "Go Developer") || strings.Contains(list, "Sales Manager") {
+	if !strings.Contains(list, `href="/jobs?job=`) || !strings.Contains(list, "Go Developer") || strings.Contains(list, "Sales Manager") {
 		t.Fatalf("default list:\n%s", list)
 	}
 	if body := a.do(http.MethodGet, "/jobs?decision=skip", nil, session, nil).Body.String(); !strings.Contains(body, "Sales Manager") {
@@ -105,13 +105,53 @@ func TestJobPages(t *testing.T) {
 	// htmx gets only the results; a history restore gets the whole page.
 	part := a.do(http.MethodGet, "/jobs?page=1", nil, session, map[string]string{"HX-Request": "true", "HX-Request-Type": "partial"})
 	checkNonces(t, part)
-	if body := part.Body.String(); !strings.HasPrefix(strings.TrimSpace(body), `<div id="results">`) || strings.Contains(body, "<html") ||
+	if body := part.Body.String(); !strings.HasPrefix(strings.TrimSpace(body), `<div id="results"`) || strings.Contains(body, "<html") ||
 		!strings.Contains(part.Header().Get("Vary"), "HX-Request") {
 		t.Fatalf("partial: %s", body)
 	}
 	restore := a.do(http.MethodGet, "/jobs", nil, session, map[string]string{"HX-Request": "true", "HX-History-Restore-Request": "true"})
 	if !strings.Contains(restore.Body.String(), "<html") {
 		t.Fatal("history restore got a fragment")
+	}
+
+	// The job beside the list: as a fragment, and rendered into the page for ?job= (back button, shared links).
+	goStr := strconv.FormatInt(goID, 10)
+	if panel := a.do(http.MethodGet, "/jobs/"+goStr+"/panel?job="+goStr, nil, session, nil).Body.String(); !strings.Contains(panel, `id="job-panel-title"`) ||
+		!strings.Contains(panel, "Go Developer") || !strings.Contains(panel, `href="/jobs"`) {
+		t.Fatalf("panel:\n%s", panel)
+	}
+	if page := a.do(http.MethodGet, "/jobs?q=go&job="+goStr, nil, session, nil).Body.String(); !strings.Contains(page, `id="job-panel-title"`) ||
+		!strings.Contains(page, `<a href="/jobs" class="jobs-chip"`) {
+		t.Fatal("page with an open job and a removable search chip")
+	}
+
+	// Bulk actions: save, then skip; the list shows the state, the flash says what happened.
+	bulk := func(action string, ids ...int64) *httptest.ResponseRecorder {
+		form := url.Values{"action": {action}, "back": {"/jobs?decision=all"}}
+		for _, id := range ids {
+			form.Add("ids", strconv.FormatInt(id, 10))
+		}
+		return a.do(http.MethodPost, "/jobs/bulk", form, session, nil)
+	}
+	if rec := bulk("save", goID); rec.Code != http.StatusSeeOther || rec.Header().Get("Location") != "/jobs?decision=all" ||
+		!strings.Contains(rec.Header().Get("Set-Cookie"), "flash=flash.jobs.save") {
+		t.Fatalf("save: %d %q %q", rec.Code, rec.Header().Get("Location"), rec.Header().Get("Set-Cookie"))
+	}
+	if body := a.do(http.MethodGet, "/jobs?decision=all", nil, session, nil).Body.String(); !strings.Contains(body, `ui-tone-neutral">Saved<`) {
+		t.Fatal("saved state not shown")
+	}
+	if rec := bulk("skip", goID, salesID); !strings.Contains(rec.Header().Get("Set-Cookie"), "flash=flash.jobs.skip") {
+		t.Fatalf("skip: %q", rec.Header().Get("Set-Cookie"))
+	}
+	if body := a.do(http.MethodGet, "/jobs?decision=all", nil, session, nil).Body.String(); strings.Count(body, `ui-tone-neutral">Skipped<`) != 2 {
+		t.Fatal("skipped state not shown for both")
+	}
+	if rec := bulk("launch", goID); rec.Header().Get("Set-Cookie") != "" {
+		t.Fatal("unknown action did something")
+	}
+	if rec := a.do(http.MethodPost, "/jobs/bulk", url.Values{"action": {"save"}, "ids": {strconv.FormatInt(goID, 10)},
+		"back": {"https://evil.example/"}}, session, nil); rec.Header().Get("Location") != "/jobs" {
+		t.Fatalf("foreign back: %q", rec.Header().Get("Location"))
 	}
 
 	drec := a.do(http.MethodGet, "/jobs/"+strconv.FormatInt(goID, 10), nil, session, nil)
@@ -163,7 +203,7 @@ func TestJobPages(t *testing.T) {
 
 	// Blocked tab displays blocked job
 	blkList := a.do(http.MethodGet, "/jobs?decision=blocked", nil, session, nil).Body.String()
-	if !strings.Contains(blkList, "Go Developer") || !strings.Contains(blkList, "Unblock") {
+	if !strings.Contains(blkList, "Go Developer") || !strings.Contains(blkList, `ui-tone-danger">Blocked<`) {
 		t.Fatal("blocked job not displayed in decision=blocked view")
 	}
 

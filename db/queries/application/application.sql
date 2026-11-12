@@ -219,3 +219,6 @@ FROM application_events e
 WHERE e.user_id = $1 AND e.to_state = 'submitted' AND e.at >= $2
 GROUP BY 1
 ORDER BY 1;
+
+-- name: StatesByJob :many
+SELECT job_id, state FROM applications WHERE user_id = $1 AND job_id = ANY (sqlc.arg(job_ids)::bigint[]);

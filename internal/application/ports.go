@@ -255,6 +255,8 @@ type Store interface {
 	SaveNotes(ctx context.Context, userID, appID uuid.UUID, notes, salary string, interviewAt, followUpAt *time.Time, now time.Time) error
 	// PipelineApplications returns all applications for a user with their pipeline information.
 	PipelineApplications(ctx context.Context, userID uuid.UUID) ([]PipelineApplication, error)
+	// StatesByJob returns the state of the user's application per job, for the given jobs that have one.
+	StatesByJob(ctx context.Context, userID uuid.UUID, jobIDs []int64) (map[int64]State, error)
 	// ParkReasons returns the reason of the last park per parked application of the user.
 	ParkReasons(ctx context.Context, userID uuid.UUID) (map[uuid.UUID]string, error)
 	// SubmitsPerDay counts the user's submitted applications per UTC day since the given time.

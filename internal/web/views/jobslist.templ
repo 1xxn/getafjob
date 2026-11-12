@@ -1,0 +1,416 @@
+package views
+
+import (
+	"context"
+	"strings"
+
+	"github.com/1xxn/getafjob/internal/web/views/ui"
+)
+
+// JobsData fills the job list.
+type JobsData struct {
+	Name         string
+	Query        string
+	Decision     string // relevant, match, maybe, skip, all, blocked
+	Workplace    string // "", remote, hybrid, onsite
+	Location     string
+	Source       string // ATS platform
+	MinSalary    int
+	Freshness    string // "all", "24h", "3d", "7d", "14d", "30d"
+	Sort         string // "match", "newest", "salary", "company"
+	Rows         []JobRow
+	Total        int
+	Page         int
+	Pages        int
+	Counts       map[string]int
+	BlockedCount int
+	Pending      bool // no results for the user yet
+	Chips        []FilterChip
+	PageLinks    []ui.PageLink
+	PrevURL      string
+	NextURL      string
+	Back         string // this list's URL, where actions return to
+	Blocklist    []BlocklistItemData
+	Crawl        CrawlStatusData
+	Panel        *JobPanelData
+}
+
+// FilterChip is an active filter with the URL that removes it.
+type FilterChip struct {
+	Label     string
+	RemoveURL string
+}
+
+// JobPanelData fills the job shown beside the list.
+type JobPanelData struct {
+	Row           JobRow
+	Reasons       []Reason
+	Excerpt       string
+	URL           string
+	ApplyMode     string // form, portal or email
+	ApplyHost     string
+	ApplicationID string
+	Applying      bool // an application runs or was sent
+	Excluded      bool // the search settings rule the job out (hard reason): no apply actions
+	CloseURL      string
+	Back          string
+}
+
+func opts(cur string, pairs ...string) []ui.Option {
+	out := make([]ui.Option, 0, len(pairs)/2)
+	for i := 0; i+1 < len(pairs); i += 2 {
+		out = append(out, ui.Option{Value: pairs[i], Label: pairs[i+1], Selected: pairs[i] == cur})
+	}
+	return out
+}
+
+func decisionOptions(ctx context.Context, d JobsData) []ui.Option {
+	o := opts(d.Decision, "relevant", T(ctx, "jobs.decision.relevant"), "match", T(ctx, "match.decision.match"),
+		"maybe", T(ctx, "match.decision.maybe"), "skip", T(ctx, "match.decision.skip"), "all", T(ctx, "jobs.decision.all"))
+	if d.BlockedCount > 0 || d.Decision == "blocked" {
+		o = append(o, opts(d.Decision, "blocked", T(ctx, "jobs.decision.blocked", "count", d.BlockedCount))...)
+	}
+	return o
+}
+
+// sourceOptions lists the platforms; a source from the URL that is not in the list stays selectable, so typing in
+// the search does not drop it.
+func sourceOptions(ctx context.Context, cur string) []ui.Option {
+	pairs := []string{"", T(ctx, "jobs.source.any"), "greenhouse", "Greenhouse", "lever", "Lever", "ashby", "Ashby",
+		"workday", "Workday", "personio", "Personio", "smartrecruiters", "SmartRecruiters", "recruitee", "Recruitee",
+		"workable", "Workable"}
+	known := false
+	for i := 0; i < len(pairs); i += 2 {
+		known = known || pairs[i] == cur
+	}
+	if !known {
+		pairs = append(pairs, cur, cur)
+	}
+	return opts(cur, pairs...)
+}
+
+func scoreTone(decision string) ui.Tone {
+	switch decision {
+	case "match":
+		return ui.Success
+	case "maybe":
+		return ui.Info
+	default:
+		return ui.Neutral
+	}
+}
+
+func stateTone(state string) ui.Tone {
+	switch state {
+	case "new":
+		return ui.Accent
+	case "applying":
+		return ui.Warning
+	case "applied":
+		return ui.Success
+	case "stopped":
+		return ui.Danger
+	default:
+		return ui.Neutral
+	}
+}
+
+templ jobFacts(r JobRow) {
+	<span class="job-facts">
+		<span>{ r.Company }</span>
+		if r.Location != "" {
+			<span>{ r.Location }</span>
+		}
+		if r.Workplace != "" && !strings.Contains(strings.ToLower(r.Location), r.Workplace) {
+			<span>{ T(ctx, "jobs.workplace." + r.Workplace) }</span>
+		}
+		if r.Salary != "" {
+			<span>{ r.Salary }</span>
+		}
+		if r.Age == 0 {
+			<span>{ T(ctx, "jobs.age_today") }</span>
+		} else if r.Age > 0 {
+			<span>{ T(ctx, "jobs.age_days", "days", r.Age) }</span>
+		}
+	</span>
+}
+
+templ jobBadges(r JobRow) {
+	<span class="job-badges">
+		@ui.Badge(itoa(r.Score), scoreTone(r.Decision))
+		if r.State != "" {
+			@ui.Badge(T(ctx, "jobs.state." + r.State), stateTone(r.State))
+		}
+		if r.Blocked {
+			@ui.Badge(T(ctx, "jobs.blocked_badge"), ui.Danger)
+		}
+	</span>
+}
+
+templ jobsToolbar(d JobsData) {
+	<div class="jobs-tools">
+		@CrawlStatus(d.Crawl)
+		@ui.Menu(ui.MenuProps{ID: "jobs-more", Label: T(ctx, "jobs.more"), Icon: "more", AlignEnd: true}) {
+			<button type="button" class="ui-menu-item" { ui.OpenDialog("dlg-import")... }>
+				@ui.Icon("download")
+				<span>{ T(ctx, "jobs.import_title") }</span>
+			</button>
+			<button type="button" class="ui-menu-item" { ui.OpenDialog("dlg-board")... }>
+				@ui.Icon("building")
+				<span>{ T(ctx, "jobs.board_add_title") }</span>
+			</button>
+			<button type="button" class="ui-menu-item" { ui.OpenDialog("dlg-blocklist")... }>
+				@ui.Icon("ban")
+				<span>{ T(ctx, "jobs.blocklist_title") }</span>
+			</button>
+		}
+	</div>
+	@ui.Dialog(ui.DialogProps{ID: "dlg-import", Title: T(ctx, "jobs.import_title"), CloseLabel: T(ctx, "shell.close")}) {
+		<form method="post" action="/jobs/import" { HX(ctx, "hx-post", "/jobs/import", "hx-target", "#import-result", "hx-swap", "innerHTML")... }>
+			@ui.Input(ui.InputProps{FieldProps: ui.FieldProps{ID: "import-url", Name: "url", Label: T(ctx, "jobs.import_label"),
+				Hint: T(ctx, "jobs.import_hint"), Required: true}, Type: "url", MaxLength: 500, Placeholder: "https://"})
+			<div id="import-result"></div>
+			<div class="ui-dialog-actions">
+				@ui.Button(ui.ButtonProps{Label: T(ctx, "jobs.import_button"), Type: "submit", Variant: "primary"})
+			</div>
+		</form>
+	}
+	@ui.Dialog(ui.DialogProps{ID: "dlg-board", Title: T(ctx, "jobs.board_add_title"), CloseLabel: T(ctx, "shell.close")}) {
+		<form method="post" action="/jobs/boards" { HX(ctx, "hx-post", "/jobs/boards", "hx-target", "#board-add-result", "hx-swap", "innerHTML")... }>
+			@ui.Input(ui.InputProps{FieldProps: ui.FieldProps{ID: "board-url", Name: "url", Label: T(ctx, "jobs.board_add_label"),
+				Hint: T(ctx, "jobs.board_add_hint"), Required: true}, Type: "url", MaxLength: 500, Placeholder: "https://"})
+			<div id="board-add-result"></div>
+			<div class="ui-dialog-actions">
+				@ui.Button(ui.ButtonProps{Label: T(ctx, "jobs.board_add_button"), Type: "submit", Variant: "primary"})
+			</div>
+		</form>
+	}
+	@ui.Dialog(ui.DialogProps{ID: "dlg-blocklist", Title: T(ctx, "jobs.blocklist_title"), CloseLabel: T(ctx, "shell.close")}) {
+		<p class="jobs-dialog-text">{ T(ctx, "jobs.blocklist_text") }</p>
+		<form method="post" action="/jobs/blocklist" class="jobs-block-form">
+			@ui.Select(ui.SelectProps{FieldProps: ui.FieldProps{ID: "block-kind", Name: "kind", Label: T(ctx, "jobs.blocklist_kind")},
+				Options: opts("company", "company", T(ctx, "jobs.blocklist_kind_company"), "keyword", T(ctx, "jobs.blocklist_kind_keyword"))})
+			@ui.Input(ui.InputProps{FieldProps: ui.FieldProps{ID: "block-pattern", Name: "pattern", Label: T(ctx, "jobs.blocklist_pattern"),
+				Required: true}, MaxLength: 200})
+			@ui.Button(ui.ButtonProps{Label: T(ctx, "jobs.blocklist_add"), Type: "submit", Icon: "plus"})
+		</form>
+		if len(d.Blocklist) == 0 {
+			<p class="dash-quiet">{ T(ctx, "jobs.blocklist_empty") }</p>
+		} else {
+			<ul class="jobs-blocklist">
+				for _, b := range d.Blocklist {
+					<li>
+						@ui.Badge(T(ctx, "jobs.blocklist_kind_" + b.Kind), ui.Neutral)
+						<span class="jobs-blocklist-pattern">{ b.Pattern }</span>
+						<form method="post" action="/jobs/blocklist/delete">
+							<input type="hidden" name="id" value={ i64(b.ID) }/>
+							@ui.IconButton(ui.IconButtonProps{Icon: "trash", Label: T(ctx, "jobs.blocklist_remove_named", "pattern", b.Pattern), Type: "submit"})
+						</form>
+					</li>
+				}
+			</ul>
+		}
+	}
+}
+
+templ jobsFilters(d JobsData) {
+	<form
+		method="get"
+		action="/jobs"
+		class="jobs-filters"
+		role="search"
+		aria-label={ T(ctx, "jobs.filters") }
+		{ HX(ctx, "hx-get", "/jobs", "hx-target", "#results", "hx-swap", "outerHTML transition:false", "hx-push-url", "true",
+			"hx-trigger", "submit, change from:select, input changed delay:400ms from:input")... }
+	>
+		<div class="jobs-filter-search">
+			@ui.Input(ui.InputProps{FieldProps: ui.FieldProps{Name: "q", Label: T(ctx, "jobs.search_label"), HideLabel: true},
+				Type: "search", Value: d.Query, Placeholder: T(ctx, "jobs.search_placeholder"), MaxLength: 200})
+		</div>
+		@ui.Select(ui.SelectProps{FieldProps: ui.FieldProps{Name: "decision", Label: T(ctx, "jobs.decision")}, Options: decisionOptions(ctx, d)})
+		@ui.Select(ui.SelectProps{FieldProps: ui.FieldProps{Name: "freshness", Label: T(ctx, "jobs.freshness")}, Options: opts(d.Freshness,
+			"all", T(ctx, "jobs.freshness.all"), "24h", T(ctx, "jobs.freshness.24h"), "3d", T(ctx, "jobs.freshness.3d"),
+			"7d", T(ctx, "jobs.freshness.7d"), "14d", T(ctx, "jobs.freshness.14d"), "30d", T(ctx, "jobs.freshness.30d"))})
+		@ui.Select(ui.SelectProps{FieldProps: ui.FieldProps{Name: "workplace", Label: T(ctx, "jobs.workplace")}, Options: opts(d.Workplace,
+			"", T(ctx, "jobs.workplace.any"), "remote", T(ctx, "jobs.workplace.remote"), "hybrid", T(ctx, "jobs.workplace.hybrid"),
+			"onsite", T(ctx, "jobs.workplace.onsite"))})
+		@ui.Input(ui.InputProps{FieldProps: ui.FieldProps{Name: "location", Label: T(ctx, "jobs.location_label")}, Value: d.Location, MaxLength: 100})
+		@ui.Select(ui.SelectProps{FieldProps: ui.FieldProps{Name: "min_salary", Label: T(ctx, "jobs.min_salary_label")}, Options: opts(itoa(d.MinSalary),
+			"0", T(ctx, "jobs.min_salary.any"), "50000", T(ctx, "jobs.min_salary.val", "val", Amount(ctx, "50000")),
+			"70000", T(ctx, "jobs.min_salary.val", "val", Amount(ctx, "70000")), "90000", T(ctx, "jobs.min_salary.val", "val", Amount(ctx, "90000")),
+			"110000", T(ctx, "jobs.min_salary.val", "val", Amount(ctx, "110000")))})
+		@ui.Select(ui.SelectProps{FieldProps: ui.FieldProps{Name: "source", Label: T(ctx, "jobs.source_label")}, Options: sourceOptions(ctx, d.Source)})
+		@ui.Select(ui.SelectProps{FieldProps: ui.FieldProps{Name: "sort", Label: T(ctx, "jobs.sort")}, Options: opts(d.Sort,
+			"match", T(ctx, "jobs.sort.match"), "newest", T(ctx, "jobs.sort.newest"), "salary", T(ctx, "jobs.sort.salary"),
+			"company", T(ctx, "jobs.sort.company"))})
+		<noscript>
+			@ui.Button(ui.ButtonProps{Label: T(ctx, "jobs.apply_filter"), Type: "submit"})
+		</noscript>
+	</form>
+}
+
+// JobsPage is the job list: filters, results with bulk actions, and the job open beside them.
+templ JobsPage(d JobsData) {
+	@Layout(Page{Title: T(ctx, "jobs.title"), UserName: d.Name, Wide: true}) {
+		<div class="jobs-head">
+			<h1>{ T(ctx, "jobs.title") }</h1>
+			@jobsToolbar(d)
+		</div>
+		@jobsFilters(d)
+		@JobResults(d)
+		<form id="row-action" method="post" action="/jobs/bulk" hidden>
+			<input type="hidden" name="back" value={ d.Back }/>
+			<input type="hidden" name="ids" value=""/>
+			<input type="hidden" name="action" value=""/>
+		</form>
+	}
+}
+
+// JobResults is the part htmx swaps on filter changes: chips, bulk bar, rows, pager and the open job.
+templ JobResults(d JobsData) {
+	<div id="results" class={ "jobs-layout", templ.KV("jobs-layout-open", d.Panel != nil) }>
+		<div class="jobs-main">
+			if len(d.Chips) > 0 {
+				<ul class="jobs-chips" aria-label={ T(ctx, "jobs.active_filters") }>
+					for _, c := range d.Chips {
+						<li>
+							<a href={ templ.SafeURL(c.RemoveURL) } class="jobs-chip" aria-label={ T(ctx, "jobs.chip.remove", "filter", c.Label) }>
+								{ c.Label }
+								@ui.Icon("x")
+							</a>
+						</li>
+					}
+				</ul>
+			}
+			if d.Pending {
+				@ui.EmptyState(ui.EmptyProps{Icon: "clock", Title: T(ctx, "jobs.pending")})
+			} else {
+				<p class="jobs-count" role="status">
+					{ T(ctx, "jobs.count", "total", d.Total) }
+					<span class="dash-quiet">{ T(ctx, "jobs.counts", "match", d.Counts["match"], "maybe", d.Counts["maybe"], "skip", d.Counts["skip"]) }</span>
+				</p>
+				if len(d.Rows) == 0 {
+					@ui.EmptyState(ui.EmptyProps{Icon: "search", Title: T(ctx, "jobs.none"), Text: T(ctx, "jobs.none_hint")}) {
+						@ui.Button(ui.ButtonProps{Label: T(ctx, "jobs.clear_filters"), Href: "/jobs"})
+					}
+				} else {
+					<form id="bulk" method="post" action="/jobs/bulk" class="jobs-bulk" data-bulk>
+						<input type="hidden" name="back" value={ d.Back }/>
+						<span class="jobs-bulk-count" data-bulk-count data-t-none={ T(ctx, "jobs.bulk.none") } data-t-some={ T(ctx, "jobs.bulk.some", "n", "{n}") }>{ T(ctx, "jobs.bulk.none") }</span>
+						<div class="jobs-bulk-actions">
+							@ui.Button(ui.ButtonProps{Label: T(ctx, "jobs.action.queue"), Type: "submit", Size: "sm", Icon: "send", Attrs: templ.Attributes{"name": "action", "value": "queue"}})
+							@ui.Button(ui.ButtonProps{Label: T(ctx, "jobs.action.save"), Type: "submit", Size: "sm", Variant: "ghost", Icon: "bookmark", Attrs: templ.Attributes{"name": "action", "value": "save"}})
+							@ui.Button(ui.ButtonProps{Label: T(ctx, "jobs.action.skip"), Type: "submit", Size: "sm", Variant: "ghost", Icon: "x", Attrs: templ.Attributes{"name": "action", "value": "skip"}})
+							@ui.Button(ui.ButtonProps{Label: T(ctx, "jobs.action.block"), Type: "submit", Size: "sm", Variant: "ghost", Icon: "ban", Attrs: templ.Attributes{"name": "action", "value": "block"}})
+						</div>
+					</form>
+					<ol class="job-rows" data-joblist aria-label={ T(ctx, "jobs.list_label") } aria-describedby="jobs-keys">
+						for _, r := range d.Rows {
+							<li class={ "job-row", templ.KV("job-row-current", r.Current) } data-job-row data-id={ i64(r.ID) } data-state={ r.State }>
+								<input type="checkbox" name="ids" value={ i64(r.ID) } form="bulk" class="job-check" aria-label={ T(ctx, "jobs.select", "title", r.Title) }/>
+								<a
+									href={ templ.SafeURL(r.PanelURL) }
+									class="job-row-link"
+									if r.Current {
+										aria-current="true"
+									}
+									{ HX(ctx, "hx-get", r.PanelGet, "hx-target", "#job-panel", "hx-swap", "innerHTML transition:false", "hx-push-url", r.PanelURL)... }
+								>
+									<span class="job-row-title">{ r.Title }</span>
+									@jobFacts(r)
+								</a>
+								@jobBadges(r)
+							</li>
+						}
+					</ol>
+					<p id="jobs-keys" class="jobs-keys">{ T(ctx, "jobs.keys") }</p>
+					if len(d.PageLinks) > 0 {
+						@ui.Pagination(ui.PaginationProps{Label: T(ctx, "jobs.pages"), PrevLabel: T(ctx, "jobs.prev"), NextLabel: T(ctx, "jobs.next"),
+							PrevHref: d.PrevURL, NextHref: d.NextURL, Pages: d.PageLinks})
+					}
+				}
+			}
+		</div>
+		<aside id="job-panel" class="job-panel" aria-label={ T(ctx, "jobs.panel_label") }>
+			if d.Panel != nil {
+				@JobPanel(*d.Panel)
+			} else if len(d.Rows) > 0 {
+				<p class="job-panel-hint">{ T(ctx, "jobs.panel_hint") }</p>
+			}
+		</aside>
+	</div>
+}
+
+templ panelAction(p JobPanelData, action, icon, variant string) {
+	<form method="post" action="/jobs/bulk">
+		<input type="hidden" name="back" value={ p.Back }/>
+		<input type="hidden" name="ids" value={ i64(p.Row.ID) }/>
+		@ui.Button(ui.ButtonProps{Label: T(ctx, "jobs.action."+action), Type: "submit", Icon: icon, Variant: variant,
+			Attrs: templ.Attributes{"name": "action", "value": action}})
+	</form>
+}
+
+// JobPanel is one job beside the list: facts, why it scores as it does, and what to do with it.
+templ JobPanel(p JobPanelData) {
+	<section class="job-panel-inner" aria-labelledby="job-panel-title" data-job-id={ i64(p.Row.ID) }>
+		<div class="job-panel-top">
+			@jobBadges(p.Row)
+			<a href={ templ.SafeURL(p.CloseURL) } class="ui-btn ui-btn-ghost ui-btn-icon" aria-label={ T(ctx, "jobs.panel_close") } title={ T(ctx, "jobs.panel_close") }>
+				@ui.Icon("x")
+			</a>
+		</div>
+		<h2 id="job-panel-title" class="job-panel-title">{ p.Row.Title }</h2>
+		@jobFacts(p.Row)
+		if p.Applying && p.ApplicationID != "" {
+			@ui.Alert(ui.AlertProps{Tone: ui.Info, Text: T(ctx, "jobs.panel_applying")}) {
+				<p><a href={ templ.SafeURL("/applications/" + p.ApplicationID) }>{ T(ctx, "jobs.view_application") }</a></p>
+			}
+		}
+		if p.Excluded {
+			@ui.Alert(ui.AlertProps{Tone: ui.Warning, Text: T(ctx, "jobs.panel_excluded")}) {
+				<p><a href="/preferences">{ T(ctx, "jobs.panel_excluded_link") }</a></p>
+			}
+		}
+		<div class="job-panel-actions">
+			if p.Excluded {
+			} else if p.ApplyMode == "form" && !p.Applying {
+				@ui.Button(ui.ButtonProps{Label: T(ctx, "jobs.apply_now"), Href: "/jobs/" + i64(p.Row.ID) + "/apply", Variant: "primary", Icon: "send"})
+				@panelAction(p, "queue", "list", "secondary")
+			} else if p.ApplyMode != "form" && p.URL != "" && !p.Applying {
+				@ui.Button(ui.ButtonProps{Label: T(ctx, "jobs.open_posting"), Href: p.URL, Variant: "primary", Icon: "external",
+					Attrs: templ.Attributes{"rel": "noopener noreferrer external", "target": "_blank"}})
+			}
+			if !p.Applying {
+				@panelAction(p, "save", "bookmark", "ghost")
+				@panelAction(p, "skip", "x", "ghost")
+			}
+			if p.Row.Blocked {
+				<form method="post" action="/jobs/blocklist/delete">
+					<input type="hidden" name="kind" value="company"/>
+					<input type="hidden" name="pattern" value={ p.Row.Company }/>
+					@ui.Button(ui.ButtonProps{Label: T(ctx, "jobs.unblock"), Type: "submit", Icon: "check", Variant: "ghost"})
+				</form>
+			} else {
+				@panelAction(p, "block", "ban", "ghost")
+			}
+		</div>
+		if len(p.Reasons) > 0 {
+			<h3 class="job-panel-sub">{ T(ctx, "jobs.panel_why") }</h3>
+			<ul class="job-reasons">
+				for _, rs := range p.Reasons {
+					<li class={ templ.KV("job-reason-hard", rs.Hard) }>
+						<span>{ rs.Text }</span>
+						<span class="job-reason-points">{ points(rs.Points) }</span>
+					</li>
+				}
+			</ul>
+		}
+		if p.Excerpt != "" {
+			<h3 class="job-panel-sub">{ T(ctx, "jobs.panel_description") }</h3>
+			<p class="job-panel-text">{ p.Excerpt }</p>
+		}
+		<p class="job-panel-more">
+			<a href={ templ.SafeURL("/jobs/" + i64(p.Row.ID)) }>{ T(ctx, "jobs.panel_full") }</a>
+		</p>
+	</section>
+}
