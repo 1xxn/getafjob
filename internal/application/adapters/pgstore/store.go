@@ -1092,6 +1092,42 @@ func (s *Store) Briefs(ctx context.Context, userID uuid.UUID, ids []uuid.UUID) (
 	return out, err
 }
 
+// QueueItems lists the user's queued applications in queue order.
+func (s *Store) QueueItems(ctx context.Context, userID uuid.UUID) ([]application.QueueItem, error) {
+	var out []application.QueueItem
+	err := s.user(ctx, userID, func(qs *q.Queries) error {
+		rows, err := qs.QueuedApplications(ctx, userID)
+		for _, r := range rows {
+			out = append(out, application.QueueItem{ID: r.ID, JobID: r.JobID, Title: r.Title, Company: r.Company,
+				Paused: r.QueuePaused})
+		}
+		return err
+	})
+	return out, err
+}
+
+// MoveQueued swaps a queued application with its neighbour.
+func (s *Store) MoveQueued(ctx context.Context, userID, id uuid.UUID, up bool) (bool, error) {
+	var n int64
+	err := s.user(ctx, userID, func(qs *q.Queries) error {
+		var err error
+		n, err = qs.MoveQueued(ctx, q.MoveQueuedParams{UserID: userID, ID: id, Up: up})
+		return err
+	})
+	return n > 0, err
+}
+
+// PauseQueued pauses or resumes a queued application.
+func (s *Store) PauseQueued(ctx context.Context, userID, id uuid.UUID, paused bool) (bool, error) {
+	var n int64
+	err := s.user(ctx, userID, func(qs *q.Queries) error {
+		var err error
+		n, err = qs.SetQueuePaused(ctx, q.SetQueuePausedParams{UserID: userID, ID: id, QueuePaused: paused})
+		return err
+	})
+	return n > 0, err
+}
+
 // StatesByJob returns the state per job.
 func (s *Store) StatesByJob(ctx context.Context, userID uuid.UUID, jobIDs []int64) (map[int64]application.State, error) {
 	out := map[int64]application.State{}

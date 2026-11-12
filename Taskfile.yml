@@ -121,7 +121,7 @@ tasks:
           -email "e2e-$(date +%s)@example.org" | head -n 1)" &&
           admin_invite="$({{.COMPOSE}} exec -T serve /usr/local/bin/getafjob admin invite -role admin
           -email "e2e-admin-$(date +%s)@example.org" | head -n 1)" &&
-          jobs="$({{.COMPOSE}} exec -T serve /usr/local/bin/getafjob admin demo -jobs 0 -fresh 8
+          jobs="$({{.COMPOSE}} exec -T serve /usr/local/bin/getafjob admin demo -jobs 0 -fresh 10
           -fixtures http://fixtures:8080 | sed -n 's/^fixture job //p' | paste -sd, -)" &&
           id="$(docker create --read-only --tmpfs /tmp:rw,size=512m --shm-size=512m
           --cap-drop ALL --security-opt no-new-privileges
