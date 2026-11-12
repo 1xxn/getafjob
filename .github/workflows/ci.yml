@@ -2,7 +2,6 @@ name: CI
 
 on:
   pull_request:
-  merge_group: # the merge queue tests each pull request on top of main before it lands
   push:
     branches: [main]
 
@@ -55,7 +54,7 @@ jobs:
       - name: buf lint
         run: go tool buf lint
       - name: buf breaking
-        if: github.event_name != 'push'
+        if: github.event_name == 'pull_request'
         run: go tool buf breaking --against "https://github.com/${GITHUB_REPOSITORY}.git#branch=main"
 
   lint:
