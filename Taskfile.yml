@@ -123,11 +123,18 @@ tasks:
           --security-opt seccomp=deploy/seccomp/chromium.json
           --network getafjob_edge
           -v "{{.ROOT_DIR}}/bin/e2e:/e2e"
-          -e GETAFJOB_E2E_INVITE="$invite" -e GETAFJOB_E2E_ADMIN_INVITE="$admin_invite" -e GETAFJOB_E2E_CA=/e2e/caddy-intermediate.crt -e GETAFJOB_E2E_OUT=/e2e/out
+          -e GETAFJOB_E2E_INVITE="$invite" -e GETAFJOB_E2E_ADMIN_INVITE="$admin_invite" -e GETAFJOB_E2E_DOCS="{{.DOCS}}" -e GETAFJOB_E2E_CA=/e2e/caddy-intermediate.crt -e GETAFJOB_E2E_OUT=/e2e/out
           -e GETAFJOB_E2E_MAILPIT=http://mailpit:8025
           --entrypoint /e2e/e2e.test {{.RUNNER_IMAGE}} -test.v {{.CLI_ARGS}})" &&
           docker network connect getafjob_devtools "$id" &&
           { docker start -a "$id"; rc=$?; docker rm "$id" > /dev/null; exit $rc; }
+
+  docs:screenshots:
+    desc: Take the README screenshots from the demo data in English (dev stack with demo data running) into docs/images
+    cmds:
+      - task: test:e2e
+        vars: { DOCS: "1", CLI_ARGS: "-test.run TestDocsScreenshots" }
+      - for n in job-list job-detail approvals needs-input settings; do cp "bin/e2e/out/TestDocsScreenshots_$n.png" "docs/images/$n.png"; done
 
   vuln:
     desc: Known vulnerabilities in reachable code

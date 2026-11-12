@@ -14,7 +14,7 @@ Collects job postings, scores them per candidate profile, and fills out applicat
 [![Go version](https://img.shields.io/github/go-mod/go-version/1xxn/getafjob?logo=go&logoColor=white)](go.mod)
 [![License: MIT](https://img.shields.io/github/license/1xxn/getafjob)](LICENSE)
 
-[Features](#features) · [Screenshots](#screenshots) · [How It Works](#how-it-works) · [Quickstart](#quickstart) · [Administration CLI](#administration-cli) · [Operations](#operations) · [Security & Privacy](#security--privacy) · [Roadmap](#roadmap)
+[Features](#features) · [Screenshots](#screenshots) · [User Guide](docs/user-guide.md) · [How It Works](#how-it-works) · [Quickstart](#quickstart) · [Administration CLI](#administration-cli) · [Operations](#operations) · [Security & Privacy](#security--privacy) · [Roadmap](#roadmap)
 
 </div>
 
@@ -74,31 +74,31 @@ Collects job postings, scores them per candidate profile, and fills out applicat
 
 ## Screenshots
 
-All screens rendered from invented demo data (`getafjob admin demo`) using server-side templates with `templ` and `htmx 4` under a strict Content Security Policy.
+Taken by an end to end journey from invented demo data (`go tool task docs:screenshots`), never by hand.
 
 <p align="center">
-  <img src="docs/images/job-list.png" alt="Scored Job Feed" width="49%">
-  <img src="docs/images/job-detail.png" alt="Score Breakdown & Reasons" width="49%">
+  <img src="docs/images/job-list.png" alt="Job list with filters and match scores" width="49%">
+  <img src="docs/images/job-detail.png" alt="Job page with the reasons of its score" width="49%">
 </p>
 <p align="center">
-  <em>Left: Scored job feed with search, workplace filters, and match categories.<br>
-  Right: Transparent score breakdown showing positive and negative weighting factors.</em>
-</p>
-
-<p align="center">
-  <img src="docs/images/approvals.png" alt="Human Approval Queue" width="49%">
-  <img src="docs/images/preferences.png" alt="Search Preferences & Autonomy Settings" width="49%">
-</p>
-<p align="center">
-  <em>Left: Approval list holding pre-filled applications for human sign-off before submit.<br>
-  Right: Search preferences, title exclusions, remote regions, and autonomy level configuration.</em>
+  <em>Left: jobs ranked for the user, with filters and actions on several jobs at once.<br>
+  Right: a job with every reason that adds to or takes from its score.</em>
 </p>
 
 <p align="center">
-  <img src="docs/images/evidence.png" alt="Application Screen & Live Evidence" width="60%">
+  <img src="docs/images/needs-input.png" alt="Runs waiting for an answer" width="49%">
+  <img src="docs/images/approvals.png" alt="Applications waiting for approval" width="49%">
 </p>
 <p align="center">
-  <em>Application evidence view with interactive remote browser frame and human-in-the-loop controls.</em>
+  <em>Left: runs that wait for an answer from the user.<br>
+  Right: filled applications waiting for approval before anything is sent.</em>
+</p>
+
+<p align="center">
+  <img src="docs/images/settings.png" alt="Automation settings" width="60%">
+</p>
+<p align="center">
+  <em>Automation: how far getafjob may go on its own.</em>
 </p>
 
 ---
