@@ -44,7 +44,7 @@ func (s *Server) shell(w http.ResponseWriter, r *http.Request, u *identity.User)
 	if u == nil {
 		return sh
 	}
-	sh.UserName, sh.Admin = u.DisplayName, u.Role == identity.RoleAdmin
+	sh.UserName, sh.Admin, sh.Dock = u.DisplayName, u.Role == identity.RoleAdmin, u.DockLayout
 	if c, err := r.Cookie(navCookie); err == nil && c.Value == "collapsed" {
 		sh.Collapsed = true
 	}

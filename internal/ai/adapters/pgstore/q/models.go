@@ -400,6 +400,7 @@ type User struct {
 	Locale      string
 	CreatedAt   time.Time
 	DisabledAt  *time.Time
+	DockLayout  string
 }
 
 type UserAiSetting struct {

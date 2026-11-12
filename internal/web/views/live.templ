@@ -189,6 +189,15 @@ templ liveDock() {
 			</a>
 		</header>
 		<div id="dock-body" class="dock-body" hidden>
+			<div class="dock-tools" role="toolbar" aria-label={ T(ctx, "live.dock.layout") }>
+				<div class="dock-sizes" role="group" aria-label={ T(ctx, "live.dock.size") }>
+					for _, size := range []string{"sm", "md", "lg"} {
+						<button type="button" class="ui-btn ui-btn-ghost ui-btn-sm" data-dock-size-set={ size } aria-pressed="false">{ T(ctx, "live.dock.size." + size) }</button>
+					}
+				</div>
+				@ui.IconButton(ui.IconButtonProps{Icon: "columns", Label: T(ctx, "live.dock.side"), Attrs: templ.Attributes{"data-dock-side-toggle": true}})
+				@ui.IconButton(ui.IconButtonProps{Icon: "external", Label: T(ctx, "live.dock.detach"), Attrs: templ.Attributes{"data-dock-detach": true}})
+			</div>
 			<div class="dock-screen" data-dock-screen></div>
 			<ul class="dock-runs" data-dock-runs { HX(ctx, "hx-get", "/live/dock", "hx-trigger", "load, getafjob:app from:body delay:700ms", "hx-swap", "innerHTML transition:false")... }></ul>
 		</div>

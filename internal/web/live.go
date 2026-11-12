@@ -162,3 +162,21 @@ func (s *Server) liveQueueAction(w http.ResponseWriter, r *http.Request, u *iden
 	}
 	http.Redirect(w, r, "/live", http.StatusSeeOther)
 }
+
+// liveDockLayout saves where the user's dock sits and how large it is; the next page renders it there.
+func (s *Server) liveDockLayout(w http.ResponseWriter, r *http.Request, u *identity.User) {
+	if u == nil {
+		w.WriteHeader(http.StatusUnauthorized)
+		return
+	}
+	err := s.Identity.SetDockLayout(r.Context(), u.ID, r.PostFormValue("side")+":"+r.PostFormValue("size"))
+	switch {
+	case errors.Is(err, identity.ErrInvalidLayout):
+		w.WriteHeader(http.StatusBadRequest)
+	case err != nil:
+		s.Logger.WarnContext(r.Context(), "dock layout", "err", err)
+		w.WriteHeader(http.StatusInternalServerError)
+	default:
+		w.WriteHeader(http.StatusNoContent)
+	}
+}

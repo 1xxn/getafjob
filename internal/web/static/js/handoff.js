@@ -282,13 +282,52 @@ document.addEventListener("click", (e) => {
   if (run?.dataset.dockRun) {
     store(DOCK_RUN, run.dataset.dockRun);
     showRun(run.dataset.dockRun);
+    return;
+  }
+  const size = t.closest("[data-dock-size-set]");
+  if (size?.dataset.dockSizeSet) {
+    setLayout(void 0, size.dataset.dockSizeSet);
+    return;
+  }
+  if (t.closest("[data-dock-side-toggle]")) {
+    setLayout(dockSlot()?.dataset.dockSide === "left" ? "right" : "left", void 0);
+    return;
+  }
+  if (t.closest("[data-dock-detach]")) {
+    const current = dockParts().screen?.querySelector("[data-live-view]")?.dataset.app;
+    window.open(
+      current ? `/live?run=${encodeURIComponent(current)}` : "/live",
+      "getafjob-live",
+      "popup,width=960,height=720"
+    );
+    setOpen(false);
   }
 });
+function dockSlot() {
+  return document.getElementById("live-dock");
+}
+function syncLayout() {
+  const slot = dockSlot();
+  for (const b of slot?.querySelectorAll("[data-dock-size-set]") ?? []) {
+    b.setAttribute("aria-pressed", String(b.dataset.dockSizeSet === slot?.dataset.dockSize));
+  }
+}
+function setLayout(side, size) {
+  const slot = dockSlot();
+  if (!slot) return;
+  if (side) slot.dataset.dockSide = side;
+  if (size) slot.dataset.dockSize = size;
+  syncLayout();
+  const body = new URLSearchParams({ side: slot.dataset.dockSide ?? "right", size: slot.dataset.dockSize ?? "md" });
+  void fetch("/live/dock/layout", { method: "POST", body, credentials: "same-origin" }).catch(() => {
+  });
+}
 document.addEventListener("htmx:after:settle", () => {
   bindViews();
   syncDock();
 });
 function start() {
+  syncLayout();
   const { dock } = dockParts();
   if (dock) {
     dock.hidden = true;

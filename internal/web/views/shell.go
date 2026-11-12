@@ -25,6 +25,22 @@ type Shell struct {
 	Collapsed bool              // sidebar shows icons only
 	Flash     string            // catalog key of a one-time message, shown as a toast
 	Counts    func() *NavCounts // nil or returning nil: no counters
+	Dock      string            // live dock layout "<side>:<size>", empty for the default
+}
+
+// DockSide and DockSize split the dock layout; right and md by default.
+func (s Shell) DockSide() string {
+	if side, _, ok := strings.Cut(s.Dock, ":"); ok {
+		return side
+	}
+	return "right"
+}
+
+func (s Shell) DockSize() string {
+	if _, size, ok := strings.Cut(s.Dock, ":"); ok {
+		return size
+	}
+	return "md"
 }
 
 type shellKey struct{}
