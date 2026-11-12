@@ -307,7 +307,7 @@
   }
   .active-runner-pill:hover, .live-indicator:hover { border-color: var(--accent); color: var(--ink-1); }
   .active-runner-pill.current { border-color: var(--accent); color: var(--ink-1); font-weight: 600; }
-  .live-indicator { font-weight: 600; color: var(--ink-1); }
+  .live-indicator { font-weight: 600; color: var(--ink-1); white-space: nowrap; }
   .live-indicator.waiting { border-color: var(--danger); }
   .live-dot { inline-size: 0.5rem; block-size: 0.5rem; border-radius: 50%; background: var(--accent); display: inline-block; }
   .live-dot.waiting, .live-indicator.waiting .live-dot { background: var(--danger); }

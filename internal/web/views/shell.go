@@ -60,7 +60,10 @@ var navGroups = []navGroup{
 		{Key: "nav.live", Href: "/live", Icon: "live", Count: "running"},
 		{Key: "nav.approvals", Href: "/approvals", Icon: "check-circle", Count: "approvals"},
 	}},
-	{Key: "nav.group.track", Items: []navItem{{Key: "nav.tracker", Href: "/tracker", Icon: "columns"}}},
+	{Key: "nav.group.track", Items: []navItem{
+		{Key: "nav.applications", Href: "/applications", Icon: "send", Count: "needs_input"},
+		{Key: "nav.tracker", Href: "/tracker", Icon: "columns"},
+	}},
 	{Key: "nav.group.me", Items: []navItem{
 		{Key: "nav.profile", Href: "/profile", Icon: "user"},
 		{Key: "nav.documents", Href: "/documents", Icon: "file"},

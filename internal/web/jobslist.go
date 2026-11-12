@@ -407,8 +407,7 @@ func (s *Server) jobsBulk(w http.ResponseWriter, r *http.Request, u *identity.Us
 	case done < len(ids):
 		key += "_partial"
 	}
-	http.SetCookie(w, &http.Cookie{Name: flashCookie, Value: key, Path: "/", MaxAge: 60, HttpOnly: true, Secure: true,
-		SameSite: http.SameSiteLaxMode})
+	s.flash(w, key)
 	http.Redirect(w, r, back, http.StatusSeeOther) //nolint:gosec // localBack keeps only paths on this site
 }
 

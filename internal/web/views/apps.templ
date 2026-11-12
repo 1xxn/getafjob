@@ -1,0 +1,455 @@
+package views
+
+import (
+	"context"
+	"time"
+
+	"github.com/1xxn/getafjob/internal/web/views/ui"
+)
+
+// AppsData fills the application list.
+type AppsData struct {
+	Name    string
+	Query   string
+	Group   string // all, attention, active, sent, closed, saved
+	Groups  []AppGroup
+	Rows    []AppRow
+	Total   int    // rows in the group after the search
+	Any     bool   // the user has applications at all
+	Self    string // this list's URL: refresh and return target
+	PrevURL string
+	NextURL string
+}
+
+// AppGroup is one state filter with its count.
+type AppGroup struct {
+	Key    string
+	Href   string
+	Count  int
+	Active bool
+}
+
+// AppRow is one application in the list.
+type AppRow struct {
+	ID       string
+	JobID    int64
+	Title    string
+	Company  string
+	State    string // raw state, only in data attributes
+	StateKey string // catalog key of the readable state
+	Tone     ui.Tone
+	Live     bool
+	StepKey  string // catalog key of the last step or the reason it stopped
+	Updated  time.Time
+}
+
+// AppAction is a next step offered for an application: a link or a POST to a sub path.
+type AppAction struct {
+	Key     string // catalog key of the label
+	Icon    string
+	Href    string // GET link
+	Post    string // form action
+	Variant string
+	Value   string // optional hidden "decision" value of the POST
+	New     bool   // opens in a new tab (external posting)
+}
+
+templ appGroups(d AppsData) {
+	<nav class="ui-tabs apps-groups" aria-label={ T(ctx, "apps.group_label") }>
+		for _, g := range d.Groups {
+			<a
+				href={ templ.URL(g.Href) }
+				class="ui-tab"
+				data-group={ g.Key }
+				if g.Active {
+					aria-current="page"
+				}
+			>
+				{ T(ctx, "apps.group." + g.Key) }
+				if g.Count > 0 {
+					<span class="ui-count">{ itoa(g.Count) }</span>
+				}
+			</a>
+		}
+	</nav>
+}
+
+// ApplicationsPage lists all applications with their state, the last step and what to do next.
+templ ApplicationsPage(d AppsData) {
+	@Layout(Page{Title: T(ctx, "apps.title"), UserName: d.Name, Wide: true}) {
+		<div class="jobs-head">
+			<h1>{ T(ctx, "apps.title") }</h1>
+		</div>
+		if !d.Any {
+			@ui.EmptyState(ui.EmptyProps{Icon: "send", Title: T(ctx, "apps.empty"), Text: T(ctx, "apps.empty_hint")}) {
+				@ui.Button(ui.ButtonProps{Label: T(ctx, "apps.to_jobs"), Href: "/jobs", Variant: "primary", Icon: "briefcase"})
+			}
+		} else {
+			<form
+				method="get"
+				action="/applications"
+				class="apps-search"
+				role="search"
+				aria-label={ T(ctx, "apps.search_label") }
+				{ HX(ctx, "hx-get", "/applications", "hx-target", "#apps-results", "hx-swap", "outerHTML transition:false", "hx-push-url", "true",
+					"hx-trigger", "submit, input changed delay:400ms from:input")... }
+			>
+				<input type="hidden" name="group" value={ d.Group }/>
+				@ui.Input(ui.InputProps{FieldProps: ui.FieldProps{Name: "q", Label: T(ctx, "apps.search_label"), HideLabel: true},
+					Type: "search", Value: d.Query, Placeholder: T(ctx, "apps.search_placeholder"), MaxLength: 200})
+			</form>
+			@AppsResults(d)
+		}
+	}
+}
+
+// AppsResults is the part that search, group links and live changes replace.
+templ AppsResults(d AppsData) {
+	<div
+		id="apps-results"
+		class="apps-results"
+		{ HX(ctx, "hx-get", d.Self, "hx-trigger", "getafjob:app from:body delay:700ms", "hx-swap", "outerMorph transition:false")... }
+	>
+		@appGroups(d)
+		if len(d.Rows) == 0 {
+			@ui.EmptyState(ui.EmptyProps{Icon: "search", Title: T(ctx, "apps.none"), Text: T(ctx, "apps.none_hint")}) {
+				@ui.Button(ui.ButtonProps{Label: T(ctx, "apps.show_all"), Href: "/applications"})
+			}
+		} else {
+			<form id="bulk" method="post" action="/applications/bulk" class="jobs-bulk" data-bulk>
+				<input type="hidden" name="back" value={ d.Self }/>
+				<span class="jobs-bulk-count" data-bulk-count data-t-none={ T(ctx, "apps.bulk.none") } data-t-some={ T(ctx, "apps.bulk.some", "n", "{n}") }>{ T(ctx, "apps.bulk.none") }</span>
+				<div class="jobs-bulk-actions">
+					@ui.Button(ui.ButtonProps{Label: T(ctx, "apps.action.retry"), Type: "submit", Size: "sm", Icon: "refresh", Attrs: templ.Attributes{"name": "action", "value": "retry"}})
+					@ui.Button(ui.ButtonProps{Label: T(ctx, "apps.action.park"), Type: "submit", Size: "sm", Variant: "ghost", Icon: "pause", Attrs: templ.Attributes{"name": "action", "value": "park"}})
+				</div>
+			</form>
+			@ui.Table(ui.TableProps{Caption: T(ctx, "apps.caption", "total", d.Total), Columns: []ui.Column{
+				{Label: T(ctx, "apps.col.select"), SrOnly: true},
+				{Label: T(ctx, "apps.col.job")},
+				{Label: T(ctx, "apps.col.state")},
+				{Label: T(ctx, "apps.col.step"), Narrow: true},
+				{Label: T(ctx, "apps.col.updated"), Narrow: true, Align: "end"},
+			}}) {
+				for _, r := range d.Rows {
+					<tr data-app-row data-id={ r.ID } data-state={ r.State }>
+						<td>
+							<input type="checkbox" name="ids" value={ r.ID } form="bulk" class="job-check" aria-label={ T(ctx, "apps.select", "title", r.Title) }/>
+						</td>
+						<td>
+							<a href={ templ.URL("/applications/" + r.ID) } class="apps-title">{ r.Title }</a>
+							<span class="apps-company">{ r.Company }</span>
+						</td>
+						<td>
+							@ui.StatusPill(ui.StatusProps{Label: T(ctx, r.StateKey), Tone: r.Tone, Live: r.Live})
+						</td>
+						<td class="ui-narrow apps-step">{ T(ctx, r.StepKey) }</td>
+						<td class="ui-narrow ui-end apps-when">
+							<time datetime={ r.Updated.UTC().Format(time.RFC3339) }>{ When(ctx, r.Updated) }</time>
+						</td>
+					</tr>
+				}
+			}
+			if d.PrevURL != "" || d.NextURL != "" {
+				@ui.Pagination(ui.PaginationProps{Label: T(ctx, "apps.pages"), PrevLabel: T(ctx, "jobs.prev"), NextLabel: T(ctx, "jobs.next"),
+					PrevHref: d.PrevURL, NextHref: d.NextURL})
+			}
+		}
+	</div>
+}
+
+// AppDetailData fills the application page: a head with state and next steps, and one tab.
+type AppDetailData struct {
+	HandoffData
+	Tab       string // overview, live, fields, timeline, evidence, notes
+	StateKey  string
+	Tone      ui.Tone
+	NextKey   string // catalog key of the sentence that says what happens next
+	ReasonKey string // why it stopped, for parked applications
+	Actions   []AppAction
+	Notes     NoteForm
+}
+
+// NoteForm is the notes tab: free text, salary talk and dates.
+type NoteForm struct {
+	Notes       string
+	Salary      string
+	InterviewAt string // 2006-01-02T15:04
+	FollowUpAt  string // 2006-01-02
+}
+
+func appTabs(ctx context.Context, d AppDetailData) []ui.Tab {
+	base := "/applications/" + d.AppID
+	tab := func(key string, count int) ui.Tab {
+		href := base
+		if key != "overview" {
+			href += "?tab=" + key
+		}
+		return ui.Tab{Label: T(ctx, "apps.tab."+key), Href: href, Active: d.Tab == key, Count: count}
+	}
+	return []ui.Tab{tab("overview", len(d.Questions)), tab("live", 0), tab("fields", len(d.Fields)),
+		tab("timeline", len(d.Timeline)), tab("evidence", 0), tab("notes", 0)}
+}
+
+templ appAction(d AppDetailData, a AppAction) {
+	if a.Post != "" {
+		<form method="post" action={ templ.URL(a.Post) }>
+			<input type="hidden" name="back" value={ "/applications/" + d.AppID }/>
+			if a.Value != "" {
+				<input type="hidden" name="decision" value={ a.Value }/>
+			}
+			@ui.Button(ui.ButtonProps{Label: T(ctx, a.Key), Type: "submit", Icon: a.Icon, Variant: a.Variant,
+				Attrs: templ.Attributes{"data-action": a.Key}})
+		</form>
+	} else if a.New {
+		@ui.Button(ui.ButtonProps{Label: T(ctx, a.Key), Href: a.Href, Icon: a.Icon, Variant: a.Variant,
+			Attrs: templ.Attributes{"rel": "noopener noreferrer external", "target": "_blank", "data-action": a.Key}})
+	} else {
+		@ui.Button(ui.ButtonProps{Label: T(ctx, a.Key), Href: a.Href, Icon: a.Icon, Variant: a.Variant,
+			Attrs: templ.Attributes{"data-action": a.Key}})
+	}
+}
+
+// AppHead is the state of the application and what to do now; it follows live changes.
+templ AppHead(d AppDetailData) {
+	<section
+		id="app-head"
+		class="app-head"
+		data-state={ d.State }
+		aria-labelledby="app-title"
+		{ HX(ctx, "hx-get", "/applications/" + d.AppID + "/head", "hx-trigger", "getafjob:app from:body delay:700ms", "hx-swap", "outerMorph transition:false")... }
+	>
+		<p class="app-crumbs">
+			<a href="/applications">{ T(ctx, "apps.title") }</a>
+			if d.JobID > 0 {
+				<span aria-hidden="true">/</span>
+				<a href={ templ.URL("/jobs/" + i64(d.JobID)) }>{ T(ctx, "evidence.job_link") }</a>
+			}
+		</p>
+		<div class="app-head-top">
+			<div>
+				<h1 id="app-title" class="app-title">{ or(d.JobTitle, T(ctx, "apps.untitled")) }</h1>
+				if d.Company != "" {
+					<p class="app-company">{ d.Company }</p>
+				}
+			</div>
+			@ui.StatusPill(ui.StatusProps{Label: T(ctx, d.StateKey), Tone: d.Tone, Live: d.Live})
+		</div>
+		<div class="app-next">
+			<p class="app-next-text">
+				{ T(ctx, d.NextKey) }
+				if d.ReasonKey != "" {
+					<span class="app-reason">{ T(ctx, "apps.reason", "reason", T(ctx, d.ReasonKey)) }</span>
+				}
+			</p>
+			if len(d.Actions) > 0 {
+				<div class="app-actions">
+					for _, a := range d.Actions {
+						@appAction(d, a)
+					}
+				</div>
+			}
+		</div>
+	</section>
+}
+
+// ApplicationPage is one application: head, tabs and the open tab.
+templ ApplicationPage(d AppDetailData) {
+	@Layout(Page{Title: or(d.JobTitle, T(ctx, "apps.title")), UserName: d.Name, Handoff: d.Tab == "live", Wide: true}) {
+		<div hidden data-watch-app={ d.AppID } data-watch-state={ d.State }></div>
+		@AppHead(d)
+		@ui.Tabs(T(ctx, "apps.tabs_label"), appTabs(ctx, d))
+		<div class="app-tab" data-tab={ d.Tab }>
+			switch d.Tab {
+				case "live":
+					@appLiveTab(d)
+				case "fields":
+					@appFieldsTab(d)
+				case "timeline":
+					@appTimelineTab(d)
+				case "evidence":
+					@appEvidenceTab(d)
+				case "notes":
+					@appNotesTab(d)
+				default:
+					@appOverviewTab(d)
+			}
+		</div>
+	}
+}
+
+templ appOverviewTab(d AppDetailData) {
+	if d.State == "parked" && (d.ApplyMode == "portal" || d.ApplyMode == "email") {
+		@ExternalApply(d.ApplyMode, d.ApplyHost, d.ExternalURL, d.JobID)
+	}
+	if d.Suggestion != nil {
+		@ui.Card(ui.CardProps{Title: T(ctx, "handoff.suggestion.title"), Subtitle: d.Suggestion.From}) {
+			<p>{ d.Suggestion.Subject }</p>
+			<ul class="app-list">
+				for _, r := range d.Suggestion.Reasons {
+					<li>{ r }</li>
+				}
+			</ul>
+			<div class="app-actions">
+				<form method="post" action={ templ.URL("/applications/" + d.AppID + "/suggestions/" + d.Suggestion.ID + "/accept") }>
+					@ui.Button(ui.ButtonProps{Label: T(ctx, "handoff.suggestion.accept"), Type: "submit", Variant: "primary"})
+				</form>
+				<form method="post" action={ templ.URL("/applications/" + d.AppID + "/suggestions/" + d.Suggestion.ID + "/dismiss") }>
+					@ui.Button(ui.ButtonProps{Label: T(ctx, "handoff.suggestion.dismiss"), Type: "submit", Variant: "ghost"})
+				</form>
+			</div>
+		}
+	}
+	if d.ApprovalAsked {
+		@ui.Card(ui.CardProps{Title: T(ctx, "handoff.approval_reasons")}) {
+			<ul class="app-list">
+				for _, r := range d.ApprovalReasons {
+					<li>{ r }</li>
+				}
+			</ul>
+		}
+	}
+	if len(d.Questions) > 0 {
+		@ui.Card(ui.CardProps{Title: T(ctx, "handoff.questions"), Subtitle: T(ctx, "handoff.questions_hint"), Attrs: templ.Attributes{"id": "questions"}}) {
+			<form method="post" action={ templ.URL("/applications/" + d.AppID + "/answer") } class="stack" data-answer-form>
+				for i, q := range d.Questions {
+					@questionControl(i, q)
+				}
+				@ui.Button(ui.ButtonProps{Label: T(ctx, "handoff.save_continue"), Type: "submit", Variant: "primary", Icon: "send"})
+			</form>
+		}
+	}
+	@ui.Card(ui.CardProps{Title: T(ctx, "apps.summary")}) {
+		<dl class="app-facts">
+			<div><dt>{ T(ctx, "apps.col.state") }</dt><dd>{ T(ctx, d.StateKey) }</dd></div>
+			<div><dt>{ T(ctx, "apps.tab.fields") }</dt><dd>{ itoa(len(d.Fields)) }</dd></div>
+			<div><dt>{ T(ctx, "apps.tab.timeline") }</dt><dd>{ itoa(len(d.Timeline)) }</dd></div>
+			<div>
+				<dt>{ T(ctx, "evidence.confirmation.title") }</dt>
+				<dd>
+					if d.Confirmed {
+						{ T(ctx, "apps.confirmed_yes") }
+					} else {
+						{ T(ctx, "apps.confirmed_no") }
+					}
+				</dd>
+			</div>
+		</dl>
+	}
+}
+
+templ appLiveTab(d AppDetailData) {
+	if d.Live {
+		<div class="app-live">
+			@LiveScreen(LiveScreenProps{AppID: d.AppID, Size: "full", Controls: true, ReloadOnEnd: true})
+			<div class="app-actions">
+				<form method="post" action={ templ.URL("/applications/" + d.AppID + "/park") }>
+					<input type="hidden" name="back" value={ "/applications/" + d.AppID + "?tab=live" }/>
+					@ui.Button(ui.ButtonProps{Label: T(ctx, "handoff.park"), Type: "submit", Icon: "pause", Attrs: templ.Attributes{"id": "btn-park"}})
+				</form>
+				@ui.Button(ui.ButtonProps{Label: T(ctx, "handoff.push"), Variant: "ghost", Icon: "bell", Attrs: templ.Attributes{"id": "btn-push"}})
+			</div>
+		</div>
+	} else {
+		@ui.EmptyState(ui.EmptyProps{Icon: "live", Title: T(ctx, "apps.live_off"), Text: T(ctx, "apps.live_off_hint")})
+	}
+}
+
+templ appFieldsTab(d AppDetailData) {
+	if len(d.Fields) == 0 {
+		@ui.EmptyState(ui.EmptyProps{Icon: "list", Title: T(ctx, "evidence.fields.empty")})
+	} else {
+		@ui.Table(ui.TableProps{Caption: T(ctx, "evidence.fields.title"), CaptionHidden: true, Columns: []ui.Column{
+			{Label: T(ctx, "evidence.fields.field")}, {Label: T(ctx, "evidence.fields.value")}, {Label: T(ctx, "evidence.fields.source"), Narrow: true}}}) {
+			for _, f := range d.Fields {
+				<tr>
+					<td>
+						{ f.Label }
+						if f.Page > 1 {
+							<span class="apps-company">{ T(ctx, "evidence.fields.page", "page", f.Page) }</span>
+						}
+					</td>
+					<td class="app-value">{ f.Value }</td>
+					<td class="ui-narrow app-source">
+						@ui.Badge(T(ctx, sourceKey(f.Source)), ui.Neutral)
+						<code>{ f.Source }</code>
+					</td>
+				</tr>
+			}
+		}
+	}
+}
+
+templ appTimelineTab(d AppDetailData) {
+	<p class="app-hint">{ T(ctx, "evidence.retention_hint") }</p>
+	if len(d.Timeline) == 0 {
+		@ui.EmptyState(ui.EmptyProps{Icon: "clock", Title: T(ctx, "evidence.timeline.empty")})
+	} else {
+		<ol class="app-timeline">
+			for _, t := range d.Timeline {
+				<li class="app-step" data-to={ t.ToState }>
+					<time datetime={ t.At.UTC().Format(time.RFC3339) }>{ When(ctx, t.At) }</time>
+					<div>
+						<p class="app-step-title">
+							if t.Kind == "event" && t.ToState != "" {
+								{ T(ctx, "apps.state." + t.ToState) }
+							} else {
+								{ t.Step }
+							}
+							if t.Page > 0 {
+								<span class="apps-company">{ T(ctx, "evidence.fields.page", "page", t.Page) }</span>
+							}
+						</p>
+						if t.Kind != "event" && (t.Detail != "" || t.URL != "") {
+							<p class="app-step-detail">{ or(t.Detail, t.URL) }</p>
+						}
+						if t.ScreenshotURL != "" {
+							<a href={ templ.URL(t.ScreenshotURL) } class="app-step-shot">{ T(ctx, "evidence.timeline.screenshot") }</a>
+						}
+					</div>
+				</li>
+			}
+		</ol>
+	}
+}
+
+templ appEvidenceTab(d AppDetailData) {
+	<div class="app-evidence">
+		@ui.Card(ui.CardProps{Title: T(ctx, "evidence.before_submit.title")}) {
+			if d.BeforeSubmitURL != "" {
+				<img src={ d.BeforeSubmitURL } alt={ T(ctx, "evidence.before_submit.title") } class="app-shot" loading="lazy"/>
+			} else {
+				<p class="app-hint">{ T(ctx, "evidence.before_submit.empty") }</p>
+			}
+		}
+		@ui.Card(ui.CardProps{Title: T(ctx, "evidence.confirmation.title")}) {
+			if d.Confirmed {
+				<p>{ T(ctx, "evidence.confirmation.confirmed") }</p>
+			} else {
+				<p class="app-hint">{ T(ctx, "evidence.confirmation.unconfirmed") }</p>
+			}
+			if d.ConfirmationURL != "" {
+				<p><a href={ templ.URL(d.ConfirmationURL) } rel="noopener noreferrer external" class="app-value">{ d.ConfirmationURL }</a></p>
+			}
+			if d.ConfirmationShotURL != "" {
+				<img src={ d.ConfirmationShotURL } alt={ T(ctx, "evidence.confirmation.title") } class="app-shot" loading="lazy"/>
+			}
+		}
+	</div>
+	<p class="app-hint">{ T(ctx, "evidence.retention_hint") }</p>
+}
+
+templ appNotesTab(d AppDetailData) {
+	<form method="post" action={ templ.URL("/tracker/" + d.AppID + "/notes") } class="app-notes" data-notes-form>
+		<input type="hidden" name="back" value={ "/applications/" + d.AppID + "?tab=notes" }/>
+		@ui.Textarea(ui.TextareaProps{FieldProps: ui.FieldProps{ID: "app-notes", Name: "notes", Label: T(ctx, "apps.notes.text")},
+			Value: d.Notes.Notes, Rows: 6, MaxLength: 10000})
+		@ui.Input(ui.InputProps{FieldProps: ui.FieldProps{ID: "app-salary", Name: "salary", Label: T(ctx, "apps.notes.salary")},
+			Value: d.Notes.Salary, MaxLength: 200})
+		@ui.Input(ui.InputProps{FieldProps: ui.FieldProps{ID: "app-interview", Name: "interview_at", Label: T(ctx, "apps.notes.interview")},
+			Type: "datetime-local", Value: d.Notes.InterviewAt})
+		@ui.Input(ui.InputProps{FieldProps: ui.FieldProps{ID: "app-follow", Name: "follow_up_at", Label: T(ctx, "apps.notes.follow_up")},
+			Type: "date", Value: d.Notes.FollowUpAt})
+		@ui.Button(ui.ButtonProps{Label: T(ctx, "apps.notes.save"), Type: "submit", Variant: "primary", Icon: "check"})
+	</form>
+}

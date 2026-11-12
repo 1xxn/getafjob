@@ -273,10 +273,10 @@ func TestHandoffPageAnswerAndPark(t *testing.T) {
 
 	// Render handoff page
 	rec := httptest.NewRecorder()
-	req := httptest.NewRequest(http.MethodGet, "/applications/"+appID.String(), nil)
+	req := httptest.NewRequest(http.MethodGet, "/applications/"+appID.String()+"?tab=live", nil)
 	req.SetPathValue("id", appID.String())
 	srv.applicationPage(rec, req, u)
-	if rec.Code != http.StatusOK || !strings.Contains(rec.Body.String(), `data-live-view`) {
+	if rec.Code != http.StatusOK || !strings.Contains(rec.Body.String(), `live-screen-full`) {
 		t.Fatalf("handoff page: %d %s", rec.Code, rec.Body.String())
 	}
 
@@ -528,36 +528,34 @@ func TestEvidencePageAndScreenshotEndpoint(t *testing.T) {
 		Logger:   slog.Default(),
 	}
 
-	rec := httptest.NewRecorder()
-	req := httptest.NewRequest(http.MethodGet, "/applications/"+appID.String(), nil)
-	req.SetPathValue("id", appID.String())
-	srv.applicationPage(rec, req, u)
-	body := rec.Body.String()
-	if rec.Code != http.StatusOK {
-		t.Fatalf("evidence page status = %d", rec.Code)
+	tabs := map[string][]string{
+		"fields":   {"First name", "profile:personal.first_name", "Salary expectation", "answer:0192f3a4"},
+		"evidence": {"/applications/" + appID.String() + "/screenshots/10", "/applications/" + appID.String() + "/screenshots/11", "https://jobs.example.org/apply/thanks"},
+		"timeline": {`data-to="confirmed"`},
+		"overview": {`data-state="confirmed"`},
 	}
-	for _, want := range []string{
-		"First name",
-		"profile:personal.first_name",
-		"Salary expectation",
-		"answer:0192f3a4",
-		"/applications/" + appID.String() + "/screenshots/10",
-		"/applications/" + appID.String() + "/screenshots/11",
-		"https://jobs.example.org/apply/thanks",
-		"submitted -&gt; confirmed",
-	} {
-		if !strings.Contains(body, want) {
-			t.Fatalf("evidence page missing %q in body:\n%s", want, body)
+	for tab, wants := range tabs {
+		rec := httptest.NewRecorder()
+		req := httptest.NewRequest(http.MethodGet, "/applications/"+appID.String()+"?tab="+tab, nil)
+		req.SetPathValue("id", appID.String())
+		srv.applicationPage(rec, req, u)
+		body := rec.Body.String()
+		if rec.Code != http.StatusOK {
+			t.Fatalf("%s tab status = %d", tab, rec.Code)
+		}
+		for _, want := range wants {
+			if !strings.Contains(body, want) {
+				t.Fatalf("%s tab missing %q", tab, want)
+			}
+		}
+		// The hub still lists the confirmed run, but a finished run is not live.
+		if strings.Contains(body, "ui-pill-live") {
+			t.Fatal("a confirmed application shows as live")
 		}
 	}
-	// The hub still lists the confirmed run, but a finished run is not live: no banner for it.
-	if strings.Contains(body, "active-runners-banner") {
-		t.Fatal("a confirmed application shows as an active run")
-	}
 
-	// Owner can fetch the decrypted screenshot.
-	rec = httptest.NewRecorder()
-	req = httptest.NewRequest(http.MethodGet, "/applications/"+appID.String()+"/screenshots/10", nil)
+	rec := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodGet, "/applications/"+appID.String()+"/screenshots/10", nil)
 	req.SetPathValue("id", appID.String())
 	req.SetPathValue("checkpoint", "10")
 	srv.applicationScreenshot(rec, req, u)
@@ -606,7 +604,7 @@ func TestQuestionsRenderMatchingControls(t *testing.T) {
 		{Question: "Start date", Input: "date"},
 		{Question: "Resume", Input: "file"},
 	}}
-	if err := views.HandoffPage(d).Render(t.Context(), &b); err != nil {
+	if err := views.ApplicationPage(views.AppDetailData{HandoffData: d, Tab: "overview", StateKey: "apps.state.needs_input", NextKey: "apps.next.needs_input"}).Render(t.Context(), &b); err != nil {
 		t.Fatal(err)
 	}
 	html := b.String()

@@ -23,7 +23,16 @@ var flashKeys = map[string]bool{"flash.language": true,
 	"flash.jobs.queue": true, "flash.jobs.save": true, "flash.jobs.skip": true, "flash.jobs.block": true,
 	"flash.jobs.queue_partial": true, "flash.jobs.save_partial": true, "flash.jobs.skip_partial": true,
 	"flash.jobs.block_partial": true, "flash.jobs.not_queued.mail": true, "flash.jobs.not_queued.duplicate": true,
-	"flash.jobs.not_queued.company": true, "flash.jobs.not_queued.excluded": true, "flash.jobs.not_queued.other": true}
+	"flash.jobs.not_queued.company": true, "flash.jobs.not_queued.excluded": true, "flash.jobs.not_queued.other": true,
+	"flash.apps.retry": true, "flash.apps.retry_partial": true, "flash.apps.retry_none": true, "flash.apps.park": true,
+	"flash.apps.park_partial": true, "flash.apps.park_none": true, "flash.apps.sent": true, "flash.apps.not_sent": true,
+	"flash.apps.unchanged": true, "flash.apps.notes": true}
+
+// flash leaves a one-time message (a key of flashKeys) for the page the redirect leads to.
+func (s *Server) flash(w http.ResponseWriter, key string) {
+	http.SetCookie(w, &http.Cookie{Name: flashCookie, Value: key, Path: "/", MaxAge: 60, HttpOnly: true, Secure: true,
+		SameSite: http.SameSiteLaxMode})
+}
 
 // shell returns the app frame data of the request: theme and sidebar width from cookies for everyone, for
 // signed-in users also the counters (computed once, when the frame renders) and a one-time message.

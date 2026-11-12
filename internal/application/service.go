@@ -462,3 +462,31 @@ func (s *Service) SkipJob(ctx context.Context, userID uuid.UUID, jobID int64) er
 	_, err = s.Fire(ctx, userID, id, EvSkip, ActorUser, map[string]any{"reason": "skipped by user"})
 	return err
 }
+
+// List returns the user's applications with the reason of every parked one (two queries).
+func (s *Service) List(ctx context.Context, userID uuid.UUID) ([]PipelineApplication, map[uuid.UUID]string, error) {
+	apps, err := s.store.PipelineApplications(ctx, userID)
+	if err != nil {
+		return nil, nil, err
+	}
+	reasons, err := s.store.ParkReasons(ctx, userID)
+	if err != nil {
+		return nil, nil, err
+	}
+	return apps, reasons, nil
+}
+
+// ParkReason returns why the application was parked last, or "" when it is not parked.
+func (s *Service) ParkReason(ctx context.Context, userID, id uuid.UUID) (string, error) {
+	reasons, err := s.store.ParkReasons(ctx, userID)
+	if err != nil {
+		return "", err
+	}
+	return reasons[id], nil
+}
+
+// Retry queues a parked or failed application again by the user's decision; sent ones are refused by the state
+// machine, so nothing is ever sent twice.
+func (s *Service) Retry(ctx context.Context, userID, id uuid.UUID) (State, error) {
+	return s.Fire(ctx, userID, id, EvRequeue, ActorUser, map[string]any{"reason": "retried by user"})
+}
