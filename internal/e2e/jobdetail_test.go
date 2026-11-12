@@ -32,8 +32,11 @@ func TestJobDetail(t *testing.T) {
 	}
 
 	app := startRun(t, tab)
-	tab.WaitWithin(30*time.Second, "document.querySelector('.live-screen-full')")
-	tab.Shot("focus")
+	// A fresh application lands in the live focus; a retried one (no fresh fixture job left) stays on its page.
+	if tab.Eval("return location.pathname") == `"/live"` {
+		tab.WaitWithin(30*time.Second, "document.querySelector('.live-screen-full')")
+		tab.Shot("focus")
+	}
 
 	// Clean up: park the run from its application page.
 	tab.Go("/applications/" + app)
@@ -45,8 +48,6 @@ func TestJobDetail(t *testing.T) {
 	phone := OpenIn(t, Demo(t), 375, 812, "dark")
 	phone.Go("/jobs/" + id[1:len(id)-1])
 	phone.El(".jd-head")
-	if over := phone.Eval("return Math.max(0, document.documentElement.scrollWidth - document.documentElement.clientWidth)"); over != "0" {
-		t.Errorf("%s px horizontal overflow", over)
-	}
+	phone.NoOverflow("page")
 	phone.Shot("phone")
 }
