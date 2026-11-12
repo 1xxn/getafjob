@@ -246,6 +246,7 @@ func (s *Store) SessionByHash(ctx context.Context, h identity.Hash) (u identity.
 			return notFound(err)
 		}
 		u = toUser(r.UserID, r.Email, r.DisplayName, r.Role, r.Locale, r.DisabledAt)
+		u.DockLayout = r.DockLayout
 		sess = identity.Session{UserID: r.UserID, Method: identity.Method(r.Method), CreatedAt: r.CreatedAt, LastSeen: r.LastSeenAt,
 			ExpiresAt: r.ExpiresAt, RotatedAt: deref(r.RotatedAt), ReplacedAt: deref(r.ReplacedAt)}
 		return nil
@@ -492,6 +493,17 @@ func (s *Store) AuditEvents(ctx context.Context, userID uuid.UUID) ([]identity.A
 }
 
 // SetLocale changes the user's UI language.
+// SetDockLayout saves the user's live dock layout.
+func (s *Store) SetDockLayout(ctx context.Context, userID uuid.UUID, layout string) error {
+	return s.user(ctx, userID, func(qs *q.Queries) error {
+		n, err := qs.SetDockLayout(ctx, q.SetDockLayoutParams{ID: userID, DockLayout: layout})
+		if err == nil && n == 0 {
+			return identity.ErrNotFound
+		}
+		return err
+	})
+}
+
 func (s *Store) SetLocale(ctx context.Context, userID uuid.UUID, locale string) error {
 	return s.user(ctx, userID, func(qs *q.Queries) error {
 		n, err := qs.SetUserLocale(ctx, q.SetUserLocaleParams{ID: userID, Locale: locale})

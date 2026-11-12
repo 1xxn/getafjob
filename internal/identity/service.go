@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"net/url"
+	"regexp"
 	"time"
 
 	"github.com/go-webauthn/webauthn/webauthn"
@@ -353,6 +354,20 @@ func (s *Service) AuditEvents(ctx context.Context, userID uuid.UUID) ([]AuditEve
 }
 
 // SetLocale changes the user's UI language; unknown values fall back to the default.
+// dockLayout matches a dock layout: side and size, or empty for the default.
+var dockLayout = regexp.MustCompile(`^((left|right):(sm|md|lg))?$`)
+
+// ErrInvalidLayout rejects a dock layout outside the known sides and sizes.
+var ErrInvalidLayout = errors.New("invalid dock layout")
+
+// SetDockLayout saves the user's live dock layout ("<side>:<size>", empty for the default).
+func (s *Service) SetDockLayout(ctx context.Context, userID uuid.UUID, layout string) error {
+	if !dockLayout.MatchString(layout) {
+		return ErrInvalidLayout
+	}
+	return s.store.SetDockLayout(ctx, userID, layout)
+}
+
 func (s *Service) SetLocale(ctx context.Context, userID uuid.UUID, locale i18n.Locale) error {
 	return s.store.SetLocale(ctx, userID, string(i18n.Parse(string(locale))))
 }

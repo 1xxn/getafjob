@@ -96,6 +96,7 @@ type User struct {
 	Role        Role
 	Locale      i18n.Locale
 	Disabled    bool
+	DockLayout  string // "<side>:<size>" of the live dock, empty for the default; set by the session lookup only
 }
 
 // Session is a signed-in browser.

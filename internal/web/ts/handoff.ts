@@ -326,8 +326,49 @@ document.addEventListener('click', (e) => {
   if (run?.dataset.dockRun) {
     store(DOCK_RUN, run.dataset.dockRun);
     showRun(run.dataset.dockRun);
+    return;
+  }
+  const size = t.closest<HTMLElement>('[data-dock-size-set]');
+  if (size?.dataset.dockSizeSet) {
+    setLayout(undefined, size.dataset.dockSizeSet);
+    return;
+  }
+  if (t.closest('[data-dock-side-toggle]')) {
+    setLayout(dockSlot()?.dataset.dockSide === 'left' ? 'right' : 'left', undefined);
+    return;
+  }
+  if (t.closest('[data-dock-detach]')) {
+    // A window of its own shows the run in the live center's focus view; the dock closes meanwhile.
+    const current = dockParts().screen?.querySelector<HTMLElement>('[data-live-view]')?.dataset.app;
+    window.open(current ? `/live?run=${encodeURIComponent(current)}` : '/live', 'getafjob-live',
+      'popup,width=960,height=720');
+    setOpen(false);
   }
 });
+
+// The dock's place and size belong to the user: the slot carries them, the server stores them for every browser.
+function dockSlot(): HTMLElement | null {
+  return document.getElementById('live-dock');
+}
+
+function syncLayout(): void {
+  const slot = dockSlot();
+  for (const b of slot?.querySelectorAll<HTMLElement>('[data-dock-size-set]') ?? []) {
+    b.setAttribute('aria-pressed', String(b.dataset.dockSizeSet === slot?.dataset.dockSize));
+  }
+}
+
+function setLayout(side: string | undefined, size: string | undefined): void {
+  const slot = dockSlot();
+  if (!slot) return;
+  if (side) slot.dataset.dockSide = side;
+  if (size) slot.dataset.dockSize = size;
+  syncLayout();
+  const body = new URLSearchParams({ side: slot.dataset.dockSide ?? 'right', size: slot.dataset.dockSize ?? 'md' });
+  void fetch('/live/dock/layout', { method: 'POST', body, credentials: 'same-origin' }).catch(() => {
+    // offline: the layout holds on this page and is saved with the next change
+  });
+}
 
 document.addEventListener('htmx:after:settle', () => {
   bindViews();
@@ -335,6 +376,7 @@ document.addEventListener('htmx:after:settle', () => {
 });
 
 function start(): void {
+  syncLayout();
   const { dock } = dockParts();
   if (dock) {
     dock.hidden = true;

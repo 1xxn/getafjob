@@ -221,7 +221,7 @@ templ AppShell(s Shell, wide bool) {
 			@ui.Toast(flashTone(s.Flash), T(ctx, s.Flash), T(ctx, "shell.close"))
 		}
 	}
-	<div id="live-dock" class="shell-dock" { HX(ctx, "hx-preserve", "true")... }>
+	<div id="live-dock" class="shell-dock" data-dock-side={ s.DockSide() } data-dock-size={ s.DockSize() } { HX(ctx, "hx-preserve", "true")... }>
 		@liveDock()
 	</div>
 	<div id="route-announcer" class="ui-sr" aria-live="polite" { HX(ctx, "hx-preserve", "true")... }></div>

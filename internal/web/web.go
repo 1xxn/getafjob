@@ -193,6 +193,7 @@ func (s *Server) Register(mux *http.ServeMux) {
 	mux.Handle("GET /live/dock", s.page(s.liveDock))
 	mux.Handle("GET /live/queue", s.page(s.liveQueue))
 	mux.Handle("POST /live/queue/{id}/{action}", s.page(s.liveQueueAction))
+	mux.Handle("POST /live/dock/layout", s.page(s.liveDockLayout))
 	mux.Handle("GET /events", s.page(s.eventStream))
 	mux.Handle("POST /applications/{id}/answer", s.page(s.applicationAnswer))
 	mux.Handle("POST /applications/{id}/park", s.page(s.applicationPark))

@@ -35,7 +35,7 @@ VALUES ($1, $2, $3, $4, $4, $5);
 
 -- name: GetSession :one
 SELECT s.user_id, s.method, s.created_at, s.last_seen_at, s.expires_at, s.rotated_at, s.replaced_at,
-       u.email, u.display_name, u.role, u.locale, u.disabled_at
+       u.email, u.display_name, u.role, u.locale, u.disabled_at, u.dock_layout
 FROM sessions s JOIN users u ON u.id = s.user_id
 WHERE s.token_hash = $1;
 
@@ -153,3 +153,6 @@ UPDATE users SET role = $2 WHERE id = $1;
 -- name: AdminAuditEvents :many
 SELECT id, user_id, actor, code, params, created_at FROM audit_events
 WHERE actor = 'admin' ORDER BY id DESC LIMIT $1;
+
+-- name: SetDockLayout :execrows
+UPDATE users SET dock_layout = $2 WHERE id = $1;

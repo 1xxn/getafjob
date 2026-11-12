@@ -82,6 +82,8 @@ type Store interface {
 	StartRecovery(ctx context.Context, userID uuid.UUID, r Recovery, audit AuditEvent) (Recovery, bool, error)
 	CancelRecovery(ctx context.Context, userID uuid.UUID, audit AuditEvent) (bool, error)
 	SessionByHash(ctx context.Context, h Hash) (User, Session, error)
+	// SetDockLayout saves where the user's live dock sits and how large it is.
+	SetDockLayout(ctx context.Context, userID uuid.UUID, layout string) error
 	// SetLocale changes the user's UI language.
 	SetLocale(ctx context.Context, userID uuid.UUID, locale string) error
 	TouchSession(ctx context.Context, h Hash, at time.Time) error

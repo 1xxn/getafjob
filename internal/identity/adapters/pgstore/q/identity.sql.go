@@ -359,7 +359,7 @@ func (q *Queries) GetRecovery(ctx context.Context, userID uuid.UUID) (GetRecover
 
 const getSession = `-- name: GetSession :one
 SELECT s.user_id, s.method, s.created_at, s.last_seen_at, s.expires_at, s.rotated_at, s.replaced_at,
-       u.email, u.display_name, u.role, u.locale, u.disabled_at
+       u.email, u.display_name, u.role, u.locale, u.disabled_at, u.dock_layout
 FROM sessions s JOIN users u ON u.id = s.user_id
 WHERE s.token_hash = $1
 `
@@ -377,6 +377,7 @@ type GetSessionRow struct {
 	Role        string
 	Locale      string
 	DisabledAt  *time.Time
+	DockLayout  string
 }
 
 func (q *Queries) GetSession(ctx context.Context, tokenHash []byte) (GetSessionRow, error) {
@@ -395,6 +396,7 @@ func (q *Queries) GetSession(ctx context.Context, tokenHash []byte) (GetSessionR
 		&i.Role,
 		&i.Locale,
 		&i.DisabledAt,
+		&i.DockLayout,
 	)
 	return i, err
 }
@@ -681,6 +683,23 @@ DELETE FROM invitations WHERE id = $1 AND accepted_at IS NULL
 
 func (q *Queries) RevokeInvitation(ctx context.Context, id uuid.UUID) (int64, error) {
 	result, err := q.db.Exec(ctx, revokeInvitation, id)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
+}
+
+const setDockLayout = `-- name: SetDockLayout :execrows
+UPDATE users SET dock_layout = $2 WHERE id = $1
+`
+
+type SetDockLayoutParams struct {
+	ID         uuid.UUID
+	DockLayout string
+}
+
+func (q *Queries) SetDockLayout(ctx context.Context, arg SetDockLayoutParams) (int64, error) {
+	result, err := q.db.Exec(ctx, setDockLayout, arg.ID, arg.DockLayout)
 	if err != nil {
 		return 0, err
 	}

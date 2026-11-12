@@ -1636,6 +1636,17 @@
     display: none;
   }
 
+  .shell-dock[data-dock-side="left"] {
+    inset-inline-start: calc(var(--side-w) + var(--space-4));
+    inset-inline-end: auto;
+  }
+
+  @media (max-width: 63.99rem) {
+    .shell-dock[data-dock-side="left"] {
+      inset-inline-start: var(--space-4);
+    }
+  }
+
   /* command palette */
   .shell-palette {
     width: min(36rem, calc(100vw - 2 * var(--space-4)));
@@ -2037,7 +2048,8 @@
   }
 
   .dock {
-    width: min(22rem, calc(100vw - 2 * var(--space-4)));
+    --dock-w: 22rem;
+    width: min(var(--dock-w), calc(100vw - 2 * var(--space-4)));
     border: 1px solid var(--border);
     border-radius: var(--radius-lg);
     background: var(--surface);
@@ -2050,6 +2062,31 @@
 
   .dock:not(.dock-open) {
     width: auto;
+  }
+
+  [data-dock-size="sm"] .dock {
+    --dock-w: 16rem;
+  }
+
+  [data-dock-size="lg"] .dock {
+    --dock-w: 36rem;
+  }
+
+  .dock-tools {
+    display: flex;
+    align-items: center;
+    gap: var(--space-1);
+  }
+
+  .dock-sizes {
+    display: flex;
+    gap: 2px;
+    margin-inline-end: auto;
+  }
+
+  .dock-sizes [aria-pressed="true"] {
+    background: var(--accent-soft);
+    color: var(--accent-text);
   }
 
   .dock-head {
