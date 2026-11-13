@@ -106,6 +106,10 @@ SELECT id, application_id, user_id, expires_at, finished_at FROM runs WHERE toke
 -- name: FinishRun :exec
 UPDATE runs SET finished_at = $3, outcome = $4 WHERE id = $1 AND user_id = $2 AND finished_at IS NULL;
 
+-- name: FinishAppRuns :exec
+-- Ends the open runs of an application that left the run states, so their tokens stop working.
+UPDATE runs SET finished_at = $3, outcome = $4 WHERE application_id = $1 AND user_id = $2 AND finished_at IS NULL;
+
 -- name: InsertCheckpoint :exec
 INSERT INTO run_checkpoints (run_id, user_id, step, page, url, data, screenshot, at) VALUES ($1, $2, $3, $4, $5, $6, $7, $8);
 

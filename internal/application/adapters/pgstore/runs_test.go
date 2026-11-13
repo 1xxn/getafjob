@@ -219,3 +219,29 @@ func TestReapLostParksSilentRuns(t *testing.T) {
 		t.Fatalf("run with a recent call: %s", a.State)
 	}
 }
+
+// A run whose application the user parked ends with it: its token no longer works, so the old runner cannot touch
+// the application after the user queued it again.
+func TestUserParkEndsTheRun(t *testing.T) {
+	pool, st, svc, _ := setup(t)
+	ctx := t.Context()
+	runs := application.NewRuns(svc, st)
+	max := user(t, pool, "max@example.org")
+	id := queued(t, svc, max, jobAt(t, pool, "https://a.example.org/1", "Muster", "muster|go"))
+	l, ok, err := runs.Lease(ctx, "r1", application.RunnerServer, nil)
+	if err != nil || !ok || l.AppID != id {
+		t.Fatalf("lease: %+v, %v, %v", l, ok, err)
+	}
+	if _, err := svc.Fire(ctx, max, id, application.EvPark, application.ActorUser, map[string]any{"reason": "parked by user"}); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := runs.Authorize(ctx, l.Token); !errors.Is(err, application.ErrNoRun) {
+		t.Fatalf("authorize after park = %v, want ErrNoRun", err)
+	}
+	if _, err := svc.Retry(ctx, max, id); err != nil {
+		t.Fatal(err)
+	}
+	if a, _ := st.Get(ctx, max, id); a.State != application.Queued {
+		t.Fatalf("state = %s, want queued", a.State)
+	}
+}
