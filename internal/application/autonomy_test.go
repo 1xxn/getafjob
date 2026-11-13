@@ -74,6 +74,7 @@ func TestGreenRule(t *testing.T) {
 				{Kind: "text", Source: "profile.first_name"},
 				{Kind: "textarea", Source: "textblock#" + validID},
 				{Kind: "richtext", Source: "answer#" + validID},
+				{Kind: "textarea", Source: "input"},
 			},
 			OpenFields:       0,
 			FormErrors:       0,

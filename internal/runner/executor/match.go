@@ -10,8 +10,9 @@ import (
 	"golang.org/x/text/unicode/norm"
 )
 
-// sourceRx is the provenance of a value (ADR 0013): a profile field, an answer, a text block or a document.
-var sourceRx = regexp.MustCompile(`^(profile\.[a-z][a-z0-9_.]{0,60}|(answer|textblock)#(` + idRx + `)|document#` + uuidRx + `)$`)
+// sourceRx is the provenance of a value (ADR 0013): a profile field, an answer, a text block, a document or input the
+// user typed during the run without keeping it in the answer bank.
+var sourceRx = regexp.MustCompile(`^(profile\.[a-z][a-z0-9_.]{0,60}|(answer|textblock)#(` + idRx + `)|document#` + uuidRx + `|input)$`)
 
 // Stored IDs: UUIDs (answers, text blocks, documents) or numbers.
 const (

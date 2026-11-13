@@ -108,7 +108,11 @@ func (p *Planner) answer(f browser.Field) (executor.Value, bool) {
 		if executor.Normalize(a.Question) != label {
 			continue
 		}
-		v := executor.Value{Text: a.Answer, Options: split(f, a.Answer), Source: "answer#" + a.ID}
+		source := "input" // typed during this run, not kept in the answer bank
+		if a.ID != "" {
+			source = "answer#" + a.ID
+		}
+		v := executor.Value{Text: a.Answer, Options: split(f, a.Answer), Source: source}
 		if f.Kind == "checkbox" || f.Kind == "aria_checkbox" || f.Kind == "aria_radio" {
 			i, ok := executor.Match(a.Answer, []string{"Yes", "No"})
 			if !ok {

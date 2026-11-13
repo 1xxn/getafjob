@@ -201,3 +201,14 @@ func TestRealFormQuirks(t *testing.T) {
 		t.Fatalf("city combobox = %+v, want Berlin, Germany", got)
 	}
 }
+
+// An answer typed during the run and kept out of the answer bank has no id: its source is "input".
+func TestOneOffAnswerSource(t *testing.T) {
+	k := know
+	k.Answers = append([]Answer{{Question: "Favorite color", Answer: "Blue"}}, k.Answers...)
+	p := &Planner{K: k}
+	plan, _, err := p.Plan(context.Background(), state(browser.Field{Kind: "text", Label: "Favorite color", Required: true}))
+	if err != nil || len(plan.Values) != 1 || plan.Values[0].Source != "input" {
+		t.Fatalf("values %+v, err %v", plan.Values, err)
+	}
+}
