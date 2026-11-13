@@ -83,7 +83,7 @@ func TestSkills(t *testing.T) {
 		{"Kochen im Team", "skills.fit", 4, 4, ""},
 	}
 	for _, tt := range tests {
-		r := m.skillFit(normalize(tt.text))
+		r := skillReason(m.skillHitsAndMissing(normalize(tt.text)))
 		if r.Code != tt.code || r.Points < tt.min || r.Points > tt.max || !strings.Contains(r.Params["missing"], tt.missing) {
 			t.Errorf("%q: %+v", tt.text, r)
 		}
@@ -160,6 +160,8 @@ func TestLanguage(t *testing.T) {
 		{[]Language{{"German", "native"}, {"English", "B1"}}, english, "language.missing"},
 		{[]Language{{"English", ""}}, german, "language.missing"},
 		{nil, german, "language.unknown"},
+		{[]Language{{"Polnisch", "Muttersprache"}}, german, "language.unknown"},
+		{[]Language{{"English", "A2"}}, english, "language.missing"},
 	}
 	for _, tt := range tests {
 		r := NewMatcher(Criteria{Languages: tt.langs}).language(normalize(tt.text))
@@ -293,6 +295,17 @@ func TestInspectFit(t *testing.T) {
 	}
 	if fit.TitlePoints <= 0 || fit.MaxTitlePoints != 35 {
 		t.Errorf("TitlePoints = %d / %d", fit.TitlePoints, fit.MaxTitlePoints)
+	}
+	// The breakdown adds up to the score of Evaluate.
+	if r := NewMatcher(c).Evaluate(j, now); r.Score != fit.Score || r.Decision != fit.Decision {
+		t.Errorf("Evaluate = %d %s, InspectFit = %d %s", r.Score, r.Decision, fit.Score, fit.Decision)
+	}
+	// An excluded title scores 0, and so do its parts.
+	c.ExcludeTitles = []string{"developer"}
+	ex := InspectFit(c, j, now)
+	if ex.Score != 0 || ex.Decision != Skip || ex.TitlePoints != 0 || ex.SkillPoints != 0 || len(ex.MatchingSkills) != 0 ||
+		len(ex.Reasons) != 1 || ex.Reasons[0].Code != "title.excluded" {
+		t.Errorf("excluded: %+v", ex)
 	}
 }
 
