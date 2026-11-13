@@ -129,6 +129,12 @@ func (s Session) NeedsRotation(now time.Time) bool {
 	return s.ReplacedAt.IsZero() && now.Sub(since) >= SessionRotate
 }
 
+// NeedsTouch reports whether last-seen should be written again (bounded writes per request).
+func (s Session) NeedsTouch(now time.Time) bool { return now.Sub(s.LastSeen) >= sessionTouchGap }
+
+// Fresh reports whether the sign-in of this session is recent enough for sensitive account changes.
+func (s Session) Fresh(now time.Time) bool { return now.Sub(s.CreatedAt) < SessionFresh }
+
 // SessionInfo describes an active session of the user (account page); Current marks the one asking.
 type SessionInfo struct {
 	Method    Method
@@ -136,9 +142,6 @@ type SessionInfo struct {
 	LastSeen  time.Time
 	Current   bool
 }
-
-// NeedsTouch reports whether last-seen should be written again (bounded writes per request).
-func (s Session) NeedsTouch(now time.Time) bool { return now.Sub(s.LastSeen) >= sessionTouchGap }
 
 // Token is a one-time secret handed to a person (link or cookie); only its hash is stored.
 type Token string
@@ -190,9 +193,6 @@ func CleanDisplayName(s string) string {
 	}
 	return s
 }
-
-// Fresh reports whether the sign-in of this session is recent enough for sensitive account changes.
-func (s Session) Fresh(now time.Time) bool { return now.Sub(s.CreatedAt) < SessionFresh }
 
 // Recovery is a request to sign in with a mail link although the account has a passkey. It works from ReadyAt
 // until ExpiresAt, once; any passkey sign-in cancels it.
