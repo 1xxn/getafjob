@@ -1024,6 +1024,14 @@ func TestCVReviewAndImport(t *testing.T) {
 			t.Errorf("profile lacks %q", want)
 		}
 	}
+
+	// 4. An entry the profile refuses is reported, not dropped without a word.
+	refused := url.Values{"exp_count": {"1"}, "include_exp_0": {"1"}, "exp_0_title": {strings.Repeat("x", 1000)},
+		"exp_0_bullets": {strings.Repeat("bullet\n", 51)}}
+	if rec := a.do(http.MethodPost, "/documents/"+docID+"/review", refused, session, nil); rec.Code != http.StatusUnprocessableEntity ||
+		!strings.Contains(rec.Body.String(), "were not saved") {
+		t.Errorf("refused entry %d: %s", rec.Code, rec.Body.String())
+	}
 }
 
 func (a *app) uploadTo(path, name string, data []byte, cookie string) *httptest.ResponseRecorder {

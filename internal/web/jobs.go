@@ -571,8 +571,11 @@ func (s *Server) addBlocklist(w http.ResponseWriter, r *http.Request, u *identit
 		kind = "company"
 	}
 	pattern := r.PostFormValue("pattern")
-	if pattern != "" {
-		_ = s.Jobs.AddBlocklist(r.Context(), u.ID, kind, pattern)
+	if strings.TrimSpace(pattern) != "" {
+		if err := s.Jobs.AddBlocklist(r.Context(), u.ID, kind, pattern); err != nil {
+			s.failed(w, r, u, err)
+			return
+		}
 	}
 	if partial(r) {
 		s.jobsPage(w, r, u)
@@ -592,14 +595,20 @@ func (s *Server) deleteBlocklist(w http.ResponseWriter, r *http.Request, u *iden
 	}
 	if idStr := r.PostFormValue("id"); idStr != "" {
 		if id, err := strconv.ParseInt(idStr, 10, 64); err == nil && id > 0 {
-			_ = s.Jobs.RemoveBlocklist(r.Context(), u.ID, id)
+			if err := s.Jobs.RemoveBlocklist(r.Context(), u.ID, id); err != nil {
+				s.failed(w, r, u, err)
+				return
+			}
 		}
 	} else if pattern := r.PostFormValue("pattern"); pattern != "" {
 		kind := r.PostFormValue("kind")
 		if kind != "company" && kind != "keyword" {
 			kind = "company"
 		}
-		_ = s.Jobs.RemoveBlocklistByPattern(r.Context(), u.ID, kind, pattern)
+		if err := s.Jobs.RemoveBlocklistByPattern(r.Context(), u.ID, kind, pattern); err != nil {
+			s.failed(w, r, u, err)
+			return
+		}
 	}
 	if partial(r) {
 		s.jobsPage(w, r, u)
@@ -730,8 +739,15 @@ func (s *Server) triggerCrawl(w http.ResponseWriter, r *http.Request, u *identit
 		s.failed(w, r, u, errors.New("discovery service unavailable"))
 		return
 	}
-	_, _ = s.Discovery.TriggerCrawl(r.Context())
-	st, _ := s.Discovery.CrawlStatus(r.Context())
+	if _, err := s.Discovery.TriggerCrawl(r.Context()); err != nil {
+		s.failed(w, r, u, err)
+		return
+	}
+	st, err := s.Discovery.CrawlStatus(r.Context())
+	if err != nil {
+		s.failed(w, r, u, err)
+		return
+	}
 	if !st.Running {
 		st.Queued = true
 	}

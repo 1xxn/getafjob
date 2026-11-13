@@ -51,6 +51,7 @@
   "documents.focus": "Schwerpunkte",
   "documents.focus_hint": "Durch Kommas getrennt, z. B. platform, kubernetes.",
   "documents.import": "Profil aus diesem Lebenslauf füllen",
+  "documents.import_partial": "Einige Einträge aus deinem Lebenslauf wurden nicht gespeichert: zu viele Stationen, ein Eintrag ist zu lang oder das Profil wurde zwischendurch geändert. Die anderen stehen in deinem Profil.",
   "documents.import_no_text": "In dieser Datei wurde kein Text gefunden. Vermutlich ist sie ein eingescanntes Bild; bitte fülle das Profil von Hand aus.",
   "documents.import_nothing": "Der Lebenslauf hatte nichts zu ergänzen: Die Felder, die er abdeckt, sind schon ausgefüllt.",
   "documents.import_unreadable": "Diese Datei konnte nicht gelesen werden.",

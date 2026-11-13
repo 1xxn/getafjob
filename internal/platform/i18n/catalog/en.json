@@ -51,6 +51,7 @@
   "documents.focus": "Focus words",
   "documents.focus_hint": "Separated by commas, e.g. platform, kubernetes.",
   "documents.import": "Fill my profile from this CV",
+  "documents.import_partial": "Some entries from your CV were not saved: there are too many career stations, an entry is too long, or the profile changed meanwhile. The others are in your profile.",
   "documents.import_no_text": "No text found in this file. It is probably a scanned image; please fill in the profile by hand.",
   "documents.import_nothing": "The CV had nothing to add: the fields it covers are already filled.",
   "documents.import_unreadable": "This file could not be read.",
