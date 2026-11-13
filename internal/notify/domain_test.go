@@ -89,7 +89,7 @@ func TestFormatSummary(t *testing.T) {
 
 	title, body := stats.FormatSummary(i18n.EN)
 	for _, want := range []string{"Applications sent: 3", "Waiting for your approval: 2", "Waiting for your answer: 1",
-		"Status suggestions from your mailbox: 4", "1 interviews, 2 confirmations, 0 rejections"} {
+		"Status suggestions from your mailbox: 4", "1 interview, 2 confirmations, 0 rejections"} {
 		if !strings.Contains(body, want) {
 			t.Errorf("summary lacks %q: %s", want, body)
 		}
