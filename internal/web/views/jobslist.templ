@@ -130,7 +130,9 @@ templ jobFacts(r JobRow) {
 		}
 		if r.Age == 0 {
 			<span>{ T(ctx, "jobs.age_today") }</span>
-		} else if r.Age > 0 {
+		} else if r.Age == 1 {
+			<span>{ T(ctx, "jobs.age_yesterday") }</span>
+		} else if r.Age > 1 {
 			<span>{ T(ctx, "jobs.age_days", "days", r.Age) }</span>
 		}
 	</span>
