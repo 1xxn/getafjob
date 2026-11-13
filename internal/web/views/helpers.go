@@ -13,12 +13,12 @@ import (
 
 func itoa(n int) string { return strconv.Itoa(n) }
 
-// When formats a time for the reader's locale (UTC; the UI has no time zone setting yet).
+// When formats a time for the reader's locale in the instance time zone, with the zone's abbreviation.
 func When(ctx context.Context, t time.Time) string {
 	if Locale(ctx) == "de" {
-		return t.UTC().Format("02.01.2006 15:04") + " UTC"
+		return t.In(zone(ctx)).Format("02.01.2006 15:04 MST")
 	}
-	return t.UTC().Format("Jan 2, 2006 15:04") + " UTC"
+	return t.In(zone(ctx)).Format("Jan 2, 2006 15:04 MST")
 }
 
 func or(s, fallback string) string {

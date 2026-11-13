@@ -108,11 +108,11 @@ type Server struct {
 	Privacy        PrivacyService
 	Shots          Screenshots
 	Handoffs       HandoffHub
-	Events         *events.Hub   // live application changes; nil turns /events off
-	StyleGuide     bool          // serve /dev/styleguide (development builds only)
-	TimeZone       string        // instance time zone of summaries and quiet hours, shown in the settings
-	System         SystemService // nil: the system page shows the build only
-	Ops            AdminOps      // nil: no runner, source and queue pages
+	Events         *events.Hub    // live application changes; nil turns /events off
+	StyleGuide     bool           // serve /dev/styleguide (development builds only)
+	TimeZone       *time.Location // instance time zone of UI times, summaries and quiet hours
+	System         SystemService  // nil: the system page shows the build only
+	Ops            AdminOps       // nil: no runner, source and queue pages
 	PushStore      webpush.Store
 	VAPIDPublicKey string
 	Logger         *slog.Logger
@@ -294,7 +294,7 @@ func (s *Server) page(h func(http.ResponseWriter, *http.Request, *identity.User)
 		if u != nil {
 			l = u.Locale
 		}
-		ctx := context.WithValue(views.WithLocale(r.Context(), l), tokenKey{}, token)
+		ctx := context.WithValue(views.WithZone(views.WithLocale(r.Context(), l), s.TimeZone), tokenKey{}, token)
 		ctx = templ.WithNonce(ctx, httpx.Nonce(ctx))
 		r = r.WithContext(ctx)
 		h(w, r.WithContext(views.WithShell(ctx, s.shell(w, r, u))), u)

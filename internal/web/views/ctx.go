@@ -5,11 +5,30 @@ package views
 
 import (
 	"context"
+	"time"
 
 	"github.com/1xxn/getafjob/internal/platform/i18n"
 )
 
-type localeKey struct{}
+type (
+	localeKey struct{}
+	zoneKey   struct{}
+)
+
+// WithZone stores the instance time zone for When; nil keeps UTC.
+func WithZone(ctx context.Context, loc *time.Location) context.Context {
+	if loc == nil {
+		return ctx
+	}
+	return context.WithValue(ctx, zoneKey{}, loc)
+}
+
+func zone(ctx context.Context) *time.Location {
+	if loc, ok := ctx.Value(zoneKey{}).(*time.Location); ok {
+		return loc
+	}
+	return time.UTC
+}
 
 // WithLocale stores the reader's locale for T.
 func WithLocale(ctx context.Context, l i18n.Locale) context.Context {
