@@ -46,6 +46,7 @@ type Stats struct {
 	Duplicates    int            `json:"duplicates"`
 	Changes       map[Change]int `json:"changes"`
 	Closed        int            `json:"closed"`
+	Rechecked     int            `json:"rechecked,omitempty"` // jobs added by URL whose page was looked at again
 }
 
 // CrawlRun records one crawl's metadata and statistics.
@@ -79,6 +80,8 @@ type Store interface {
 	// Described returns the fingerprints of stored jobs that already have a description.
 	Described(ctx context.Context, fingerprints []string) (map[string]bool, error)
 	Close(ctx context.Context, runID int64, ids []int64, at time.Time) error
+	// StaleImports returns open jobs added by URL that were not seen since seenBefore, longest unseen first.
+	StaleImports(ctx context.Context, seenBefore time.Time, limit int) ([]ImportedJob, error)
 	FinishRun(ctx context.Context, runID int64, s Stats, errs map[string]string, at time.Time) error
 	LatestCrawlRun(ctx context.Context) (*CrawlRun, error)
 	ActiveCrawlRun(ctx context.Context, since time.Time) (*ActiveRun, error)

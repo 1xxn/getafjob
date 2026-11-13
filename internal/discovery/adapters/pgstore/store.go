@@ -265,6 +265,19 @@ func (s *Store) OpenJobs(ctx context.Context, sources []string) ([]discovery.Ope
 	return out, err
 }
 
+// StaleImports returns open jobs added by URL that were not seen since seenBefore, longest unseen first.
+func (s *Store) StaleImports(ctx context.Context, seenBefore time.Time, limit int) ([]discovery.ImportedJob, error) {
+	var out []discovery.ImportedJob
+	err := s.system(ctx, func(qs *q.Queries) error {
+		rows, err := qs.StaleImportedJobs(ctx, q.StaleImportedJobsParams{SeenBefore: seenBefore, MaxRows: int32(min(limit, 1000))}) //nolint:gosec // bounded above
+		for _, r := range rows {
+			out = append(out, discovery.ImportedJob{ID: r.ID, Fingerprint: r.Fingerprint, URL: r.Url})
+		}
+		return err
+	})
+	return out, err
+}
+
 // Seen marks open jobs as seen and returns the fingerprints it found.
 func (s *Store) Seen(ctx context.Context, fingerprints []string, at time.Time) (map[string]bool, error) {
 	out := map[string]bool{}

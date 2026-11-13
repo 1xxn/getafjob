@@ -3,6 +3,7 @@
 package discovery
 
 import (
+	"context"
 	"crypto/sha256"
 	"encoding/hex"
 	"regexp"
@@ -160,6 +161,35 @@ func ShouldClose(j OpenJob, runs map[string]SourceRun, listed map[string]bool, n
 		return true
 	}
 	return now.Sub(j.LastSeen) >= StaleAfter
+}
+
+// Jobs added by URL ("import:<host>") belong to no crawled source, so nothing would ever close them. Each crawl looks
+// at the pages of up to MaxImportChecks of them that were not seen for ImportRecheck.
+const (
+	ImportRecheck   = 3 * 24 * time.Hour
+	MaxImportChecks = 50
+)
+
+// ImportedJob is an open job added by URL.
+type ImportedJob struct {
+	ID          int64
+	Fingerprint string
+	URL         string
+}
+
+// ImportState is what a look at an imported job's page found.
+type ImportState int
+
+// Import states. Unknown (no answer, an unexpected status) changes nothing; the next crawl looks again.
+const (
+	ImportUnknown ImportState = iota
+	ImportOpen
+	ImportGone
+)
+
+// ImportChecker looks at the page of a job added by URL.
+type ImportChecker interface {
+	CheckImport(ctx context.Context, url string) ImportState
 }
 
 // ValidStub reports whether a stub names a job.

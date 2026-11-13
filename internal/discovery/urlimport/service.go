@@ -156,6 +156,39 @@ func (s *Service) ImportJob(ctx context.Context, userID uuid.UUID, rawURL string
 	return jobID, nil
 }
 
+var _ discovery.ImportChecker = (*Service)(nil)
+
+// CheckImport looks at the page of a job added by URL. The job is gone when the page answers 404 or 410 or no longer
+// names a job and a company; anything else that fails (no answer, another status) is unknown and closes nothing.
+func (s *Service) CheckImport(ctx context.Context, rawURL string) discovery.ImportState {
+	if !s.allowPrivate && !netguard.PublicURL(rawURL) {
+		return discovery.ImportUnknown
+	}
+	resp, err := netguard.Get(ctx, s.client, rawURL, s.allowPrivate)
+	if err != nil {
+		return discovery.ImportUnknown
+	}
+	defer resp.Body.Close()
+	switch {
+	case resp.StatusCode == http.StatusNotFound || resp.StatusCode == http.StatusGone:
+		return discovery.ImportGone
+	case resp.StatusCode < 200 || resp.StatusCode >= 300:
+		return discovery.ImportUnknown
+	}
+	body, err := netguard.ReadPrefix(resp.Body, maxPage)
+	if err != nil {
+		return discovery.ImportUnknown
+	}
+	extracted, err := Extract(rawURL, body)
+	if err != nil {
+		return discovery.ImportUnknown
+	}
+	if extracted.Title == "" || extracted.Company == "" {
+		return discovery.ImportGone
+	}
+	return discovery.ImportOpen
+}
+
 // TriggerCrawl queues an immediate manual crawl job.
 func (s *Service) TriggerCrawl(ctx context.Context) (queued bool, err error) {
 	if s.queue == nil {

@@ -69,6 +69,12 @@ VALUES ($1, $2, $3, $4, $5, $6, $7, $8);
 -- name: OpenJobsOfSources :many
 SELECT id, fingerprint, source, last_seen FROM jobs WHERE status = 'open' AND source = ANY(sqlc.arg(sources)::text[]);
 
+-- name: StaleImportedJobs :many
+SELECT id, fingerprint, url FROM jobs
+WHERE status = 'open' AND source LIKE 'import:%' AND last_seen < sqlc.arg(seen_before)
+ORDER BY last_seen, id
+LIMIT sqlc.arg(max_rows);
+
 -- name: CloseJob :one
 UPDATE jobs SET status = 'closed', closed_at = $2 WHERE id = $1 AND status = 'open'
 RETURNING title, location, content_hash;

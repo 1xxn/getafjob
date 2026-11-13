@@ -227,7 +227,9 @@ func worker(ctx context.Context, cfg config.Config, logger *slog.Logger) error {
 	}
 	pstore := profilestore.New(pool)
 	mstore := matchingstore.New(pool)
-	river.AddWorker(workers, &crawlWorker{svc: discovery.NewService(store), boards: store, states: store, client: client,
+	recheck := urlimport.NewService(urlimport.Options{Client: netguard.NewClient(netguard.ClientOptions{
+		Proxy: cfg.EgressProxy, Timeout: 20 * time.Second})})
+	river.AddWorker(workers, &crawlWorker{svc: discovery.NewService(store).WithImportChecker(recheck), boards: store, states: store, client: client,
 		terms: preferenceTerms(pstore, logger), logger: logger, timeout: 90 * time.Minute, metrics: metrics,
 		notify: pageNotifier(pool, logger)})
 	river.AddWorker(workers, &matchWorker{logger: logger, notify: pageNotifier(pool, logger), svc: matching.NewService(
