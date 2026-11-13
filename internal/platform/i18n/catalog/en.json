@@ -1063,7 +1063,7 @@
   "settings.intro.search": "Which jobs getafjob looks for and how it fills in what every form asks.",
   "settings.intro.automation": "How far getafjob goes on its own. Nothing is ever sent twice, and you can park any run.",
   "settings.intro.notifications": "When and how getafjob tells you that a run needs you.",
-  "settings.intro.integrations": "Optional helpers: AI drafts, your mailbox for replies, the browser extension and your own runner.",
+  "settings.intro.integrations": "Optional helpers: your mailbox for replies, the browser extension and your own runner.",
   "settings.intro.account": "Passkeys, signed-in browsers, your data export and deleting the account.",
   "settings.autonomy.suggest": "getafjob finds and ranks jobs; you start every application yourself.",
   "settings.autonomy.approve": "getafjob fills out forms on its own and sends only after you approve.",
