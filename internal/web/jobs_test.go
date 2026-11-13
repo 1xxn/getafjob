@@ -120,6 +120,12 @@ func TestJobPages(t *testing.T) {
 		!strings.Contains(panel, "Go Developer") || !strings.Contains(panel, `href="/jobs"`) {
 		t.Fatalf("panel:\n%s", panel)
 	}
+	// The panel shows five reasons; the hard one that skipped a job is among them although it carries no points.
+	salesStr := strconv.FormatInt(salesID, 10)
+	if panel := a.do(http.MethodGet, "/jobs/"+salesStr+"/panel?job="+salesStr, nil, session, nil).Body.String(); !strings.Contains(panel,
+		"The title matches none of your wanted titles.") {
+		t.Fatalf("panel of a skipped job lacks its hard reason:\n%s", panel)
+	}
 	if page := a.do(http.MethodGet, "/jobs?q=go&job="+goStr, nil, session, nil).Body.String(); !strings.Contains(page, `id="job-panel-title"`) ||
 		!strings.Contains(page, `<a href="/jobs" class="jobs-chip"`) {
 		t.Fatal("page with an open job and a removable search chip")
