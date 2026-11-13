@@ -186,9 +186,9 @@ func TestNotifyDispatchAllChannels(t *testing.T) {
 		t.Errorf("webpush url = %v", wp.sentURLs)
 	}
 
-	// Verify Email received to custom address
-	if len(em.sentTo) != 1 || em.sentTo[0] != "custom@example.org" {
-		t.Errorf("email to = %v, want custom@example.org", em.sentTo)
+	// Mail goes to the verified account address, never to the typed one.
+	if len(em.sentTo) != 1 || em.sentTo[0] != "primary@example.org" {
+		t.Errorf("email to = %v, want the account address primary@example.org", em.sentTo)
 	}
 	if len(em.sentBody) != 1 || !strings.Contains(em.sentBody[0], "https://app.example.org/applications/123") {
 		t.Errorf("email body missing url: %v", em.sentBody)
@@ -340,5 +340,16 @@ func TestActivityUnreadAndMarkRead(t *testing.T) {
 	}
 	if a, _ := svc.Activity(ctx, u, time.Time{}, 10); a.Unread != 0 || a.Items[0].Unread {
 		t.Errorf("after mark read: %+v", a)
+	}
+}
+
+// An ntfy topic stays one path segment of the server URL.
+func TestNtfyTopicShape(t *testing.T) {
+	svc := notify.NewService(newFakeStore(), nil, nil, nil, "", nil)
+	for topic, ok := range map[string]bool{"getafjob-max_1": true, "../admin": false, "a/b": false, "x?y=1": false} {
+		err := svc.SavePreferences(t.Context(), notify.Preferences{UserID: uuid.New(), NtfyEnabled: true, NtfyTopic: topic})
+		if (err == nil) != ok {
+			t.Errorf("topic %q: err = %v, want ok=%v", topic, err, ok)
+		}
 	}
 }

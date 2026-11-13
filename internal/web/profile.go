@@ -434,7 +434,6 @@ func preferencesForm(p profile.Preferences, a application.Settings, mb tracking.
 		"mailbox_host":              mb.Host,
 		"mailbox_port":              portStr,
 		"mailbox_username":          mb.Username,
-		"notify_email_address":      np.EmailAddress,
 		"notify_ntfy_url":           ntfyURL,
 		"notify_ntfy_topic":         np.NtfyTopic,
 		"notify_ntfy_token":         np.NtfyToken,
@@ -676,7 +675,6 @@ func (s *Server) preferencesSave(w http.ResponseWriter, r *http.Request, u *iden
 	}
 	if sectionIs(section, "notifications") {
 		np.EmailEnabled = r.PostFormValue("notify_email_enabled") == "on"
-		np.EmailAddress = strings.TrimSpace(r.PostFormValue("notify_email_address"))
 		np.WebPushEnabled = r.PostFormValue("notify_webpush_enabled") == "on"
 		np.NtfyEnabled = r.PostFormValue("notify_ntfy_enabled") == "on"
 		if urlStr := strings.TrimSpace(r.PostFormValue("notify_ntfy_url")); urlStr != "" {

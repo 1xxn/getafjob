@@ -61,7 +61,7 @@ type Notification struct {
 type Preferences struct {
 	UserID              uuid.UUID
 	EmailEnabled        bool
-	EmailAddress        string // if empty, fall back to account email
+	EmailAddress        string // unused: mail goes to the verified account address only
 	WebPushEnabled      bool
 	NtfyEnabled         bool
 	NtfyURL             string

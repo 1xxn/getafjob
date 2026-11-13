@@ -29,12 +29,8 @@ import (
 func newNotifyService(pool *pgxpool.Pool, cfg config.Config, logger *slog.Logger) (*notify.Service, pushNotifier, string) {
 	notifier, vapidPub := newPushNotifier(pool, cfg, logger)
 	nstore := notifystore.New(pool)
-	var ntfyClient *ntfy.Client
-	if cfg.EgressProxy != nil {
-		ntfyClient = ntfy.NewClientWithHTTP(netguard.NewClient(netguard.ClientOptions{Proxy: cfg.EgressProxy, Timeout: 10 * time.Second}))
-	} else {
-		ntfyClient = ntfy.NewClient()
-	}
+	// The ntfy server is the user's choice: public targets only, through the egress proxy when there is one.
+	ntfyClient := ntfy.NewClientWithHTTP(netguard.NewClient(netguard.ClientOptions{Proxy: cfg.EgressProxy, Timeout: 10 * time.Second}))
 
 	var emailClient notify.EmailClient
 	if cfg.SMTPURL != "" {
