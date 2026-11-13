@@ -651,6 +651,11 @@ func TestProfilePages(t *testing.T) {
 	if loc != "/profile?saved=1&added=experience" || m == nil || !strings.Contains(body, `id="`+m[1]+`"`) {
 		t.Errorf("add experience: Location %q, focus %v", loc, m)
 	}
+	// An empty entry comes back on the profile page instead of the error page.
+	if rec := a.do(http.MethodPost, "/profile/experiences", url.Values{"title": {""}}, session, nil); rec.Code != http.StatusUnprocessableEntity ||
+		!strings.Contains(rec.Body.String(), "was not saved") {
+		t.Errorf("empty experience %d", rec.Code)
+	}
 	for _, want := range []string{"Staff Platform Engineer", "Acme Corp", "Munich", "Built scalable infra"} {
 		if !strings.Contains(body, want) {
 			t.Errorf("profile page lacks experience field %q", want)
