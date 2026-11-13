@@ -2,6 +2,7 @@ package urlimport
 
 import (
 	"context"
+	"encoding/json"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -212,6 +213,22 @@ func TestService_AddBoard(t *testing.T) {
 	}
 	if b2.ATS != "greenhouse" || b2.Slug != "beispiel" {
 		t.Errorf("Board = %+v, want greenhouse / beispiel", b2)
+	}
+
+	// 3. Career page with its own JSON-LD postings: the config stays valid JSON whatever the URL holds.
+	ld := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.Header().Set("Content-Type", "text/html")
+		_, _ = w.Write([]byte(`<html><body><script type="application/ld+json">{"@context":"https://schema.org","@type":"JobPosting",
+"title":"Platform Engineer","hiringOrganization":{"@type":"Organization","name":"Muster GmbH"}}</script></body></html>`))
+	}))
+	defer ld.Close()
+	b3, err := NewService(Options{Client: ld.Client(), AllowPrivate: true, Boards: boards}).AddBoard(t.Context(), ld.URL+`/jobs?team="x","y":"z`)
+	if err != nil {
+		t.Fatalf("AddBoard JSON-LD failed: %v", err)
+	}
+	var cfg map[string]string
+	if err := json.Unmarshal(b3.Config, &cfg); err != nil || len(cfg) != 1 || cfg["url"] != ld.URL+`/jobs?team="x","y":"z` {
+		t.Errorf("config = %s (%v)", b3.Config, err)
 	}
 }
 

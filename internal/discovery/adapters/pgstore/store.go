@@ -73,14 +73,11 @@ func (s *Store) Upsert(ctx context.Context, runID int64, p discovery.Posting, at
 	return change, dup, err
 }
 
-// UpsertPosting records one posting directly (e.g. from single URL ingestion) and returns its ID.
+// UpsertPosting records one posting directly (e.g. from single URL ingestion) and returns its ID; a duplicate of a
+// job in the index returns that job.
 func (s *Store) UpsertPosting(ctx context.Context, p discovery.Posting, at time.Time) (id int64, change discovery.Change, err error) {
 	err = s.system(ctx, func(qs *q.Queries) error {
-		var dup bool
-		id, change, dup, err = upsert(ctx, qs, 0, p, at)
-		if dup {
-			return nil
-		}
+		id, change, _, err = upsert(ctx, qs, 0, p, at)
 		return err
 	})
 	return id, change, err
@@ -110,7 +107,7 @@ func upsert(ctx context.Context, qs *q.Queries, runID int64, p discovery.Posting
 		}
 		switch {
 		case other != nil && discovery.IsAggregator(p.Source):
-			return 0, "", true, nil
+			return other.ID, discovery.ChangeUnchanged, true, nil
 		case other != nil && discovery.IsAggregator(other.Source):
 			// The company board replaces the job-board entry (direct link, complete data).
 			alt := other.AltUrls
