@@ -6,6 +6,7 @@ import (
 	"regexp"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/1xxn/getafjob/internal/platform/i18n"
 )
@@ -25,6 +26,24 @@ func TestAmount(t *testing.T) {
 }
 
 // Inline event handlers never run under the nonce CSP; every interaction goes through htmx or plain links.
+func TestWhenUsesTheInstanceZone(t *testing.T) {
+	berlin, err := time.LoadLocation("Europe/Berlin")
+	if err != nil {
+		t.Skip("no tzdata:", err)
+	}
+	at := time.Date(2026, 11, 13, 22, 0, 0, 0, time.UTC)
+	de := WithLocale(t.Context(), i18n.Locale("de"))
+	if got := When(de, at); got != "13.11.2026 22:00 UTC" {
+		t.Errorf("without zone = %q", got)
+	}
+	if got := When(WithZone(de, berlin), at); got != "13.11.2026 23:00 CET" {
+		t.Errorf("de = %q", got)
+	}
+	if got := When(WithZone(WithLocale(t.Context(), i18n.Locale("en")), berlin), at); got != "Nov 13, 2026 23:00 CET" {
+		t.Errorf("en = %q", got)
+	}
+}
+
 func TestTemplatesHaveNoInlineHandlers(t *testing.T) {
 	files, err := filepath.Glob("*.templ")
 	more, _ := filepath.Glob("ui/*.templ")

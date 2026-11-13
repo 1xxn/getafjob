@@ -544,7 +544,7 @@ func (s *Server) settingsForm(ctx context.Context, u *identity.User, p profile.P
 		}
 	}
 	f := preferencesForm(p, a, mb, np, accounts, easyApplyAdmin)
-	f.Values["time_zone"] = s.TimeZone
+	f.Values["time_zone"] = s.TimeZone.String()
 	return f
 }
 
