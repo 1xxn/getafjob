@@ -99,6 +99,7 @@ type Engine struct {
 	// application leaves no data with the employer.
 	FillBeforeAsk bool
 	now           func() time.Time
+	page          int // form page of the last Run; Run continues there after the user answers
 }
 
 func (e *Engine) wait() time.Duration {
@@ -129,7 +130,8 @@ func (e *Engine) Run(ctx context.Context, p *rod.Page) error {
 	p = p.Context(ctx) // every browser call below runs under ctx
 	dialogs := browser.GuardDialogs(p)
 	defer dialogs.Stop()
-	for page := 1; page <= maxPages; page++ {
+	for page := max(e.page, 1); page <= maxPages; page++ {
+		e.page = page
 		st, err := browser.Extract(p)
 		if err != nil {
 			return err

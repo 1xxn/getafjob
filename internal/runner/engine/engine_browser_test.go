@@ -66,6 +66,7 @@ type coord struct {
 	refuse    error
 	asked     []Question
 	confirmed bool
+	pages     []int // form page of each checkpoint
 }
 
 func (c *coord) log(s string) { c.mu.Lock(); c.calls = append(c.calls, s); c.mu.Unlock() }
@@ -75,6 +76,9 @@ func (c *coord) Checkpoint(_ context.Context, cp Checkpoint) error {
 		return errors.New("checkpoint without screenshot")
 	}
 	c.log("checkpoint:" + string(cp.Step))
+	c.mu.Lock()
+	c.pages = append(c.pages, cp.Page)
+	c.mu.Unlock()
 	return nil
 }
 func (c *coord) Ask(_ context.Context, qs []Question) error { c.asked = qs; c.log("ask"); return nil }
@@ -191,6 +195,34 @@ func TestMultiPageApplication(t *testing.T) {
 	begin := slices.Index(r.coord.calls, "begin_submit")
 	if begin < 0 || slices.Index(r.coord.calls, "submitted") < begin {
 		t.Fatalf("calls = %v", r.coord.calls)
+	}
+}
+
+// A question on page 2 hands the run to the user; after the answer the next Run continues on page 2.
+func TestPageContinuesAfterTheAnswer(t *testing.T) {
+	r := start(t, "step1.html")
+	pl := planner{
+		"Vorname":           {Text: "Max", Source: "profile.personal.first_name"},
+		"Nachname":          {Text: "Mustermann", Source: "profile.personal.last_name"},
+		"E-Mail":            {Text: "max.mustermann@example.org", Source: "profile.personal.email"},
+		"Telefonnummer":     {Text: "+49 30 1234567", Source: "profile.personal.phone"},
+		"Lebenslauf":        cv,
+		"Ich möchte in den": {Text: "false", Source: "profile.talent_pool"},
+	}
+	e := r.engine(pl)
+	if err := e.Run(t.Context(), r.page); !errors.Is(err, ErrAsked) {
+		t.Fatalf("run: %v (calls %v)", err, r.coord.calls)
+	}
+	asked := len(r.coord.pages)
+	pl["Ich willige"] = executor.Value{Text: "true", Source: "answer#1"}
+	if err := e.Run(t.Context(), r.page); err != nil {
+		t.Fatalf("run after the answer: %v (calls %v)", err, r.coord.calls)
+	}
+	if got := r.coord.pages[asked-1]; got != 2 {
+		t.Fatalf("question asked on page %d, want 2 (pages %v)", got, r.coord.pages)
+	}
+	if got := r.coord.pages[asked]; got != 2 {
+		t.Fatalf("after the answer the run continued on page %d, want 2 (pages %v)", got, r.coord.pages)
 	}
 }
 
