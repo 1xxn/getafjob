@@ -238,3 +238,19 @@ func TestAssistEndpoints(t *testing.T) {
 		t.Fatalf("decide status = %d: %s", rec.Code, rec.Body.String())
 	}
 }
+
+// Pairing attempts are rate limited, so pairing codes cannot be guessed by trying many.
+func TestPairIsRateLimited(t *testing.T) {
+	mux := http.NewServeMux()
+	Mount(mux, &fakeAssistService{})
+	codes := map[int]int{}
+	for range 15 {
+		body, _ := json.Marshal(PairRequest{Code: "WRONG", ClientName: "Firefox"})
+		rec := httptest.NewRecorder()
+		mux.ServeHTTP(rec, httptest.NewRequest(http.MethodPost, "/api/v1/assist/pair", bytes.NewReader(body)))
+		codes[rec.Code]++
+	}
+	if codes[http.StatusTooManyRequests] == 0 || codes[http.StatusBadRequest] > 10 {
+		t.Fatalf("status counts = %v, want at most 10 tries and then 429", codes)
+	}
+}

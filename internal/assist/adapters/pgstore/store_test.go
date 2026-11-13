@@ -59,20 +59,16 @@ func TestPgstoreAssist(t *testing.T) {
 		t.Fatalf("CreatePairingCode() err = %v", err)
 	}
 
-	gotPairing, err := store.GetPairingCode(ctx, assist.HashCode(code), now)
+	gotPairing, err := store.ConsumePairingCode(ctx, assist.HashCode(code), now)
 	if err != nil {
-		t.Fatalf("GetPairingCode() err = %v", err)
+		t.Fatalf("ConsumePairingCode() err = %v", err)
 	}
 	if gotPairing.ID != p.ID || gotPairing.UserID != u1 {
 		t.Fatalf("unexpected pairing code returned: %+v", gotPairing)
 	}
-
-	// Delete pairing code
-	if err := store.DeletePairingCode(ctx, p.ID); err != nil {
-		t.Fatalf("DeletePairingCode() err = %v", err)
-	}
-	if _, err := store.GetPairingCode(ctx, assist.HashCode(code), now); !errors.Is(err, assist.ErrNotFound) {
-		t.Fatalf("expected ErrNotFound after deletion, got %v", err)
+	// A code works once.
+	if _, err := store.ConsumePairingCode(ctx, assist.HashCode(code), now); !errors.Is(err, assist.ErrNotFound) {
+		t.Fatalf("second redemption: got %v, want ErrNotFound", err)
 	}
 
 	// 2. Create and retrieve extension token

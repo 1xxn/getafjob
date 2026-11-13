@@ -8,12 +8,17 @@ import (
 	"errors"
 	"net/http"
 	"strings"
+	"time"
 
 	"github.com/google/uuid"
+	"golang.org/x/time/rate"
 
 	"github.com/1xxn/getafjob/internal/assist"
 	"github.com/1xxn/getafjob/internal/platform/buildinfo"
 )
+
+// newPairLimiter bounds pairing attempts for the whole instance: pairing is rare, guessing needs many tries.
+func newPairLimiter() *rate.Limiter { return rate.NewLimiter(rate.Every(2*time.Second), 10) }
 
 type userCtxKeyType struct{}
 
@@ -33,6 +38,7 @@ type AssistService interface {
 // Server implements the generated StrictServerInterface.
 type Server struct {
 	Assist AssistService
+	pairs  *rate.Limiter // nil: no limit (tests)
 }
 
 var _ StrictServerInterface = (*Server)(nil)
@@ -51,6 +57,12 @@ func (s *Server) PostAssistPair(ctx context.Context, req PostAssistPairRequestOb
 				Status: http.StatusServiceUnavailable,
 				Code:   "api.service_unavailable",
 			},
+		}, nil
+	}
+	if s.pairs != nil && !s.pairs.Allow() {
+		return PostAssistPairdefaultApplicationProblemPlusJSONResponse{
+			StatusCode: http.StatusTooManyRequests,
+			Body:       Problem{Status: http.StatusTooManyRequests, Code: "api.rate_limited"},
 		}, nil
 	}
 	tok, userName, err := s.Assist.Pair(ctx, req.Body.Code, req.Body.ClientName)
@@ -300,7 +312,7 @@ func (s *Server) PostAssistApprovalDecide(ctx context.Context, req PostAssistApp
 
 // Mount registers the API on mux under /api/v1.
 func Mount(mux *http.ServeMux, assistSvc AssistService) http.Handler {
-	server := &Server{Assist: assistSvc}
+	server := &Server{Assist: assistSvc, pairs: newPairLimiter()}
 	var middlewares []StrictMiddlewareFunc
 	if assistSvc != nil {
 		middlewares = append(middlewares, func(f StrictHandlerFunc, _ string) StrictHandlerFunc {

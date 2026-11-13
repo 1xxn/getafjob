@@ -99,12 +99,16 @@ type ApprovalItem struct {
 	CreatedAt time.Time
 }
 
-// GenerateCode creates an 8-character human-friendly pairing code like "GAJ-W9X2".
+// GenerateCode creates a human-friendly pairing code like "GAJ-W9X2-K4PM": 8 random characters from 32 (40 bits),
+// so that guessing a code within its 10 minutes is out of reach even before the rate limit.
 func GenerateCode() (plain string, hash []byte, err error) {
 	const chars = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789"
 	var sb strings.Builder
 	sb.WriteString("GAJ-")
-	for i := 0; i < 4; i++ {
+	for i := range 8 {
+		if i == 4 {
+			sb.WriteByte('-')
+		}
 		idx, err := rand.Int(rand.Reader, big.NewInt(int64(len(chars))))
 		if err != nil {
 			return "", nil, err

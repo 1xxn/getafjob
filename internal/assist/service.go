@@ -75,13 +75,10 @@ func (s *Service) Pair(ctx context.Context, code, clientName string) (Token, str
 	hash := HashCode(code)
 	now := s.now()
 
-	pairing, err := s.store.GetPairingCode(ctx, hash, now)
+	pairing, err := s.store.ConsumePairingCode(ctx, hash, now)
 	if err != nil {
 		return Token{}, "", ErrInvalidPairingCode
 	}
-
-	// Single-use code: delete immediately upon redemption
-	_ = s.store.DeletePairingCode(ctx, pairing.ID)
 
 	tok, err := NewToken(pairing.UserID, clientName, now, DefaultTokenTTL)
 	if err != nil {
