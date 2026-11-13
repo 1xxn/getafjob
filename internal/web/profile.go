@@ -684,8 +684,8 @@ func (s *Server) preferencesSave(w http.ResponseWriter, r *http.Request, u *iden
 	}
 	mbPort, mbPortErr := 993, false
 	if v := strings.TrimSpace(r.PostFormValue("mailbox_port")); v != "" && sectionIs(section, "integrations") {
-		n, err := strconv.Atoi(v)
-		mbPort, mbPortErr = n, err != nil || n <= 0 || n > 65535
+		n, err := strconv.ParseUint(v, 10, 16)
+		mbPort, mbPortErr = int(n), err != nil || n == 0
 	}
 
 	if salaryErr || autoErr || len(notifyBad) > 0 || mbPortErr {
