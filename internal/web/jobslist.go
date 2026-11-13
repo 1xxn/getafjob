@@ -103,6 +103,22 @@ func (q listQuery) url() string {
 	return "/jobs?" + v.Encode()
 }
 
+// saveQuery is the filter part of the URL for a saved search: no page, no open job.
+func (q listQuery) saveQuery() string {
+	q.Page, q.Job = 0, 0
+	_, query, _ := strings.Cut(q.url(), "?")
+	return query
+}
+
+// SearchFilter turns a saved search's URL query into the list filter (the alerts count new jobs with it).
+func SearchFilter(query string) matching.Filter {
+	v, err := url.ParseQuery(query)
+	if err != nil {
+		v = url.Values{}
+	}
+	return parseListQuery(v).filter()
+}
+
 func (q listQuery) with(change func(*listQuery)) string {
 	change(&q)
 	return q.url()
@@ -125,7 +141,7 @@ func (s *Server) jobsPage(w http.ResponseWriter, r *http.Request, u *identity.Us
 		Name: u.DisplayName, Query: lq.Query, Decision: lq.Decision, Workplace: f.Workplace, Location: f.Location,
 		Source: f.Source, MinSalary: f.MinSalary, Freshness: lq.Freshness, Sort: f.Sort,
 		Total: l.Total, Page: f.Page, Pages: (l.Total + matching.PageSize - 1) / matching.PageSize,
-		Counts: map[string]int{}, BlockedCount: l.BlockedCount, Back: lq.url(),
+		Counts: map[string]int{}, BlockedCount: l.BlockedCount, Back: lq.url(), SaveQuery: lq.saveQuery(),
 	}
 	for k, n := range l.Counts {
 		d.Counts[string(k)] = n

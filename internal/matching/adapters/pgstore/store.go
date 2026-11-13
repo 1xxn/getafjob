@@ -102,6 +102,7 @@ func (s *Store) ListMatches(ctx context.Context, userID uuid.UUID, f matching.Fi
 			FreshnessDays: int32(min(max(f.FreshnessDays, 0), 365)),
 			Query:         f.Query,
 			ShowBlocked:   f.Blocked,
+			SeenAfter:     seenAfter(f.SeenAfter),
 			Sort:          f.Sort,
 			PageOffset:    int32(min(max(offset, 0), 1_000_000)),
 			PageSize:      int32(min(max(limit, 0), 1000)),
@@ -273,5 +274,87 @@ func (s *Store) RemoveBlocklistByPattern(ctx context.Context, userID uuid.UUID, 
 			Kind:   kind,
 			Lower:  pattern,
 		})
+	})
+}
+
+func seenAfter(t time.Time) *time.Time {
+	if t.IsZero() {
+		return nil
+	}
+	return &t
+}
+
+// SavedSearches lists the user's saved searches by name.
+func (s *Store) SavedSearches(ctx context.Context, userID uuid.UUID) (out []matching.SavedSearch, err error) {
+	err = db.InUserTx(ctx, s.pool, userID, func(tx pgx.Tx) error {
+		rows, err := q.New(tx).SavedSearches(ctx, userID)
+		for _, r := range rows {
+			out = append(out, matching.SavedSearch{ID: r.ID, Name: r.Name, Query: r.Query, Alert: r.Alert, CheckedAt: r.CheckedAt})
+		}
+		return err
+	})
+	return out, err
+}
+
+// CreateSavedSearch saves a search or gives an existing one of the same name the new query.
+func (s *Store) CreateSavedSearch(ctx context.Context, userID uuid.UUID, ss matching.SavedSearch) (id int64, err error) {
+	err = db.InUserTx(ctx, s.pool, userID, func(tx pgx.Tx) error {
+		id, err = q.New(tx).CreateSavedSearch(ctx, q.CreateSavedSearchParams{UserID: userID, Name: ss.Name, Query: ss.Query,
+			Alert: ss.Alert, CheckedAt: ss.CheckedAt})
+		return err
+	})
+	return id, err
+}
+
+// RenameSavedSearch renames a saved search.
+func (s *Store) RenameSavedSearch(ctx context.Context, userID uuid.UUID, id int64, name string) (bool, error) {
+	var n int64
+	err := db.InUserTx(ctx, s.pool, userID, func(tx pgx.Tx) error {
+		var err error
+		n, err = q.New(tx).RenameSavedSearch(ctx, q.RenameSavedSearchParams{UserID: userID, ID: id, Name: name})
+		return err
+	})
+	return n > 0, err
+}
+
+// SetSavedSearchAlert turns the alert on or off; turning it on starts counting at at.
+func (s *Store) SetSavedSearchAlert(ctx context.Context, userID uuid.UUID, id int64, alert bool, at time.Time) (bool, error) {
+	var n int64
+	err := db.InUserTx(ctx, s.pool, userID, func(tx pgx.Tx) error {
+		var err error
+		n, err = q.New(tx).SetSavedSearchAlert(ctx, q.SetSavedSearchAlertParams{UserID: userID, ID: id, Alert: alert, CheckedAt: at})
+		return err
+	})
+	return n > 0, err
+}
+
+// DeleteSavedSearch removes a saved search.
+func (s *Store) DeleteSavedSearch(ctx context.Context, userID uuid.UUID, id int64) (bool, error) {
+	var n int64
+	err := db.InUserTx(ctx, s.pool, userID, func(tx pgx.Tx) error {
+		var err error
+		n, err = q.New(tx).DeleteSavedSearch(ctx, q.DeleteSavedSearchParams{UserID: userID, ID: id})
+		return err
+	})
+	return n > 0, err
+}
+
+// DueSearchAlerts lists alerts last checked at or before (system role).
+func (s *Store) DueSearchAlerts(ctx context.Context, before time.Time) (out []matching.SavedSearch, err error) {
+	err = db.InSystemTx(ctx, s.pool, func(tx pgx.Tx) error {
+		rows, err := q.New(tx).DueSearchAlerts(ctx, before)
+		for _, r := range rows {
+			out = append(out, matching.SavedSearch{ID: r.ID, UserID: r.UserID, Name: r.Name, Query: r.Query, Alert: true,
+				CheckedAt: r.CheckedAt})
+		}
+		return err
+	})
+	return out, err
+}
+
+// MarkSearchChecked records when an alert last looked for new jobs.
+func (s *Store) MarkSearchChecked(ctx context.Context, userID uuid.UUID, id int64, at time.Time) error {
+	return db.InUserTx(ctx, s.pool, userID, func(tx pgx.Tx) error {
+		return q.New(tx).MarkSearchChecked(ctx, q.MarkSearchCheckedParams{UserID: userID, ID: id, CheckedAt: at})
 	})
 }

@@ -169,7 +169,7 @@ func serve(ctx context.Context, cfg config.Config, logger *slog.Logger) error {
 		Queue:     crawlQueue,
 	})
 	(&web.Server{Identity: ids, Logger: logger, Profile: profiles, Documents: docs, Items: items, Stations: stations,
-		Importer: cvimport.NewImporter(docs, profiles, stations, extractor), Jobs: listings, Discovery: discoverySvc,
+		Importer: cvimport.NewImporter(docs, profiles, stations, extractor), Jobs: listings, Searches: matching.NewSavedSearches(mstore, listings), Discovery: discoverySvc,
 		PushStore: webpush.NewStore(pool), VAPIDPublicKey: vapidPub, Apps: apps, Tracking: trackingSvc, Notify: notifySvc, Assist: assistSvc, Portals: portalsSvc, AI: aiSvc, Privacy: privacySvc, Shots: sealedFiles, Handoffs: gw, Events: liveEvents, StyleGuide: cfg.DevStyleGuide,
 		System: systemFacts{pool: pool, cfg: cfg}, Ops: adminOps{pool: pool, queue: inserter}}).Register(mux)
 
@@ -245,6 +245,8 @@ func worker(ctx context.Context, cfg config.Config, logger *slog.Logger) error {
 	appNotifier := newNotifyAppNotifier(notifySvc)
 	river.AddWorker(workers, &handoffWorker{svc: apps, notifier: appNotifier, logger: logger})
 	river.AddWorker(workers, &dailySummaryWorker{svc: notifySvc, logger: logger})
+	river.AddWorker(workers, &searchAlertWorker{searches: matching.NewSavedSearches(mstore, matching.NewListings(mstore)),
+		notify: notifySvc, logger: logger})
 	river.AddWorker(workers, &planWorker{svc: apps, logger: logger})
 	tstore := trackingstore.New(pool)
 	tcipher := trackingcrypto.NewCipher(env)

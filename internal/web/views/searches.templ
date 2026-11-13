@@ -1,0 +1,72 @@
+package views
+
+import "github.com/1xxn/getafjob/internal/web/views/ui"
+
+// SearchesData is the saved searches page.
+type SearchesData struct {
+	Name   string
+	Notice string // saved, renamed, alert, deleted, invalid
+	Rows   []SearchRow
+}
+
+// SearchRow is one saved search.
+type SearchRow struct {
+	ID    string
+	Name  string
+	Query string
+	Alert bool
+}
+
+func searchTone(notice string) ui.Tone {
+	if notice == "invalid" {
+		return ui.Danger
+	}
+	return ui.Success
+}
+
+templ SearchesPage(d SearchesData) {
+	@Layout(Page{Title: T(ctx, "searches.title"), UserName: d.Name, Wide: true}) {
+		<h1>{ T(ctx, "searches.title") }</h1>
+		<p class="muted">{ T(ctx, "searches.lead") }</p>
+		if d.Notice != "" {
+			@ui.Alert(ui.AlertProps{Tone: searchTone(d.Notice), Text: T(ctx, "searches.done."+d.Notice)})
+		}
+		if len(d.Rows) == 0 {
+			@ui.EmptyState(ui.EmptyProps{Icon: "bookmark", Title: T(ctx, "searches.empty.title"), Text: T(ctx, "searches.empty.text")}) {
+				@ui.Button(ui.ButtonProps{Label: T(ctx, "nav.jobs"), Href: "/jobs", Variant: "primary"})
+			}
+		} else {
+			<ul class="searches">
+				for _, row := range d.Rows {
+					<li class="search-item" data-search={ row.ID }>
+						<div class="search-main">
+							<a class="search-name" href={ templ.SafeURL("/jobs?" + row.Query) } data-search-open>{ row.Name }</a>
+							if row.Alert {
+								@ui.Badge(T(ctx, "searches.alert_on"), ui.Accent)
+							}
+						</div>
+						<div class="search-actions">
+							<form method="post" action={ templ.SafeURL("/searches/" + row.ID + "/rename") } class="search-rename">
+								@ui.Input(ui.InputProps{FieldProps: ui.FieldProps{ID: "search-name-" + row.ID, Name: "name", Label: T(ctx, "searches.rename"), HideLabel: true},
+									Value: row.Name, MaxLength: 100, Attrs: templ.Attributes{"data-search-name": true}})
+								@ui.Button(ui.ButtonProps{Label: T(ctx, "searches.rename"), Type: "submit", Size: "sm", Attrs: templ.Attributes{"data-search-rename": true}})
+							</form>
+							<form method="post" action={ templ.SafeURL("/searches/" + row.ID + "/alert") }>
+								if row.Alert {
+									<input type="hidden" name="alert" value="off"/>
+									@ui.Button(ui.ButtonProps{Label: T(ctx, "searches.alert_off"), Type: "submit", Size: "sm", Icon: "bell", Attrs: templ.Attributes{"data-search-alert": "off"}})
+								} else {
+									<input type="hidden" name="alert" value="on"/>
+									@ui.Button(ui.ButtonProps{Label: T(ctx, "searches.alert_turn_on"), Type: "submit", Size: "sm", Icon: "bell", Attrs: templ.Attributes{"data-search-alert": "on"}})
+								}
+							</form>
+							<form method="post" action={ templ.SafeURL("/searches/" + row.ID + "/delete") } data-confirm={ T(ctx, "searches.delete_confirm") }>
+								@ui.Button(ui.ButtonProps{Label: T(ctx, "searches.delete"), Type: "submit", Size: "sm", Variant: "ghost", Icon: "trash", Attrs: templ.Attributes{"data-search-delete": true}})
+							</form>
+						</div>
+					</li>
+				}
+			</ul>
+		}
+	}
+}

@@ -72,7 +72,8 @@ type navGroup struct {
 // navGroups follow docs/ui/sitemap.md; pages that do not exist yet join their group when they are built.
 var navGroups = []navGroup{
 	{Items: []navItem{{Key: "nav.home", Href: "/", Icon: "home"}}},
-	{Key: "nav.group.discover", Items: []navItem{{Key: "nav.jobs", Href: "/jobs", Icon: "briefcase"}}},
+	{Key: "nav.group.discover", Items: []navItem{{Key: "nav.jobs", Href: "/jobs", Icon: "briefcase"},
+		{Key: "nav.searches", Href: "/searches", Icon: "bookmark"}}},
 	{Key: "nav.group.apply", Items: []navItem{
 		{Key: "nav.live", Href: "/live", Icon: "live", Count: "running"},
 		{Key: "nav.needs_input", Href: "/needs-input", Icon: "inbox", Count: "needs_input"},

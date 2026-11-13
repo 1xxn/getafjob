@@ -339,6 +339,16 @@ type RunCheckpoint struct {
 	At         time.Time
 }
 
+type SavedSearch struct {
+	ID        int64
+	UserID    uuid.UUID
+	Name      string
+	Query     string
+	Alert     bool
+	CheckedAt time.Time
+	CreatedAt time.Time
+}
+
 type Session struct {
 	TokenHash  []byte
 	UserID     uuid.UUID

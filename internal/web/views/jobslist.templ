@@ -10,6 +10,7 @@ import (
 // JobsData fills the job list.
 type JobsData struct {
 	Name         string
+	SaveQuery    string // the filters as a URL query, for "Save search"
 	Query        string
 	Decision     string // relevant, match, maybe, skip, all, blocked
 	Workplace    string // "", remote, hybrid, onsite
@@ -151,6 +152,14 @@ templ jobsToolbar(d JobsData) {
 	<div class="jobs-tools">
 		@CrawlStatus(d.Crawl)
 		@ui.Menu(ui.MenuProps{ID: "jobs-more", Label: T(ctx, "jobs.more"), Icon: "more", AlignEnd: true}) {
+			<button type="button" class="ui-menu-item" data-save-search { ui.OpenDialog("dlg-save-search")... }>
+				@ui.Icon("bookmark")
+				<span>{ T(ctx, "searches.save") }</span>
+			</button>
+			<a class="ui-menu-item" href="/searches">
+				@ui.Icon("list")
+				<span>{ T(ctx, "searches.title") }</span>
+			</a>
 			<button type="button" class="ui-menu-item" { ui.OpenDialog("dlg-import")... }>
 				@ui.Icon("download")
 				<span>{ T(ctx, "jobs.import_title") }</span>
@@ -165,6 +174,15 @@ templ jobsToolbar(d JobsData) {
 			</button>
 		}
 	</div>
+	@ui.Dialog(ui.DialogProps{ID: "dlg-save-search", Title: T(ctx, "searches.save"), CloseLabel: T(ctx, "shell.close")}) {
+		<form method="post" action="/searches" class="stack" data-save-search-form>
+			<input type="hidden" name="query" value={ d.SaveQuery }/>
+			<p class="muted">{ T(ctx, "searches.save_hint") }</p>
+			@ui.Input(ui.InputProps{FieldProps: ui.FieldProps{ID: "search-name", Name: "name", Label: T(ctx, "searches.name"), Required: true}, MaxLength: 100})
+			@ui.Checkbox(ui.CheckProps{ID: "search-alert", Name: "alert", Label: T(ctx, "searches.alert"), Hint: T(ctx, "searches.alert_hint")})
+			@ui.Button(ui.ButtonProps{Label: T(ctx, "searches.save"), Variant: "primary", Type: "submit", Icon: "bookmark"})
+		</form>
+	}
 	@ui.Dialog(ui.DialogProps{ID: "dlg-import", Title: T(ctx, "jobs.import_title"), CloseLabel: T(ctx, "shell.close")}) {
 		<form method="post" action="/jobs/import" { HX(ctx, "hx-post", "/jobs/import", "hx-target", "#import-result", "hx-swap", "innerHTML")... }>
 			@ui.Input(ui.InputProps{FieldProps: ui.FieldProps{ID: "import-url", Name: "url", Label: T(ctx, "jobs.import_label"),

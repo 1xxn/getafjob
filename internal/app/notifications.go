@@ -12,6 +12,7 @@ import (
 	"github.com/riverqueue/river/rivertype"
 
 	"github.com/1xxn/getafjob/internal/application"
+	"github.com/1xxn/getafjob/internal/matching"
 	"github.com/1xxn/getafjob/internal/notify"
 	notifymail "github.com/1xxn/getafjob/internal/notify/adapters/mail"
 	"github.com/1xxn/getafjob/internal/notify/adapters/ntfy"
@@ -22,6 +23,7 @@ import (
 	"github.com/1xxn/getafjob/internal/platform/mail"
 	"github.com/1xxn/getafjob/internal/platform/netguard"
 	"github.com/1xxn/getafjob/internal/platform/queue"
+	"github.com/1xxn/getafjob/internal/web"
 )
 
 func newNotifyService(pool *pgxpool.Pool, cfg config.Config, logger *slog.Logger) (*notify.Service, pushNotifier, string) {
@@ -156,4 +158,38 @@ func adminNotifySummary(ctx context.Context, args []string, env Env) int {
 	}
 	_, _ = fmt.Fprintln(env.Stdout, "daily summary check queued")
 	return ExitOK
+}
+
+// SearchAlertArgs checks the saved searches with an alert for new jobs (each at most once a day).
+type SearchAlertArgs struct{}
+
+// Kind implements river.JobArgs.
+func (SearchAlertArgs) Kind() string { return "search_alerts" }
+
+// InsertOpts ensures at most one check waits or runs.
+func (SearchAlertArgs) InsertOpts() river.InsertOpts {
+	return DailySummaryArgs{}.InsertOpts()
+}
+
+type searchAlertWorker struct {
+	river.WorkerDefaults[SearchAlertArgs]
+	searches *matching.SavedSearchService
+	notify   *notify.Service
+	logger   *slog.Logger
+}
+
+func (w *searchAlertWorker) Timeout(*river.Job[SearchAlertArgs]) time.Duration {
+	return 15 * time.Minute
+}
+
+func (w *searchAlertWorker) Work(ctx context.Context, _ *river.Job[SearchAlertArgs]) error {
+	n, err := w.searches.CheckAlerts(ctx, web.SearchFilter, func(ctx context.Context, a matching.Alert) error {
+		return w.notify.Notify(ctx, notify.Notification{UserID: a.Search.UserID, Event: notify.EventSearchAlert,
+			Key: "search_alert", Params: map[string]any{"name": a.Search.Name, "count": a.New},
+			URL: "/jobs?" + a.Search.Query, Priority: notify.PriorityNormal})
+	})
+	if n > 0 {
+		w.logger.InfoContext(ctx, "search alerts sent", "count", n)
+	}
+	return err
 }

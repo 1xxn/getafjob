@@ -106,7 +106,8 @@ type Server struct {
 	Stations       *profile.Stations
 	Importer       *cvimport.Importer // nil: no CV import
 	Jobs           *matching.Listings
-	Discovery      DiscoveryService // nil: no discovery controls
+	Searches       *matching.SavedSearchService // saved searches and their alerts; nil turns them off
+	Discovery      DiscoveryService             // nil: no discovery controls
 	Apps           *application.Service
 	Tracking       TrackingService
 	Notify         NotificationService
@@ -189,6 +190,9 @@ func (s *Server) Register(mux *http.ServeMux) {
 	mux.Handle("GET /applications/{id}/screen", s.page(s.screenWebSocket))
 	mux.Handle("GET /live/indicator", s.page(s.liveIndicator))
 	mux.Handle("GET /live", s.page(s.livePage))
+	mux.Handle("GET /searches", s.page(s.searchesPage))
+	mux.Handle("POST /searches", s.page(s.saveSearch))
+	mux.Handle("POST /searches/{id}/{action}", s.page(s.searchAction))
 	mux.Handle("GET /live/grid", s.page(s.liveGrid))
 	mux.Handle("GET /live/dock", s.page(s.liveDock))
 	mux.Handle("GET /live/queue", s.page(s.liveQueue))
