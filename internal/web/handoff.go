@@ -434,7 +434,7 @@ func (s *Server) applicationDetail(w http.ResponseWriter, r *http.Request, u *id
 			d.ExternalURL = webLink(cmp.Or(j.ApplyURL, j.URL))
 		}
 	}
-	if app.State == application.NeedsInput || app.State == application.Parked {
+	if app.State == application.NeedsInput || (app.State == application.Parked && !app.Attempted) {
 		if asked, err := s.Apps.Questions(ctx, u.ID, appID); err == nil {
 			for _, q := range asked {
 				if q.Kind != "captcha" && q.Label != "" {
@@ -481,6 +481,9 @@ func (s *Server) applicationDetail(w http.ResponseWriter, r *http.Request, u *id
 				}
 			}
 		}
+	}
+	if app.Attempted && (app.State == application.Parked || app.State == application.Failed) {
+		d.Attempted, d.NextKey = true, "apps.next.attempted"
 	}
 	d.Actions = appActions(d, app.State)
 	return d, true

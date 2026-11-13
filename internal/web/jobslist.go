@@ -446,6 +446,8 @@ func guardFlash(err error) string {
 		return "flash.jobs.not_queued.company"
 	case errors.Is(err, application.ErrExcluded):
 		return "flash.jobs.not_queued.excluded"
+	case errors.Is(err, application.ErrAlreadySubmitted):
+		return "flash.apps.retry_attempted"
 	default:
 		return "flash.jobs.not_queued.other"
 	}

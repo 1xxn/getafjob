@@ -2,6 +2,7 @@ package web
 
 import (
 	"cmp"
+	"errors"
 	"net/http"
 	"net/url"
 	"slices"
@@ -246,7 +247,9 @@ func (s *Server) applicationRetry(w http.ResponseWriter, r *http.Request, u *ide
 		return
 	}
 	key := "flash.apps.retry"
-	if _, err := s.Apps.Retry(r.Context(), u.ID, appID); err != nil {
+	if _, err := s.Apps.Retry(r.Context(), u.ID, appID); errors.Is(err, application.ErrAlreadySubmitted) {
+		key = "flash.apps.retry_attempted"
+	} else if err != nil {
 		key = "flash.apps.retry_none"
 	}
 	s.flash(w, key)
@@ -254,7 +257,7 @@ func (s *Server) applicationRetry(w http.ResponseWriter, r *http.Request, u *ide
 }
 
 // applicationReconcile records the user's answer for a run that crashed while sending: it was sent or it was not.
-// Nothing is retried automatically; a "not sent" application is parked and the user decides about a retry.
+// Nothing is retried; a "not sent" application is parked and the user applies directly (ADR 0014).
 func (s *Server) applicationReconcile(w http.ResponseWriter, r *http.Request, u *identity.User) {
 	if u == nil {
 		http.Redirect(w, r, "/login", http.StatusSeeOther)
@@ -300,7 +303,11 @@ func appActions(d views.AppDetailData, st application.State) []views.AppAction {
 		if len(out) > 0 {
 			v = ""
 		}
-		if d.ApplyMode == "form" {
+		switch {
+		case d.Attempted && d.JobID > 0: // never sent again by getafjob: the user checks and applies directly
+			out = append(out, views.AppAction{Key: "apply.mark_applied", Icon: "check",
+				Post: "/jobs/" + strconv.FormatInt(d.JobID, 10) + "/apply-external", Variant: v})
+		case d.ApplyMode == "form" && !d.Attempted:
 			out = append(out, views.AppAction{Key: "apps.action.retry", Icon: "refresh", Post: base + "/retry", Variant: v})
 		}
 		if d.ExternalURL != "" {

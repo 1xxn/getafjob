@@ -378,8 +378,9 @@ func (q *Queries) FinishSubmitAttempt(ctx context.Context, arg FinishSubmitAttem
 }
 
 const getApplication = `-- name: GetApplication :one
-SELECT id, job_id, state, version, updated_at, approval_asked_at, approval_reasons, approved_at, cv_document_id
-FROM applications WHERE id = $1 AND user_id = $2
+SELECT id, job_id, state, version, updated_at, approval_asked_at, approval_reasons, approved_at, cv_document_id,
+  EXISTS (SELECT 1 FROM submit_attempts s WHERE s.application_id = applications.id)::boolean AS attempted
+FROM applications WHERE applications.id = $1 AND applications.user_id = $2
 `
 
 type GetApplicationParams struct {
@@ -397,6 +398,7 @@ type GetApplicationRow struct {
 	ApprovalReasons []string
 	ApprovedAt      *time.Time
 	CvDocumentID    *uuid.UUID
+	Attempted       bool
 }
 
 func (q *Queries) GetApplication(ctx context.Context, arg GetApplicationParams) (GetApplicationRow, error) {
@@ -412,13 +414,15 @@ func (q *Queries) GetApplication(ctx context.Context, arg GetApplicationParams) 
 		&i.ApprovalReasons,
 		&i.ApprovedAt,
 		&i.CvDocumentID,
+		&i.Attempted,
 	)
 	return i, err
 }
 
 const getApplicationByJob = `-- name: GetApplicationByJob :one
-SELECT id, job_id, state, version, updated_at, approval_asked_at, approval_reasons, approved_at, cv_document_id
-FROM applications WHERE job_id = $1 AND user_id = $2
+SELECT id, job_id, state, version, updated_at, approval_asked_at, approval_reasons, approved_at, cv_document_id,
+  EXISTS (SELECT 1 FROM submit_attempts s WHERE s.application_id = applications.id)::boolean AS attempted
+FROM applications WHERE applications.job_id = $1 AND applications.user_id = $2
 `
 
 type GetApplicationByJobParams struct {
@@ -436,6 +440,7 @@ type GetApplicationByJobRow struct {
 	ApprovalReasons []string
 	ApprovedAt      *time.Time
 	CvDocumentID    *uuid.UUID
+	Attempted       bool
 }
 
 func (q *Queries) GetApplicationByJob(ctx context.Context, arg GetApplicationByJobParams) (GetApplicationByJobRow, error) {
@@ -451,6 +456,7 @@ func (q *Queries) GetApplicationByJob(ctx context.Context, arg GetApplicationByJ
 		&i.ApprovalReasons,
 		&i.ApprovedAt,
 		&i.CvDocumentID,
+		&i.Attempted,
 	)
 	return i, err
 }

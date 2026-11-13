@@ -70,3 +70,20 @@ func TestFillApplications(t *testing.T) {
 		t.Fatalf("trend: sent %d max %d", d.Sent30, d.TrendMax)
 	}
 }
+
+// A parked application with a submit attempt offers marking it as applied, never a retry (#336).
+func TestAppActionsAfterSubmitAttempt(t *testing.T) {
+	d := views.AppDetailData{Attempted: true}
+	d.AppID, d.JobID, d.ApplyMode, d.ExternalURL = "a1", 7, "form", "https://jobs.example.org/7"
+	var keys []string
+	for _, a := range appActions(d, application.Parked) {
+		keys = append(keys, a.Key)
+	}
+	if len(keys) != 2 || keys[0] != "apply.mark_applied" || keys[1] != "apps.action.open_external" {
+		t.Fatalf("actions = %v, want mark applied and open posting", keys)
+	}
+	d.Attempted = false
+	if a := appActions(d, application.Parked); len(a) == 0 || a[0].Key != "apps.action.retry" {
+		t.Fatalf("without attempt = %+v, want retry first", a)
+	}
+}

@@ -1,6 +1,7 @@
 package web
 
 import (
+	"errors"
 	"net/http"
 	"slices"
 
@@ -78,7 +79,9 @@ func (s *Server) approvalApprove(w http.ResponseWriter, r *http.Request, u *iden
 	}
 	key := "flash.approvals.approve"
 	if s.Apps != nil {
-		if _, err := s.Apps.Approve(r.Context(), u.ID, appID); err != nil {
+		if _, err := s.Apps.Approve(r.Context(), u.ID, appID); errors.Is(err, application.ErrAlreadySubmitted) {
+			key = "flash.apps.retry_attempted"
+		} else if err != nil {
 			key = "flash.approvals.approve_none" // it moved on meanwhile
 		}
 	}

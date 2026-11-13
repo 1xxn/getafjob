@@ -663,6 +663,7 @@ type AppDetailData struct {
 	Tone      ui.Tone
 	NextKey   string // catalog key of the sentence that says what happens next
 	ReasonKey string // why it stopped, for parked applications
+	Attempted bool   // a submit was tried once: getafjob never sends it again, the user applies directly
 	Actions   []AppAction
 	Notes     NoteForm
 }
@@ -713,7 +714,7 @@ func appAction(d AppDetailData, a AppAction) templ.Component {
 			var templ_7745c5c3_Var31 string
 			templ_7745c5c3_Var31, templ_7745c5c3_Err = templruntime.NewAttributeExpression(templ.URL(a.Post)).ResolveURL(ctx)
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `apps.templ`, Line: 196, Col: 48}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `apps.templ`, Line: 197, Col: 48}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var31)
 			if templ_7745c5c3_Err != nil {
@@ -726,7 +727,7 @@ func appAction(d AppDetailData, a AppAction) templ.Component {
 			var templ_7745c5c3_Var32 string
 			templ_7745c5c3_Var32, templ_7745c5c3_Err = templruntime.NewAttributeExpression("/applications/" + d.AppID).Resolve(ctx)
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `apps.templ`, Line: 197, Col: 70}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `apps.templ`, Line: 198, Col: 70}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var32)
 			if templ_7745c5c3_Err != nil {
@@ -744,7 +745,7 @@ func appAction(d AppDetailData, a AppAction) templ.Component {
 				var templ_7745c5c3_Var33 string
 				templ_7745c5c3_Var33, templ_7745c5c3_Err = templruntime.NewAttributeExpression(a.Value).Resolve(ctx)
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `apps.templ`, Line: 199, Col: 56}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `apps.templ`, Line: 200, Col: 56}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var33)
 				if templ_7745c5c3_Err != nil {
@@ -810,7 +811,7 @@ func AppHead(d AppDetailData) templ.Component {
 			var templ_7745c5c3_Var35 string
 			templ_7745c5c3_Var35, templ_7745c5c3_Err = templruntime.NewAttributeExpression(d.State).Resolve(ctx)
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `apps.templ`, Line: 218, Col: 22}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `apps.templ`, Line: 219, Col: 22}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var35)
 			if templ_7745c5c3_Err != nil {
@@ -841,7 +842,7 @@ func AppHead(d AppDetailData) templ.Component {
 		var templ_7745c5c3_Var36 string
 		templ_7745c5c3_Var36, templ_7745c5c3_Err = templ.JoinStringErrs(T(ctx, "apps.title"))
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `apps.templ`, Line: 223, Col: 49}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `apps.templ`, Line: 224, Col: 49}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var36))
 		if templ_7745c5c3_Err != nil {
@@ -859,7 +860,7 @@ func AppHead(d AppDetailData) templ.Component {
 			var templ_7745c5c3_Var37 string
 			templ_7745c5c3_Var37, templ_7745c5c3_Err = templruntime.NewAttributeExpression(templ.URL("/jobs/" + i64(d.JobID))).ResolveURL(ctx)
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `apps.templ`, Line: 226, Col: 48}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `apps.templ`, Line: 227, Col: 48}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var37)
 			if templ_7745c5c3_Err != nil {
@@ -872,7 +873,7 @@ func AppHead(d AppDetailData) templ.Component {
 			var templ_7745c5c3_Var38 string
 			templ_7745c5c3_Var38, templ_7745c5c3_Err = templ.JoinStringErrs(T(ctx, "evidence.job_link"))
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `apps.templ`, Line: 226, Col: 80}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `apps.templ`, Line: 227, Col: 80}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var38))
 			if templ_7745c5c3_Err != nil {
@@ -890,7 +891,7 @@ func AppHead(d AppDetailData) templ.Component {
 		var templ_7745c5c3_Var39 string
 		templ_7745c5c3_Var39, templ_7745c5c3_Err = templ.JoinStringErrs(or(d.JobTitle, T(ctx, "apps.untitled")))
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `apps.templ`, Line: 231, Col: 82}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `apps.templ`, Line: 232, Col: 82}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var39))
 		if templ_7745c5c3_Err != nil {
@@ -908,7 +909,7 @@ func AppHead(d AppDetailData) templ.Component {
 			var templ_7745c5c3_Var40 string
 			templ_7745c5c3_Var40, templ_7745c5c3_Err = templ.JoinStringErrs(d.Company)
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `apps.templ`, Line: 233, Col: 39}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `apps.templ`, Line: 234, Col: 39}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var40))
 			if templ_7745c5c3_Err != nil {
@@ -934,7 +935,7 @@ func AppHead(d AppDetailData) templ.Component {
 		var templ_7745c5c3_Var41 string
 		templ_7745c5c3_Var41, templ_7745c5c3_Err = templ.JoinStringErrs(T(ctx, d.NextKey))
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `apps.templ`, Line: 240, Col: 23}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `apps.templ`, Line: 241, Col: 23}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var41))
 		if templ_7745c5c3_Err != nil {
@@ -952,7 +953,7 @@ func AppHead(d AppDetailData) templ.Component {
 			var templ_7745c5c3_Var42 string
 			templ_7745c5c3_Var42, templ_7745c5c3_Err = templ.JoinStringErrs(T(ctx, "apps.reason", "reason", T(ctx, d.ReasonKey)))
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `apps.templ`, Line: 242, Col: 84}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `apps.templ`, Line: 243, Col: 84}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var42))
 			if templ_7745c5c3_Err != nil {
@@ -1028,7 +1029,7 @@ func ApplicationPage(d AppDetailData) templ.Component {
 			var templ_7745c5c3_Var45 string
 			templ_7745c5c3_Var45, templ_7745c5c3_Err = templruntime.NewAttributeExpression(d.AppID).Resolve(ctx)
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `apps.templ`, Line: 259, Col: 38}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `apps.templ`, Line: 260, Col: 38}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var45)
 			if templ_7745c5c3_Err != nil {
@@ -1041,7 +1042,7 @@ func ApplicationPage(d AppDetailData) templ.Component {
 			var templ_7745c5c3_Var46 string
 			templ_7745c5c3_Var46, templ_7745c5c3_Err = templruntime.NewAttributeExpression(d.State).Resolve(ctx)
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `apps.templ`, Line: 259, Col: 67}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `apps.templ`, Line: 260, Col: 67}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var46)
 			if templ_7745c5c3_Err != nil {
@@ -1066,7 +1067,7 @@ func ApplicationPage(d AppDetailData) templ.Component {
 			var templ_7745c5c3_Var47 string
 			templ_7745c5c3_Var47, templ_7745c5c3_Err = templruntime.NewAttributeExpression(d.Tab).Resolve(ctx)
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `apps.templ`, Line: 262, Col: 39}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `apps.templ`, Line: 263, Col: 39}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var47)
 			if templ_7745c5c3_Err != nil {
@@ -1165,7 +1166,7 @@ func appOverviewTab(d AppDetailData) templ.Component {
 				var templ_7745c5c3_Var50 string
 				templ_7745c5c3_Var50, templ_7745c5c3_Err = templ.JoinStringErrs(d.Suggestion.Subject)
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `apps.templ`, Line: 287, Col: 28}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `apps.templ`, Line: 288, Col: 28}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var50))
 				if templ_7745c5c3_Err != nil {
@@ -1183,7 +1184,7 @@ func appOverviewTab(d AppDetailData) templ.Component {
 					var templ_7745c5c3_Var51 string
 					templ_7745c5c3_Var51, templ_7745c5c3_Err = templ.JoinStringErrs(r)
 					if templ_7745c5c3_Err != nil {
-						return templ.Error{Err: templ_7745c5c3_Err, FileName: `apps.templ`, Line: 290, Col: 12}
+						return templ.Error{Err: templ_7745c5c3_Err, FileName: `apps.templ`, Line: 291, Col: 12}
 					}
 					_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var51))
 					if templ_7745c5c3_Err != nil {
@@ -1201,7 +1202,7 @@ func appOverviewTab(d AppDetailData) templ.Component {
 				var templ_7745c5c3_Var52 string
 				templ_7745c5c3_Var52, templ_7745c5c3_Err = templruntime.NewAttributeExpression(templ.URL("/applications/" + d.AppID + "/suggestions/" + d.Suggestion.ID + "/accept")).ResolveURL(ctx)
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `apps.templ`, Line: 294, Col: 118}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `apps.templ`, Line: 295, Col: 118}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var52)
 				if templ_7745c5c3_Err != nil {
@@ -1222,7 +1223,7 @@ func appOverviewTab(d AppDetailData) templ.Component {
 				var templ_7745c5c3_Var53 string
 				templ_7745c5c3_Var53, templ_7745c5c3_Err = templruntime.NewAttributeExpression(templ.URL("/applications/" + d.AppID + "/suggestions/" + d.Suggestion.ID + "/dismiss")).ResolveURL(ctx)
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `apps.templ`, Line: 297, Col: 119}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `apps.templ`, Line: 298, Col: 119}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var53)
 				if templ_7745c5c3_Err != nil {
@@ -1272,7 +1273,7 @@ func appOverviewTab(d AppDetailData) templ.Component {
 					var templ_7745c5c3_Var55 string
 					templ_7745c5c3_Var55, templ_7745c5c3_Err = templ.JoinStringErrs(r)
 					if templ_7745c5c3_Err != nil {
-						return templ.Error{Err: templ_7745c5c3_Err, FileName: `apps.templ`, Line: 307, Col: 12}
+						return templ.Error{Err: templ_7745c5c3_Err, FileName: `apps.templ`, Line: 308, Col: 12}
 					}
 					_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var55))
 					if templ_7745c5c3_Err != nil {
@@ -1314,7 +1315,7 @@ func appOverviewTab(d AppDetailData) templ.Component {
 				var templ_7745c5c3_Var57 string
 				templ_7745c5c3_Var57, templ_7745c5c3_Err = templruntime.NewAttributeExpression(templ.URL("/applications/" + d.AppID + "/answer")).ResolveURL(ctx)
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `apps.templ`, Line: 314, Col: 81}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `apps.templ`, Line: 315, Col: 81}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var57)
 				if templ_7745c5c3_Err != nil {
@@ -1364,7 +1365,7 @@ func appOverviewTab(d AppDetailData) templ.Component {
 			var templ_7745c5c3_Var59 string
 			templ_7745c5c3_Var59, templ_7745c5c3_Err = templ.JoinStringErrs(T(ctx, "apps.col.state"))
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `apps.templ`, Line: 324, Col: 38}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `apps.templ`, Line: 325, Col: 38}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var59))
 			if templ_7745c5c3_Err != nil {
@@ -1377,7 +1378,7 @@ func appOverviewTab(d AppDetailData) templ.Component {
 			var templ_7745c5c3_Var60 string
 			templ_7745c5c3_Var60, templ_7745c5c3_Err = templ.JoinStringErrs(T(ctx, d.StateKey))
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `apps.templ`, Line: 324, Col: 69}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `apps.templ`, Line: 325, Col: 69}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var60))
 			if templ_7745c5c3_Err != nil {
@@ -1390,7 +1391,7 @@ func appOverviewTab(d AppDetailData) templ.Component {
 			var templ_7745c5c3_Var61 string
 			templ_7745c5c3_Var61, templ_7745c5c3_Err = templ.JoinStringErrs(T(ctx, "apps.tab.fields"))
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `apps.templ`, Line: 325, Col: 39}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `apps.templ`, Line: 326, Col: 39}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var61))
 			if templ_7745c5c3_Err != nil {
@@ -1403,7 +1404,7 @@ func appOverviewTab(d AppDetailData) templ.Component {
 			var templ_7745c5c3_Var62 string
 			templ_7745c5c3_Var62, templ_7745c5c3_Err = templ.JoinStringErrs(itoa(len(d.Fields)))
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `apps.templ`, Line: 325, Col: 71}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `apps.templ`, Line: 326, Col: 71}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var62))
 			if templ_7745c5c3_Err != nil {
@@ -1416,7 +1417,7 @@ func appOverviewTab(d AppDetailData) templ.Component {
 			var templ_7745c5c3_Var63 string
 			templ_7745c5c3_Var63, templ_7745c5c3_Err = templ.JoinStringErrs(T(ctx, "apps.tab.timeline"))
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `apps.templ`, Line: 326, Col: 41}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `apps.templ`, Line: 327, Col: 41}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var63))
 			if templ_7745c5c3_Err != nil {
@@ -1429,7 +1430,7 @@ func appOverviewTab(d AppDetailData) templ.Component {
 			var templ_7745c5c3_Var64 string
 			templ_7745c5c3_Var64, templ_7745c5c3_Err = templ.JoinStringErrs(itoa(len(d.Timeline)))
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `apps.templ`, Line: 326, Col: 75}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `apps.templ`, Line: 327, Col: 75}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var64))
 			if templ_7745c5c3_Err != nil {
@@ -1442,7 +1443,7 @@ func appOverviewTab(d AppDetailData) templ.Component {
 			var templ_7745c5c3_Var65 string
 			templ_7745c5c3_Var65, templ_7745c5c3_Err = templ.JoinStringErrs(T(ctx, "evidence.confirmation.title"))
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `apps.templ`, Line: 328, Col: 47}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `apps.templ`, Line: 329, Col: 47}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var65))
 			if templ_7745c5c3_Err != nil {
@@ -1456,7 +1457,7 @@ func appOverviewTab(d AppDetailData) templ.Component {
 				var templ_7745c5c3_Var66 string
 				templ_7745c5c3_Var66, templ_7745c5c3_Err = templ.JoinStringErrs(T(ctx, "apps.confirmed_yes"))
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `apps.templ`, Line: 331, Col: 36}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `apps.templ`, Line: 332, Col: 36}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var66))
 				if templ_7745c5c3_Err != nil {
@@ -1466,7 +1467,7 @@ func appOverviewTab(d AppDetailData) templ.Component {
 				var templ_7745c5c3_Var67 string
 				templ_7745c5c3_Var67, templ_7745c5c3_Err = templ.JoinStringErrs(T(ctx, "apps.confirmed_no"))
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `apps.templ`, Line: 333, Col: 35}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `apps.templ`, Line: 334, Col: 35}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var67))
 				if templ_7745c5c3_Err != nil {
@@ -1520,7 +1521,7 @@ func appLiveTab(d AppDetailData) templ.Component {
 			var templ_7745c5c3_Var69 string
 			templ_7745c5c3_Var69, templ_7745c5c3_Err = templruntime.NewAttributeExpression(templ.URL("/applications/" + d.AppID + "/park")).ResolveURL(ctx)
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `apps.templ`, Line: 346, Col: 80}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `apps.templ`, Line: 347, Col: 80}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var69)
 			if templ_7745c5c3_Err != nil {
@@ -1533,7 +1534,7 @@ func appLiveTab(d AppDetailData) templ.Component {
 			var templ_7745c5c3_Var70 string
 			templ_7745c5c3_Var70, templ_7745c5c3_Err = templruntime.NewAttributeExpression("/applications/" + d.AppID + "?tab=live").Resolve(ctx)
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `apps.templ`, Line: 347, Col: 86}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `apps.templ`, Line: 348, Col: 86}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var70)
 			if templ_7745c5c3_Err != nil {
@@ -1612,7 +1613,7 @@ func appFieldsTab(d AppDetailData) templ.Component {
 					var templ_7745c5c3_Var73 string
 					templ_7745c5c3_Var73, templ_7745c5c3_Err = templ.JoinStringErrs(f.Label)
 					if templ_7745c5c3_Err != nil {
-						return templ.Error{Err: templ_7745c5c3_Err, FileName: `apps.templ`, Line: 367, Col: 15}
+						return templ.Error{Err: templ_7745c5c3_Err, FileName: `apps.templ`, Line: 368, Col: 15}
 					}
 					_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var73))
 					if templ_7745c5c3_Err != nil {
@@ -1630,7 +1631,7 @@ func appFieldsTab(d AppDetailData) templ.Component {
 						var templ_7745c5c3_Var74 string
 						templ_7745c5c3_Var74, templ_7745c5c3_Err = templ.JoinStringErrs(T(ctx, "evidence.fields.page", "page", f.Page))
 						if templ_7745c5c3_Err != nil {
-							return templ.Error{Err: templ_7745c5c3_Err, FileName: `apps.templ`, Line: 369, Col: 82}
+							return templ.Error{Err: templ_7745c5c3_Err, FileName: `apps.templ`, Line: 370, Col: 82}
 						}
 						_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var74))
 						if templ_7745c5c3_Err != nil {
@@ -1648,7 +1649,7 @@ func appFieldsTab(d AppDetailData) templ.Component {
 					var templ_7745c5c3_Var75 string
 					templ_7745c5c3_Var75, templ_7745c5c3_Err = templ.JoinStringErrs(f.Value)
 					if templ_7745c5c3_Err != nil {
-						return templ.Error{Err: templ_7745c5c3_Err, FileName: `apps.templ`, Line: 372, Col: 36}
+						return templ.Error{Err: templ_7745c5c3_Err, FileName: `apps.templ`, Line: 373, Col: 36}
 					}
 					_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var75))
 					if templ_7745c5c3_Err != nil {
@@ -1669,7 +1670,7 @@ func appFieldsTab(d AppDetailData) templ.Component {
 					var templ_7745c5c3_Var76 string
 					templ_7745c5c3_Var76, templ_7745c5c3_Err = templ.JoinStringErrs(f.Source)
 					if templ_7745c5c3_Err != nil {
-						return templ.Error{Err: templ_7745c5c3_Err, FileName: `apps.templ`, Line: 375, Col: 22}
+						return templ.Error{Err: templ_7745c5c3_Err, FileName: `apps.templ`, Line: 376, Col: 22}
 					}
 					_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var76))
 					if templ_7745c5c3_Err != nil {
@@ -1716,7 +1717,7 @@ func appTimelineTab(d AppDetailData) templ.Component {
 		var templ_7745c5c3_Var78 string
 		templ_7745c5c3_Var78, templ_7745c5c3_Err = templ.JoinStringErrs(T(ctx, "evidence.retention_hint"))
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `apps.templ`, Line: 384, Col: 56}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `apps.templ`, Line: 385, Col: 56}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var78))
 		if templ_7745c5c3_Err != nil {
@@ -1744,7 +1745,7 @@ func appTimelineTab(d AppDetailData) templ.Component {
 				var templ_7745c5c3_Var79 string
 				templ_7745c5c3_Var79, templ_7745c5c3_Err = templruntime.NewAttributeExpression(t.ToState).Resolve(ctx)
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `apps.templ`, Line: 390, Col: 44}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `apps.templ`, Line: 391, Col: 44}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var79)
 				if templ_7745c5c3_Err != nil {
@@ -1757,7 +1758,7 @@ func appTimelineTab(d AppDetailData) templ.Component {
 				var templ_7745c5c3_Var80 string
 				templ_7745c5c3_Var80, templ_7745c5c3_Err = templruntime.NewAttributeExpression(t.At.UTC().Format(time.RFC3339)).Resolve(ctx)
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `apps.templ`, Line: 391, Col: 53}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `apps.templ`, Line: 392, Col: 53}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var80)
 				if templ_7745c5c3_Err != nil {
@@ -1770,7 +1771,7 @@ func appTimelineTab(d AppDetailData) templ.Component {
 				var templ_7745c5c3_Var81 string
 				templ_7745c5c3_Var81, templ_7745c5c3_Err = templ.JoinStringErrs(When(ctx, t.At))
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `apps.templ`, Line: 391, Col: 73}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `apps.templ`, Line: 392, Col: 73}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var81))
 				if templ_7745c5c3_Err != nil {
@@ -1784,7 +1785,7 @@ func appTimelineTab(d AppDetailData) templ.Component {
 					var templ_7745c5c3_Var82 string
 					templ_7745c5c3_Var82, templ_7745c5c3_Err = templ.JoinStringErrs(T(ctx, "apps.state."+t.ToState))
 					if templ_7745c5c3_Err != nil {
-						return templ.Error{Err: templ_7745c5c3_Err, FileName: `apps.templ`, Line: 395, Col: 43}
+						return templ.Error{Err: templ_7745c5c3_Err, FileName: `apps.templ`, Line: 396, Col: 43}
 					}
 					_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var82))
 					if templ_7745c5c3_Err != nil {
@@ -1798,7 +1799,7 @@ func appTimelineTab(d AppDetailData) templ.Component {
 					var templ_7745c5c3_Var83 string
 					templ_7745c5c3_Var83, templ_7745c5c3_Err = templ.JoinStringErrs(t.Step)
 					if templ_7745c5c3_Err != nil {
-						return templ.Error{Err: templ_7745c5c3_Err, FileName: `apps.templ`, Line: 397, Col: 16}
+						return templ.Error{Err: templ_7745c5c3_Err, FileName: `apps.templ`, Line: 398, Col: 16}
 					}
 					_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var83))
 					if templ_7745c5c3_Err != nil {
@@ -1817,7 +1818,7 @@ func appTimelineTab(d AppDetailData) templ.Component {
 					var templ_7745c5c3_Var84 string
 					templ_7745c5c3_Var84, templ_7745c5c3_Err = templ.JoinStringErrs(T(ctx, "evidence.fields.page", "page", t.Page))
 					if templ_7745c5c3_Err != nil {
-						return templ.Error{Err: templ_7745c5c3_Err, FileName: `apps.templ`, Line: 400, Col: 83}
+						return templ.Error{Err: templ_7745c5c3_Err, FileName: `apps.templ`, Line: 401, Col: 83}
 					}
 					_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var84))
 					if templ_7745c5c3_Err != nil {
@@ -1840,7 +1841,7 @@ func appTimelineTab(d AppDetailData) templ.Component {
 					var templ_7745c5c3_Var85 string
 					templ_7745c5c3_Var85, templ_7745c5c3_Err = templ.JoinStringErrs(or(t.Detail, t.URL))
 					if templ_7745c5c3_Err != nil {
-						return templ.Error{Err: templ_7745c5c3_Err, FileName: `apps.templ`, Line: 404, Col: 55}
+						return templ.Error{Err: templ_7745c5c3_Err, FileName: `apps.templ`, Line: 405, Col: 55}
 					}
 					_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var85))
 					if templ_7745c5c3_Err != nil {
@@ -1859,7 +1860,7 @@ func appTimelineTab(d AppDetailData) templ.Component {
 					var templ_7745c5c3_Var86 string
 					templ_7745c5c3_Var86, templ_7745c5c3_Err = templruntime.NewAttributeExpression(templ.URL(t.ScreenshotURL)).ResolveURL(ctx)
 					if templ_7745c5c3_Err != nil {
-						return templ.Error{Err: templ_7745c5c3_Err, FileName: `apps.templ`, Line: 407, Col: 43}
+						return templ.Error{Err: templ_7745c5c3_Err, FileName: `apps.templ`, Line: 408, Col: 43}
 					}
 					_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var86)
 					if templ_7745c5c3_Err != nil {
@@ -1872,7 +1873,7 @@ func appTimelineTab(d AppDetailData) templ.Component {
 					var templ_7745c5c3_Var87 string
 					templ_7745c5c3_Var87, templ_7745c5c3_Err = templ.JoinStringErrs(T(ctx, "evidence.timeline.screenshot"))
 					if templ_7745c5c3_Err != nil {
-						return templ.Error{Err: templ_7745c5c3_Err, FileName: `apps.templ`, Line: 407, Col: 108}
+						return templ.Error{Err: templ_7745c5c3_Err, FileName: `apps.templ`, Line: 408, Col: 108}
 					}
 					_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var87))
 					if templ_7745c5c3_Err != nil {
@@ -1938,7 +1939,7 @@ func appEvidenceTab(d AppDetailData) templ.Component {
 				var templ_7745c5c3_Var90 string
 				templ_7745c5c3_Var90, templ_7745c5c3_Err = templruntime.NewAttributeExpression(d.BeforeSubmitURL).ResolveURL(ctx)
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `apps.templ`, Line: 420, Col: 32}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `apps.templ`, Line: 421, Col: 32}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var90)
 				if templ_7745c5c3_Err != nil {
@@ -1951,7 +1952,7 @@ func appEvidenceTab(d AppDetailData) templ.Component {
 				var templ_7745c5c3_Var91 string
 				templ_7745c5c3_Var91, templ_7745c5c3_Err = templruntime.NewAttributeExpression(T(ctx, "evidence.before_submit.title")).Resolve(ctx)
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `apps.templ`, Line: 420, Col: 79}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `apps.templ`, Line: 421, Col: 79}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var91)
 				if templ_7745c5c3_Err != nil {
@@ -1969,7 +1970,7 @@ func appEvidenceTab(d AppDetailData) templ.Component {
 				var templ_7745c5c3_Var92 string
 				templ_7745c5c3_Var92, templ_7745c5c3_Err = templ.JoinStringErrs(T(ctx, "evidence.before_submit.empty"))
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `apps.templ`, Line: 422, Col: 64}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `apps.templ`, Line: 423, Col: 64}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var92))
 				if templ_7745c5c3_Err != nil {
@@ -2006,7 +2007,7 @@ func appEvidenceTab(d AppDetailData) templ.Component {
 				var templ_7745c5c3_Var94 string
 				templ_7745c5c3_Var94, templ_7745c5c3_Err = templ.JoinStringErrs(T(ctx, "evidence.confirmation.confirmed"))
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `apps.templ`, Line: 427, Col: 50}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `apps.templ`, Line: 428, Col: 50}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var94))
 				if templ_7745c5c3_Err != nil {
@@ -2024,7 +2025,7 @@ func appEvidenceTab(d AppDetailData) templ.Component {
 				var templ_7745c5c3_Var95 string
 				templ_7745c5c3_Var95, templ_7745c5c3_Err = templ.JoinStringErrs(T(ctx, "evidence.confirmation.unconfirmed"))
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `apps.templ`, Line: 429, Col: 69}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `apps.templ`, Line: 430, Col: 69}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var95))
 				if templ_7745c5c3_Err != nil {
@@ -2047,7 +2048,7 @@ func appEvidenceTab(d AppDetailData) templ.Component {
 				var templ_7745c5c3_Var96 string
 				templ_7745c5c3_Var96, templ_7745c5c3_Err = templruntime.NewAttributeExpression(templ.URL(d.ConfirmationURL)).ResolveURL(ctx)
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `apps.templ`, Line: 432, Col: 45}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `apps.templ`, Line: 433, Col: 45}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var96)
 				if templ_7745c5c3_Err != nil {
@@ -2060,7 +2061,7 @@ func appEvidenceTab(d AppDetailData) templ.Component {
 				var templ_7745c5c3_Var97 string
 				templ_7745c5c3_Var97, templ_7745c5c3_Err = templ.JoinStringErrs(d.ConfirmationURL)
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `apps.templ`, Line: 432, Col: 120}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `apps.templ`, Line: 433, Col: 120}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var97))
 				if templ_7745c5c3_Err != nil {
@@ -2083,7 +2084,7 @@ func appEvidenceTab(d AppDetailData) templ.Component {
 				var templ_7745c5c3_Var98 string
 				templ_7745c5c3_Var98, templ_7745c5c3_Err = templruntime.NewAttributeExpression(d.ConfirmationShotURL).ResolveURL(ctx)
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `apps.templ`, Line: 435, Col: 36}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `apps.templ`, Line: 436, Col: 36}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var98)
 				if templ_7745c5c3_Err != nil {
@@ -2096,7 +2097,7 @@ func appEvidenceTab(d AppDetailData) templ.Component {
 				var templ_7745c5c3_Var99 string
 				templ_7745c5c3_Var99, templ_7745c5c3_Err = templruntime.NewAttributeExpression(T(ctx, "evidence.confirmation.title")).Resolve(ctx)
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `apps.templ`, Line: 435, Col: 82}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `apps.templ`, Line: 436, Col: 82}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var99)
 				if templ_7745c5c3_Err != nil {
@@ -2120,7 +2121,7 @@ func appEvidenceTab(d AppDetailData) templ.Component {
 		var templ_7745c5c3_Var100 string
 		templ_7745c5c3_Var100, templ_7745c5c3_Err = templ.JoinStringErrs(T(ctx, "evidence.retention_hint"))
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `apps.templ`, Line: 439, Col: 56}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `apps.templ`, Line: 440, Col: 56}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var100))
 		if templ_7745c5c3_Err != nil {
@@ -2158,7 +2159,7 @@ func appNotesTab(d AppDetailData) templ.Component {
 		var templ_7745c5c3_Var102 string
 		templ_7745c5c3_Var102, templ_7745c5c3_Err = templruntime.NewAttributeExpression(templ.URL("/tracker/" + d.AppID + "/notes")).ResolveURL(ctx)
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `apps.templ`, Line: 443, Col: 73}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `apps.templ`, Line: 444, Col: 73}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var102)
 		if templ_7745c5c3_Err != nil {
@@ -2171,7 +2172,7 @@ func appNotesTab(d AppDetailData) templ.Component {
 		var templ_7745c5c3_Var103 string
 		templ_7745c5c3_Var103, templ_7745c5c3_Err = templruntime.NewAttributeExpression("/applications/" + d.AppID + "?tab=notes").Resolve(ctx)
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `apps.templ`, Line: 444, Col: 84}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `apps.templ`, Line: 445, Col: 84}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var103)
 		if templ_7745c5c3_Err != nil {
