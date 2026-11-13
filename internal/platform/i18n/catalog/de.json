@@ -1063,7 +1063,7 @@
   "settings.intro.search": "Welche Stellen getafjob sucht und was es in Felder einträgt, die jedes Formular fragt.",
   "settings.intro.automation": "Wie weit getafjob selbst geht. Nichts wird je doppelt gesendet, und du kannst jeden Lauf parken.",
   "settings.intro.notifications": "Wann und wie getafjob dir sagt, dass ein Lauf dich braucht.",
-  "settings.intro.integrations": "Optionale Helfer: KI-Entwürfe, dein Postfach für Antworten, die Browser-Erweiterung und dein eigener Runner.",
+  "settings.intro.integrations": "Optionale Helfer: dein Postfach für Antworten, die Browser-Erweiterung und dein eigener Runner.",
   "settings.intro.account": "Passkeys, angemeldete Browser, Export deiner Daten und Löschen des Kontos.",
   "settings.autonomy.suggest": "getafjob findet und bewertet Stellen; jede Bewerbung startest du selbst.",
   "settings.autonomy.approve": "getafjob füllt Formulare selbst aus und sendet erst nach deiner Freigabe.",
