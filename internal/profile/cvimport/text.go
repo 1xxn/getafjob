@@ -133,12 +133,35 @@ func pdfText(b []byte) (s string, err error) {
 	if r.NumPage() > maxPDFPages {
 		return "", profile.ErrFileTooLarge
 	}
-	pr, err := r.GetPlainText()
-	if err != nil {
-		return "", profile.ErrFileType
+	var out strings.Builder
+	for i := 1; i <= r.NumPage() && out.Len() < 4*MaxText; i++ {
+		if p := r.Page(i); !p.V.IsNull() {
+			pageLines(&out, p.Content().Text)
+			out.WriteString("\n\n")
+		}
 	}
-	out, err := io.ReadAll(io.LimitReader(pr, 4*MaxText))
-	return string(out), err
+	return out.String(), nil
+}
+
+// pageLines writes the glyphs of one page as lines. Most PDFs place lines with Td or Tm instead of T*, so line
+// breaks come from the positions: a new baseline starts a line, a gap of more than two lines leaves an empty one, and
+// a horizontal gap within a line becomes a space. Glyphs keep the order of the content stream.
+func pageLines(out *strings.Builder, glyphs []pdf.Text) {
+	for i, g := range glyphs {
+		if i > 0 {
+			prev := glyphs[i-1]
+			size := max(g.FontSize, prev.FontSize, 1)
+			switch dy := prev.Y - g.Y; {
+			case dy > 2.2*size || dy < -2.2*size:
+				out.WriteString("\n\n")
+			case dy > size/2 || dy < -size/2:
+				out.WriteByte('\n')
+			case g.X-(prev.X+prev.W) > size/5 && prev.S != " " && g.S != " ":
+				out.WriteByte(' ')
+			}
+		}
+		out.WriteString(g.S)
+	}
 }
 
 var (
