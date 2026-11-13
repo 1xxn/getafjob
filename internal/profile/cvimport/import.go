@@ -110,10 +110,6 @@ func dropInvalid(p, before profile.Profile) profile.Profile {
 			p.Certifications = before.Certifications
 		case "languages":
 			p.Languages = before.Languages
-		case "experience":
-			p.Experience = before.Experience
-		case "education":
-			p.Education = before.Education
 		default:
 			return before
 		}

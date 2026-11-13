@@ -5,21 +5,18 @@ package profile
 import (
 	"net/mail"
 	"regexp"
-	"slices"
 	"strings"
 	"unicode/utf8"
 )
 
 // Profile is the applicant profile; empty fields are unknown (the planner asks instead of guessing).
 type Profile struct {
-	Personal       Personal     `json:"personal"`
-	Work           Work         `json:"work"`
-	Summary        string       `json:"summary,omitempty"`
-	Skills         []string     `json:"skills,omitempty"`
-	Languages      []Language   `json:"languages,omitempty"`
-	Experience     []Experience `json:"experience,omitempty"`
-	Education      []Education  `json:"education,omitempty"`
-	Certifications []string     `json:"certifications,omitempty"`
+	Personal       Personal   `json:"personal"`
+	Work           Work       `json:"work"`
+	Summary        string     `json:"summary,omitempty"`
+	Skills         []string   `json:"skills,omitempty"`
+	Languages      []Language `json:"languages,omitempty"`
+	Certifications []string   `json:"certifications,omitempty"`
 }
 
 // Personal holds contact data.
@@ -58,25 +55,6 @@ type Work struct {
 type Language struct {
 	Name  string `json:"name"`
 	Level string `json:"level"`
-}
-
-// Experience is one position.
-type Experience struct {
-	Company    string   `json:"company"`
-	Title      string   `json:"title"`
-	Start      string   `json:"start"`
-	End        string   `json:"end,omitempty"` // empty: current
-	Location   string   `json:"location,omitempty"`
-	Highlights []string `json:"highlights,omitempty"`
-}
-
-// Education is one degree or training.
-type Education struct {
-	Institution string `json:"institution"`
-	Degree      string `json:"degree"`
-	Start       string `json:"start,omitempty"`
-	End         string `json:"end,omitempty"`
-	Grade       string `json:"grade,omitempty"`
 }
 
 // Preferences steer search and matching; they hold no contact data and stay readable for the crawler.
@@ -193,37 +171,23 @@ func (p Profile) Validate() []FieldError {
 			c.add("languages", "profile.error.required")
 		}
 	}
-	if len(p.Experience) > maxItems || len(p.Education) > maxItems {
-		c.add("experience", "profile.error.too_many")
-	}
-	for _, e := range p.Experience {
-		for _, v := range []string{e.Company, e.Title, e.Start, e.End, e.Location} {
-			c.text("experience", v, maxShort)
-		}
-		c.list("experience", e.Highlights)
-	}
-	for _, e := range p.Education {
-		for _, v := range []string{e.Institution, e.Degree, e.Start, e.End, e.Grade} {
-			c.text("education", v, maxShort)
-		}
-	}
 	return c.errs
 }
 
-// Missing lists the fields most forms need that are still empty (the assistant asks for them).
+// Missing lists the fields most forms need that are still empty, in the order of the profile form (the assistant
+// asks for them, the profile page links to them).
 func (p Profile) Missing() []string {
 	var out []string
-	for f, v := range map[string]string{
-		"first_name": p.Personal.FirstName, "last_name": p.Personal.LastName, "email": p.Personal.Email,
-		"phone": p.Personal.Phone, "city": p.Personal.City, "notice_period": p.Work.NoticePeriod,
-		"earliest_start": p.Work.EarliestStart, "salary_expectation": p.Work.SalaryExpectation,
-		"years_total": p.Work.YearsTotal,
+	for _, f := range []struct{ key, v string }{
+		{"first_name", p.Personal.FirstName}, {"last_name", p.Personal.LastName}, {"email", p.Personal.Email},
+		{"phone", p.Personal.Phone}, {"city", p.Personal.City}, {"years_total", p.Work.YearsTotal},
+		{"notice_period", p.Work.NoticePeriod}, {"earliest_start", p.Work.EarliestStart},
+		{"salary_expectation", p.Work.SalaryExpectation},
 	} {
-		if strings.TrimSpace(v) == "" {
-			out = append(out, f)
+		if strings.TrimSpace(f.v) == "" {
+			out = append(out, f.key)
 		}
 	}
-	slices.Sort(out)
 	return out
 }
 

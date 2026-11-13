@@ -89,22 +89,8 @@ func TestParseEnglish(t *testing.T) {
 	if len(p.Languages) != 2 || p.Languages[0] != (profile.Language{Name: "German", Level: "native"}) || p.Languages[1].Level != "C1" {
 		t.Errorf("languages = %+v", p.Languages)
 	}
-	if len(p.Experience) != 2 {
-		t.Fatalf("experience = %+v", p.Experience)
-	}
-	e := p.Experience[0]
-	if e.Title != "Senior Platform Engineer" || e.Company != "Muster GmbH" || e.Start != "01/2021" || e.End != "" || len(e.Highlights) != 2 {
-		t.Errorf("first position = %+v", e)
-	}
-	if e := p.Experience[1]; e.Title != "Backend Developer" || e.Company != "Beispiel AG" || e.Start != "2017" || e.End != "2020" ||
-		len(e.Highlights) != 1 {
-		t.Errorf("second position = %+v", e)
-	}
-	if p.Work.CurrentTitle != "Senior Platform Engineer" || p.Work.CurrentEmployer != "Muster GmbH" {
-		t.Errorf("work = %+v", p.Work)
-	}
-	if len(p.Education) != 1 || p.Education[0].Degree != "B.Sc. Computer Science" || p.Education[0].Institution != "TU Musterstadt" {
-		t.Errorf("education = %+v", p.Education)
+	if w := ParseAll(cvEN).Profile.Work; w.CurrentTitle != "Senior Platform Engineer" || w.CurrentEmployer != "Muster GmbH" {
+		t.Errorf("work = %+v", w)
 	}
 	if !slices.Equal(p.Certifications, []string{"CKA", "AWS Solutions Architect Associate"}) {
 		t.Errorf("certifications = %q", p.Certifications)
@@ -120,9 +106,6 @@ func TestParseGerman(t *testing.T) {
 		p.Personal.Phone != "0151 23456789" {
 		t.Errorf("personal = %+v", p.Personal)
 	}
-	if len(p.Experience) != 1 || p.Experience[0].Company != "Beispiel GmbH" || p.Experience[0].End != "" {
-		t.Errorf("experience = %+v", p.Experience)
-	}
 	if !slices.Equal(p.Skills, []string{"Go", "Python", "Docker"}) {
 		t.Errorf("skills = %q", p.Skills)
 	}
@@ -134,8 +117,7 @@ func TestParseGerman(t *testing.T) {
 func TestMergeKeepsUserValues(t *testing.T) {
 	cur := profile.Profile{Personal: profile.Personal{FirstName: "Maximilian"}, Skills: []string{"Rust"}}
 	got := Merge(cur, Parse(cvEN))
-	if got.Personal.FirstName != "Maximilian" || got.Personal.LastName != "Mustermann" || !slices.Equal(got.Skills, []string{"Rust"}) ||
-		len(got.Experience) != 2 {
+	if got.Personal.FirstName != "Maximilian" || got.Personal.LastName != "Mustermann" || !slices.Equal(got.Skills, []string{"Rust"}) {
 		t.Errorf("merged = %+v", got)
 	}
 }
@@ -334,8 +316,8 @@ func FuzzParse(f *testing.F) {
 	f.Add(cvEN)
 	f.Add(cvDE)
 	f.Fuzz(func(t *testing.T, s string) {
-		p := Parse(s)
-		if len(p.Experience) > 30 || len(p.Skills) > 80 {
+		p := ParseAll(s)
+		if len(p.Experiences) > profile.MaxStations || len(p.Educations) > profile.MaxStations || len(p.Profile.Skills) > 80 {
 			t.Fatal("unbounded result")
 		}
 	})
