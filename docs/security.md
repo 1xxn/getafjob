@@ -31,16 +31,16 @@ This document grows with every module.
 | S3 | Account enumeration and mail flooding via sign-in links | 1 | Same answer for unknown addresses; at most 3 links per account and 15 minutes | `TestMagicLinkFlow`, `TestMagicLinksAreRateLimited` |
 | S4 | Session cookie stolen or replayed | 1 | `__Host-` cookie, Secure, HttpOnly, SameSite=Lax; idle and absolute expiry; stored as hash | `TestInvitationAndSignOut`, `TestSessionIdleTimeoutAndTouch` |
 | T1 | CSRF changes data | 1 | `http.CrossOriginProtection`, `__Host-` cookies | `TestProtectSetsHeadersAndBlocksCrossOriginPosts`, `TestCrossSitePostIsRejected` |
-| T2 | Page tricks the engine into a wrong field or domain | 5 | Provenance verification against profile facts; field and origin checks; page content treated strictly as untrusted data; cover letters strictly refused | `TestPlannerProvenance`, `TestDomainOrigins`, `TestFillRefuses`, `TestProvenanceFactCheck` |
+| T2 | Page tricks the engine into a wrong field or domain | 5 | Provenance verification against profile facts; field and origin checks; page content treated strictly as untrusted data; no generated text (no AI) | `TestValidSource`, `TestOrigins`, `TestFillRefuses`, `TestGreenRule` |
 | T3 | Tampered images or binaries | 6 | Pinned actions/tools, cosign signatures, provenance, SBOM | CI, `.github/workflows/ci.yml` |
 | T4 | Mail scanners use up sign-in links | 1 | Opening a link shows a button; only the POST signs in | `TestMagicLinkSignIn` |
 | T5 | Script injection through user-controlled text | 1 | templ escapes all output; CSP with a nonce per response, no inline scripts, Trusted Types with only the `htmx` policy; htmx elements without the nonce are inert (`hx-csp`); vendored htmx checked against its sums | `TestInvitationAndSignOut`, `TestJobPages`, `TestProtectSetsHeadersAndBlocksCrossOriginPosts`, `TestVendoredFilesMatchChecksums` |
 | T6 | Hostile source data poisons the job index or merges unrelated jobs | 1 | Descriptions reduced to plain text (`htmltext`), length checks, board slugs checked before they become host names or paths (`TestFromBoardRejectsUnsafeSlugs`), a job board never replaces a company board, no cross-source match without a company, a failing source closes nothing; JSON-LD with block, size and depth limits; sitemap job pages must stay on the sitemap's host; a discovered board is added only if it lists one of the company's jobs (same `MatchKey`), never replaces a known board, and guessed slugs pass the same checks; stored ETag and Last-Modified values are capped at 256 bytes and a 304 closes nothing | `FuzzText`, `FuzzSources`, `FuzzJobPostings`, `TestBoardFromURL`, `TestFindBoard`, `TestBoardChecks`, `TestConditionalFetch`, `TestCrawlNotModified`, `TestCrawl`, `TestShouldClose` |
 | T7 | Hostile upload (HTML or SVG disguised as a CV, zip bomb, path tricks in names) | 1 | Type from magic bytes only (PDF, DOCX, PNG, JPEG); DOCX checked as zip with bounded entries and size; names cleaned and sealed; files sealed in the blob store; download only as attachment with `Content-Security-Policy: sandbox`; 10 MB limit on the upload route only, read in memory without temporary files | `TestSniff`, `FuzzSniff`, `TestCleanName`, `TestDocumentPages`, `TestProtectUploadLimit` |
 | T8 | Duplicate or invented application (race, crash, retry, wrong field) | 2 | Submit register: a `submit_attempt` row unique per application, written with the state `submitting` in one transaction before the click; concurrent submits lose on the version or the unique key; crashes become `submit_unknown`, never retried; a parked application keeps its attempt, so it is never sent again; every value needs provenance, fields are checked against label and origin before filling and verified afterwards | `TestSubmitRegister`, `TestParkedAfterSubmitIsNeverSentAgain`, `TestCrashWhileSubmittingBecomesUnknown`, `TestTransitions`, `TestFillRefuses` |
-| T9 | Easy Apply session hijacking or account ban by portal | 1 / 3 | Explicit user opt-in with terms acceptance; envelope-encrypted session cookies; daily quota limit (1–20, default 5); automatic handoff for interactive user re-auth without credential storage | `TestEasyApplyOptInRequired`, `TestPortalSessionsEncrypted`, `TestEasyApplyDailyLimit`, `TestReviewStepDetection` |
+| T9 | Easy Apply session hijacking or account ban by portal | 1 / 3 | Explicit user opt-in with terms acceptance; envelope-encrypted session cookies; daily quota limit (1–20, default 5); automatic handoff for interactive user re-auth without credential storage | `TestServiceUserNotOptedIn`, `TestServiceSaveAndGetCookies`, `TestServiceRateLimitsAndConcurrency`, `TestIsSessionExpired` |
 | T10 | Hostile page content steers the engine | 5 | Page content is data, never instructions; no AI; every value needs provenance from the user's own data; free text only from text blocks or answers | `TestValidSource`, `TestGreenRule` |
-| R1 | User disputes an application | n/a | Evidence preserved: filled values + sources, screenshots per step, confirmation page screenshot, timeline events; append-only audit log | `TestSubmitRegister`, `TestCheckpointScreenshot`, `TestApplicationTimeline`, `TestAuditEventsAreAppendOnly` |
+| R1 | User disputes an application | n/a | Evidence preserved: filled values + sources, screenshots per step, confirmation page screenshot, timeline events; append-only audit log | `TestSubmitRegister`, `TestEvidencePageAndScreenshotEndpoint`, `TestAuditEventsAreAppendOnly` |
 | R2 | Security events cannot be traced or are altered | 4 | Append-only audit log (codes and params, no personal data, triggers prevent UPDATE/DELETE) | `TestAuditEventsAreAppendOnly`, `TestAuditLogHasNoPersonalData` |
 | I1 | User reads another user's data | 4 | RLS for the application role `getafjob_app` (FORCE RLS, no bypass), tenant set per transaction ([0006](adr/0006-tenant-isolation-rls-and-envelope-encryption.md)) | `TestTenantSeparation`, `TestAppRoleCannotBypassRLS`, `TestDatabaseMigrationsEnforceRLS` |
 | I2 | SSRF to internal services or cloud metadata | 3 | `netguard`: URLs read like Chromium (WHATWG, UTS 46); a request goes only to the canonical form (`CanonicalURL`: ASCII host or dotted IPv4, default port, no user info, checked against a strict pattern right before the request), so other ports of a public host stay out of reach; every connection checked after DNS, redirects held to the same rules; egress proxy denies private/loopback/link-local/cloud metadata (169.254.169.254); runner on internal networks only | `TestNonPublicURLs`, `TestCanonicalURL`, `TestGetRefusesOtherPortsAndRedirectsThere`, `TestClientRefusesPrivateTargetsPerConnection`, `FuzzPublicURL`, `deploy/smoke.sh` |
@@ -49,7 +49,7 @@ This document grows with every module.
 | I5 | One-time tokens in access logs | 1 | Caddy without access log; tokens carried in query string are single-use and short-lived | `deploy/Caddyfile` |
 | I6 | Database dump or blob storage exposes secrets | 4 | Envelope encryption: AES-256-GCM data key per user, wrapped with the master key (Docker secret, never in the database); associated data binds every ciphertext to user and purpose; `Forget` deletes the data key. Files are sealed before they reach the volume or bucket, under `users/<id>/`, bound to their key; keys are checked segment by segment and the directory store works through `os.Root` | `TestEnvelope`, `TestKeyring`, `FuzzOpen`, `TestSealed`, `TestSealedWithEnvelope`, `TestValidKey` |
 | D1 | Slowloris / huge bodies | 1 | Server timeouts, header and body limits (1 MB default, 10 MB on upload paths) | `httpx.NewServer`, `TestProtectSetsHeadersAndBlocksCrossOriginPosts`, `TestProtectUploadLimit` |
-| D2 | Hostile page exhausts the runner | 2/3 | Per-run timeouts, max 10 form pages, memory (2 GB) and pids (512) limits on container, browser wiped and restarted per run | `TestLaunchKeepsSandboxAndSiteIsolation`, `TestMaxPages` |
+| D2 | Hostile page exhausts the runner | 2/3 | Per-run timeouts, max 10 form pages, memory (2 GB) and pids (512) limits on container, browser wiped and restarted per run | `TestLaunchKeepsSandboxAndSiteIsolation` (the page limit has no test yet) |
 | D3 | Guessing or flooding on sign-in endpoints | 1 | Rate limit per client address (burst 10, then one request per 6 s); pages are `no-store` | `TestSignInIsRateLimited` |
 | D4 | Huge or endless source responses | 1 | Body cap (`sources.MaxBody`), request timeouts, page caps per source, bounded fetch and detail parallelism, at most 3 attempts with backoff and `Retry-After` up to 30 s | `TestPagingIsBounded`, `TestClientErrors`, `FuzzSources` |
 | D5 | Hostile CV (PDF or DOCX) crashes or exhausts `serve` during import | 1 | Text extraction runs in a child process of the binary without environment (no secrets), with address space, CPU time and file size limits (Linux), a 20 second timeout and bounded output; DOCX parts and PDF pages are bounded; parser panics are recovered | `TestExtractorChild`, `FuzzText`, `FuzzParse`, `TestCVImport` |
@@ -111,26 +111,26 @@ This document grows with every module.
 | 4.1.2 | Multi-tenant isolation | Row-Level Security on every tenant table; application role connects with `getafjob_app` without bypass rights | `TestTenantSeparation`, `TestDatabaseMigrationsEnforceRLS` |
 | 4.2.1 | Prevention of IDOR / indirect object reference | Object lookups always require user ID context; blob store paths prefixed with `users/<id>/` | `TestDocumentPages`, `TestValidKey`, `TestSealedWithEnvelope` |
 | 4.3.1 | Administrative interface separation | Administration performed exclusively via CLI (`getafjob admin`), no administrative web routes | `cmd/getafjob`, `internal/app/admin.go` |
-| 4.4.1 | Extension / assist token scoping | Browser extension tokens scoped specifically to assist actions with limited TTL | `TestAssistPairingAndToken`, `TestAssistScope` |
+| 4.4.1 | Extension / assist token scoping | Browser extension tokens scoped specifically to assist actions with limited TTL | `TestAssistServicePairingAndAuth`, `TestAssistEndpoints`, `TestPairIsRateLimited` |
 
 ### V5: Validation, Sanitization and Encoding
 
 | Req. | Requirement (short) | How getafjob satisfies it | Proof / Test |
 |---|---|---|---|
-| 5.1.1 | Input validation on length, type, and format | Strict input length limits (names, URLs, text blocks); numeric bounds validated | `TestProtectUploadLimit`, `TestMaxPages`, `TestCatalogValidation` |
-| 5.2.1 | Context-aware output encoding (XSS) | All templates compiled with `templ` providing automatic HTML context escaping | `TestJobPages`, `TestProfileView` |
+| 5.1.1 | Input validation on length, type, and format | Strict input length limits (names, URLs, text blocks); numeric bounds validated | `TestProtectUploadLimit`, `TestJobPostingsLimits`, `TestCatalogIsValid` |
+| 5.2.1 | Context-aware output encoding (XSS) | All templates compiled with `templ` providing automatic HTML context escaping | `TestJobPages`, `TestProfilePages` |
 | 5.2.2 | Content-Security-Policy & Trusted Types | Per-response CSP nonce, Trusted Types restricted to `htmx` policy, no inline scripts | `TestProtectSetsHeadersAndBlocksCrossOriginPosts`, `internal/platform/httpx/secure.go` |
 | 5.3.1 | SQL injection prevention | 100% parameterized SQL queries compiled via `sqlc`, zero dynamic SQL concatenation | `sqlc.yaml`, `db/queries/`, `go test ./...` |
-| 5.5.1 | Safe deserialization | Bounded JSON decoders, structured JSON-LD validation | `FuzzJobPostings`, `TestStructuredOutputs` |
+| 5.5.1 | Safe deserialization | Bounded JSON decoders, structured JSON-LD validation | `FuzzJobPostings` |
 
 ### V6: Stored Cryptography
 
 | Req. | Requirement (short) | How getafjob satisfies it | Proof / Test |
 |---|---|---|---|
 | 6.1.1 | Standard industry-accepted cryptography | AES-256-GCM for envelope encryption, SHA-256 for hashes, ed25519 for VAPID | `internal/platform/crypto`, `internal/platform/webpush` |
-| 6.2.1 | Cryptographic key management | Per-user AES-256-GCM data keys wrapped with master key; master key in Docker secrets; key rotation via keyring | `TestEnvelope`, `TestKeyring`, `TestKeyRotation` |
+| 6.2.1 | Cryptographic key management | Per-user AES-256-GCM data keys wrapped with master key; master key in Docker secrets; key rotation via keyring | `TestEnvelope` (includes rotation), `TestKeyring` |
 | 6.3.1 | Cryptographically secure random numbers | `crypto/rand` CSPRNG used for all nonces, session tokens, challenges, and keys | `TestSessionRotation`, `newNonce` |
-| 6.4.1 | Associated data binding | Ciphertexts bind user ID and purpose string in GCM additional authenticated data | `TestEnvelope`, `TestPortalSessionsEncrypted` |
+| 6.4.1 | Associated data binding | Ciphertexts bind user ID and purpose string in GCM additional authenticated data | `TestEnvelope`, `TestSealedWithEnvelope` |
 
 ### V7: Error Handling and Logging
 
@@ -145,10 +145,10 @@ This document grows with every module.
 
 | Req. | Requirement (short) | How getafjob satisfies it | Proof / Test |
 |---|---|---|---|
-| 8.1.1 | Personal data minimization | Search preferences hold no contact data; cover letters strictly refused | `TestProfileItems`, `TestCoverLetterRefused` |
-| 8.2.1 | Evidence & screenshot retention limits | Checkpoint screenshots automatically expired and purged from blob store after 90 days; expired sessions, magic links, WebAuthn challenges, recoveries, and unaccepted invitations pruned on schedule or via `admin cleanup` | `TestCleanupRunsAllPruning`, `TestPruneExpired` |
-| 8.3.1 | Secure data destruction (GDPR Art. 17) | Crypto-shredding via `crypto.Envelope.Forget(ctx, userID)` zeroes and drops the user data key rendering stored ciphertexts mathematically unrecoverable; document and screenshot blobs purged from blob store; tenant cascade deletion drops user records | `TestUserAccountDeletion`, `TestEnvelope`, `TestPrivacyExportAndDelete` |
-| 8.4.1 | Data portability (GDPR Art. 20) | User profile, text blocks, answers, matches, applications, audit events, and decrypted documents exportable as structured JSON and raw files inside a ZIP archive via web UI or `admin export-user` | `TestUserDataExport`, `TestPrivacyExportAndDelete` |
+| 8.1.1 | Personal data minimization | Search preferences hold no contact data; no AI-generated text | `TestItems` |
+| 8.2.1 | Evidence & screenshot retention limits | Checkpoint screenshots automatically expired and purged from blob store after 90 days; expired sessions, magic links, WebAuthn challenges, recoveries, and unaccepted invitations pruned on schedule or via `admin cleanup` | `TestCleanupRunsAllPruning`, `TestCleanupRemovesExpired`, `TestEvidenceAndScreenshotRetention` |
+| 8.3.1 | Secure data destruction (GDPR Art. 17) | Crypto-shredding via `crypto.Envelope.Forget(ctx, userID)` zeroes and drops the user data key rendering stored ciphertexts mathematically unrecoverable; document and screenshot blobs purged from blob store; tenant cascade deletion drops user records | `TestDeleteAccountPurgesBlobsAndKeys`, `TestEnvelope`, `TestPrivacyExportAndDelete` |
+| 8.4.1 | Data portability (GDPR Art. 20) | User profile, text blocks, answers, matches, applications, audit events, and decrypted documents exportable as structured JSON and raw files inside a ZIP archive via web UI or `admin export-user` | `TestExportGeneratesValidZip`, `TestPrivacyExportAndDelete` |
 | 8.5.1 | Transparent privacy notice | Public `/privacy` page served in English and German with security architecture explanation; customizable operator privacy policy template provided for self-hosters | `TestPrivacyExportAndDelete`, `docs/privacy-policy-template.md` |
 
 ### V9: Communication Security
@@ -173,7 +173,7 @@ This document grows with every module.
 | Req. | Requirement (short) | How getafjob satisfies it | Proof / Test |
 |---|---|---|---|
 | 11.1.1 | Idempotent transaction execution | `submit_attempts` unique constraint ensures an application cannot be submitted twice | `TestSubmitRegister`, `TestParkedAfterSubmitIsNeverSentAgain` |
-| 11.2.1 | Anti-automation & abuse controls | Easy Apply rate limits (max 5/day default); portal account concurrency limits | `TestEasyApplyDailyLimit`, `TestLeaseHonorsHostLimits` |
+| 11.2.1 | Anti-automation & abuse controls | Easy Apply rate limits (max 5/day default); portal account concurrency limits | `TestServiceRateLimitsAndConcurrency`, `TestLeaseHonorsHostLimits` |
 | 11.3.1 | Mandatory human approval for high-risk actions | Automated answers require explicit user approval | `TestGreenRule` |
 
 ### V12: File and Resource Handling
@@ -182,13 +182,13 @@ This document grows with every module.
 |---|---|---|---|
 | 12.1.1 | Upload size limits enforced | 10 MB limit on document upload routes; 1 MB on general web routes | `TestProtectUploadLimit` |
 | 12.2.1 | MIME type verified via magic bytes | Content-Type header ignored; magic bytes inspected (PDF, DOCX, PNG, JPEG); DOCX verified as safe zip | `TestSniff`, `FuzzSniff` |
-| 12.4.1 | Safe file download serving | Documents served with `Content-Security-Policy: sandbox`, `Content-Disposition: attachment`, `nosniff` | `TestDocumentDownloadSandbox` |
+| 12.4.1 | Safe file download serving | Documents served with `Content-Security-Policy: sandbox`, `Content-Disposition: attachment`, `nosniff` | `TestDocumentPages` |
 
 ### V13: API and Web Service
 
 | Req. | Requirement (short) | How getafjob satisfies it | Proof / Test |
 |---|---|---|---|
-| 13.1.1 | API authentication | Connect RPC runner gateway authenticated with bearer token or shared secret; API v1 authenticated | `TestGateway`, `TestAssistAPI` |
+| 13.1.1 | API authentication | Connect RPC runner gateway authenticated with bearer token or shared secret; API v1 authenticated | `TestGateway`, `TestAssistEndpoints` |
 | 13.2.1 | Payload size caps | Request message size strictly bounded (`MaxMessage = 12 MB`, `maxScreenshot = 8 MB`, `maxData = 256 KB`) | `TestGateway` |
 | 13.3.1 | CSRF defense | `http.CrossOriginProtection` validates origin/fetch metadata on all mutating requests | `TestProtectSetsHeadersAndBlocksCrossOriginPosts` |
 
@@ -197,8 +197,8 @@ This document grows with every module.
 | Req. | Requirement (short) | How getafjob satisfies it | Proof / Test |
 |---|---|---|---|
 | 14.1.1 | Production secrets protection | Passwords and keys provided as Docker secret files (`*_FILE`), never committed | `deploy/compose.yaml`, `config.go` |
-| 14.2.1 | Strict configuration parsing | Unknown configuration variables generate warnings; invalid types fail fast | `TestConfigUnknownVariables`, `TestConfigValidation` |
-| 14.4.1 | Secure defaults | No AI module; Easy Apply disabled by default; telemetry disabled by default | `TestConfigDefaults` |
+| 14.2.1 | Strict configuration parsing | Unknown configuration variables generate warnings; invalid types fail fast | `TestLoadValuesAndFiles`, `TestLoadErrors` |
+| 14.4.1 | Secure defaults | No AI module; Easy Apply disabled by default; telemetry disabled by default | `TestLoadDefaults` |
 
 ---
 
