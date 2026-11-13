@@ -58,6 +58,12 @@ function initLiveView(box) {
     box.dataset.mode = mode;
     if (statusEl) statusEl.textContent = texts[mode];
     if (resumeBtn) resumeBtn.hidden = mode !== "interactive";
+    if (mode === "interactive" || mode === "view") {
+      const want = mode === "interactive" ? "waiting" : "running";
+      box.closest(".live-focus")?.querySelectorAll("[data-live-state]").forEach((el) => {
+        el.hidden = el.dataset.liveState !== want;
+      });
+    }
   }
   function retry(mode) {
     failures++;

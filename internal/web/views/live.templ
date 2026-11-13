@@ -140,7 +140,13 @@ templ liveFocus(d LiveData) {
 				if d.Focus.Company != "" {
 					<span>{ d.Focus.Company }</span>
 				}
-				@runState(*d.Focus)
+				// Both states are rendered; handoff.ts shows the one the live view reports (your turn or running).
+				<span data-live-state="waiting" hidden?={ !d.Focus.Waiting }>
+					@ui.StatusPill(ui.StatusProps{Label: T(ctx, "live.state.waiting"), Tone: ui.Warning})
+				</span>
+				<span data-live-state="running" hidden?={ d.Focus.Waiting }>
+					@ui.StatusPill(ui.StatusProps{Label: T(ctx, "live.state.running"), Tone: ui.Accent, Live: true})
+				</span>
 			</p>
 			@LiveScreen(LiveScreenProps{AppID: d.Focus.AppID, Size: "full", Controls: true})
 		</div>
