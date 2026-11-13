@@ -2,6 +2,8 @@ package views
 
 import (
 	"context"
+	"slices"
+	"strings"
 	"time"
 
 	"github.com/1xxn/getafjob/internal/web/views/ui"
@@ -286,9 +288,14 @@ templ appOverviewTab(d AppDetailData) {
 	if d.Suggestion != nil {
 		@ui.Card(ui.CardProps{Title: T(ctx, "handoff.suggestion.title"), Subtitle: d.Suggestion.From}) {
 			<p>{ d.Suggestion.Subject }</p>
+			<p><strong>{ T(ctx, "handoff.suggestion.to", "state", T(ctx, "apps.state."+d.Suggestion.SuggestedState)) }</strong></p>
 			<ul class="app-list">
-				for _, r := range d.Suggestion.Reasons {
-					<li>{ r }</li>
+				for _, r := range slices.Compact(slices.Clone(d.Suggestion.Reasons)) {
+					if strings.HasPrefix(r, "track.") {
+						<li>{ T(ctx, r) }</li>
+					} else {
+						<li>{ r }</li>
+					}
 				}
 			</ul>
 			<div class="app-actions">

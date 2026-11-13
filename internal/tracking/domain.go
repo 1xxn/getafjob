@@ -111,7 +111,7 @@ func Classify(msg EmailMessage) (Category, []string) {
 
 	// 1. Security codes: NEVER read automatically, always ignored for applications.
 	if isSecurityCode(subj, body) {
-		return CategorySecurityCode, []string{"security code or verification email (ignored per ADR 0015)"}
+		return CategorySecurityCode, nil
 	}
 
 	// 2. Rejection before invitation: a no after an interview mentions the interview too.
@@ -156,111 +156,90 @@ func isSecurityCode(subj, body string) bool {
 
 // isInvitation detects interview or meeting invitations.
 func isInvitation(subj, body, full string) (bool, []string) {
-	inviteTerms := []struct {
-		pattern string
-		reason  string
-	}{
-		{"einladung zum vorstellungsgespräch", "Einladung zum Vorstellungsgespräch"},
-		{"einladung zum interview", "Einladung zum Interview"},
-		{"einladung zum kennenlerngespräch", "Einladung zum Kennenlerngespräch"},
-		{"einladung zu einem", "Einladung zu einem Gespräch"},
-		{"terminvorschlag für ein", "Terminvorschlag für ein Interview"},
-		{"vorstellungsgespräch", "Erwähnung Vorstellungsgespräch"},
-		{"kennenlerngespräch", "Erwähnung Kennenlerngespräch"},
-		{"telefoninterview", "Einladung zu Telefoninterview"},
-		{"videointerview", "Einladung zu Videointerview"},
-		{"gesprächtstermin", "Gesprächstermin vorgeschlagen"},
-		{"interview invitation", "Interview invitation"},
-		{"invite you to an interview", "Invitation to interview"},
-		{"schedule an interview", "Schedule an interview"},
-		{"invitation to interview", "Invitation to interview"},
-		{"next steps in our process", "Next steps in hiring process"},
-		{"chat about your application", "Chat about your application"},
-		{"phone screen", "Phone screen interview"},
-		{"technical interview", "Technical interview"},
-		{"like to invite you", "Invitation extended"},
+	inviteTerms := []string{
+		"einladung zum vorstellungsgespräch",
+		"einladung zum interview",
+		"einladung zum kennenlerngespräch",
+		"einladung zu einem",
+		"terminvorschlag für ein",
+		"vorstellungsgespräch",
+		"kennenlerngespräch",
+		"telefoninterview",
+		"videointerview",
+		"gesprächstermin",
+		"interview invitation",
+		"invite you to an interview",
+		"schedule an interview",
+		"invitation to interview",
+		"next steps in our process",
+		"chat about your application",
+		"phone screen",
+		"technical interview",
+		"like to invite you",
 	}
 
-	var reasons []string
 	for _, it := range inviteTerms {
-		if strings.Contains(full, it.pattern) {
-			reasons = append(reasons, it.reason)
+		if strings.Contains(full, it) {
+			return true, []string{"track.reason.invitation"}
 		}
-	}
-	if len(reasons) > 0 {
-		return true, reasons
 	}
 	return false, nil
 }
 
 // isRejection detects rejection notices.
 func isRejection(subj, body, full string) (bool, []string) {
-	rejectTerms := []struct {
-		pattern string
-		reason  string
-	}{
-		{"leider müssen wir ihnen mitteilen", "Absage (leider müssen wir Ihnen mitteilen)"},
-		{"nicht näher in betracht ziehen", "Absage (nicht näher in Betracht ziehen)"},
-		{"anderweitig entschieden", "Absage (anderweitig entschieden)"},
-		{"haben uns für einen anderen", "Absage (für einen anderen Bewerber entschieden)"},
-		{"haben uns für eine andere", "Absage (für eine andere Person entschieden)"},
-		{"leider eine absage", "Absage erhalten"},
-		{"können ihre bewerbung nicht berücksichtigen", "Bewerbung kann nicht berücksichtigt werden"},
-		{"müssen ihnen leider absagen", "Absage erhalten"},
-		{"nicht für die engere auswahl", "Nicht in der engeren Auswahl"},
-		{"unable to offer you an interview", "Rejection (unable to offer interview)"},
-		{"decided not to move forward", "Rejection (decided not to move forward)"},
-		{"pursuing other candidates", "Rejection (pursuing other candidates)"},
-		{"not selected for this role", "Rejection (not selected for role)"},
-		{"position has been filled", "Position filled"},
-		{"will not be moving forward", "Rejection (will not be moving forward)"},
-		{"other applicants whose qualifications", "Rejection (other candidates chosen)"},
-		{"cannot consider your application further", "Rejection (cannot consider further)"},
-		{"regret to inform you", "Rejection (regret to inform you)"},
+	rejectTerms := []string{
+		"leider müssen wir ihnen mitteilen",
+		"nicht näher in betracht ziehen",
+		"anderweitig entschieden",
+		"haben uns für einen anderen",
+		"haben uns für eine andere",
+		"leider eine absage",
+		"können ihre bewerbung nicht berücksichtigen",
+		"müssen ihnen leider absagen",
+		"nicht für die engere auswahl",
+		"unable to offer you an interview",
+		"decided not to move forward",
+		"pursuing other candidates",
+		"not selected for this role",
+		"position has been filled",
+		"will not be moving forward",
+		"other applicants whose qualifications",
+		"cannot consider your application further",
+		"regret to inform you",
 	}
 
-	var reasons []string
 	for _, rt := range rejectTerms {
-		if strings.Contains(full, rt.pattern) {
-			reasons = append(reasons, rt.reason)
+		if strings.Contains(full, rt) {
+			return true, []string{"track.reason.rejection"}
 		}
-	}
-	if len(reasons) > 0 {
-		return true, reasons
 	}
 	return false, nil
 }
 
 // isReceived detects confirmation and receipt notices.
 func isReceived(subj, body, full string) (bool, []string) {
-	receivedTerms := []struct {
-		pattern string
-		reason  string
-	}{
-		{"eingangsbestätigung", "Eingangsbestätigung erhalten"},
-		{"haben ihre bewerbung erhalten", "Bestätigung: Bewerbung erhalten"},
-		{"vielen dank für ihre bewerbung", "Vielen Dank für Ihre Bewerbung"},
-		{"bestätigung ihrer bewerbung", "Bestätigung der Bewerbung"},
-		{"eingang ihrer bewerbung", "Bestätigung des Bewerbungseingangs"},
-		{"bewerbung ist bei uns eingegangen", "Bewerbung eingegangen"},
-		{"bewerbungseingang", "Bewerbungseingang"},
-		{"thank you for your application", "Thank you for your application"},
-		{"we have received your application", "Application received confirmation"},
-		{"application received", "Application received"},
-		{"successfully submitted", "Successfully submitted"},
-		{"confirmation of application", "Confirmation of application"},
-		{"received your resume", "Resume received"},
-		{"application has been received", "Application has been received"},
+	receivedTerms := []string{
+		"eingangsbestätigung",
+		"haben ihre bewerbung erhalten",
+		"vielen dank für ihre bewerbung",
+		"bestätigung ihrer bewerbung",
+		"eingang ihrer bewerbung",
+		"bewerbung ist bei uns eingegangen",
+		"bewerbungseingang",
+		"thank you for your application",
+		"we have received your application",
+		"application received",
+		"successfully submitted",
+		"confirmation of application",
+		"received your resume",
+		"application has been received",
 	}
 
-	var reasons []string
 	for _, rt := range receivedTerms {
-		if strings.Contains(full, rt.pattern) {
-			reasons = append(reasons, rt.reason)
+		if strings.Contains(full, rt) {
+			return true, []string{"track.reason.received"}
 		}
-	}
-	if len(reasons) > 0 {
-		return true, reasons
 	}
 	return false, nil
 }
@@ -299,22 +278,22 @@ func MatchApplication(msg EmailMessage, apps []ApplicationSummary) (*Application
 		appDomain := extractDomainFromURL(app.URL)
 		if fromDomain != "" && appDomain != "" && !sharedDomain(fromDomain) && (fromDomain == appDomain || strings.HasSuffix(fromDomain, "."+appDomain) || strings.HasSuffix(appDomain, "."+fromDomain)) {
 			score += 50
-			reasons = append(reasons, "Sender domain matches job URL domain ("+fromDomain+")")
+			reasons = append(reasons, "track.match.domain")
 		}
 
 		// Check company name in sender address / display name
 		if strings.Contains(strings.ToLower(msg.From), company) {
 			score += 40
-			reasons = append(reasons, "Company name '"+app.Company+"' in sender")
+			reasons = append(reasons, "track.match.company")
 		}
 
 		// Check company name in subject
 		if strings.Contains(subj, company) {
 			score += 35
-			reasons = append(reasons, "Company name '"+app.Company+"' in subject")
+			reasons = append(reasons, "track.match.company")
 		} else if strings.Contains(body, company) {
 			score += 20
-			reasons = append(reasons, "Company name '"+app.Company+"' in message body")
+			reasons = append(reasons, "track.match.company")
 		}
 
 		// Check job title keywords in subject or body
@@ -322,10 +301,10 @@ func MatchApplication(msg EmailMessage, apps []ApplicationSummary) (*Application
 		if title != "" && len(title) >= 4 {
 			if strings.Contains(subj, title) {
 				score += 30
-				reasons = append(reasons, "Job title '"+app.Title+"' in subject")
+				reasons = append(reasons, "track.match.title")
 			} else if strings.Contains(body, title) {
 				score += 15
-				reasons = append(reasons, "Job title '"+app.Title+"' in message body")
+				reasons = append(reasons, "track.match.title")
 			}
 		}
 

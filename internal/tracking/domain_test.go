@@ -1,6 +1,7 @@
 package tracking_test
 
 import (
+	"slices"
 	"strings"
 	"testing"
 	"time"
@@ -215,5 +216,23 @@ func TestClassifyAndMatchEdgeCases(t *testing.T) {
 	if m, _ := tracking.MatchApplication(tracking.EmailMessage{From: "jobs@musterfirma.example.org",
 		Subject: "Musterfirma: your application", Body: "Thanks."}, twins); m != nil {
 		t.Errorf("tie matched %s", m.ID)
+	}
+}
+
+// Reasons are catalog codes (track.*), never text in one language.
+func TestReasonsAreCatalogCodes(t *testing.T) {
+	_, cr := tracking.Classify(tracking.EmailMessage{Subject: "Einladung zum Vorstellungsgespräch"})
+	app := tracking.ApplicationSummary{ID: uuid.New(), Company: "Acme Cloud", Title: "Go Backend Developer",
+		URL: "https://jobs.acmecloud.example.org/1"}
+	_, mr := tracking.MatchApplication(tracking.EmailMessage{From: "jobs@jobs.acmecloud.example.org",
+		Subject: "Acme Cloud: Go Backend Developer"}, []tracking.ApplicationSummary{app})
+	all := slices.Concat(cr, mr)
+	if len(cr) == 0 || len(mr) == 0 {
+		t.Fatalf("reasons = %v / %v", cr, mr)
+	}
+	for _, r := range all {
+		if !strings.HasPrefix(r, "track.") {
+			t.Errorf("reason %q is no catalog code", r)
+		}
 	}
 }
