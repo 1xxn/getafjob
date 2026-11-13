@@ -155,6 +155,17 @@ func (s *Server) profilePage(w http.ResponseWriter, r *http.Request, u *identity
 		s.failed(w, r, u, err)
 		return
 	}
+	// After adding a station the page focuses the new (last) entry's first field.
+	switch r.URL.Query().Get("added") {
+	case "experience":
+		if len(expRows) > 0 {
+			f.Values["focus"] = "f-title-" + expRows[len(expRows)-1].ID
+		}
+	case "education":
+		if len(eduRows) > 0 {
+			f.Values["focus"] = "f-degree-" + eduRows[len(eduRows)-1].ID
+		}
+	}
 	s.render(w, r, http.StatusOK, views.ProfilePage(u.DisplayName, s.candidateHead(r.Context(), u, "profile"), f, expRows, eduRows))
 }
 
@@ -207,13 +218,13 @@ func (s *Server) experienceAdd(w http.ResponseWriter, r *http.Request, u *identi
 		IsCurrent:          r.PostFormValue("is_current") == "on",
 		DescriptionBullets: profile.Lines(r.PostFormValue("bullets")),
 	}
-	id, err := s.Stations.SaveWorkExperience(r.Context(), u.ID, we)
+	_, err := s.Stations.SaveWorkExperience(r.Context(), u.ID, we)
 	if err != nil {
 		s.failed(w, r, u, err)
 		return
 	}
-	// Land on the new entry's first field: the page focuses and scrolls to a field named in the hash.
-	http.Redirect(w, r, "/profile?saved=1#f-title-"+id.String(), http.StatusSeeOther)
+	// The new entry is the last one; the page focuses its first field.
+	http.Redirect(w, r, "/profile?saved=1&added=experience", http.StatusSeeOther)
 }
 
 func (s *Server) experienceSave(w http.ResponseWriter, r *http.Request, u *identity.User) {
@@ -235,7 +246,7 @@ func (s *Server) experienceSave(w http.ResponseWriter, r *http.Request, u *ident
 		s.failed(w, r, u, err)
 		return
 	}
-	http.Redirect(w, r, "/profile?saved=1#f-title-"+id.String(), http.StatusSeeOther)
+	http.Redirect(w, r, "/profile?saved=1#stations", http.StatusSeeOther)
 }
 
 func (s *Server) experienceMove(direction string) func(http.ResponseWriter, *http.Request, *identity.User) {
@@ -300,13 +311,13 @@ func (s *Server) educationAdd(w http.ResponseWriter, r *http.Request, u *identit
 		IsCurrent:    r.PostFormValue("is_current") == "on",
 		Grade:        strings.TrimSpace(r.PostFormValue("grade")),
 	}
-	id, err := s.Stations.SaveEducation(r.Context(), u.ID, e)
+	_, err := s.Stations.SaveEducation(r.Context(), u.ID, e)
 	if err != nil {
 		s.failed(w, r, u, err)
 		return
 	}
-	// Land on the new entry's first field: the page focuses and scrolls to a field named in the hash.
-	http.Redirect(w, r, "/profile?saved=1#f-degree-"+id.String(), http.StatusSeeOther)
+	// The new entry is the last one; the page focuses its first field.
+	http.Redirect(w, r, "/profile?saved=1&added=education", http.StatusSeeOther)
 }
 
 func (s *Server) educationSave(w http.ResponseWriter, r *http.Request, u *identity.User) {
@@ -328,7 +339,7 @@ func (s *Server) educationSave(w http.ResponseWriter, r *http.Request, u *identi
 		s.failed(w, r, u, err)
 		return
 	}
-	http.Redirect(w, r, "/profile?saved=1#f-degree-"+id.String(), http.StatusSeeOther)
+	http.Redirect(w, r, "/profile?saved=1#stations", http.StatusSeeOther)
 }
 
 func (s *Server) educationMove(direction string) func(http.ResponseWriter, *http.Request, *identity.User) {

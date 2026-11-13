@@ -644,11 +644,12 @@ func TestProfilePages(t *testing.T) {
 	if rec.Code != http.StatusSeeOther {
 		t.Fatalf("add experience failed: %d", rec.Code)
 	}
-	// The redirect lands on the new entry's first field, which the page focuses.
-	field := strings.TrimPrefix(rec.Header().Get("Location"), "/profile?saved=1#")
-	body = a.do(http.MethodGet, "/profile", nil, session, nil).Body.String()
-	if !strings.HasPrefix(field, "f-title-") || !strings.Contains(body, `id="`+field+`"`) {
-		t.Errorf("add experience lands on %q, not on a field of the page", field)
+	// The page after adding names the new entry's first field, which the shell focuses.
+	loc := rec.Header().Get("Location")
+	body = a.do(http.MethodGet, loc, nil, session, nil).Body.String()
+	m := regexp.MustCompile(`data-focus-field="(f-title-[0-9a-f-]{36})"`).FindStringSubmatch(body)
+	if loc != "/profile?saved=1&added=experience" || m == nil || !strings.Contains(body, `id="`+m[1]+`"`) {
+		t.Errorf("add experience: Location %q, focus %v", loc, m)
 	}
 	for _, want := range []string{"Staff Platform Engineer", "Acme Corp", "Munich", "Built scalable infra"} {
 		if !strings.Contains(body, want) {

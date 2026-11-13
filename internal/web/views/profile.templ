@@ -216,6 +216,9 @@ templ ProfilePage(name string, h CandidateHead, f Form, experiences []ProfileExp
 	@candidatePage(T(ctx, "profile.title"), name, h) {
 		<p class="muted">{ T(ctx, "profile.text") }</p>
 		@formNotice(f)
+		if f.Values["focus"] != "" {
+			<span hidden data-focus-field={ f.Values["focus"] }></span>
+		}
 		<form method="post" action="/profile" class="stack" novalidate data-autosave { autosave(ctx, "/profile/autosave", "profile")... }>
 			<input type="hidden" id="version-profile" name="version" value={ f.Version }/>
 			<h2>{ T(ctx, "profile.section.personal") }</h2>
