@@ -163,7 +163,20 @@ func (s *Service) SignInWithMagicLink(ctx context.Context, token string) (User, 
 	}
 	now := s.now()
 	st, sh := NewToken()
-	u, recovered, err := s.store.ConsumeMagicLink(ctx, h, s.newSession(sh, MethodMagicLink, now), now)
+	// The recovery notice goes out before the commit: if it cannot be sent, the link and the recovery stay unused,
+	// so nobody signs in by recovery without the owner being told.
+	notice := func(u User) error {
+		if s.mailer == nil {
+			return nil
+		}
+		l := u.Locale
+		body := i18n.T(l, "mail.recovered.body", map[string]any{"name": u.DisplayName, "time": stamp(now), "account": s.link("/account", "")})
+		if err := s.mailer.Send(ctx, Mail{To: u.Email, Subject: i18n.T(l, "mail.recovered.subject", nil), Text: body}); err != nil {
+			return fmt.Errorf("send recovery notice: %w", err)
+		}
+		return nil
+	}
+	u, err := s.store.ConsumeMagicLink(ctx, h, s.newSession(sh, MethodMagicLink, now), now, notice)
 	if errors.Is(err, ErrNotFound) {
 		return User{}, "", ErrInvalidToken
 	}
@@ -172,13 +185,6 @@ func (s *Service) SignInWithMagicLink(ctx context.Context, token string) (User, 
 	}
 	if u.Disabled {
 		return User{}, "", ErrUserDisabled // the store created no session
-	}
-	if recovered && s.mailer != nil {
-		l := u.Locale
-		body := i18n.T(l, "mail.recovered.body", map[string]any{"name": u.DisplayName, "time": stamp(now), "account": s.link("/account", "")})
-		if err := s.mailer.Send(ctx, Mail{To: u.Email, Subject: i18n.T(l, "mail.recovered.subject", nil), Text: body}); err != nil {
-			return User{}, "", fmt.Errorf("send recovery notice: %w", err)
-		}
 	}
 	return u, st, nil
 }

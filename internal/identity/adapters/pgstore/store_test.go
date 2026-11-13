@@ -27,11 +27,15 @@ import (
 type fakeMailer struct {
 	mu   sync.Mutex
 	sent []identity.Mail
+	fail error // returned by Send when set
 }
 
 func (m *fakeMailer) Send(_ context.Context, mail identity.Mail) error {
 	m.mu.Lock()
 	defer m.mu.Unlock()
+	if m.fail != nil {
+		return m.fail
+	}
 	m.sent = append(m.sent, mail)
 	return nil
 }
@@ -739,6 +743,15 @@ func TestRecoveryInsteadOfMagicLink(t *testing.T) {
 		t.Fatal(err)
 	}
 	link := tokenFrom(linkIn(t, e.mail.last(t).Text))
+	// Without the notice there is no recovery sign-in, and nothing is used up.
+	e.mail.fail = errors.New("smtp down")
+	if _, s, err := e.svc.SignInWithMagicLink(ctx, link); err == nil || s != "" {
+		t.Fatalf("recovery sign-in without notice: %q, %v", s, err)
+	}
+	e.mail.fail = nil
+	if rec, _ := e.svc.Recovery(ctx, u.ID); rec == nil {
+		t.Fatal("failed notice used up the recovery")
+	}
 	if _, s, err := e.svc.SignInWithMagicLink(ctx, link); err != nil || s == "" {
 		t.Fatalf("recovery sign-in: %v", err)
 	}

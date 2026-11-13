@@ -74,8 +74,9 @@ type Store interface {
 	// CreateMagicLink stores a link unless the user already got limit links since 'since'; returns false then.
 	CreateMagicLink(ctx context.Context, userID uuid.UUID, h Hash, at, expires, since time.Time, limit int) (bool, error)
 	// ConsumeMagicLink marks the link used and creates the session atomically. For an account with a passkey it
-	// needs a ready recovery, which it uses up (recovered); otherwise ErrRecoveryWait and no session.
-	ConsumeMagicLink(ctx context.Context, h Hash, s NewSession, at time.Time) (u User, recovered bool, err error)
+	// needs a ready recovery, which it uses up; otherwise ErrRecoveryWait and no session. After a
+	// recovery it calls notice inside the transaction; an error there rolls everything back.
+	ConsumeMagicLink(ctx context.Context, h Hash, s NewSession, at time.Time, notice func(User) error) (User, error)
 	// RecoveryState tells whether the user has a passkey and returns a pending recovery (nil if none).
 	RecoveryState(ctx context.Context, userID uuid.UUID) (hasPasskeys bool, r *Recovery, err error)
 	// StartRecovery stores r unless a recovery is pending or ready; it returns the recovery in force.
