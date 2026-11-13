@@ -347,9 +347,24 @@ func TestActivityUnreadAndMarkRead(t *testing.T) {
 func TestNtfyTopicShape(t *testing.T) {
 	svc := notify.NewService(newFakeStore(), nil, nil, nil, "", nil)
 	for topic, ok := range map[string]bool{"getafjob-max_1": true, "../admin": false, "a/b": false, "x?y=1": false} {
-		err := svc.SavePreferences(t.Context(), notify.Preferences{UserID: uuid.New(), NtfyEnabled: true, NtfyTopic: topic})
+		p := notify.DefaultPreferences(uuid.New(), "")
+		p.NtfyEnabled, p.NtfyTopic = true, topic
+		err := svc.SavePreferences(t.Context(), p)
 		if (err == nil) != ok {
 			t.Errorf("topic %q: err = %v, want ok=%v", topic, err, ok)
 		}
+	}
+}
+
+// Invalid names every field that cannot be saved; the defaults are valid.
+func TestPreferencesInvalid(t *testing.T) {
+	p := notify.DefaultPreferences(uuid.New(), "")
+	if bad := p.Invalid(); len(bad) != 0 {
+		t.Fatalf("defaults invalid: %v", bad)
+	}
+	p.NtfyEnabled, p.DailySummaryTime, p.QuietHoursStart, p.QuietHoursEnd = true, "25:00", "7", "08:60"
+	want := "ntfy_topic daily_summary_time quiet_hours_start quiet_hours_end"
+	if got := strings.Join(p.Invalid(), " "); got != want {
+		t.Errorf("Invalid() = %q, want %q", got, want)
 	}
 }

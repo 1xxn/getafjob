@@ -607,6 +607,19 @@ func TestProfilePages(t *testing.T) {
 	if body := a.do(http.MethodGet, "/settings/search", nil, session, nil).Body.String(); !strings.Contains(body, `value="70000"`) {
 		t.Error("invalid preferences were saved")
 	}
+	// Invalid notification settings come back as field errors; nothing is saved.
+	bad := url.Values{"section": {"notifications"}, "notify_ntfy_enabled": {"on"}, "notify_daily_summary_time": {"25:00"}}
+	if rec := a.do(http.MethodPost, "/preferences", bad, session, nil); rec.Code != http.StatusUnprocessableEntity ||
+		strings.Count(rec.Body.String(), "This value is not valid.") != 2 {
+		t.Fatalf("invalid notifications %d: %s", rec.Code, rec.Body.String())
+	}
+	if body := a.do(http.MethodGet, "/settings/notifications", nil, session, nil).Body.String(); strings.Contains(body, "25:00") {
+		t.Error("invalid notification settings were saved")
+	}
+	port := url.Values{"section": {"integrations"}, "mailbox_host": {"imap.example.org"}, "mailbox_username": {"max"}, "mailbox_port": {"99999"}}
+	if rec := a.do(http.MethodPost, "/preferences", port, session, nil); rec.Code != http.StatusUnprocessableEntity || !strings.Contains(rec.Body.String(), `value="99999"`) {
+		t.Fatalf("invalid mailbox port %d", rec.Code)
+	}
 
 	// Station management on /profile
 	expForm := url.Values{

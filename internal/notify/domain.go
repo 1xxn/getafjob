@@ -4,6 +4,7 @@ package notify
 
 import (
 	"errors"
+	"regexp"
 	"strconv"
 	"strings"
 	"time"
@@ -75,6 +76,26 @@ type Preferences struct {
 	QuietHoursEnd       string // "HH:MM", defaults to "08:00"
 	CreatedAt           time.Time
 	UpdatedAt           time.Time
+}
+
+// ntfyTopicRx is the topic shape ntfy accepts; it keeps the topic one path segment of the server URL.
+var ntfyTopicRx = regexp.MustCompile(`^[A-Za-z0-9_-]{1,64}$`)
+
+// Invalid lists the fields that cannot be saved: an enabled ntfy channel needs a topic of letters, digits, - and _,
+// and the summary and quiet hour times are HH:MM.
+func (p Preferences) Invalid() []string {
+	var bad []string
+	if t := strings.TrimSpace(p.NtfyTopic); (p.NtfyEnabled && t == "") || (t != "" && !ntfyTopicRx.MatchString(t)) {
+		bad = append(bad, "ntfy_topic")
+	}
+	for _, f := range []struct{ name, v string }{
+		{"daily_summary_time", p.DailySummaryTime}, {"quiet_hours_start", p.QuietHoursStart}, {"quiet_hours_end", p.QuietHoursEnd},
+	} {
+		if _, _, err := parseHourMinute(f.v); err != nil {
+			bad = append(bad, f.name)
+		}
+	}
+	return bad
 }
 
 // DefaultPreferences returns standard preferences for a user.
