@@ -60,8 +60,12 @@ type item struct {
 	p   Posting
 }
 
-// Crawl fetches all sources, updates the index and closes jobs that disappeared.
-func (s *Service) Crawl(ctx context.Context, sources []Source) (Report, error) {
+// crawlFailed is the error key of a crawl that stopped before its end; source names never contain a space.
+const crawlFailed = "crawl failed"
+
+// Crawl fetches all sources, updates the index and closes jobs that disappeared. The run is finished on every exit;
+// a crawl that stops early records why under crawlFailed, so the pages do not keep showing the last good run.
+func (s *Service) Crawl(ctx context.Context, sources []Source) (rep Report, err error) {
 	names := make([]string, len(sources))
 	for i, src := range sources {
 		names[i] = src.Name()
@@ -71,10 +75,17 @@ func (s *Service) Crawl(ctx context.Context, sources []Source) (Report, error) {
 	if err != nil {
 		return Report{}, err
 	}
+	rep = Report{RunID: runID, Stats: Stats{Changes: map[Change]int{}}, Errors: map[string]string{},
+		Validators: map[string]Validators{}}
+	defer func() {
+		if err == nil {
+			return
+		}
+		rep.Errors[crawlFailed] = errorCode(err)
+		err = errors.Join(err, s.store.FinishRun(context.WithoutCancel(ctx), runID, rep.Stats, rep.Errors, s.now()))
+	}()
 	results := s.fetchAll(ctx, sources)
 
-	rep := Report{RunID: runID, Stats: Stats{Changes: map[Change]int{}}, Errors: map[string]string{},
-		Validators: map[string]Validators{}}
 	runs := map[string]SourceRun{}
 	listed := map[string]bool{}
 	var items, stubs []item
