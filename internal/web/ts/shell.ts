@@ -82,6 +82,23 @@ function afterPage(): void {
 
 document.addEventListener('htmx:after:settle', afterPage);
 
+// --- dialogs ---
+
+// A dialog opens on its first field, not on the close button that comes first in the markup: typing goes where the
+// user expects, and Enter no longer closes the dialog. Dialogs without fields (menus, drawers) keep the browser's focus.
+document.addEventListener(
+  'toggle',
+  (e) => {
+    const dialog = e.target;
+    if (!(dialog instanceof HTMLDialogElement) || !dialog.open || dialog.querySelector('[autofocus]')) return;
+    const field = dialog.querySelector<HTMLElement>(
+      '.ui-dialog-body :is(input:not([type="hidden"]), textarea, select):not(:disabled)',
+    );
+    field?.focus();
+  },
+  true,
+);
+
 // --- counters ---
 
 let countTimer = 0;

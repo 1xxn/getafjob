@@ -60,6 +60,18 @@ function afterPage() {
   }
 }
 document.addEventListener("htmx:after:settle", afterPage);
+document.addEventListener(
+  "toggle",
+  (e) => {
+    const dialog = e.target;
+    if (!(dialog instanceof HTMLDialogElement) || !dialog.open || dialog.querySelector("[autofocus]")) return;
+    const field = dialog.querySelector(
+      '.ui-dialog-body :is(input:not([type="hidden"]), textarea, select):not(:disabled)'
+    );
+    field?.focus();
+  },
+  true
+);
 var countTimer = 0;
 async function refreshCounts() {
   const res = await fetch("/shell/counts", { headers: { Accept: "application/json" } });
