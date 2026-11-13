@@ -135,11 +135,13 @@ func TestPushEndpoints(t *testing.T) {
 }
 
 // liveServer serves the live view socket of one application in the given state.
-func liveServer(t *testing.T, state application.State, sess *gateway.HandoffSession, logs io.Writer) (*identity.User, string) {
+func liveServer(t *testing.T, state application.State, sess *gateway.HandoffSession, logs io.Writer,
+	qs ...application.Question,
+) (*identity.User, string) {
 	t.Helper()
 	u := &identity.User{ID: uuid.New(), DisplayName: "Max"}
 	appID := uuid.New()
-	st := &fakeAppStore{userID: u.ID, app: application.App{ID: appID, JobID: 42, State: state, Version: 1}}
+	st := &fakeAppStore{userID: u.ID, app: application.App{ID: appID, JobID: 42, State: state, Version: 1}, qs: qs}
 	srv := &Server{Apps: application.NewService(st), Handoffs: fakeHub{sess: sess},
 		Logger: slog.New(slog.NewTextHandler(logs, nil))}
 	mux := http.NewServeMux()
@@ -164,6 +166,11 @@ func dialLive(ctx context.Context, t *testing.T, url string) *websocket.Conn {
 // readStatus reads messages until a status message arrives and returns its interactive flag.
 func readStatus(ctx context.Context, t *testing.T, ws *websocket.Conn) bool {
 	t.Helper()
+	return readScreenStatus(ctx, t, ws).Interactive
+}
+
+func readScreenStatus(ctx context.Context, t *testing.T, ws *websocket.Conn) screenStatus {
+	t.Helper()
 	for {
 		typ, data, err := ws.Read(ctx)
 		if err != nil {
@@ -174,7 +181,7 @@ func readStatus(ctx context.Context, t *testing.T, ws *websocket.Conn) bool {
 			if err := json.Unmarshal(data, &st); err != nil || st.Type != "status" {
 				t.Fatalf("status = %s, %v", data, err)
 			}
-			return st.Interactive
+			return st
 		}
 	}
 }
@@ -205,6 +212,26 @@ func TestScreenWebSocketStreamsToEveryViewer(t *testing.T) {
 	sess.Publish(frame)
 	if !bytes.Equal(readFrame(ctx, t, a), frame) || !bytes.Equal(readFrame(ctx, t, b), frame) {
 		t.Fatal("both viewers must get the frame")
+	}
+}
+
+// Field questions are answered on the answer form; the status tells the live view so it links there.
+func TestScreenWebSocketNamesOpenFieldQuestions(t *testing.T) {
+	sess := gateway.NewHandoffSession(uuid.Nil)
+	sess.MarkWaiting()
+	_, url := liveServer(t, application.NeedsInput, sess, io.Discard,
+		application.Question{Kind: application.QuestionField, Label: "Privacy consent", Input: "checkbox"})
+	ctx, cancel := context.WithTimeout(t.Context(), 5*time.Second)
+	defer cancel()
+	if st := readScreenStatus(ctx, t, dialLive(ctx, t, url)); !st.Interactive || !st.Answers {
+		t.Fatalf("status = %+v, want interactive with answers", st)
+	}
+
+	sess = gateway.NewHandoffSession(uuid.Nil)
+	sess.MarkWaiting()
+	_, url = liveServer(t, application.NeedsInput, sess, io.Discard, application.Question{Kind: "captcha", Label: "captcha"})
+	if st := readScreenStatus(ctx, t, dialLive(ctx, t, url)); !st.Interactive || st.Answers {
+		t.Fatalf("captcha status = %+v, want interactive without answers", st)
 	}
 }
 

@@ -59,10 +59,21 @@ const (
 var liveStates = map[application.State]bool{application.Queued: true, application.Running: true,
 	application.NeedsInput: true, application.Submitting: true}
 
-// screenStatus tells the client whether its input reaches the page.
+// screenStatus tells the client whether its input reaches the page, and whether the run waits for answers to
+// questions: those are given on the answer form, the page itself cannot carry their provenance.
 type screenStatus struct {
 	Type        string `json:"type"`
 	Interactive bool   `json:"interactive"`
+	Answers     bool   `json:"answers,omitempty"`
+}
+
+// openFieldQuestions reports whether the waiting run asks the user for field answers.
+func (s *Server) openFieldQuestions(ctx context.Context, userID, appID uuid.UUID) bool {
+	qs, err := s.Apps.Questions(ctx, userID, appID)
+	if err != nil {
+		return false
+	}
+	return slices.ContainsFunc(qs, func(q application.Question) bool { return q.Kind == application.QuestionField })
 }
 
 // screenWebSocket streams the run's live view to the user and, while the runner waits for the user, passes mouse
@@ -132,12 +143,16 @@ func (s *Server) screenWebSocket(w http.ResponseWriter, r *http.Request, u *iden
 				return
 			}
 		}
+		status := func(interactive bool) screenStatus {
+			return screenStatus{Type: "status", Interactive: interactive,
+				Answers: interactive && s.openFieldQuestions(ctx, u.ID, appID)}
+		}
 		interactive := sess.Interactive()
-		if wsJSON(ctx, ws, screenStatus{Type: "status", Interactive: interactive}) != nil {
+		if wsJSON(ctx, ws, status(interactive)) != nil {
 			return
 		}
-		status := time.NewTicker(time.Second)
-		defer status.Stop()
+		statusTick := time.NewTicker(time.Second)
+		defer statusTick.Stop()
 		defer gate.stop()
 		for {
 			select {
@@ -146,10 +161,10 @@ func (s *Server) screenWebSocket(w http.ResponseWriter, r *http.Request, u *iden
 			case <-sess.Done:
 				_ = ws.Close(websocket.StatusNormalClosure, "session ended")
 				return
-			case <-status.C:
+			case <-statusTick.C:
 				if now := sess.Interactive(); now != interactive {
 					interactive = now
-					if wsJSON(ctx, ws, screenStatus{Type: "status", Interactive: now}) != nil {
+					if wsJSON(ctx, ws, status(now)) != nil {
 						return
 					}
 				}
