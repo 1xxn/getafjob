@@ -394,8 +394,8 @@ func (s *Server) Lease(ctx context.Context, req *runnerv1.LeaseRequest) (*runner
 	// sends. Only the server secret may use a session registered as a home runner without a user.
 	choice := application.RunnerServer
 	var userPtr *uuid.UUID
-	switch {
-	case ident.kind == runnerv1.RunnerKind_RUNNER_KIND_HOME:
+	switch ident.kind {
+	case runnerv1.RunnerKind_RUNNER_KIND_HOME:
 		if ident.userID == uuid.Nil {
 			return nil, connect.NewError(connect.CodeUnauthenticated, "home runner without a user")
 		}
