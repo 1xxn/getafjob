@@ -3,10 +3,33 @@ package pgstore_test
 import (
 	"errors"
 	"testing"
+	"time"
 
 	"github.com/1xxn/getafjob/internal/identity"
 	"github.com/1xxn/getafjob/internal/platform/i18n"
 )
+
+// Last seen stays on the account after its sessions end.
+func TestLastSeenOutlivesSessions(t *testing.T) {
+	e := newEnv(t)
+	ctx := t.Context()
+	_, session := signIn(t, e)
+	e.now = e.now.Add(time.Hour)
+	seen := e.now
+	if _, _, err := e.svc.Authenticate(ctx, string(session)); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := e.svc.SignOutUser(ctx, "max.mustermann@example.com"); err != nil {
+		t.Fatal(err)
+	}
+	users, err := e.svc.Users(ctx)
+	if err != nil || len(users) != 1 {
+		t.Fatalf("users = %v, %v", users, err)
+	}
+	if !users[0].LastSeen.Equal(seen) {
+		t.Fatalf("last seen = %v, want %v", users[0].LastSeen, seen)
+	}
+}
 
 func TestSetDisabled(t *testing.T) {
 	e := newEnv(t)
