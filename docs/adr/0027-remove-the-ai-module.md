@@ -16,7 +16,7 @@ about 2,300 lines of code to maintain (#370).
 
 Remove the module: the `internal/ai` package, its configuration (`GETAFJOB_AI_*`, `GETAFJOB_ANTHROPIC_*`), its
 tables (migration 00041), the settings section, the planner's drafter hook, the runner question's `draft` field
-(proto field 3 reserved) and the `ai_draft#…` provenance. Unknown fields keep ending in a question to the user.
+(proto field 3 kept as deprecated) and the `ai_draft#…` provenance. Unknown fields keep ending in a question to the user.
 
 If drafts for unknown fields are wanted later, they come back as a new feature with its own ADR: the gateway
 calls the provider for the runner, the draft is only a prefill, and the user approves every value.
