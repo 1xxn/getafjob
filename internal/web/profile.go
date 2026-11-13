@@ -470,27 +470,7 @@ func (s *Server) preferencesPage(w http.ResponseWriter, r *http.Request, u *iden
 			auto = st
 		}
 	}
-	var mb tracking.MailboxAccount
-	if s.Tracking != nil {
-		if m, err := s.Tracking.GetMailbox(r.Context(), u.ID); err == nil {
-			mb = m
-		}
-	}
-	np := notify.DefaultPreferences(u.ID, u.Email)
-	if s.Notify != nil {
-		if p, err := s.Notify.GetPreferences(r.Context(), u.ID); err == nil {
-			np = p
-		}
-	}
-	var portalAccounts []portals.AccountView
-	easyApplyAdmin := false
-	if s.Portals != nil {
-		easyApplyAdmin = s.Portals.AdminEnabled()
-		if accs, err := s.Portals.ListAccounts(r.Context(), u.ID); err == nil {
-			portalAccounts = accs
-		}
-	}
-	f := preferencesForm(snap.Preferences, auto, mb, np, portalAccounts, easyApplyAdmin)
+	f := s.settingsForm(r.Context(), u, snap.Preferences, auto, s.notifyPreferences(r.Context(), u))
 	if r.URL.Query().Get("saved") == "1" {
 		f.Notice = views.T(r.Context(), "profile.saved")
 	}
@@ -501,6 +481,36 @@ func (s *Server) preferencesPage(w http.ResponseWriter, r *http.Request, u *iden
 		f.Notice = n
 	}
 	s.render(w, r, http.StatusOK, views.PreferencesPage(u.DisplayName, f, settingsSection(r.PathValue("section"))))
+}
+
+// notifyPreferences are the user's stored notification preferences, or the defaults.
+func (s *Server) notifyPreferences(ctx context.Context, u *identity.User) notify.Preferences {
+	if s.Notify != nil {
+		if p, err := s.Notify.GetPreferences(ctx, u.ID); err == nil {
+			return p
+		}
+	}
+	return notify.DefaultPreferences(u.ID, u.Email)
+}
+
+// settingsForm is the settings form for the given search, automation and notification values plus what is stored
+// for the mailbox and the portal accounts.
+func (s *Server) settingsForm(ctx context.Context, u *identity.User, p profile.Preferences, a application.Settings, np notify.Preferences) views.Form {
+	var mb tracking.MailboxAccount
+	if s.Tracking != nil {
+		if m, err := s.Tracking.GetMailbox(ctx, u.ID); err == nil {
+			mb = m
+		}
+	}
+	var accounts []portals.AccountView
+	easyApplyAdmin := false
+	if s.Portals != nil {
+		easyApplyAdmin = s.Portals.AdminEnabled()
+		if accs, err := s.Portals.ListAccounts(ctx, u.ID); err == nil {
+			accounts = accs
+		}
+	}
+	return preferencesForm(p, a, mb, np, accounts, easyApplyAdmin)
 }
 
 // settingsSection is a settings section with a form of its own; anything else falls back to search.
@@ -530,8 +540,11 @@ func (s *Server) preferencesSave(w http.ResponseWriter, r *http.Request, u *iden
 	}
 	back := "/settings/" + settingsSection(section)
 	if disconnectPortal := strings.TrimSpace(r.PostFormValue("disconnect_portal")); disconnectPortal != "" {
-		if s.Portals != nil {
-			_ = s.Portals.Disconnect(r.Context(), u.ID, disconnectPortal)
+		if s.Portals != nil && portals.ValidatePortal(disconnectPortal) == nil {
+			if err := s.Portals.Disconnect(r.Context(), u.ID, disconnectPortal); err != nil {
+				s.failed(w, r, u, err)
+				return
+			}
 		}
 		http.Redirect(w, r, back+"?saved=1", http.StatusSeeOther)
 		return
@@ -643,12 +656,8 @@ func (s *Server) preferencesSave(w http.ResponseWriter, r *http.Request, u *iden
 		}
 	}
 
-	np := notify.DefaultPreferences(u.ID, u.Email)
-	if s.Notify != nil {
-		if cur, err := s.Notify.GetPreferences(r.Context(), u.ID); err == nil {
-			np = cur
-		}
-	}
+	np := s.notifyPreferences(r.Context(), u)
+	var notifyBad []string
 	if sectionIs(section, "notifications") {
 		np.EmailEnabled = r.PostFormValue("notify_email_enabled") == "on"
 		np.WebPushEnabled = r.PostFormValue("notify_webpush_enabled") == "on"
@@ -671,24 +680,16 @@ func (s *Server) preferencesSave(w http.ResponseWriter, r *http.Request, u *iden
 		if qEnd := strings.TrimSpace(r.PostFormValue("notify_quiet_hours_end")); qEnd != "" {
 			np.QuietHoursEnd = qEnd
 		}
+		notifyBad = np.Invalid()
+	}
+	mbPort, mbPortErr := 993, false
+	if v := strings.TrimSpace(r.PostFormValue("mailbox_port")); v != "" && sectionIs(section, "integrations") {
+		n, err := strconv.Atoi(v)
+		mbPort, mbPortErr = n, err != nil || n <= 0 || n > 65535
 	}
 
-	if salaryErr || autoErr {
-		var mb tracking.MailboxAccount
-		if s.Tracking != nil {
-			if m, err := s.Tracking.GetMailbox(r.Context(), u.ID); err == nil {
-				mb = m
-			}
-		}
-		var portalAccounts []portals.AccountView
-		easyApplyAdmin := false
-		if s.Portals != nil {
-			easyApplyAdmin = s.Portals.AdminEnabled()
-			if accs, err := s.Portals.ListAccounts(r.Context(), u.ID); err == nil {
-				portalAccounts = accs
-			}
-		}
-		f := preferencesForm(p, autoSettings, mb, np, portalAccounts, easyApplyAdmin)
+	if salaryErr || autoErr || len(notifyBad) > 0 || mbPortErr {
+		f := s.settingsForm(r.Context(), u, p, autoSettings, np)
 		f.Values["min_salary"] = r.PostFormValue("min_salary")
 		f.Values["min_score"] = r.PostFormValue("min_score")
 		f.Values["daily_limit"] = r.PostFormValue("daily_limit")
@@ -714,8 +715,15 @@ func (s *Server) preferencesSave(w http.ResponseWriter, r *http.Request, u *iden
 				f.Errors["daily_limit"] = views.T(r.Context(), "profile.error.invalid")
 			}
 			if errEasyApplyTerms {
-				f.Errors["easy_apply_terms_accepted"] = views.T(r.Context(), "profile.error.invalid")
+				f.Errors["easy_apply_terms_accepted"] = views.T(r.Context(), "profile.error.terms_required")
 			}
+		}
+		for _, name := range notifyBad {
+			f.Errors["notify_"+name] = views.T(r.Context(), "profile.error.invalid")
+		}
+		if mbPortErr {
+			f.Values["mailbox_port"] = r.PostFormValue("mailbox_port")
+			f.Errors["mailbox_port"] = views.T(r.Context(), "profile.error.invalid")
 		}
 		f.Notice, f.Failed = views.T(r.Context(), "profile.invalid"), true
 		s.render(w, r, http.StatusUnprocessableEntity, views.PreferencesPage(u.DisplayName, f, settingsSection(section)))
@@ -724,21 +732,7 @@ func (s *Server) preferencesSave(w http.ResponseWriter, r *http.Request, u *iden
 
 	if err := s.Profile.SavePreferences(r.Context(), u.ID, p); err != nil {
 		if errors.Is(err, profile.ErrInvalid) {
-			var mb tracking.MailboxAccount
-			if s.Tracking != nil {
-				if m, err := s.Tracking.GetMailbox(r.Context(), u.ID); err == nil {
-					mb = m
-				}
-			}
-			var portalAccounts []portals.AccountView
-			easyApplyAdmin := false
-			if s.Portals != nil {
-				easyApplyAdmin = s.Portals.AdminEnabled()
-				if accs, err := s.Portals.ListAccounts(r.Context(), u.ID); err == nil {
-					portalAccounts = accs
-				}
-			}
-			f := preferencesForm(p, autoSettings, mb, np, portalAccounts, easyApplyAdmin)
+			f := s.settingsForm(r.Context(), u, p, autoSettings, np)
 			f.Errors, f.Notice, f.Failed = fieldErrors(r, err), views.T(r.Context(), "profile.invalid"), true
 			s.render(w, r, http.StatusUnprocessableEntity, views.PreferencesPage(u.DisplayName, f, settingsSection(section)))
 			return
@@ -765,12 +759,6 @@ func (s *Server) preferencesSave(w http.ResponseWriter, r *http.Request, u *iden
 		mbHost := strings.TrimSpace(r.PostFormValue("mailbox_host"))
 		mbUser := strings.TrimSpace(r.PostFormValue("mailbox_username"))
 		mbPass := r.PostFormValue("mailbox_password")
-		mbPort := 993
-		if v := strings.TrimSpace(r.PostFormValue("mailbox_port")); v != "" {
-			if n, err := strconv.Atoi(v); err == nil && n > 0 && n <= 65535 {
-				mbPort = n
-			}
-		}
 		mbEnabled := r.PostFormValue("mailbox_enabled") == "on"
 		if mbHost != "" && mbUser != "" {
 			if err := s.Tracking.SaveMailbox(r.Context(), u.ID, mbHost, mbPort, true, mbUser, mbPass, mbEnabled); err != nil {

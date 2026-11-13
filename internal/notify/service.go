@@ -5,7 +5,6 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
-	"regexp"
 	"strings"
 	"time"
 
@@ -13,9 +12,6 @@ import (
 
 	"github.com/1xxn/getafjob/internal/platform/i18n"
 )
-
-// ntfyTopicRx is the topic shape ntfy accepts; it keeps the topic one path segment of the server URL.
-var ntfyTopicRx = regexp.MustCompile(`^[A-Za-z0-9_-]{1,64}$`)
 
 // Service dispatches notifications and generates daily summaries.
 type Service struct {
@@ -67,11 +63,8 @@ func (s *Service) SavePreferences(ctx context.Context, prefs Preferences) error 
 	if prefs.UserID == uuid.Nil {
 		return errors.New("user ID is required")
 	}
-	if prefs.NtfyEnabled && strings.TrimSpace(prefs.NtfyTopic) == "" {
-		return fmt.Errorf("%w: ntfy topic is required when ntfy is enabled", ErrInvalidPreferences)
-	}
-	if t := strings.TrimSpace(prefs.NtfyTopic); t != "" && !ntfyTopicRx.MatchString(t) {
-		return fmt.Errorf("%w: ntfy topic may hold letters, digits, - and _ only", ErrInvalidPreferences)
+	if bad := prefs.Invalid(); len(bad) > 0 {
+		return fmt.Errorf("%w: %s", ErrInvalidPreferences, strings.Join(bad, ", "))
 	}
 	return s.store.SavePreferences(ctx, prefs)
 }
