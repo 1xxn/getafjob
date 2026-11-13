@@ -177,8 +177,8 @@ message Question {
   // field or captcha.
   string kind = 1;
   string label = 2;
-  reserved 3;
-  reserved "draft";
+  // Unused since the AI module was removed (ADR 0027); kept for wire compatibility.
+  string draft = 3 [deprecated = true];
   // The field's kind as extracted (text, textarea, checkbox, checkbox_group, radio, select, combobox, date, file);
   // the web form renders a matching input.
   string input = 4;
