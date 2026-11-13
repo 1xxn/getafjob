@@ -4,12 +4,13 @@ import (
 	"testing"
 
 	"github.com/1xxn/getafjob/internal/runner/browser"
+	"github.com/1xxn/getafjob/internal/runner/executor"
 )
 
 func TestButtonTexts(t *testing.T) {
 	for text, want := range map[string]string{
 		"Submit application": "final", "Bewerbung absenden": "final", "Jetzt bewerben": "final", "Apply": "final",
-		"Send": "final", "Bewerbung einreichen": "final",
+		"Send": "final", "Bewerbung einreichen": "final", "Bewerben": "final", "Senden": "final",
 		"Weiter": "next", "Next": "next", "Continue": "next", "Fortfahren": "next",
 		"Save draft": "", "Sender settings": "", "Applying tips": "",
 	} {
@@ -23,6 +24,35 @@ func TestButtonTexts(t *testing.T) {
 		if got != want {
 			t.Errorf("%q = %q, want %q", text, got, want)
 		}
+	}
+}
+
+// Only a clear send or next text is clicked; any other form button parks the run, so a click never sends an
+// application past the register, and a submit-type helper button (add position) is never taken for "next".
+func TestFormButton(t *testing.T) {
+	st := func(texts ...string) *browser.State {
+		f := &browser.Frame{Fields: []browser.Field{{ID: "0-1", Kind: "text", Form: "f"}}}
+		for i, t := range texts {
+			f.Buttons = append(f.Buttons, browser.Button{ID: "0-b" + string(rune('a'+i)), Text: t, Kind: "submit", Form: "f"})
+		}
+		return &browser.State{Frames: []*browser.Frame{f}}
+	}
+	for _, c := range []struct {
+		texts []string
+		want  string
+		final bool
+	}{
+		{[]string{"+ Add position", "Weiter"}, "Weiter", false},
+		{[]string{"Save draft", "Submit application"}, "Submit application", true},
+		{[]string{"Bewerben"}, "Bewerben", true},
+	} {
+		b, final, err := formButton(st(c.texts...), executor.Plan{})
+		if err != nil || b.Text != c.want || final != c.final {
+			t.Errorf("%v = %q final=%v err=%v; want %q final=%v", c.texts, b.Text, final, err, c.want, c.final)
+		}
+	}
+	if _, _, err := formButton(st("Los"), executor.Plan{}); err == nil {
+		t.Error("an unclear button was accepted")
 	}
 }
 

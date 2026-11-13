@@ -278,6 +278,9 @@ func (x *Executor) toggle(st *browser.State, p Plan, b browser.Button, v Value) 
 	if normalize(b.Text) != normalize(v.Label) || (v.Text != "true" && v.Text != "false") {
 		return st, ErrFieldChanged
 	}
+	if b.Kind == "submit" { // a toggle never sends a form: only the engine's submit path may click those
+		return st, ErrRefused
+	}
 	fr, err := st.FrameOf(b.ID)
 	if err != nil {
 		return st, err
