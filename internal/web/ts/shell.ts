@@ -38,17 +38,39 @@ document.addEventListener('htmx:before:request', (e) => {
 });
 document.addEventListener('htmx:finally:request', () => html.classList.remove('is-navigating'));
 
+// hashField is the form field the URL points at (the profile gaps link to /profile#f-email), if any.
+function hashField(): HTMLElement | null {
+  const id = decodeURIComponent(location.hash.slice(1));
+  const el = id ? document.getElementById(id) : null;
+  return el instanceof HTMLInputElement || el instanceof HTMLTextAreaElement || el instanceof HTMLSelectElement ? el : null;
+}
+
+// focusHashField moves to the field of the URL: browsers only scroll to it, a keyboard user wants to type there.
+function focusHashField(): boolean {
+  const field = hashField();
+  if (!field) return false;
+  field.focus({ preventScroll: true });
+  field.scrollIntoView({ block: 'center' });
+  return true;
+}
+
+addEventListener('hashchange', focusHashField);
+
 function afterPage(): void {
   const main = document.getElementById('main');
   if (!main || main === lastMain) return;
   const first = lastMain === null;
   lastMain = main;
-  if (first) return; // the initial load keeps the browser's own focus handling
+  if (first) {
+    focusHashField(); // otherwise the initial load keeps the browser's own focus handling
+    return;
+  }
   const heading = main.querySelector<HTMLElement>('h1');
-  const target = heading ?? main;
   if (heading && !heading.hasAttribute('tabindex')) heading.tabIndex = -1;
-  target.focus({ preventScroll: true });
-  window.scrollTo({ top: 0 });
+  if (!focusHashField()) {
+    (heading ?? main).focus({ preventScroll: true });
+    window.scrollTo({ top: 0 });
+  }
   const announcer = document.getElementById('route-announcer');
   if (announcer) {
     announcer.textContent = '';

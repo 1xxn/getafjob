@@ -23,17 +23,34 @@ document.addEventListener("htmx:before:request", (e) => {
   if (isPageSwap(e)) html.classList.add("is-navigating");
 });
 document.addEventListener("htmx:finally:request", () => html.classList.remove("is-navigating"));
+function hashField() {
+  const id = decodeURIComponent(location.hash.slice(1));
+  const el = id ? document.getElementById(id) : null;
+  return el instanceof HTMLInputElement || el instanceof HTMLTextAreaElement || el instanceof HTMLSelectElement ? el : null;
+}
+function focusHashField() {
+  const field = hashField();
+  if (!field) return false;
+  field.focus({ preventScroll: true });
+  field.scrollIntoView({ block: "center" });
+  return true;
+}
+addEventListener("hashchange", focusHashField);
 function afterPage() {
   const main = document.getElementById("main");
   if (!main || main === lastMain) return;
   const first = lastMain === null;
   lastMain = main;
-  if (first) return;
+  if (first) {
+    focusHashField();
+    return;
+  }
   const heading = main.querySelector("h1");
-  const target = heading ?? main;
   if (heading && !heading.hasAttribute("tabindex")) heading.tabIndex = -1;
-  target.focus({ preventScroll: true });
-  window.scrollTo({ top: 0 });
+  if (!focusHashField()) {
+    (heading ?? main).focus({ preventScroll: true });
+    window.scrollTo({ top: 0 });
+  }
   const announcer = document.getElementById("route-announcer");
   if (announcer) {
     announcer.textContent = "";

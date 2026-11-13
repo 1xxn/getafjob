@@ -151,7 +151,7 @@ templ formNotice(f Form) {
 		if f.Failed {
 			@ui.Alert(ui.AlertProps{Tone: ui.Danger, Text: f.Notice})
 		} else {
-			@ui.Alert(ui.AlertProps{Tone: ui.Info, Text: f.Notice})
+			@ui.Alert(ui.AlertProps{Tone: ui.Success, Text: f.Notice})
 		}
 	}
 }
