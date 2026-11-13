@@ -11,17 +11,6 @@ import (
 	"github.com/jackc/pgx/v5/pgtype"
 )
 
-type AiUsageEvent struct {
-	ID        int64
-	UserID    uuid.UUID
-	Task      string
-	Model     string
-	TokensIn  int32
-	TokensOut int32
-	CostCents int32
-	CreatedAt time.Time
-}
-
 type Application struct {
 	ID              uuid.UUID
 	UserID          uuid.UUID
@@ -412,15 +401,6 @@ type User struct {
 	DisabledAt  *time.Time
 	DockLayout  string
 	LastSeenAt  *time.Time
-}
-
-type UserAiSetting struct {
-	UserID          uuid.UUID
-	Enabled         bool
-	EncryptedApiKey []byte
-	SpentCents      int32
-	CreatedAt       time.Time
-	UpdatedAt       time.Time
 }
 
 type UserBlocklist struct {

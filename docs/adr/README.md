@@ -17,7 +17,7 @@ rewritten once accepted: a changed decision gets a new ADR that supersedes the o
 | [0009](0009-server-rendered-ui-templ-htmx.md) | Server-rendered UI with templ, htmx and SSE | accepted, partly superseded by 0024 |
 | [0010](0010-spec-first-json-api.md) | Spec-first JSON API v1 | accepted |
 | [0011](0011-browser-automation-go-rod.md) | Browser automation with go-rod | accepted |
-| [0012](0012-no-ai-by-default.md) | Works without AI; optional AI module | accepted |
+| [0012](0012-no-ai-by-default.md) | Works without AI; optional AI module | superseded by 0027 |
 | [0013](0013-provenance-for-every-form-value.md) | Provenance for every form value | accepted |
 | [0014](0014-submit-register-never-twice.md) | One submit path and a submit register | accepted |
 | [0015](0015-humans-handle-checks-no-disguise.md) | Humans handle checks; no disguise | accepted |
@@ -32,3 +32,4 @@ rewritten once accepted: a changed decision gets a new ADR that supersedes the o
 | [0024](0024-htmx-4-with-hx-csp.md) | htmx 4 with hx-csp under a nonce CSP and Trusted Types | accepted |
 | [0025](0025-boosted-navigation-and-live-dock.md) | Boosted navigation with a preserved live dock | accepted |
 | [0026](0026-ci-pipeline-build-once.md) | CI pipeline: a fast pull request gate, end to end tests after the merge | accepted |
+| [0027](0027-remove-the-ai-module.md) | Remove the AI module | accepted |

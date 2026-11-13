@@ -93,14 +93,6 @@ type Config struct {
 	// Limits keeps the throughput limits (daily quota, per-host gap). Default off: a self-hosted instance for a
 	// few people applies as fast as its runners allow; guard rails stay on either way.
 	Limits bool
-	// AIEnabled is an operator switch enabling the optional AI module (#44). Default: false.
-	AIEnabled bool
-	// AnthropicAPIKey is the operator's Anthropic API key. Empty: users must supply their own key.
-	AnthropicAPIKey Secret
-	// AnthropicModel is the default Anthropic model for AI operations. Default: claude-haiku-5-5.
-	AnthropicModel string
-	// AIBudgetPerUserCents is the budget cap per user in USD cents when using the operator key. Default: 500 (5 USD).
-	AIBudgetPerUserCents int
 
 	// Unknown lists GETAFJOB_* variables that are set but read by nobody (typos); names only, never values.
 	Unknown []string
@@ -175,17 +167,6 @@ var specs = []spec{
 	{"DEV_FIXTURE_HOST", "", func(c *Config, v string) error { c.DevFixtureHost = strings.ToLower(strings.TrimSpace(v)); return nil }},
 	{"DEV_STYLEGUIDE", "false", func(c *Config, v string) error { return setBool(&c.DevStyleGuide, v) }},
 	{"LIMITS", "off", setLimits},
-	{"AI_ENABLED", "false", func(c *Config, v string) error { return setBool(&c.AIEnabled, v) }},
-	{"ANTHROPIC_API_KEY", "", func(c *Config, v string) error { c.AnthropicAPIKey = Secret(v); return nil }},
-	{"ANTHROPIC_MODEL", "claude-haiku-5-5", func(c *Config, v string) error { c.AnthropicModel = strings.TrimSpace(v); return nil }},
-	{"AI_BUDGET_PER_USER_CENTS", "500", func(c *Config, v string) error {
-		n, err := strconv.Atoi(v)
-		if err != nil || n < 0 {
-			return errors.New("must be a positive integer")
-		}
-		c.AIBudgetPerUserCents = n
-		return nil
-	}},
 }
 
 // Names returns all known variable names (with prefix), e.g. for the docs.

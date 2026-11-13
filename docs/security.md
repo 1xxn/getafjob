@@ -8,7 +8,7 @@ This document grows with every module.
 | Asset | Where |
 |---|---|
 | Profiles, CVs, certificates, answers, application history | PostgreSQL, blob store (envelope-encrypted per user; search preferences stay readable for the crawler and hold no contact data) |
-| Mail credentials, portal sessions, AI keys | PostgreSQL (envelope-encrypted per user) |
+| Mail credentials, portal sessions | PostgreSQL (envelope-encrypted per user) |
 | Master key, database password, runner secret | Docker secrets (`*_FILE`) |
 | Evidence (screenshots, filled values, timeline) | blob store (encrypted, 90-day retention) |
 | User intent | never submit without the rule or approval, never twice, never invented data, no cover letters |
@@ -19,7 +19,7 @@ This document grows with every module.
 2. serve ↔ runner / home runner (gateway)
 3. runner/worker ↔ internet (egress proxy)
 4. serve/worker ↔ PostgreSQL, blob store
-5. Page content ↔ engine (untrusted HTML, prompt injection for the optional AI)
+5. Page content ↔ engine (untrusted HTML)
 6. Build and release supply chain (GitHub Actions, modules, images)
 
 ## STRIDE
@@ -39,7 +39,7 @@ This document grows with every module.
 | T7 | Hostile upload (HTML or SVG disguised as a CV, zip bomb, path tricks in names) | 1 | Type from magic bytes only (PDF, DOCX, PNG, JPEG); DOCX checked as zip with bounded entries and size; names cleaned and sealed; files sealed in the blob store; download only as attachment with `Content-Security-Policy: sandbox`; 10 MB limit on the upload route only, read in memory without temporary files | `TestSniff`, `FuzzSniff`, `TestCleanName`, `TestDocumentPages`, `TestProtectUploadLimit` |
 | T8 | Duplicate or invented application (race, crash, retry, wrong field) | 2 | Submit register: a `submit_attempt` row unique per application, written with the state `submitting` in one transaction before the click; concurrent submits lose on the version or the unique key; crashes become `submit_unknown`, never retried; a parked application keeps its attempt, so it is never sent again; every value needs provenance, fields are checked against label and origin before filling and verified afterwards | `TestSubmitRegister`, `TestParkedAfterSubmitIsNeverSentAgain`, `TestCrashWhileSubmittingBecomesUnknown`, `TestTransitions`, `TestFillRefuses` |
 | T9 | Easy Apply session hijacking or account ban by portal | 1 / 3 | Explicit user opt-in with terms acceptance; envelope-encrypted session cookies; daily quota limit (1–20, default 5); automatic handoff for interactive user re-auth without credential storage | `TestEasyApplyOptInRequired`, `TestPortalSessionsEncrypted`, `TestEasyApplyDailyLimit`, `TestReviewStepDetection` |
-| T10 | Prompt injection via job description or AI budget exhaustion | 5 | Anthropic Messages API with tool-calling for strict JSON schema enforcement; operator key budget caps in integer millionths of cents; encrypted user keys; drafts always require approval; cover letters refused | `TestCalculateCostCents`, `TestBudgetCaps`, `TestCoverLetterRefused`, `TestEnforceApprovalOnDrafts`, `TestProvenanceFactCheck` |
+| T10 | Hostile page content steers the engine | 5 | Page content is data, never instructions; no AI; every value needs provenance from the user's own data; free text only from text blocks or answers | `TestValidSource`, `TestGreenRule` |
 | R1 | User disputes an application | n/a | Evidence preserved: filled values + sources, screenshots per step, confirmation page screenshot, timeline events; append-only audit log | `TestSubmitRegister`, `TestCheckpointScreenshot`, `TestApplicationTimeline`, `TestAuditEventsAreAppendOnly` |
 | R2 | Security events cannot be traced or are altered | 4 | Append-only audit log (codes and params, no personal data, triggers prevent UPDATE/DELETE) | `TestAuditEventsAreAppendOnly`, `TestAuditLogHasNoPersonalData` |
 | I1 | User reads another user's data | 4 | RLS for the application role `getafjob_app` (FORCE RLS, no bypass), tenant set per transaction ([0006](adr/0006-tenant-isolation-rls-and-envelope-encryption.md)) | `TestTenantSeparation`, `TestAppRoleCannotBypassRLS`, `TestDatabaseMigrationsEnforceRLS` |
@@ -121,7 +121,7 @@ This document grows with every module.
 | 5.2.1 | Context-aware output encoding (XSS) | All templates compiled with `templ` providing automatic HTML context escaping | `TestJobPages`, `TestProfileView` |
 | 5.2.2 | Content-Security-Policy & Trusted Types | Per-response CSP nonce, Trusted Types restricted to `htmx` policy, no inline scripts | `TestProtectSetsHeadersAndBlocksCrossOriginPosts`, `internal/platform/httpx/secure.go` |
 | 5.3.1 | SQL injection prevention | 100% parameterized SQL queries compiled via `sqlc`, zero dynamic SQL concatenation | `sqlc.yaml`, `db/queries/`, `go test ./...` |
-| 5.5.1 | Safe deserialization | Bounded JSON decoders, structured JSON-LD validation, strict schema for AI output | `FuzzJobPostings`, `TestStructuredOutputs` |
+| 5.5.1 | Safe deserialization | Bounded JSON decoders, structured JSON-LD validation | `FuzzJobPostings`, `TestStructuredOutputs` |
 
 ### V6: Stored Cryptography
 
@@ -174,7 +174,7 @@ This document grows with every module.
 |---|---|---|---|
 | 11.1.1 | Idempotent transaction execution | `submit_attempts` unique constraint ensures an application cannot be submitted twice | `TestSubmitRegister`, `TestParkedAfterSubmitIsNeverSentAgain` |
 | 11.2.1 | Anti-automation & abuse controls | Easy Apply rate limits (max 5/day default); portal account concurrency limits | `TestEasyApplyDailyLimit`, `TestLeaseHonorsHostLimits` |
-| 11.3.1 | Mandatory human approval for high-risk actions | AI application drafts and automated answers require explicit user approval | `TestEnforceApprovalOnDrafts`, `TestAutonomyRuleApproval` |
+| 11.3.1 | Mandatory human approval for high-risk actions | Automated answers require explicit user approval | `TestGreenRule` |
 
 ### V12: File and Resource Handling
 
@@ -198,7 +198,7 @@ This document grows with every module.
 |---|---|---|---|
 | 14.1.1 | Production secrets protection | Passwords and keys provided as Docker secret files (`*_FILE`), never committed | `deploy/compose.yaml`, `config.go` |
 | 14.2.1 | Strict configuration parsing | Unknown configuration variables generate warnings; invalid types fail fast | `TestConfigUnknownVariables`, `TestConfigValidation` |
-| 14.4.1 | Secure defaults | AI disabled by default (`GETAFJOB_AI_ENABLED=false`); Easy Apply disabled by default; telemetry disabled by default | `TestConfigDefaults` |
+| 14.4.1 | Secure defaults | No AI module; Easy Apply disabled by default; telemetry disabled by default | `TestConfigDefaults` |
 
 ---
 

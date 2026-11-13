@@ -55,31 +55,21 @@ func TestLoadDefaults(t *testing.T) {
 	if c.Limits {
 		t.Errorf("Limits default = on, want off")
 	}
-	if c.AIEnabled {
-		t.Errorf("AIEnabled default = true, want false")
-	}
-	if c.AnthropicModel != "claude-haiku-5-5" || c.AIBudgetPerUserCents != 500 {
-		t.Errorf("AI defaults wrong: model=%q, budget=%d", c.AnthropicModel, c.AIBudgetPerUserCents)
-	}
 }
 
 func TestLoadValuesAndFiles(t *testing.T) {
 	env := map[string]string{
-		"GETAFJOB_HTTP_ADDR":                "127.0.0.1:9000",
-		"GETAFJOB_DATABASE_URL":             "postgres://getafjob@postgres:5432/getafjob?sslmode=disable",
-		"GETAFJOB_DATABASE_PASSWORD_FILE":   "/run/secrets/db_password",
-		"GETAFJOB_LOG_LEVEL":                "debug",
-		"GETAFJOB_LOG_FORMAT":               "text",
-		"GETAFJOB_EGRESS_PROXY":             "http://egress:4750",
-		"GETAFJOB_LIMITS":                   "ON",
-		"GETAFJOB_EASY_APPLY_ENABLED":       "true",
-		"GETAFJOB_AI_ENABLED":               "true",
-		"GETAFJOB_ANTHROPIC_API_KEY":        "sk-ant-test-key",
-		"GETAFJOB_ANTHROPIC_MODEL":          "claude-sonnet-5-5",
-		"GETAFJOB_AI_BUDGET_PER_USER_CENTS": "1000",
-		"GETAFJOB_SHUTDOWN_TIMEOUT":         "5s",
-		"GETAFJOB_HTTP_ADRR":                "typo",
-		"OTHER":                             "ignored",
+		"GETAFJOB_HTTP_ADDR":              "127.0.0.1:9000",
+		"GETAFJOB_DATABASE_URL":           "postgres://getafjob@postgres:5432/getafjob?sslmode=disable",
+		"GETAFJOB_DATABASE_PASSWORD_FILE": "/run/secrets/db_password",
+		"GETAFJOB_LOG_LEVEL":              "debug",
+		"GETAFJOB_LOG_FORMAT":             "text",
+		"GETAFJOB_EGRESS_PROXY":           "http://egress:4750",
+		"GETAFJOB_LIMITS":                 "ON",
+		"GETAFJOB_EASY_APPLY_ENABLED":     "true",
+		"GETAFJOB_SHUTDOWN_TIMEOUT":       "5s",
+		"GETAFJOB_HTTP_ADRR":              "typo",
+		"OTHER":                           "ignored",
 	}
 	files := map[string]string{"/run/secrets/db_password": "s3cr3t\r\n"}
 	c, err := Load(fakeSource(env, files))
@@ -101,14 +91,8 @@ func TestLoadValuesAndFiles(t *testing.T) {
 	if !c.EasyApplyEnabled {
 		t.Errorf("EasyApplyEnabled = false, want true")
 	}
-	if !c.AIEnabled {
-		t.Errorf("AIEnabled = false, want true")
-	}
 	if !c.Limits {
 		t.Errorf("Limits = off, want on")
-	}
-	if c.AnthropicAPIKey.Reveal() != "sk-ant-test-key" || c.AnthropicModel != "claude-sonnet-5-5" || c.AIBudgetPerUserCents != 1000 {
-		t.Errorf("AI values wrong: key=%q, model=%q, budget=%d", c.AnthropicAPIKey.Reveal(), c.AnthropicModel, c.AIBudgetPerUserCents)
 	}
 	if len(c.Unknown) != 1 || c.Unknown[0] != "GETAFJOB_HTTP_ADRR" {
 		t.Errorf("Unknown = %v", c.Unknown)

@@ -79,10 +79,8 @@ getafjob employs defense-in-depth security controls (OWASP ASVS 4.0 Level 2 comp
 
 ## 5. Artificial Intelligence Policy
 
-- **Opt-In Only:** AI capabilities (such as Claude API integration for parsing unstructured forms) are disabled by default (`GETAFJOB_AI_ENABLED=false`).
-- **No Cover Letters:** The AI engine will refuse any instruction to generate cover letters.
-- **No Automated Final Submission:** If AI assistance is enabled, draft responses must be explicitly reviewed and approved by the user before any application is submitted.
-- **Provider:** When enabled by the operator, requests are sent via HTTPS to Anthropic (`api.anthropic.com`) using structured tool schemas. Job postings and minimal required profile facts are transmitted solely for field mapping.
+- **No AI:** getafjob uses no AI provider. No profile data or job posting is sent to an AI service.
+- **No invented content:** form values come only from the user's profile, answers, text blocks and documents; no cover letter is generated.
 
 ---
 
@@ -133,6 +131,5 @@ To exercise any of these rights outside the self-service web interface, contact 
 When deploying this template for your instance:
 1. Fill in the **Controller and Contact Information** in Section 1.
 2. Confirm the **Hosting Location** and server jurisdiction.
-3. If AI features are disabled, confirm Section 5 reflects `GETAFJOB_AI_ENABLED=false`.
-4. If third-party storage (e.g. AWS S3, Cloudflare R2) is used instead of local disk storage, specify the subprocessor in Section 4.
-5. If using transactional email (e.g. Resend, Postmark, AWS SES), list the email delivery provider under third-party processors.
+3. If third-party storage (e.g. AWS S3, Cloudflare R2) is used instead of local disk storage, specify the subprocessor in Section 4.
+4. If using transactional email (e.g. Resend, Postmark, AWS SES), list the email delivery provider under third-party processors.

@@ -1182,8 +1182,6 @@ type Question struct {
 	// field or captcha.
 	Kind  string `protobuf:"bytes,1,opt,name=kind,proto3" json:"kind,omitempty"`
 	Label string `protobuf:"bytes,2,opt,name=label,proto3" json:"label,omitempty"`
-	// An AI suggestion, used only after the user approved it.
-	Draft string `protobuf:"bytes,3,opt,name=draft,proto3" json:"draft,omitempty"`
 	// The field's kind as extracted (text, textarea, checkbox, checkbox_group, radio, select, combobox, date, file);
 	// the web form renders a matching input.
 	Input string `protobuf:"bytes,4,opt,name=input,proto3" json:"input,omitempty"`
@@ -1233,13 +1231,6 @@ func (x *Question) GetKind() string {
 func (x *Question) GetLabel() string {
 	if x != nil {
 		return x.Label
-	}
-	return ""
-}
-
-func (x *Question) GetDraft() string {
-	if x != nil {
-		return x.Draft
 	}
 	return ""
 }
@@ -2069,13 +2060,12 @@ const file_runner_v1_runner_proto_rawDesc = "" +
 	"screenshot\x18\x05 \x01(\fR\n" +
 	"screenshot\x12?\n" +
 	"\x1cupdated_session_cookies_json\x18\x06 \x01(\fR\x19updatedSessionCookiesJson\"\x14\n" +
-	"\x12CheckpointResponse\"z\n" +
+	"\x12CheckpointResponse\"q\n" +
 	"\bQuestion\x12\x12\n" +
 	"\x04kind\x18\x01 \x01(\tR\x04kind\x12\x14\n" +
 	"\x05label\x18\x02 \x01(\tR\x05label\x12\x14\n" +
-	"\x05draft\x18\x03 \x01(\tR\x05draft\x12\x14\n" +
 	"\x05input\x18\x04 \x01(\tR\x05input\x12\x18\n" +
-	"\aoptions\x18\x05 \x03(\tR\aoptions\"?\n" +
+	"\aoptions\x18\x05 \x03(\tR\aoptionsJ\x04\b\x03\x10\x04R\x05draft\"?\n" +
 	"\n" +
 	"AskRequest\x121\n" +
 	"\tquestions\x18\x01 \x03(\v2\x13.runner.v1.QuestionR\tquestions\"\r\n" +

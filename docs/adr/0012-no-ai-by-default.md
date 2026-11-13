@@ -1,6 +1,6 @@
 # 0012. Works without AI; optional AI module
 
-- Status: accepted
+- Status: superseded by [0027](0027-remove-the-ai-module.md)
 - Date: 2026-11-04
 - Deciders: maintainer
 

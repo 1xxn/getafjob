@@ -5,7 +5,7 @@ arc42 structure; decisions are in [adr/](adr/README.md). Diagrams use Mermaid (C
 ## 1. Introduction and goals
 
 getafjob collects job postings, ranks them per user and fills out application forms in a real browser, without
-disguise and, by default, without AI. Invite-only, several users, self-hosted.
+disguise and without AI. Invite-only, several users, self-hosted.
 
 Quality goals, in order:
 
@@ -33,14 +33,12 @@ C4Context
   System_Ext(forms, "Application forms", "ATS-hosted forms")
   System_Ext(mail, "User mailbox", "IMAP, read-only")
   System_Ext(push, "Push services", "Web Push, mail, ntfy")
-  System_Ext(ai, "Anthropic API", "Optional AI module")
   Rel(user, gaj, "Uses", "HTTPS, PWA, extension")
   Rel(admin, gaj, "Invites, operates")
   Rel(gaj, sources, "Crawls", "via egress proxy")
   Rel(gaj, forms, "Fills and submits", "browser via egress proxy")
   Rel(gaj, mail, "Reads replies")
   Rel(gaj, push, "Notifies")
-  Rel(gaj, ai, "Optional")
 ```
 
 ## 4. Solution strategy
@@ -91,7 +89,6 @@ C4Container
 | `tracking` | inbox (IMAP) → rules → status suggestions |
 | `notify` | Web Push, mail, ntfy, daily summary |
 | `assist` | API for the browser extension |
-| `ai` | optional Planner, Drafter, Extractor, Classifier |
 | `platform` | config, logging, OpenTelemetry, crypto, database, queue, blob, HTTP, netguard |
 
 Boundaries are tested on the whole dependency graph (`internal/archtest`): modules do not depend on each other,

@@ -18,7 +18,6 @@ import (
 	"github.com/google/uuid"
 	"golang.org/x/time/rate"
 
-	"github.com/1xxn/getafjob/internal/ai"
 	"github.com/1xxn/getafjob/internal/application"
 	"github.com/1xxn/getafjob/internal/assist"
 	"github.com/1xxn/getafjob/internal/discovery"
@@ -76,13 +75,6 @@ type PortalsService interface {
 	SetDailyLimit(ctx context.Context, userID uuid.UUID, portal string, limit int) error
 }
 
-// AIService manages AI configuration, budgets, and capabilities (ADR 0012, #44).
-type AIService interface {
-	AdminEnabled() bool
-	GetSettings(ctx context.Context, userID uuid.UUID) (ai.UserSettings, error)
-	SaveSettings(ctx context.Context, userID uuid.UUID, enabled bool, customKey string, clearKey bool) error
-}
-
 // PrivacyService exports and permanently deletes user data.
 type PrivacyService interface {
 	Export(ctx context.Context, userID uuid.UUID, w io.Writer) error
@@ -113,7 +105,6 @@ type Server struct {
 	Notify         NotificationService
 	Assist         AssistService
 	Portals        PortalsService
-	AI             AIService
 	Privacy        PrivacyService
 	Shots          Screenshots
 	Handoffs       HandoffHub
