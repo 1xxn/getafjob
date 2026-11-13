@@ -33,10 +33,11 @@ function focusHashField() {
   const field = hashField();
   if (!field) return false;
   field.focus({ preventScroll: true });
-  field.scrollIntoView({ block: "center" });
+  requestAnimationFrame(() => field.scrollIntoView({ block: "center" }));
   return true;
 }
 addEventListener("hashchange", focusHashField);
+focusHashField();
 function afterPage() {
   const main = document.getElementById("main");
   if (!main || main === lastMain) return;

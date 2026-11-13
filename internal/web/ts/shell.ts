@@ -52,11 +52,13 @@ function focusHashField(): boolean {
   const field = hashField();
   if (!field) return false;
   field.focus({ preventScroll: true });
-  field.scrollIntoView({ block: 'center' });
+  // A frame later: a boosted page change scrolls to the top after settling.
+  requestAnimationFrame(() => field.scrollIntoView({ block: 'center' }));
   return true;
 }
 
 addEventListener('hashchange', focusHashField);
+focusHashField(); // a full page load (no settle event)
 
 function afterPage(): void {
   const main = document.getElementById('main');
