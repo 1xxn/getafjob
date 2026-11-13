@@ -472,6 +472,27 @@ func TestPipelineAndNotes(t *testing.T) {
 	if err != nil || app2.State != application.Submitted {
 		t.Fatalf("app2 state = %v, err = %v; want Submitted", app2.State, err)
 	}
+	ev2, err := svc.Evidence(ctx, max, appID2)
+	if err != nil || len(ev2.Timeline) == 0 || ev2.Timeline[len(ev2.Timeline)-1].Step != string(application.EvSubmitted) {
+		t.Fatalf("external submit timeline = %+v, err = %v; want a submitted event", ev2.Timeline, err)
+	}
+	if again, err := svc.ApplyExternal(ctx, max, jID2); err != nil || again != appID2 {
+		t.Fatalf("ApplyExternal again = %v, %v; want %v unchanged", again, err, appID2)
+	}
+
+	// An application in a run is not marked from outside.
+	if _, _, err := svc.Queue(ctx, max, jID1); err != nil {
+		t.Fatal(err)
+	}
+	if err := svc.Start(ctx, max, appID1, application.ActorRunner); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := svc.ApplyExternal(ctx, max, jID1); !errors.Is(err, application.ErrTransition) {
+		t.Fatalf("ApplyExternal on running = %v, want ErrTransition", err)
+	}
+	if _, err := svc.Fire(ctx, max, appID1, application.EvPark, application.ActorUser, nil); err != nil {
+		t.Fatal(err)
+	}
 
 	// 3. Notes: initial GetNotes returns empty
 	notes1, err := svc.GetNotes(ctx, max, appID1)

@@ -1021,23 +1021,6 @@ func (s *Store) BookmarkJob(ctx context.Context, userID uuid.UUID, jobID int64, 
 	return id, err
 }
 
-// MarkExternalApplied marks a job as applied externally (state: submitted).
-func (s *Store) MarkExternalApplied(ctx context.Context, userID uuid.UUID, jobID int64, now time.Time) (id uuid.UUID, err error) {
-	err = s.user(ctx, userID, func(qs *q.Queries) error {
-		row, err := qs.SetExternalSubmit(ctx, q.SetExternalSubmitParams{
-			UserID: userID,
-			JobID:  jobID,
-			Now:    now,
-		})
-		if err != nil {
-			return err
-		}
-		id = row.ID
-		return nil
-	})
-	return id, err
-}
-
 // NavCounts counts the user's waiting and running applications in one query.
 func (s *Store) NavCounts(ctx context.Context, userID uuid.UUID) (c application.NavCounts, err error) {
 	err = s.user(ctx, userID, func(qs *q.Queries) error {

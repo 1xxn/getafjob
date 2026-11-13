@@ -230,10 +230,6 @@ func (f *fakePlannerStore) BookmarkJob(_ context.Context, _ uuid.UUID, _ int64, 
 	return uuid.New(), nil
 }
 
-func (f *fakePlannerStore) MarkExternalApplied(_ context.Context, _ uuid.UUID, _ int64, _ time.Time) (uuid.UUID, error) {
-	return uuid.New(), nil
-}
-
 func TestPlanner(t *testing.T) {
 	u1 := uuid.New()
 	u2 := uuid.New()

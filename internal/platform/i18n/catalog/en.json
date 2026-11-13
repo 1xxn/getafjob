@@ -1022,6 +1022,7 @@
   "pl.interview_at": "Interview {when}",
   "pl.ics": "Add to calendar",
   "flash.pl.external": "Added to the pipeline as applied.",
+  "flash.pl.in_run": "An application for this job is running. Wait until it stops.",
   "flash.pl.import_error": "The posting could not be read from this link.",
   "answers.count": "{shown} of {total} answers",
   "answers.delete_confirm": "Delete this answer? Runs will ask the question again.",

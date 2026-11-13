@@ -993,31 +993,6 @@ func (q *Queries) SetCvDocument(ctx context.Context, arg SetCvDocumentParams) (i
 	return result.RowsAffected(), nil
 }
 
-const setExternalSubmit = `-- name: SetExternalSubmit :one
-INSERT INTO applications (user_id, job_id, state, created_at, updated_at)
-VALUES ($1, $2, 'submitted', $3::timestamptz, $3::timestamptz)
-ON CONFLICT (user_id, job_id) DO UPDATE SET state = 'submitted', updated_at = EXCLUDED.updated_at
-RETURNING id, state
-`
-
-type SetExternalSubmitParams struct {
-	UserID uuid.UUID
-	JobID  int64
-	Now    time.Time
-}
-
-type SetExternalSubmitRow struct {
-	ID    uuid.UUID
-	State string
-}
-
-func (q *Queries) SetExternalSubmit(ctx context.Context, arg SetExternalSubmitParams) (SetExternalSubmitRow, error) {
-	row := q.db.QueryRow(ctx, setExternalSubmit, arg.UserID, arg.JobID, arg.Now)
-	var i SetExternalSubmitRow
-	err := row.Scan(&i.ID, &i.State)
-	return i, err
-}
-
 const setJobCvDocument = `-- name: SetJobCvDocument :one
 INSERT INTO applications (user_id, job_id, state, cv_document_id, created_at, updated_at)
 VALUES ($1, $2, 'matched', $3::uuid, $4::timestamptz, $4::timestamptz)

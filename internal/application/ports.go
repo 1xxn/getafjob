@@ -273,8 +273,6 @@ type Store interface {
 	PauseQueued(ctx context.Context, userID, id uuid.UUID, paused bool) (bool, error)
 	// BookmarkJob saves a job to the user's applications in matched state.
 	BookmarkJob(ctx context.Context, userID uuid.UUID, jobID int64, now time.Time) (uuid.UUID, error)
-	// MarkExternalApplied marks a job as applied externally (state: submitted).
-	MarkExternalApplied(ctx context.Context, userID uuid.UUID, jobID int64, now time.Time) (uuid.UUID, error)
 }
 
 // NoteData represents user's private notes and interview tracking for an application.

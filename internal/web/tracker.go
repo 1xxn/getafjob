@@ -10,6 +10,7 @@ import (
 
 	"github.com/google/uuid"
 
+	"github.com/1xxn/getafjob/internal/application"
 	"github.com/1xxn/getafjob/internal/identity"
 	"github.com/1xxn/getafjob/internal/web/views"
 	"github.com/1xxn/getafjob/internal/web/views/ui"
@@ -107,6 +108,11 @@ func (s *Server) jobApplyExternal(w http.ResponseWriter, r *http.Request, u *ide
 		return
 	}
 	if _, err := s.Apps.ApplyExternal(r.Context(), u.ID, id); err != nil {
+		if errors.Is(err, application.ErrTransition) {
+			s.flash(w, "flash.pl.in_run")
+			http.Redirect(w, r, fmt.Sprintf("/jobs/%d", id), http.StatusSeeOther)
+			return
+		}
 		s.failed(w, r, u, err)
 		return
 	}
@@ -135,6 +141,11 @@ func (s *Server) trackerAddExternal(w http.ResponseWriter, r *http.Request, u *i
 		return
 	}
 	if _, err := s.Apps.ApplyExternal(r.Context(), u.ID, jobID); err != nil {
+		if errors.Is(err, application.ErrTransition) {
+			s.flash(w, "flash.pl.in_run")
+			http.Redirect(w, r, "/pipeline", http.StatusSeeOther)
+			return
+		}
 		s.failed(w, r, u, err)
 		return
 	}
