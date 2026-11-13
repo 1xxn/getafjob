@@ -1745,9 +1745,15 @@
       gap: 0;
     }
 
+    /* the phone tab bar covers the bottom of the page: sticky bars stand on top of it (--bottom-h) */
+    body.shell {
+      --bottom-h: calc(3.8rem + env(safe-area-inset-bottom));
+    }
+
     .shell-bottom {
       position: fixed;
       inset: auto 0 0;
+      min-height: var(--bottom-h);
       z-index: var(--z-nav);
       display: grid;
       grid-template-columns: repeat(5, 1fr);
