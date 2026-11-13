@@ -52,6 +52,9 @@ func TestLoadDefaults(t *testing.T) {
 	if c.EasyApplyEnabled {
 		t.Errorf("EasyApplyEnabled default = true, want false")
 	}
+	if c.TimeZone == nil || c.TimeZone.String() != "Europe/Berlin" {
+		t.Errorf("TimeZone default = %v, want Europe/Berlin", c.TimeZone)
+	}
 	if c.Limits {
 		t.Errorf("Limits default = on, want off")
 	}
@@ -221,5 +224,15 @@ func TestRunnerSecret(t *testing.T) {
 	c, err := Load(fakeSource(map[string]string{"GETAFJOB_RUNNER_SECRET": strings.Repeat("s", 43)}, nil))
 	if err != nil || c.RunnerSecret.Reveal() != strings.Repeat("s", 43) || c.GatewayAddr != ":8090" {
 		t.Fatalf("secret: %v %q", err, c.GatewayAddr)
+	}
+}
+
+func TestTimeZone(t *testing.T) {
+	if c, err := Load(fakeSource(map[string]string{"GETAFJOB_TIMEZONE": "America/New_York"}, nil)); err != nil || c.TimeZone.String() != "America/New_York" {
+		t.Fatalf("TimeZone = %v, err %v", c.TimeZone, err)
+	}
+	if _, err := Load(fakeSource(map[string]string{"GETAFJOB_TIMEZONE": "Mars/Base"}, nil)); err == nil ||
+		!strings.Contains(err.Error(), "GETAFJOB_TIMEZONE") {
+		t.Fatalf("invalid time zone: err %v", err)
 	}
 }

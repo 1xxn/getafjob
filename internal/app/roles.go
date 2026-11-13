@@ -157,7 +157,7 @@ func serve(ctx context.Context, cfg config.Config, logger *slog.Logger) error {
 	})
 	(&web.Server{Identity: ids, Logger: logger, Profile: profiles, Documents: docs, Items: items, Stations: stations,
 		Importer: cvimport.NewImporter(docs, profiles, stations, extractor), Jobs: listings, Searches: matching.NewSavedSearches(mstore, listings), Discovery: discoverySvc,
-		PushStore: webpush.NewStore(pool), VAPIDPublicKey: vapidPub, Apps: apps, Tracking: trackingSvc, Notify: notifySvc, Assist: assistSvc, Portals: portalsSvc, Privacy: privacySvc, Shots: sealedFiles, Handoffs: gw, Events: liveEvents, StyleGuide: cfg.DevStyleGuide,
+		PushStore: webpush.NewStore(pool), VAPIDPublicKey: vapidPub, Apps: apps, Tracking: trackingSvc, Notify: notifySvc, Assist: assistSvc, Portals: portalsSvc, Privacy: privacySvc, Shots: sealedFiles, Handoffs: gw, Events: liveEvents, StyleGuide: cfg.DevStyleGuide, TimeZone: cfg.TimeZone.String(),
 		System: systemFacts{pool: pool, cfg: cfg}, Ops: adminOps{pool: pool, queue: inserter}}).Register(mux)
 
 	h := httpx.Instrument(httpx.Protect(httpx.Routes(mux), maxBody, cfg.PublicURL.Scheme == "https",

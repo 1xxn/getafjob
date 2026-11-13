@@ -7,6 +7,7 @@ import (
 	"os"
 	"os/signal"
 	"syscall"
+	_ "time/tzdata" // time zones without the image's zoneinfo (GETAFJOB_TIMEZONE)
 
 	"github.com/1xxn/getafjob/internal/app"
 	"github.com/1xxn/getafjob/internal/platform/config"

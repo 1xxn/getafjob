@@ -40,6 +40,13 @@ func NewService(store Store, ntfy NtfyClient, email EmailClient, webpush WebPush
 	}
 }
 
+// SetLocation makes daily summaries and quiet hours follow the clock of loc instead of the server's.
+func (s *Service) SetLocation(loc *time.Location) {
+	if loc != nil {
+		s.now = func() time.Time { return time.Now().In(loc) }
+	}
+}
+
 // SetNow overrides the time source (used in tests).
 func (s *Service) SetNow(now func() time.Time) {
 	s.now = now

@@ -35,6 +35,7 @@ an error. Unknown `GETAFJOB_*` variables are reported as a warning (typos), with
 | `GETAFJOB_MAIL_FROM` | `getafjob@localhost` | serve, worker, admin | sender address of all mail |
 | `GETAFJOB_VAPID_KEY` | none | serve, worker | P-256 private key for Web Push notifications, 32 bytes base64url (`admin gen-vapid-key`); use `_FILE` |
 | `GETAFJOB_VAPID_SUBJECT` | `mailto:<MAIL_FROM>` | worker | contact URI (`mailto:` or `https://`) in VAPID tokens |
+| `GETAFJOB_TIMEZONE` | `Europe/Berlin` | serve, worker | IANA time zone of daily summaries and quiet hours; the notification settings name it |
 | `GETAFJOB_CRAWL_INTERVAL` | `6h` | worker | time between two crawls (30m to 168h); `0` schedules none (the development stack's default, `GETAFJOB_DEV_CRAWL_INTERVAL` overrides it) |
 
 `getafjob admin env` lists all variables; `getafjob admin check-config` validates the current environment without

@@ -543,7 +543,9 @@ func (s *Server) settingsForm(ctx context.Context, u *identity.User, p profile.P
 			accounts = accs
 		}
 	}
-	return preferencesForm(p, a, mb, np, accounts, easyApplyAdmin)
+	f := preferencesForm(p, a, mb, np, accounts, easyApplyAdmin)
+	f.Values["time_zone"] = s.TimeZone
+	return f
 }
 
 // settingsSection is a settings section with a form of its own; anything else falls back to search.

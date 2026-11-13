@@ -44,6 +44,7 @@ func newNotifyService(pool *pgxpool.Pool, cfg config.Config, logger *slog.Logger
 	webpushClient := notifywebpush.NewNotifier(notifier.push)
 	baseURL := cfg.PublicURL.String()
 	notifySvc := notify.NewService(nstore, ntfyClient, emailClient, webpushClient, baseURL, logger)
+	notifySvc.SetLocation(cfg.TimeZone)
 
 	return notifySvc, notifier, vapidPub
 }

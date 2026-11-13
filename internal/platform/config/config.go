@@ -94,6 +94,9 @@ type Config struct {
 	// few people applies as fast as its runners allow; guard rails stay on either way.
 	Limits bool
 
+	// TimeZone is the instance time zone for daily summaries and quiet hours. Default: Europe/Berlin.
+	TimeZone *time.Location
+
 	// Unknown lists GETAFJOB_* variables that are set but read by nobody (typos); names only, never values.
 	Unknown []string
 }
@@ -167,6 +170,7 @@ var specs = []spec{
 	{"DEV_FIXTURE_HOST", "", func(c *Config, v string) error { c.DevFixtureHost = strings.ToLower(strings.TrimSpace(v)); return nil }},
 	{"DEV_STYLEGUIDE", "false", func(c *Config, v string) error { return setBool(&c.DevStyleGuide, v) }},
 	{"LIMITS", "off", setLimits},
+	{"TIMEZONE", "Europe/Berlin", setTimeZone},
 }
 
 // Names returns all known variable names (with prefix), e.g. for the docs.
@@ -347,6 +351,15 @@ func setShutdownTimeout(c *Config, v string) error {
 		return errors.New("must be a duration between 1s and 5m")
 	}
 	c.ShutdownTimeout = d
+	return nil
+}
+
+func setTimeZone(c *Config, v string) error {
+	loc, err := time.LoadLocation(strings.TrimSpace(v))
+	if err != nil {
+		return errors.New("must be an IANA time zone such as Europe/Berlin")
+	}
+	c.TimeZone = loc
 	return nil
 }
 
