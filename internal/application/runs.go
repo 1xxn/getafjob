@@ -48,8 +48,9 @@ type Checkpoint struct {
 
 // RunStore persists runs (row-level security; leasing in the system role).
 type RunStore interface {
-	// LeaseNext leases the oldest queued application that passes the per-host limits.
+	// UnfinishedRuns lists runs without a finish whose application still waits on its runner.
 	UnfinishedRuns(ctx context.Context) ([]UnfinishedRun, error)
+	// LeaseNext leases the oldest queued application that passes the per-host limits.
 	LeaseNext(ctx context.Context, runnerID string, tokenHash []byte, runnerChoice string, userID *uuid.UUID, now, expires, gapStart time.Time, unlimited bool) (Lease, bool, error)
 	RunByToken(ctx context.Context, tokenHash []byte) (RunRef, time.Time, *time.Time, error)
 	FinishRun(ctx context.Context, r RunRef, outcome string, at time.Time) error

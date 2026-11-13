@@ -2,7 +2,11 @@ package application
 
 import (
 	"context"
+	"errors"
+	"fmt"
 	"time"
+
+	"github.com/google/uuid"
 )
 
 // PacingInterval returns the target gap between two applications so that dailyLimit applications
@@ -14,60 +18,72 @@ func PacingInterval(dailyLimit int) time.Duration {
 	return QuotaWindow / time.Duration(dailyLimit)
 }
 
-// Plan plans and queues matching applications on behalf of users whose autonomy settings allow it.
-// Applications are queued immediately up to the user's daily quota (#156), or all of them without limits (#164).
+// Plan queues matching applications for users whose autonomy settings allow it: up to the daily quota (submits in
+// QuotaWindow plus applications in flight), or all of them without limits. Candidates come by score, and those
+// that fail a guard are left out. A failing user does not stop the others; their errors are returned together.
 func (s *Service) Plan(ctx context.Context) (PlanStats, error) {
 	users, err := s.store.PlanUsers(ctx, s.unlimited)
 	if err != nil {
 		return PlanStats{}, err
 	}
-	now := s.now()
 	st := PlanStats{UsersEligible: len(users)}
+	var errs []error
 	for _, u := range users {
-		cfg, err := s.Settings(ctx, u)
-		if err != nil || !cfg.AutoQueue() || (!cfg.Unlimited && cfg.DailyLimit <= 0) {
-			continue
-		}
-		// Check user's submit quota in the 24h window
-		submits, err := s.store.SubmitsSince(ctx, u, now.Add(-QuotaWindow))
+		n, err := s.planUser(ctx, u)
+		st.JobsPlanned += n
 		if err != nil {
-			return st, err
-		}
-		// Check user's active applications in flight
-		active, err := s.store.ActiveApplicationsCount(ctx, u)
-		if err != nil {
-			return st, err
-		}
-		if !cfg.Unlimited && submits+active >= cfg.DailyLimit {
-			continue
-		}
-
-		// Find candidates matching the user's criteria, ordered by score descending
-		cands, err := s.store.PlannerCandidates(ctx, u, cfg.MinScore)
-		if err != nil {
-			return st, err
-		}
-
-		for _, c := range cands {
-			if !cfg.Unlimited && submits+active >= cfg.DailyLimit {
-				break
-			}
-			// Check candidate guards (exclusion, duplicate, company window)
-			cand, err := s.store.Candidate(ctx, u, c.JobID)
-			if err != nil {
-				continue
-			}
-			if err := Guard(cand, now); err != nil {
-				continue
-			}
-
-			// Queue the application
-			if _, _, err := s.Queue(ctx, u, c.JobID); err != nil {
-				continue
-			}
-			st.JobsPlanned++
-			active++
+			errs = append(errs, fmt.Errorf("plan user %s: %w", u, err))
 		}
 	}
-	return st, nil
+	return st, errors.Join(errs...)
+}
+
+// planUser queues the user's candidates and returns how many it queued.
+func (s *Service) planUser(ctx context.Context, u uuid.UUID) (int, error) {
+	cfg, err := s.Settings(ctx, u)
+	if err != nil {
+		return 0, err
+	}
+	if !cfg.AutoQueue() || (!cfg.Unlimited && cfg.DailyLimit <= 0) {
+		return 0, nil
+	}
+	now := s.now()
+	submits, err := s.store.SubmitsSince(ctx, u, now.Add(-QuotaWindow))
+	if err != nil {
+		return 0, err
+	}
+	active, err := s.store.ActiveApplicationsCount(ctx, u)
+	if err != nil {
+		return 0, err
+	}
+	full := func() bool { return !cfg.Unlimited && submits+active >= cfg.DailyLimit }
+	if full() {
+		return 0, nil
+	}
+	cands, err := s.store.PlannerCandidates(ctx, u, cfg.MinScore)
+	if err != nil {
+		return 0, err
+	}
+	planned := 0
+	var errs []error
+	for _, c := range cands {
+		if full() {
+			break
+		}
+		cand, err := s.store.Candidate(ctx, u, c.JobID)
+		if err != nil {
+			errs = append(errs, err)
+			continue
+		}
+		if Guard(cand, now) != nil {
+			continue
+		}
+		if _, _, err := s.Queue(ctx, u, c.JobID); err != nil {
+			errs = append(errs, err)
+			continue
+		}
+		planned++
+		active++
+	}
+	return planned, errors.Join(errs...)
 }
