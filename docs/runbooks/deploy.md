@@ -49,7 +49,7 @@ Every deployment (via `deploy/deploy.sh`) follows an automated 4-step sequence:
      Success: Update Active Version State
 ```
 
-1. **Pull Images:** Pulls pinned container images from GHCR (`ghcr.io/1xxn/getafjob`, `getafjob-runner`, `getafjob-egress`). When cosign is available, the keyless OIDC signatures that GitHub Actions issues for all three images are verified; a production deploy without cosign prints a warning (`COSIGN_VERIFY=true` makes it an error).
+1. **Pull Images:** Pulls pinned container images from GHCR (`ghcr.io/1xxn/getafjob`, `getafjob-runner`, `getafjob-egress`). The keyless OIDC signatures that GitHub Actions issues for all three images are verified with cosign. Production requires it: install cosign on the host (a pinned release from github.com/sigstore/cosign/releases, checksum verified); a deploy without it stops before migrations unless `--skip-cosign` is passed on purpose. Staging verifies when cosign is installed (`COSIGN_VERIFY=true` makes it required there too).
 2. **Database Migrations:** Executes `docker compose run --rm migrate`. All schema migrations follow expand/contract rules (ADR 0004); old code can run against new schema. If migrations fail, the deployment immediately halts without modifying running services.
 3. **Start Containers:** Launches updated containers with `docker compose up -d --remove-orphans`.
 4. **Health Check Verification:** Polls the public health check endpoint (`https://${DOMAIN}:${PORT}/healthz`) until healthy (default timeout: 60s).
