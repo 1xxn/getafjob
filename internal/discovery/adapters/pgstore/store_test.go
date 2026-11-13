@@ -271,6 +271,38 @@ func TestCrawlCanceled(t *testing.T) {
 	}
 }
 
+// cancelingSource cancels the crawl while it is fetched, after the run has started.
+type cancelingSource struct {
+	source
+	cancel context.CancelFunc
+}
+
+func (s *cancelingSource) Fetch(ctx context.Context) (discovery.Batch, error) {
+	s.cancel()
+	return s.source.Fetch(ctx)
+}
+
+// A crawl that stops early still finishes its run and says why.
+func TestCrawlStoppedFinishesRun(t *testing.T) {
+	pool := dbtest.AppPool(t)
+	ctx, cancel := context.WithCancel(context.Background())
+	st := pgstore.New(pool)
+	src := &cancelingSource{source: source{name: "greenhouse:acme", batch: discovery.Batch{Complete: true, Postings: []discovery.Posting{
+		posting("greenhouse:acme", "1", "ACME GmbH", "Backend Engineer", "Berlin"),
+	}}}, cancel: cancel}
+	rep, err := discovery.NewService(st).Crawl(ctx, []discovery.Source{src})
+	if !errors.Is(err, context.Canceled) {
+		t.Fatalf("err = %v, want canceled", err)
+	}
+	if active, err := st.ActiveCrawlRun(context.Background(), time.Now().Add(-time.Hour)); err != nil || active != nil {
+		t.Fatalf("run still active: %+v, %v", active, err)
+	}
+	last, err := st.LatestCrawlRun(context.Background())
+	if err != nil || last == nil || last.ID != rep.RunID || last.Errors["crawl failed"] != "canceled" {
+		t.Fatalf("last run = %+v, %v", last, err)
+	}
+}
+
 func TestImportBoards(t *testing.T) {
 	pool := dbtest.AppPool(t)
 	ctx := context.Background()
