@@ -118,13 +118,18 @@ func TestParkedAfterSubmitIsNeverSentAgain(t *testing.T) {
 	if err := svc.BeginSubmit(ctx, max, id); err != nil {
 		t.Fatal(err)
 	}
-	// No effect after the retry: parked; the user requeues it; the register still blocks the submit.
-	for _, ev := range []application.Event{application.EvPark, application.EvRequeue} {
-		if _, err := svc.Fire(ctx, max, id, ev, application.ActorUser, nil); err != nil {
-			t.Fatalf("%s: %v", ev, err)
-		}
+	// No effect after the retry: parked; a requeue is refused (#336).
+	if _, err := svc.Fire(ctx, max, id, application.EvPark, application.ActorUser, nil); err != nil {
+		t.Fatal(err)
 	}
-	if err := svc.Start(ctx, max, id, application.ActorRunner); err != nil {
+	if _, err := svc.Fire(ctx, max, id, application.EvRequeue, application.ActorUser, nil); !errors.Is(err, application.ErrAlreadySubmitted) {
+		t.Fatalf("requeue: %v", err)
+	}
+	// Even a run that got there some other way cannot submit: the register blocks it.
+	if err := db.InUserTx(ctx, pool, max, func(tx pgx.Tx) error {
+		_, err := tx.Exec(ctx, "UPDATE applications SET state = 'running' WHERE id = $1", id)
+		return err
+	}); err != nil {
 		t.Fatal(err)
 	}
 	if err := svc.BeginSubmit(ctx, max, id); !errors.Is(err, application.ErrAlreadySubmitted) {

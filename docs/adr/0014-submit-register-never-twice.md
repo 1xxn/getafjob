@@ -23,3 +23,5 @@ A duplicate application is worse than a missed one; crashes can happen between c
 
 - Good, because "applied twice" requires bypassing a unique constraint.
 - Bad, because some real submissions end as `submit_unknown` and need a human look.
+- Bad, because an application with a submit attempt is never queued again, even when it was proven not sent (no
+  effect, form refused, reconciled as not sent): the user applies on the employer's site and marks it as applied.

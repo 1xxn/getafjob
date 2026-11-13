@@ -166,6 +166,7 @@ type AppDetailData struct {
 	Tone      ui.Tone
 	NextKey   string // catalog key of the sentence that says what happens next
 	ReasonKey string // why it stopped, for parked applications
+	Attempted bool   // a submit was tried once: getafjob never sends it again, the user applies directly
 	Actions   []AppAction
 	Notes     NoteForm
 }

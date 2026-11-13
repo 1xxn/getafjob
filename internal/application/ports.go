@@ -28,6 +28,8 @@ type App struct {
 	// Approved is when the user approved the submit; the next submit of the application needs no green rule.
 	Approved     *time.Time
 	CvDocumentID *uuid.UUID
+	// Attempted reports a submit attempt in the register: getafjob never sends this application again (ADR 0014).
+	Attempted bool
 }
 
 // AwaitingApproval reports an application on the approval list: a run asked for the approval, the user has not

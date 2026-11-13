@@ -163,6 +163,9 @@ func (s *Service) applyChange(ctx context.Context, userID, id uuid.UUID, c Chang
 	if err != nil {
 		return app.State, err
 	}
+	if c.Event == EvRequeue && app.Attempted {
+		return app.State, ErrAlreadySubmitted // a new run could fill the form but never send it
+	}
 	c.From, c.To, c.At, c.Outcome = app.State, to, s.now(), outcome(app.State, c.Event)
 	if c.Event == EvAsk {
 		until := c.At.Add(HandoffWindow)
@@ -277,6 +280,9 @@ func (s *Service) Approve(ctx context.Context, userID, id uuid.UUID) (State, err
 	}
 	if !app.State.Approvable() {
 		return app.State, fmt.Errorf("%w: approve on %s", ErrTransition, app.State)
+	}
+	if app.Attempted {
+		return app.State, ErrAlreadySubmitted
 	}
 	if err := s.store.Approve(ctx, userID, app, s.now()); err != nil {
 		return app.State, err
@@ -405,6 +411,9 @@ func (s *Service) CheckGuard(ctx context.Context, userID uuid.UUID, jobID int64)
 		if app.State.Open() || app.State.Sent() {
 			return ErrDuplicate
 		}
+		if app.Attempted {
+			return ErrAlreadySubmitted
+		}
 	}
 	c, err := s.store.Candidate(ctx, userID, jobID)
 	if err != nil {
@@ -531,7 +540,7 @@ func (s *Service) ParkReason(ctx context.Context, userID, id uuid.UUID) (string,
 }
 
 // Retry queues a parked or failed application again by the user's decision; sent ones are refused by the state
-// machine, so nothing is ever sent twice.
+// machine and ones with a submit attempt by the register (ErrAlreadySubmitted), so nothing is ever sent twice.
 func (s *Service) Retry(ctx context.Context, userID, id uuid.UUID) (State, error) {
 	return s.Fire(ctx, userID, id, EvRequeue, ActorUser, map[string]any{"reason": "retried by user"})
 }

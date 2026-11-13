@@ -67,6 +67,7 @@ func (s *Store) Get(ctx context.Context, userID, id uuid.UUID) (a application.Ap
 			ApprovalReasons: reasons,
 			Approved:        r.ApprovedAt,
 			CvDocumentID:    r.CvDocumentID,
+			Attempted:       r.Attempted,
 		}
 		return err
 	})
@@ -97,6 +98,7 @@ func (s *Store) ByJob(ctx context.Context, userID uuid.UUID, jobID int64) (a app
 			ApprovalReasons: reasons,
 			Approved:        r.ApprovedAt,
 			CvDocumentID:    r.CvDocumentID,
+			Attempted:       r.Attempted,
 		}
 		return nil
 	})
