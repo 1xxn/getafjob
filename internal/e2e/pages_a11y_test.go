@@ -11,7 +11,7 @@ import (
 // desktop sizes are covered by TestPagesRender.
 func TestAccessibility(t *testing.T) {
 	all := []string{"/", "/jobs", "/applications", "/needs-input", "/approvals", "/pipeline", "/activity", "/profile",
-		"/settings/automation", "/setup/matches"}
+		"/settings/automation", "/setup/matches", "/searches"}
 	for _, v := range []struct {
 		name   string
 		scheme string

@@ -28,6 +28,7 @@ const (
 	EventStatusSuggestion Event = "status_suggestion"
 	EventApprovalQueued   Event = "approval_queued"
 	EventDailySummary     Event = "daily_summary"
+	EventSearchAlert      Event = "search_alert"
 	EventTest             Event = "test"
 )
 
