@@ -143,8 +143,8 @@ func (s *Store) CreateMagicLink(ctx context.Context, userID uuid.UUID, h identit
 
 // ConsumeMagicLink marks the link used and starts a session, unless the account is disabled. An account with a
 // passkey needs a ready recovery, which is used up; without one the link is spent and no session starts.
-func (s *Store) ConsumeMagicLink(ctx context.Context, h identity.Hash, sess identity.NewSession, at time.Time) (u identity.User, recovered bool, err error) {
-	wait := false
+func (s *Store) ConsumeMagicLink(ctx context.Context, h identity.Hash, sess identity.NewSession, at time.Time, notice func(identity.User) error) (u identity.User, err error) {
+	wait, recovered := false, false
 	err = s.system(ctx, func(qs *q.Queries) error {
 		userID, err := qs.UseMagicLink(ctx, q.UseMagicLinkParams{TokenHash: h[:], UsedAt: &at})
 		if err != nil {
@@ -179,13 +179,19 @@ func (s *Store) ConsumeMagicLink(ctx context.Context, h identity.Hash, sess iden
 		if recovered {
 			code = "identity.recovered"
 		}
-		return audit(ctx, qs, identity.AuditEvent{UserID: &u.ID, Actor: "user", Code: code,
-			Params: map[string]any{"method": sess.Method}})
+		if err := audit(ctx, qs, identity.AuditEvent{UserID: &u.ID, Actor: "user", Code: code,
+			Params: map[string]any{"method": sess.Method}}); err != nil {
+			return err
+		}
+		if recovered && notice != nil {
+			return notice(u)
+		}
+		return nil
 	})
 	if err == nil && wait {
 		err = identity.ErrRecoveryWait
 	}
-	return u, recovered, err
+	return u, err
 }
 
 // RecoveryState tells whether the user has a passkey and returns a pending recovery.
