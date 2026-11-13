@@ -133,6 +133,11 @@ if [ -z "$TARGET_VERSION" ] && [ -n "${GETAFJOB_VERSION:-}" ]; then
 fi
 
 # Set defaults based on environment
+# Production deploys only signed images: auto means required there (--skip-cosign is the explicit way out).
+if [ "$VERIFY_COSIGN" = "auto" ] && [ "$ENV_NAME" = "production" ]; then
+  VERIFY_COSIGN="true"
+fi
+
 if [ -z "$PROJECT_NAME" ]; then
   if [ "$ENV_NAME" = "staging" ]; then
     PROJECT_NAME="getafjob-staging"
@@ -304,10 +309,9 @@ if [ "$VERIFY_COSIGN" != "false" ]; then
       echo "    Signature verified: $ref"
     done
   elif [ "$VERIFY_COSIGN" = "true" ]; then
-    echo "ERROR: Cosign verification required (COSIGN_VERIFY=true) but cosign not found on PATH!" >&2
+    echo "ERROR: image signatures must be verified ($ENV_NAME) but cosign is not on PATH." >&2
+    echo "Install cosign (docs/runbooks/deploy.md) or pass --skip-cosign to deploy unverified images on purpose." >&2
     exit 1
-  elif [ "$ENV_NAME" = "production" ]; then
-    echo "WARNING: cosign not found: image signatures are NOT verified. Install cosign or set COSIGN_VERIFY=true." >&2
   fi
 fi
 
