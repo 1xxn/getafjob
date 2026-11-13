@@ -76,7 +76,7 @@ func TestDocuments(t *testing.T) {
 	if err := docs.Delete(ctx, erika, d.ID); !errors.Is(err, profile.ErrNotFound) {
 		t.Errorf("erika deletes: %v", err)
 	}
-	if err := docs.SetVariant(ctx, max, uuid.New(), "x", "fr", nil); !errors.Is(err, profile.ErrFileType) {
+	if err := docs.SetVariant(ctx, max, uuid.New(), "x", "fr", nil); !errors.Is(err, profile.ErrVariant) {
 		t.Errorf("bad language: %v", err)
 	}
 
