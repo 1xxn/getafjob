@@ -92,6 +92,27 @@ func TestChooseCV(t *testing.T) {
 			t.Errorf("ChooseCV(%s, %q) = %q", c.lang, c.title, got.Label)
 		}
 	}
+	// Focus words count once and only as whole words, and never outweigh the language.
+	noisy := "Go Go Go: going to Google, good goals, go go go"
+	lang := []Document{
+		{Label: "go de", Kind: KindCV, Language: "de", Focus: []string{"go", "golang"}, CreatedAt: now},
+		{Label: "any", Kind: KindCV, Focus: []string{"go"}, CreatedAt: now.Add(-time.Hour)},
+		{Label: "plain en", Kind: KindCV, Language: "en", CreatedAt: now.Add(-2 * time.Hour)},
+	}
+	if got, _ := ChooseCV(lang, "en", "Backend Engineer", noisy); got.Label != "plain en" {
+		t.Errorf("language outweighed by focus: %q", got.Label)
+	}
+	sub := []Document{
+		{Label: "go", Kind: KindCV, Focus: []string{"go"}, CreatedAt: now.Add(-time.Hour)},
+		{Label: "newer", Kind: KindCV, CreatedAt: now},
+	}
+	if got, _ := ChooseCV(sub, "en", "Engineer", "We use Google Cloud"); got.Label != "newer" {
+		t.Errorf("substring counted as focus word: %q", got.Label)
+	}
+	if got, _ := ChooseCV([]Document{{Label: "c++", Kind: KindCV, Focus: []string{"C++"}}, {Label: "c#", Kind: KindCV, Focus: []string{"c#"}, CreatedAt: now}},
+		"", "C++ Developer", ""); got.Label != "c++" {
+		t.Errorf("C++ focus: %q", got.Label)
+	}
 	if _, ok := ChooseCV(docs[3:], "en", "x", ""); ok {
 		t.Error("certificate chosen as CV")
 	}
