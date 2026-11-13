@@ -7,10 +7,10 @@ func TestValidSource(t *testing.T) {
 		"document#0192f3a4-5b6c-7d8e-9f01-23456789abcd",
 		"answer#0192f3a4-5b6c-7d8e-9f01-23456789abcd", "textblock#0192f3a4-5b6c-7d8e-9f01-23456789abcd",
 		"profile.work_experience.0.company",
-		"profile.education.1.institution"}
+		"profile.education.1.institution", "input"}
 	bad := []string{"", "profile.", "Profile.email", "answer#", "answer#x", "textblock#4 ", "ai_draft#9 (approved)",
 		"station#0192f3a4-5b6c-7d8e-9f01-23456789abcd", "document#123",
-		"answer#0192F3A4-5b6c-7d8e-9f01-23456789abcd", "guess", "page", "profile.email; answer#1"}
+		"answer#0192F3A4-5b6c-7d8e-9f01-23456789abcd", "guess", "page", "input#1", "Input", "profile.email; answer#1"}
 	for _, s := range good {
 		if !ValidSource(s) {
 			t.Errorf("%q refused", s)

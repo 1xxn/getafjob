@@ -309,15 +309,19 @@ func (s *Server) applicationAnswer(w http.ResponseWriter, r *http.Request, u *id
 		if q == "" || a == "" {
 			continue
 		}
-		id := uuid.New()
 		// save-<i> is "0" then "1" when the switch is on; a form without it saves (older pages). Without a waiting
-		// run the answers always go to the bank: the next run reads them from there.
+		// run the answers always go to the bank: the next run reads them from there. An answer kept out of the bank
+		// has no id: the run fills it with the source "input" (ADR 0013).
+		id := ""
 		if save := r.Form["save-"+key]; s.Items != nil && (sess == nil || len(save) == 0 || save[len(save)-1] == "1") {
-			if savedID, err := s.Items.SaveAnswer(r.Context(), u.ID, profile.Answer{Question: q, Answer: a}); err == nil {
-				id = savedID
+			savedID, err := s.Items.SaveAnswer(r.Context(), u.ID, profile.Answer{Question: q, Answer: a})
+			if err != nil {
+				s.failed(w, r, u, err)
+				return
 			}
+			id = savedID.String()
 		}
-		saved = append(saved, &runnerv1.Answer{Id: id.String(), Question: q, Answer: a})
+		saved = append(saved, &runnerv1.Answer{Id: id, Question: q, Answer: a})
 	}
 
 	if s.Apps != nil {
