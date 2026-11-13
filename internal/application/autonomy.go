@@ -106,6 +106,9 @@ const (
 // QuotaWindow is the window of the daily limit.
 const QuotaWindow = 24 * time.Hour
 
+// QuestionField is the kind of a question about a form field; only those are answered in the web form.
+const QuestionField = "field"
+
 // QuestionApproval is the kind (and label) of the question a run asks when the submit needs the user's approval.
 const QuestionApproval = "approval"
 

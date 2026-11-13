@@ -68,7 +68,7 @@ func (s *Server) needsInput(w http.ResponseWriter, r *http.Request, u *identity.
 		}
 		if qs, err := s.Apps.Questions(ctx, u.ID, a.ID); err == nil {
 			for _, q := range qs {
-				if q.Kind != "captcha" && q.Label != "" {
+				if q.Kind == application.QuestionField && q.Label != "" {
 					it.Count++
 				}
 			}
