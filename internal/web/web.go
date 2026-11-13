@@ -110,6 +110,7 @@ type Server struct {
 	Handoffs       HandoffHub
 	Events         *events.Hub   // live application changes; nil turns /events off
 	StyleGuide     bool          // serve /dev/styleguide (development builds only)
+	TimeZone       string        // instance time zone of summaries and quiet hours, shown in the settings
 	System         SystemService // nil: the system page shows the build only
 	Ops            AdminOps      // nil: no runner, source and queue pages
 	PushStore      webpush.Store

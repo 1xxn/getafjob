@@ -397,6 +397,9 @@ templ PreferencesPage(name string, f Form, section string) {
 					@ui.Input(input(ctx, f, "notify_ntfy_url", "url", "", 254))
 					@ui.Input(input(ctx, f, "notify_ntfy_topic", "text", "", 254))
 					@ui.Input(ntfyToken(ctx, f))
+					if f.Values["time_zone"] != "" {
+						<p class="ui-hint">{ T(ctx, "profile.notify.time_zone", "zone", f.Values["time_zone"]) }</p>
+					}
 					@ui.Checkbox(check(ctx, f, "notify_daily_summary_enabled"))
 					@ui.Input(input(ctx, f, "notify_daily_summary_time", "text", "", 5))
 					@ui.Checkbox(check(ctx, f, "notify_quiet_hours_enabled"))
