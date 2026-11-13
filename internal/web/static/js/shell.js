@@ -1,12 +1,13 @@
 // ts/shell.ts
 var html = document.documentElement;
 var lastMain = null;
+var skippedTransition = /* @__PURE__ */ new Set(["AbortError", "InvalidStateError"]);
 var startViewTransition = document.startViewTransition?.bind(document);
 if (startViewTransition) {
   document.startViewTransition = ((arg) => {
     const vt = startViewTransition(arg);
     const skipped = (err) => {
-      if (!(err instanceof DOMException && err.name === "AbortError")) throw err;
+      if (!(err instanceof DOMException && skippedTransition.has(err.name))) throw err;
     };
     vt.ready.catch(skipped);
     vt.finished.catch(skipped);

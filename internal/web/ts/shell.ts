@@ -8,14 +8,16 @@ const html = document.documentElement;
 let lastMain: Element | null = null;
 
 // htmx wraps swaps in view transitions; when the browser skips one (another transition is running, e.g. the
-// cross-document one of a page load) its promises reject with an AbortError nobody handles. The swap itself still
-// happens, so a skipped transition is not an error.
+// cross-document one of a page load) its promises reject with an AbortError or, while the new page is still being
+// revealed, an InvalidStateError nobody handles. The swap itself still happens, so a skipped transition is not an
+// error.
+const skippedTransition = new Set(['AbortError', 'InvalidStateError']);
 const startViewTransition = document.startViewTransition?.bind(document);
 if (startViewTransition) {
   document.startViewTransition = ((arg?: ViewTransitionUpdateCallback) => {
     const vt = startViewTransition(arg);
     const skipped = (err: unknown) => {
-      if (!(err instanceof DOMException && err.name === 'AbortError')) throw err;
+      if (!(err instanceof DOMException && skippedTransition.has(err.name))) throw err;
     };
     vt.ready.catch(skipped);
     vt.finished.catch(skipped);
