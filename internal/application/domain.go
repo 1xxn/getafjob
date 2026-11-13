@@ -108,6 +108,9 @@ func (s State) Open() bool {
 	}
 }
 
+// InRun reports states that belong to an active run (the runner holds the browser).
+func (s State) InRun() bool { return s == Running || s == NeedsInput }
+
 // Guard results: why an application may not start.
 var (
 	ErrExcluded      = errors.New("excluded by the user's filters")

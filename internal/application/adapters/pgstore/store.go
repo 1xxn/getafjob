@@ -202,6 +202,16 @@ func (s *Store) Apply(ctx context.Context, userID uuid.UUID, a application.App, 
 				return err
 			}
 		}
+		if c.From.InRun() && !c.To.InRun() && c.To != application.Submitting {
+			outcome := "parked"
+			if c.To == application.Submitted {
+				outcome = "submitted"
+			}
+			if err := qs.FinishAppRuns(ctx, q.FinishAppRunsParams{ApplicationID: a.ID, UserID: userID,
+				FinishedAt: &c.At, Outcome: &outcome}); err != nil {
+				return err
+			}
+		}
 		if c.Outcome != "" {
 			return qs.FinishSubmitAttempt(ctx, q.FinishSubmitAttemptParams{ApplicationID: a.ID, UserID: userID,
 				Outcome: &c.Outcome, FinishedAt: &c.At})

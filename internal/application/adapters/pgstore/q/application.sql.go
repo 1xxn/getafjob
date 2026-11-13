@@ -313,6 +313,28 @@ func (q *Queries) ExpiredCheckpointScreenshots(ctx context.Context, at time.Time
 	return items, nil
 }
 
+const finishAppRuns = `-- name: FinishAppRuns :exec
+UPDATE runs SET finished_at = $3, outcome = $4 WHERE application_id = $1 AND user_id = $2 AND finished_at IS NULL
+`
+
+type FinishAppRunsParams struct {
+	ApplicationID uuid.UUID
+	UserID        uuid.UUID
+	FinishedAt    *time.Time
+	Outcome       *string
+}
+
+// Ends the open runs of an application that left the run states, so their tokens stop working.
+func (q *Queries) FinishAppRuns(ctx context.Context, arg FinishAppRunsParams) error {
+	_, err := q.db.Exec(ctx, finishAppRuns,
+		arg.ApplicationID,
+		arg.UserID,
+		arg.FinishedAt,
+		arg.Outcome,
+	)
+	return err
+}
+
 const finishRun = `-- name: FinishRun :exec
 UPDATE runs SET finished_at = $3, outcome = $4 WHERE id = $1 AND user_id = $2 AND finished_at IS NULL
 `
