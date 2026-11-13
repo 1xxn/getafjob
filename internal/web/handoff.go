@@ -437,7 +437,7 @@ func (s *Server) applicationDetail(w http.ResponseWriter, r *http.Request, u *id
 	if app.State == application.NeedsInput || (app.State == application.Parked && !app.Attempted) {
 		if asked, err := s.Apps.Questions(ctx, u.ID, appID); err == nil {
 			for _, q := range asked {
-				if q.Kind != "captcha" && q.Label != "" {
+				if q.Kind == application.QuestionField && q.Label != "" {
 					d.Questions = append(d.Questions, views.HandoffQuestion{Kind: q.Kind, Question: q.Label, Draft: q.Draft,
 						Input: q.Input, Options: q.Options, Keep: app.State != application.NeedsInput})
 				}

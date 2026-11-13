@@ -120,6 +120,9 @@ type Ref struct {
 
 // Question is an open question or checkpoint asked during a run.
 type Question struct {
+	// Kind is QuestionField for a form field the user answers in the web form (the answer may go to the bank);
+	// other kinds (captcha, security_code, session_expired, approval) are handled in the live view or the
+	// approval list and never become answers.
 	Kind    string   `json:"kind"`
 	Label   string   `json:"label"`
 	Draft   string   `json:"draft,omitempty"`

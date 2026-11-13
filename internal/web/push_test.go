@@ -260,6 +260,27 @@ func TestScreenWebSocketClosesForFinishedRuns(t *testing.T) {
 	}
 }
 
+// Only form field questions become web form questions; a security code or a sign-in goes through the live view
+// and never into the answer bank.
+func TestDetailListsOnlyFieldQuestions(t *testing.T) {
+	u := &identity.User{ID: uuid.New(), DisplayName: "Max"}
+	appID := uuid.New()
+	st := &fakeAppStore{userID: u.ID, app: application.App{ID: appID, JobID: 42, State: application.NeedsInput, Version: 1},
+		qs: []application.Question{{Kind: "field", Label: "Earliest start date?"},
+			{Kind: "security_code", Label: "Security code sent to your email"},
+			{Kind: "session_expired", Label: "Portal session expired"}}}
+	srv := &Server{Apps: application.NewService(st)}
+	rec := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodGet, "/applications/"+appID.String(), nil)
+	req.SetPathValue("id", appID.String())
+	srv.applicationPage(rec, req, u)
+	body := rec.Body.String()
+	if rec.Code != http.StatusOK || !strings.Contains(body, "Earliest start date?") ||
+		strings.Contains(body, "Security code sent") || strings.Contains(body, "Portal session expired") {
+		t.Fatalf("detail page %d lists the wrong questions", rec.Code)
+	}
+}
+
 func TestHandoffPageAnswerAndPark(t *testing.T) {
 	u := &identity.User{ID: uuid.New(), DisplayName: "Max"}
 	appID := uuid.New()
@@ -318,6 +339,7 @@ type fakeAppStore struct {
 	app    application.App
 	ev     application.Evidence
 	shots  map[int64]string
+	qs     []application.Question
 }
 
 func (f *fakeAppStore) Create(context.Context, uuid.UUID, int64, application.State, time.Time) (uuid.UUID, error) {
@@ -356,7 +378,7 @@ func (f *fakeAppStore) SetJobCvDocument(_ context.Context, userID uuid.UUID, job
 }
 
 func (f *fakeAppStore) Questions(context.Context, uuid.UUID, uuid.UUID) ([]application.Question, error) {
-	return nil, nil
+	return f.qs, nil
 }
 
 func (f *fakeAppStore) Evidence(_ context.Context, userID, id uuid.UUID) (application.Evidence, error) {
