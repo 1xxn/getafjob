@@ -84,7 +84,7 @@ func withHint(p ui.SelectProps, hint string) ui.SelectProps {
 	return p
 }
 
-// station builds a field of a work or education station; id is the station's (empty on the add form).
+// station builds a field of a work or education station; id is the station's, or new-exp / new-edu on the add forms.
 func station(ctx context.Context, name, id, value string, maxLen int) ui.InputProps {
 	p := ui.InputProps{FieldProps: ui.FieldProps{Name: name, Label: T(ctx, "profile.station."+name)}, Value: value,
 		MaxLength: maxLen}
@@ -900,15 +900,15 @@ func ProfilePage(name string, h CandidateHead, f Form, experiences []ProfileExpe
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
-			templ_7745c5c3_Err = ui.Input(station(ctx, "title", "", "", 200)).Render(ctx, templ_7745c5c3_Buffer)
+			templ_7745c5c3_Err = ui.Input(station(ctx, "title", "new-exp", "", 200)).Render(ctx, templ_7745c5c3_Buffer)
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
-			templ_7745c5c3_Err = ui.Input(station(ctx, "company", "", "", 200)).Render(ctx, templ_7745c5c3_Buffer)
+			templ_7745c5c3_Err = ui.Input(station(ctx, "company", "new-exp", "", 200)).Render(ctx, templ_7745c5c3_Buffer)
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
-			templ_7745c5c3_Err = ui.Input(station(ctx, "location", "", "", 200)).Render(ctx, templ_7745c5c3_Buffer)
+			templ_7745c5c3_Err = ui.Input(station(ctx, "location", "new-exp", "", 200)).Render(ctx, templ_7745c5c3_Buffer)
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
@@ -916,19 +916,19 @@ func ProfilePage(name string, h CandidateHead, f Form, experiences []ProfileExpe
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
-			templ_7745c5c3_Err = ui.Input(station(ctx, "start_date", "", "", 30)).Render(ctx, templ_7745c5c3_Buffer)
+			templ_7745c5c3_Err = ui.Input(station(ctx, "start_date", "new-exp", "", 30)).Render(ctx, templ_7745c5c3_Buffer)
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
-			templ_7745c5c3_Err = ui.Input(station(ctx, "end_date", "", "", 30)).Render(ctx, templ_7745c5c3_Buffer)
+			templ_7745c5c3_Err = ui.Input(station(ctx, "end_date", "new-exp", "", 30)).Render(ctx, templ_7745c5c3_Buffer)
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
-			templ_7745c5c3_Err = ui.Checkbox(stationCurrent(ctx, "", "is_current", false)).Render(ctx, templ_7745c5c3_Buffer)
+			templ_7745c5c3_Err = ui.Checkbox(stationCurrent(ctx, "new-exp", "is_current", false)).Render(ctx, templ_7745c5c3_Buffer)
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
-			templ_7745c5c3_Err = ui.Textarea(stationBullets(ctx, "", "")).Render(ctx, templ_7745c5c3_Buffer)
+			templ_7745c5c3_Err = ui.Textarea(stationBullets(ctx, "new-exp", "")).Render(ctx, templ_7745c5c3_Buffer)
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
@@ -1098,31 +1098,31 @@ func ProfilePage(name string, h CandidateHead, f Form, experiences []ProfileExpe
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
-			templ_7745c5c3_Err = ui.Input(station(ctx, "degree", "", "", 200)).Render(ctx, templ_7745c5c3_Buffer)
+			templ_7745c5c3_Err = ui.Input(station(ctx, "degree", "new-edu", "", 200)).Render(ctx, templ_7745c5c3_Buffer)
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
-			templ_7745c5c3_Err = ui.Input(station(ctx, "institution", "", "", 200)).Render(ctx, templ_7745c5c3_Buffer)
+			templ_7745c5c3_Err = ui.Input(station(ctx, "institution", "new-edu", "", 200)).Render(ctx, templ_7745c5c3_Buffer)
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
-			templ_7745c5c3_Err = ui.Input(station(ctx, "field_of_study", "", "", 200)).Render(ctx, templ_7745c5c3_Buffer)
+			templ_7745c5c3_Err = ui.Input(station(ctx, "field_of_study", "new-edu", "", 200)).Render(ctx, templ_7745c5c3_Buffer)
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
-			templ_7745c5c3_Err = ui.Input(station(ctx, "start_date", "", "", 30)).Render(ctx, templ_7745c5c3_Buffer)
+			templ_7745c5c3_Err = ui.Input(station(ctx, "start_date", "new-edu", "", 30)).Render(ctx, templ_7745c5c3_Buffer)
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
-			templ_7745c5c3_Err = ui.Input(station(ctx, "end_date", "", "", 30)).Render(ctx, templ_7745c5c3_Buffer)
+			templ_7745c5c3_Err = ui.Input(station(ctx, "end_date", "new-edu", "", 30)).Render(ctx, templ_7745c5c3_Buffer)
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
-			templ_7745c5c3_Err = ui.Checkbox(stationCurrent(ctx, "", "is_current_edu", false)).Render(ctx, templ_7745c5c3_Buffer)
+			templ_7745c5c3_Err = ui.Checkbox(stationCurrent(ctx, "new-edu", "is_current_edu", false)).Render(ctx, templ_7745c5c3_Buffer)
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
-			templ_7745c5c3_Err = ui.Input(station(ctx, "grade", "", "", 50)).Render(ctx, templ_7745c5c3_Buffer)
+			templ_7745c5c3_Err = ui.Input(station(ctx, "grade", "new-edu", "", 50)).Render(ctx, templ_7745c5c3_Buffer)
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}

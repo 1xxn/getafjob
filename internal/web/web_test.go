@@ -621,6 +621,14 @@ func TestProfilePages(t *testing.T) {
 		t.Fatalf("invalid mailbox port %d", rec.Code)
 	}
 
+	// Every field on /profile has its own id, so each label names its field.
+	ids := map[string]int{}
+	for _, m := range regexp.MustCompile(` id="([^"]+)"`).FindAllStringSubmatch(a.do(http.MethodGet, "/profile", nil, session, nil).Body.String(), -1) {
+		if ids[m[1]]++; ids[m[1]] == 2 {
+			t.Errorf("duplicate id %q on /profile", m[1])
+		}
+	}
+
 	// Station management on /profile
 	expForm := url.Values{
 		"title":          {"Staff Platform Engineer"},
