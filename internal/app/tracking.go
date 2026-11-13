@@ -21,16 +21,32 @@ type appTransitionAdapter struct {
 	apps *application.Service
 }
 
-func (a *appTransitionAdapter) Transition(ctx context.Context, userID, appID uuid.UUID, state string, detail map[string]any) error {
-	var ev application.Event
+// Allowed reports whether a suggestion's state is reachable from the application's state.
+func (a *appTransitionAdapter) Allowed(from, to string) bool {
+	ev, ok := suggestionEvent(to)
+	if !ok {
+		return false
+	}
+	_, err := application.Next(application.State(from), ev)
+	return err == nil
+}
+
+func suggestionEvent(state string) (application.Event, bool) {
 	switch application.State(state) {
 	case application.Confirmed:
-		ev = application.EvConfirm
+		return application.EvConfirm, true
 	case application.Rejected:
-		ev = application.EvReject
+		return application.EvReject, true
 	case application.Interview:
-		ev = application.EvInterview
+		return application.EvInterview, true
 	default:
+		return "", false
+	}
+}
+
+func (a *appTransitionAdapter) Transition(ctx context.Context, userID, appID uuid.UUID, state string, detail map[string]any) error {
+	ev, ok := suggestionEvent(state)
+	if !ok {
 		return fmt.Errorf("unsupported suggestion state transition: %s", state)
 	}
 

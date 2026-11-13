@@ -7,6 +7,7 @@ package tracking
 import (
 	"errors"
 	"net/mail"
+	"regexp"
 	"strings"
 	"time"
 
@@ -113,14 +114,14 @@ func Classify(msg EmailMessage) (Category, []string) {
 		return CategorySecurityCode, []string{"security code or verification email (ignored per ADR 0015)"}
 	}
 
-	// 2. Invitation to interview
-	if match, reasons := isInvitation(subj, body, full); match {
-		return CategoryInvitation, reasons
-	}
-
-	// 3. Rejection
+	// 2. Rejection before invitation: a no after an interview mentions the interview too.
 	if match, reasons := isRejection(subj, body, full); match {
 		return CategoryRejection, reasons
+	}
+
+	// 3. Invitation to interview
+	if match, reasons := isInvitation(subj, body, full); match {
+		return CategoryInvitation, reasons
 	}
 
 	// 4. Confirmation / Received
@@ -131,10 +132,16 @@ func Classify(msg EmailMessage) (Category, []string) {
 	return CategoryOther, nil
 }
 
+// securityWordRx finds short security terms as whole words ("otp" but not "footprint").
+var securityWordRx = regexp.MustCompile(`\b(otp|2fa)\b`)
+
 // isSecurityCode detects 2FA, OTP, verification and security codes.
 func isSecurityCode(subj, body string) bool {
+	if securityWordRx.MatchString(subj) || securityWordRx.MatchString(body) {
+		return true
+	}
 	secTerms := []string{
-		"verification code", "security code", "one-time password", "otp", "2fa", "two-factor",
+		"verification code", "security code", "one-time password", "two-factor",
 		"authentication code", "login code", "confirm your email", "password reset", "temporary code",
 		"sicherheitscode", "verifizierungscode", "einmal-passwort", "einmalpasswort", "bestätigungscode",
 		"anmeldecode", "anmelde-code", "prüfcode", "verifiziere deine", "bestätige deine e-mail",
@@ -287,9 +294,10 @@ func MatchApplication(msg EmailMessage, apps []ApplicationSummary) (*Application
 		score := 0
 		var reasons []string
 
-		// Check if company domain matches email domain
+		// Check if company domain matches email domain; an ATS or job board domain is shared by many employers
+		// and says nothing about which application the mail belongs to.
 		appDomain := extractDomainFromURL(app.URL)
-		if fromDomain != "" && appDomain != "" && (fromDomain == appDomain || strings.HasSuffix(fromDomain, "."+appDomain) || strings.HasSuffix(appDomain, "."+fromDomain)) {
+		if fromDomain != "" && appDomain != "" && !sharedDomain(fromDomain) && (fromDomain == appDomain || strings.HasSuffix(fromDomain, "."+appDomain) || strings.HasSuffix(appDomain, "."+fromDomain)) {
 			score += 50
 			reasons = append(reasons, "Sender domain matches job URL domain ("+fromDomain+")")
 		}
@@ -330,15 +338,38 @@ func MatchApplication(msg EmailMessage, apps []ApplicationSummary) (*Application
 		return nil, nil
 	}
 
-	// Pick the highest scoring match
-	best := matches[0]
+	// Pick the highest scoring match; a tie between applications is no confident match.
+	best, tie := matches[0], false
 	for _, m := range matches[1:] {
-		if m.score > best.score {
-			best = m
+		switch {
+		case m.score > best.score:
+			best, tie = m, false
+		case m.score == best.score:
+			tie = true
 		}
 	}
-
+	if tie {
+		return nil, nil
+	}
 	return &best.app, best.reasons
+}
+
+// sharedDomains are mail and job hosts that send for many employers (ATS, job boards, mail providers).
+var sharedDomains = []string{
+	"greenhouse.io", "lever.co", "myworkdayjobs.com", "workday.com", "ashbyhq.com", "smartrecruiters.com",
+	"personio.de", "personio.com", "recruitee.com", "join.com", "teamtailor.com", "workable.com", "bamboohr.com",
+	"softgarden.io", "softgarden.de", "jobvite.com", "icims.com", "successfactors.com", "successfactors.eu",
+	"linkedin.com", "indeed.com", "stepstone.de", "xing.com", "gmail.com", "googlemail.com", "outlook.com",
+}
+
+// sharedDomain reports a domain that belongs to one of sharedDomains.
+func sharedDomain(d string) bool {
+	for _, s := range sharedDomains {
+		if d == s || strings.HasSuffix(d, "."+s) {
+			return true
+		}
+	}
+	return false
 }
 
 func extractEmailAddress(from string) string {
