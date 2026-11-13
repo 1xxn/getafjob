@@ -279,7 +279,17 @@ func (s *Server) documentReviewSave(w http.ResponseWriter, r *http.Request, u *i
 		return
 	}
 
-	expCount, _ := strconv.Atoi(r.PostFormValue("exp_count"))
+	// skipped counts entries the profile refused (over the station limit, too long); other errors stop the save.
+	skipped := 0
+	refused := func(err error) bool {
+		var ve *profile.ValidationError
+		if errors.As(err, &ve) || errors.Is(err, profile.ErrTooManyStations) || errors.Is(err, profile.ErrConflict) {
+			skipped++
+			return true
+		}
+		return err == nil
+	}
+	expCount := min(formCount(r, "exp_count"), 2*profile.MaxStations)
 	for i := 0; i < expCount; i++ {
 		if r.PostFormValue(fmt.Sprintf("include_exp_%d", i)) == "" {
 			continue
@@ -299,10 +309,13 @@ func (s *Server) documentReviewSave(w http.ResponseWriter, r *http.Request, u *i
 			IsCurrent:          r.PostFormValue(fmt.Sprintf("exp_%d_current", i)) != "",
 			DescriptionBullets: profile.Lines(r.PostFormValue(fmt.Sprintf("exp_%d_bullets", i))),
 		}
-		_, _ = s.Stations.SaveWorkExperience(r.Context(), u.ID, we)
+		if _, err := s.Stations.SaveWorkExperience(r.Context(), u.ID, we); !refused(err) {
+			s.failed(w, r, u, err)
+			return
+		}
 	}
 
-	eduCount, _ := strconv.Atoi(r.PostFormValue("edu_count"))
+	eduCount := min(formCount(r, "edu_count"), 2*profile.MaxStations)
 	for i := 0; i < eduCount; i++ {
 		if r.PostFormValue(fmt.Sprintf("include_edu_%d", i)) == "" {
 			continue
@@ -321,19 +334,40 @@ func (s *Server) documentReviewSave(w http.ResponseWriter, r *http.Request, u *i
 			IsCurrent:    r.PostFormValue(fmt.Sprintf("edu_%d_current", i)) != "",
 			Grade:        strings.TrimSpace(r.PostFormValue(fmt.Sprintf("edu_%d_grade", i))),
 		}
-		_, _ = s.Stations.SaveEducation(r.Context(), u.ID, ed)
+		if _, err := s.Stations.SaveEducation(r.Context(), u.ID, ed); !refused(err) {
+			s.failed(w, r, u, err)
+			return
+		}
 	}
 
 	if r.PostFormValue("include_profile") != "" {
 		parsed, err := s.Importer.Extract(r.Context(), u.ID, id)
-		if err == nil {
-			snap, err := s.Profile.Get(r.Context(), u.ID)
-			if err == nil {
-				merged := cvimport.Merge(snap.Profile, parsed.Profile)
-				_ = s.Profile.SaveProfile(r.Context(), u.ID, merged, snap.Version)
-			}
+		if err != nil {
+			s.failed(w, r, u, err)
+			return
+		}
+		snap, err := s.Profile.Get(r.Context(), u.ID)
+		if err != nil {
+			s.failed(w, r, u, err)
+			return
+		}
+		if err := s.Profile.SaveProfile(r.Context(), u.ID, cvimport.Merge(snap.Profile, parsed.Profile), snap.Version); !refused(err) {
+			s.failed(w, r, u, err)
+			return
 		}
 	}
-
+	if skipped > 0 {
+		s.renderDocuments(w, r, u, http.StatusUnprocessableEntity, views.T(r.Context(), "documents.import_partial"), true)
+		return
+	}
 	http.Redirect(w, r, "/profile?imported=1", http.StatusSeeOther)
+}
+
+// formCount reads a non-negative count from the form; anything else is zero.
+func formCount(r *http.Request, name string) int {
+	n, err := strconv.Atoi(r.PostFormValue(name))
+	if err != nil || n < 0 {
+		return 0
+	}
+	return n
 }
