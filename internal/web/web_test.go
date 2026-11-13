@@ -128,6 +128,7 @@ func newApp(t *testing.T, opts ...func(*web.Server)) *app {
 		Discovery:    dstore,
 		Boards:       dstore,
 		Matcher:      &testMatchEvaluator{matching: mstore},
+		Queue:        testCrawlQueue{},
 		AllowPrivate: true,
 	})
 	srv := &web.Server{Identity: ids, Profile: profiles, Documents: docs, Items: items, Stations: stations, Importer: importer,
@@ -1205,3 +1206,9 @@ func TestPrivacyExportAndDelete(t *testing.T) {
 		t.Errorf("login page lacks deletion notice: %s", loginPage)
 	}
 }
+
+// testCrawlQueue accepts every manual crawl.
+type testCrawlQueue struct{}
+
+func (testCrawlQueue) QueueCrawl(context.Context) (bool, error) { return true, nil }
+func (testCrawlQueue) IsQueued(context.Context) (bool, error)   { return false, nil }
