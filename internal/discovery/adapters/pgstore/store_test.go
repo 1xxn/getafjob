@@ -544,3 +544,50 @@ func TestUpsertPostingDuplicate(t *testing.T) {
 		t.Fatalf("duplicate = %d %q, %v; want %d", dup, change, err, id)
 	}
 }
+
+// checker answers per URL; unknown URLs are ImportUnknown.
+type checker map[string]discovery.ImportState
+
+func (c checker) CheckImport(_ context.Context, url string) discovery.ImportState { return c[url] }
+
+// A crawl rechecks jobs added by URL that were not seen for ImportRecheck: gone ones close, open ones are seen
+// again, an unknown answer changes nothing; recently seen ones are left alone.
+func TestCrawlRechecksImports(t *testing.T) {
+	pool := dbtest.AppPool(t)
+	ctx := context.Background()
+	st := pgstore.New(pool)
+	now := time.Date(2026, 11, 13, 12, 0, 0, 0, time.UTC)
+	old := now.Add(-discovery.ImportRecheck - time.Hour)
+	add := func(id, title string, at time.Time) discovery.Posting {
+		p := posting("import:careers.example.org", id, "Muster GmbH", title, "Berlin")
+		if _, _, err := st.UpsertPosting(ctx, p, at); err != nil {
+			t.Fatal(err)
+		}
+		return p
+	}
+	gone, open, silent := add("1", "Platform Engineer", old), add("2", "Backend Engineer", old), add("3", "SRE", old)
+	fresh := add("4", "Data Engineer", now.Add(-time.Hour))
+	c := checker{gone.URL: discovery.ImportGone, open.URL: discovery.ImportOpen, fresh.URL: discovery.ImportGone}
+	rep, err := discovery.NewService(st).WithClock(func() time.Time { return now }).WithImportChecker(c).Crawl(ctx, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if rep.Stats.Rechecked != 3 || rep.Stats.Closed != 1 {
+		t.Errorf("stats = %+v", rep.Stats)
+	}
+	for _, w := range []struct {
+		p      discovery.Posting
+		status string
+		seen   time.Time
+	}{{gone, "closed", old}, {open, "open", now}, {silent, "open", old}, {fresh, "open", now.Add(-time.Hour)}} {
+		var status string
+		var seen time.Time
+		if err := pool.QueryRow(ctx, "SELECT status, last_seen FROM jobs WHERE fingerprint = $1",
+			discovery.Fingerprint(w.p.Source, w.p.ExternalID)).Scan(&status, &seen); err != nil {
+			t.Fatal(err)
+		}
+		if status != w.status || !seen.Equal(w.seen) {
+			t.Errorf("%s: %s seen %v, want %s seen %v", w.p.Title, status, seen, w.status, w.seen)
+		}
+	}
+}

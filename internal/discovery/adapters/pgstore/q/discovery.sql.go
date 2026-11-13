@@ -514,6 +514,44 @@ func (q *Queries) SaveBoardState(ctx context.Context, arg SaveBoardStateParams) 
 	return err
 }
 
+const staleImportedJobs = `-- name: StaleImportedJobs :many
+SELECT id, fingerprint, url FROM jobs
+WHERE status = 'open' AND source LIKE 'import:%' AND last_seen < $1
+ORDER BY last_seen, id
+LIMIT $2
+`
+
+type StaleImportedJobsParams struct {
+	SeenBefore time.Time
+	MaxRows    int32
+}
+
+type StaleImportedJobsRow struct {
+	ID          int64
+	Fingerprint string
+	Url         string
+}
+
+func (q *Queries) StaleImportedJobs(ctx context.Context, arg StaleImportedJobsParams) ([]StaleImportedJobsRow, error) {
+	rows, err := q.db.Query(ctx, staleImportedJobs, arg.SeenBefore, arg.MaxRows)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []StaleImportedJobsRow{}
+	for rows.Next() {
+		var i StaleImportedJobsRow
+		if err := rows.Scan(&i.ID, &i.Fingerprint, &i.Url); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const startRun = `-- name: StartRun :one
 INSERT INTO crawl_runs (started_at, sources) VALUES ($1, $2) RETURNING id
 `

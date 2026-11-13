@@ -18,6 +18,7 @@ const (
 // Service runs crawls.
 type Service struct {
 	store       Store
+	imports     ImportChecker // nil: jobs added by URL are not rechecked
 	now         func() time.Time
 	parallelism int
 }
@@ -29,6 +30,9 @@ func NewService(store Store) *Service {
 
 // WithClock replaces the clock (tests).
 func (s *Service) WithClock(now func() time.Time) *Service { s.now = now; return s }
+
+// WithImportChecker lets each crawl recheck jobs added by URL with c.
+func (s *Service) WithImportChecker(c ImportChecker) *Service { s.imports = c; return s }
 
 // SourceError carries a short, stable reason per source (no response bodies, no URLs with secrets).
 type SourceError struct {
@@ -172,7 +176,47 @@ func (s *Service) Crawl(ctx context.Context, sources []Source) (rep Report, err 
 		return rep, err
 	}
 	rep.Stats.Closed = len(closing)
+	if err := s.recheckImports(ctx, runID, now, &rep.Stats); err != nil {
+		return rep, err
+	}
 	return rep, s.store.FinishRun(ctx, runID, rep.Stats, rep.Errors, s.now())
+}
+
+// recheckImports looks at the pages of jobs added by URL that were not seen for ImportRecheck: a job still there is
+// seen again, a gone one is closed, an unknown answer changes nothing.
+func (s *Service) recheckImports(ctx context.Context, runID int64, now time.Time, st *Stats) error {
+	if s.imports == nil {
+		return nil
+	}
+	jobs, err := s.store.StaleImports(ctx, now.Add(-ImportRecheck), MaxImportChecks)
+	if err != nil || len(jobs) == 0 {
+		return err
+	}
+	states := make([]ImportState, len(jobs))
+	s.parallel(len(jobs), func(i int) { states[i] = s.imports.CheckImport(ctx, jobs[i].URL) })
+	if err := ctx.Err(); err != nil {
+		return err
+	}
+	var seen []string
+	var gone []int64
+	for i, j := range jobs {
+		switch states[i] {
+		case ImportOpen:
+			seen = append(seen, j.Fingerprint)
+		case ImportGone:
+			gone = append(gone, j.ID)
+		case ImportUnknown:
+		}
+	}
+	st.Rechecked += len(jobs)
+	if _, err := s.store.Seen(ctx, seen, now); err != nil {
+		return err
+	}
+	if err := s.store.Close(ctx, runID, gone, now); err != nil {
+		return err
+	}
+	st.Closed += len(gone)
+	return nil
 }
 
 // unchanged marks the open jobs of sources that answered 304 as seen and listed.

@@ -252,3 +252,37 @@ func TestService_ImportJobFromLargePage(t *testing.T) {
 		t.Fatalf("posted %+v", disc.posted)
 	}
 }
+
+func TestService_CheckImport(t *testing.T) {
+	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch r.URL.Path {
+		case "/open":
+			_, _ = w.Write([]byte(`<html><body><script type="application/ld+json">{"@context":"https://schema.org","@type":"JobPosting",
+"title":"Platform Engineer","hiringOrganization":{"@type":"Organization","name":"Muster GmbH"}}</script></body></html>`))
+		case "/empty":
+			_, _ = w.Write([]byte(`<html><body></body></html>`))
+		case "/gone":
+			w.WriteHeader(http.StatusGone)
+		case "/error":
+			w.WriteHeader(http.StatusServiceUnavailable)
+		default:
+			http.NotFound(w, r)
+		}
+	}))
+	svc := NewService(Options{Client: ts.Client(), AllowPrivate: true})
+	for path, want := range map[string]discovery.ImportState{
+		"/open": discovery.ImportOpen, "/empty": discovery.ImportGone, "/gone": discovery.ImportGone,
+		"/missing": discovery.ImportGone, "/error": discovery.ImportUnknown,
+	} {
+		if got := svc.CheckImport(t.Context(), ts.URL+path); got != want {
+			t.Errorf("%s: state %d, want %d", path, got, want)
+		}
+	}
+	ts.Close()
+	if got := svc.CheckImport(t.Context(), ts.URL+"/open"); got != discovery.ImportUnknown {
+		t.Errorf("no answer: state %d, want unknown", got)
+	}
+	if got := NewService(Options{}).CheckImport(t.Context(), "http://127.0.0.1/job"); got != discovery.ImportUnknown {
+		t.Errorf("private address: state %d, want unknown", got)
+	}
+}
