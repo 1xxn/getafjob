@@ -28,8 +28,18 @@ type fakeTrackerStore struct {
 		appID uuid.UUID
 		ev    application.Event
 	}
-	bookmarked      []int64
-	externalApplied []int64
+	bookmarked []int64
+}
+
+// submitted lists the jobs whose application is submitted, in pipeline order.
+func (f *fakeTrackerStore) submitted() []int64 {
+	var ids []int64
+	for _, p := range f.pipeline {
+		if p.State == application.Submitted {
+			ids = append(ids, p.JobID)
+		}
+	}
+	return ids
 }
 
 func (f *fakeTrackerStore) PipelineApplications(_ context.Context, _ uuid.UUID) ([]application.PipelineApplication, error) {
@@ -119,21 +129,6 @@ func (f *fakeTrackerStore) BookmarkJob(_ context.Context, _ uuid.UUID, jobID int
 		State:     application.Matched,
 		Company:   "Bookmarked Inc",
 		Title:     "Software Engineer",
-		CreatedAt: now,
-		UpdatedAt: now,
-	})
-	return id, nil
-}
-
-func (f *fakeTrackerStore) MarkExternalApplied(_ context.Context, _ uuid.UUID, jobID int64, now time.Time) (uuid.UUID, error) {
-	f.externalApplied = append(f.externalApplied, jobID)
-	id := uuid.New()
-	f.pipeline = append(f.pipeline, application.PipelineApplication{
-		ID:        id,
-		JobID:     jobID,
-		State:     application.Submitted,
-		Company:   "External Inc",
-		Title:     "DevOps Specialist",
 		CreatedAt: now,
 		UpdatedAt: now,
 	})
@@ -462,8 +457,8 @@ func TestJobBookmarkAndApplyExternal(t *testing.T) {
 	if recExt.Code != http.StatusSeeOther {
 		t.Fatalf("jobApplyExternal status = %d, want 303", recExt.Code)
 	}
-	if len(st.externalApplied) != 1 || st.externalApplied[0] != 56 {
-		t.Fatalf("externalApplied = %v, want [56]", st.externalApplied)
+	if got := st.submitted(); len(got) != 1 || got[0] != 56 {
+		t.Fatalf("submitted = %v, want [56]", got)
 	}
 
 	// 3. Add external by posting job URL from tracker
@@ -481,8 +476,8 @@ func TestJobBookmarkAndApplyExternal(t *testing.T) {
 	if disc.importedURL != "https://jobs.example.org/posting/123" {
 		t.Errorf("importedURL = %q", disc.importedURL)
 	}
-	if len(st.externalApplied) != 2 || st.externalApplied[1] != 123 {
-		t.Errorf("externalApplied = %v, want second item 123", st.externalApplied)
+	if got := st.submitted(); len(got) != 2 || got[1] != 123 {
+		t.Errorf("submitted = %v, want second item 123", got)
 	}
 }
 

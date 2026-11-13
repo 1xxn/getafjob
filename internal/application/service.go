@@ -373,22 +373,25 @@ func (s *Service) Bookmark(ctx context.Context, userID uuid.UUID, jobID int64) (
 	return s.store.BookmarkJob(ctx, userID, jobID, s.now())
 }
 
-// ApplyExternal records that the candidate applied to the job externally (state: submitted).
+// ApplyExternal records that the user applied to the job outside getafjob: the application moves to submitted
+// through the state machine with an event. One that is already sent stays as it is; one in a run is refused.
 func (s *Service) ApplyExternal(ctx context.Context, userID uuid.UUID, jobID int64) (uuid.UUID, error) {
-	appID, err := s.store.MarkExternalApplied(ctx, userID, jobID, s.now())
+	id, err := s.store.BookmarkJob(ctx, userID, jobID, s.now())
 	if err != nil {
 		return uuid.Nil, err
 	}
-	// Record an application event for the audit trail
-	_ = s.store.Apply(ctx, userID, App{ID: appID, State: Matched, Version: 1}, Change{
-		Event:  EvSubmitted,
-		Actor:  ActorUser,
-		From:   Matched,
-		To:     Submitted,
-		Detail: map[string]any{"external": true},
-		At:     s.now(),
-	})
-	return appID, nil
+	app, err := s.store.Get(ctx, userID, id)
+	if err != nil {
+		return id, err
+	}
+	switch {
+	case app.State.Sent():
+		return id, nil
+	case app.State.Open():
+		return id, fmt.Errorf("%w: external submit on %s", ErrTransition, app.State)
+	}
+	_, err = s.Fire(ctx, userID, id, EvSubmitted, ActorUser, map[string]any{"external": true})
+	return id, err
 }
 
 // Candidate collects guard inputs for a job of the user.

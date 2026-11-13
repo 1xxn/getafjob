@@ -489,10 +489,6 @@ func (f *fakeAppStore) BookmarkJob(_ context.Context, _ uuid.UUID, _ int64, _ ti
 	return uuid.New(), nil
 }
 
-func (f *fakeAppStore) MarkExternalApplied(_ context.Context, _ uuid.UUID, _ int64, _ time.Time) (uuid.UUID, error) {
-	return uuid.New(), nil
-}
-
 type fakeShots map[string][]byte
 
 func (s fakeShots) Get(_ context.Context, _ uuid.UUID, key string) ([]byte, error) {
