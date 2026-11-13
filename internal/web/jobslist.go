@@ -236,7 +236,17 @@ func (s *Server) jobPanelData(ctx context.Context, u *identity.User, id int64, l
 		// The same rule as the queue guard (HardSkipped): a skip with a hard reason is never applied to.
 		p.Excluded = p.Excluded || (rs.Hard && j.Decision == matching.Skip)
 	}
-	slices.SortStableFunc(p.Reasons, func(a, b views.Reason) int { return cmp.Compare(abs(b.Points), abs(a.Points)) })
+	// The panel shows five reasons: the hard ones first (they decide on their own and carry no points, so sorting by
+	// points alone would cut them), then the weightiest.
+	slices.SortStableFunc(p.Reasons, func(a, b views.Reason) int {
+		if a.Hard != b.Hard {
+			if a.Hard {
+				return -1
+			}
+			return 1
+		}
+		return cmp.Compare(abs(b.Points), abs(a.Points))
+	})
 	p.Reasons = p.Reasons[:min(len(p.Reasons), 5)]
 	p.Excerpt = excerpt(j.Description, 420)
 	if s.Apps != nil {
