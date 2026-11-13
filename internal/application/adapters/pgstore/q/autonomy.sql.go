@@ -184,10 +184,13 @@ func (q *Queries) MatchScore(ctx context.Context, arg MatchScoreParams) (int16, 
 
 const navCounts = `-- name: NavCounts :one
 SELECT
-  count(*) FILTER (WHERE state = 'needs_input' AND (approval_asked_at IS NULL OR approved_at IS NOT NULL))::int AS needs_input,
+  count(*) FILTER (WHERE (approval_asked_at IS NULL OR approved_at IS NOT NULL) AND (state = 'needs_input'
+    OR (state = 'parked' AND (SELECT e.detail->>'reason' FROM application_events e
+      WHERE e.application_id = applications.id AND e.to_state = 'parked' ORDER BY e.id DESC LIMIT 1)
+      LIKE 'waiting for your answers%')))::int AS needs_input,
   count(*) FILTER (WHERE approval_asked_at IS NOT NULL AND approved_at IS NULL AND state IN ('needs_input', 'parked'))::int AS approvals,
   count(*) FILTER (WHERE state IN ('running', 'submitting'))::int AS running
-FROM applications WHERE user_id = $1
+FROM applications WHERE applications.user_id = $1
 `
 
 type NavCountsRow struct {
@@ -196,6 +199,7 @@ type NavCountsRow struct {
 	Running    int32
 }
 
+// needs_input also counts runs parked to wait for answers (the runner freed the browser); the page lists both.
 func (q *Queries) NavCounts(ctx context.Context, userID uuid.UUID) (NavCountsRow, error) {
 	row := q.db.QueryRow(ctx, navCounts, userID)
 	var i NavCountsRow
