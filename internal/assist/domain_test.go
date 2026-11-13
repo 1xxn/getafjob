@@ -15,7 +15,7 @@ func TestGenerateAndHashCode(t *testing.T) {
 	if err != nil {
 		t.Fatalf("GenerateCode() err = %v", err)
 	}
-	if !strings.HasPrefix(code, "GAJ-") || len(code) != 8 {
+	if !strings.HasPrefix(code, "GAJ-") || len(code) != 13 || code[8] != '-' {
 		t.Fatalf("unexpected code format: %q", code)
 	}
 

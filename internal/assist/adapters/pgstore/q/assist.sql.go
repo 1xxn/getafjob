@@ -22,6 +22,31 @@ func (q *Queries) CleanupExpiredPairings(ctx context.Context, expiresAt time.Tim
 	return err
 }
 
+const consumePairingCode = `-- name: ConsumePairingCode :one
+DELETE FROM assist_pairings
+WHERE code_hash = $1 AND expires_at > $2
+RETURNING id, user_id, code_hash, created_at, expires_at
+`
+
+type ConsumePairingCodeParams struct {
+	CodeHash  []byte
+	ExpiresAt time.Time
+}
+
+// Redeems a valid code once: two concurrent requests with the same code cannot both get it.
+func (q *Queries) ConsumePairingCode(ctx context.Context, arg ConsumePairingCodeParams) (AssistPairing, error) {
+	row := q.db.QueryRow(ctx, consumePairingCode, arg.CodeHash, arg.ExpiresAt)
+	var i AssistPairing
+	err := row.Scan(
+		&i.ID,
+		&i.UserID,
+		&i.CodeHash,
+		&i.CreatedAt,
+		&i.ExpiresAt,
+	)
+	return i, err
+}
+
 const createExtensionToken = `-- name: CreateExtensionToken :exec
 INSERT INTO assist_tokens (id, user_id, token_hash, client_name, created_at, expires_at, last_used_at)
 VALUES ($1, $2, $3, $4, $5, $6, $7)
@@ -74,16 +99,6 @@ func (q *Queries) CreatePairingCode(ctx context.Context, arg CreatePairingCodePa
 	return err
 }
 
-const deletePairingCode = `-- name: DeletePairingCode :exec
-DELETE FROM assist_pairings
-WHERE id = $1
-`
-
-func (q *Queries) DeletePairingCode(ctx context.Context, id uuid.UUID) error {
-	_, err := q.db.Exec(ctx, deletePairingCode, id)
-	return err
-}
-
 const getExtensionToken = `-- name: GetExtensionToken :one
 SELECT id, user_id, token_hash, client_name, created_at, expires_at, last_used_at
 FROM assist_tokens
@@ -106,30 +121,6 @@ func (q *Queries) GetExtensionToken(ctx context.Context, arg GetExtensionTokenPa
 		&i.CreatedAt,
 		&i.ExpiresAt,
 		&i.LastUsedAt,
-	)
-	return i, err
-}
-
-const getPairingCode = `-- name: GetPairingCode :one
-SELECT id, user_id, code_hash, created_at, expires_at
-FROM assist_pairings
-WHERE code_hash = $1 AND expires_at > $2
-`
-
-type GetPairingCodeParams struct {
-	CodeHash  []byte
-	ExpiresAt time.Time
-}
-
-func (q *Queries) GetPairingCode(ctx context.Context, arg GetPairingCodeParams) (AssistPairing, error) {
-	row := q.db.QueryRow(ctx, getPairingCode, arg.CodeHash, arg.ExpiresAt)
-	var i AssistPairing
-	err := row.Scan(
-		&i.ID,
-		&i.UserID,
-		&i.CodeHash,
-		&i.CreatedAt,
-		&i.ExpiresAt,
 	)
 	return i, err
 }

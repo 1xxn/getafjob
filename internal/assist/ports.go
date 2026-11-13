@@ -10,8 +10,8 @@ import (
 // Store persists pairing codes and extension tokens.
 type Store interface {
 	CreatePairingCode(ctx context.Context, p PairingCode) error
-	GetPairingCode(ctx context.Context, codeHash []byte, now time.Time) (PairingCode, error)
-	DeletePairingCode(ctx context.Context, id uuid.UUID) error
+	// ConsumePairingCode redeems a valid code once (ErrNotFound when unknown, expired or already used).
+	ConsumePairingCode(ctx context.Context, codeHash []byte, now time.Time) (PairingCode, error)
 	CreateExtensionToken(ctx context.Context, t Token) error
 	GetExtensionToken(ctx context.Context, tokenHash []byte, now time.Time) (Token, error)
 	TouchExtensionToken(ctx context.Context, tokenHash []byte, now time.Time) error

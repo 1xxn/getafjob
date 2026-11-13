@@ -2,14 +2,11 @@
 INSERT INTO assist_pairings (id, user_id, code_hash, created_at, expires_at)
 VALUES ($1, $2, $3, $4, $5);
 
--- name: GetPairingCode :one
-SELECT id, user_id, code_hash, created_at, expires_at
-FROM assist_pairings
-WHERE code_hash = $1 AND expires_at > $2;
-
--- name: DeletePairingCode :exec
+-- name: ConsumePairingCode :one
+-- Redeems a valid code once: two concurrent requests with the same code cannot both get it.
 DELETE FROM assist_pairings
-WHERE id = $1;
+WHERE code_hash = $1 AND expires_at > $2
+RETURNING id, user_id, code_hash, created_at, expires_at;
 
 -- name: CleanupExpiredPairings :exec
 DELETE FROM assist_pairings

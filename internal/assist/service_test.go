@@ -28,21 +28,13 @@ func (m *mockStore) CreatePairingCode(_ context.Context, p assist.PairingCode) e
 	return nil
 }
 
-func (m *mockStore) GetPairingCode(_ context.Context, codeHash []byte, now time.Time) (assist.PairingCode, error) {
+func (m *mockStore) ConsumePairingCode(_ context.Context, codeHash []byte, now time.Time) (assist.PairingCode, error) {
 	p, ok := m.pairings[string(codeHash)]
 	if !ok || p.ExpiresAt.Before(now) {
 		return assist.PairingCode{}, assist.ErrNotFound
 	}
+	delete(m.pairings, string(codeHash))
 	return p, nil
-}
-
-func (m *mockStore) DeletePairingCode(_ context.Context, id uuid.UUID) error {
-	for k, p := range m.pairings {
-		if p.ID == id {
-			delete(m.pairings, k)
-		}
-	}
-	return nil
 }
 
 func (m *mockStore) CreateExtensionToken(_ context.Context, t assist.Token) error {

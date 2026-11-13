@@ -59,11 +59,11 @@ func (s *Store) CreatePairingCode(ctx context.Context, p assist.PairingCode) err
 	})
 }
 
-// GetPairingCode retrieves a valid pairing code by its hash.
-func (s *Store) GetPairingCode(ctx context.Context, codeHash []byte, now time.Time) (assist.PairingCode, error) {
+// ConsumePairingCode redeems a valid pairing code by its hash; it is gone afterwards.
+func (s *Store) ConsumePairingCode(ctx context.Context, codeHash []byte, now time.Time) (assist.PairingCode, error) {
 	var p assist.PairingCode
 	err := s.system(ctx, func(qs *q.Queries) error {
-		r, err := qs.GetPairingCode(ctx, q.GetPairingCodeParams{
+		r, err := qs.ConsumePairingCode(ctx, q.ConsumePairingCodeParams{
 			CodeHash:  codeHash,
 			ExpiresAt: now,
 		})
@@ -80,13 +80,6 @@ func (s *Store) GetPairingCode(ctx context.Context, codeHash []byte, now time.Ti
 		return nil
 	})
 	return p, err
-}
-
-// DeletePairingCode removes a pairing code.
-func (s *Store) DeletePairingCode(ctx context.Context, id uuid.UUID) error {
-	return s.system(ctx, func(qs *q.Queries) error {
-		return qs.DeletePairingCode(ctx, id)
-	})
 }
 
 // CreateExtensionToken stores a new extension token.
