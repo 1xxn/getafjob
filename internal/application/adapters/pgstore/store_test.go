@@ -299,8 +299,17 @@ func TestEvidenceAndScreenshotRetention(t *testing.T) {
 		Step:       "execute",
 		Page:       1,
 		URL:        "https://jobs.example.org/apply",
-		Data:       []byte(`{"filled":[{"id":"f-1","label":"First name","shown":"Max","source":"profile:personal.first_name"},{"id":"f-2","label":"Email","shown":"max@example.org","source":"profile:personal.email"}]}`),
+		Data:       []byte(`{"filled":[{"field_id":"f-1","label":"First name","shown":"Mx","source":"profile:personal.first_name"},{"field_id":"f-2","label":"Email","shown":"max@example.org","source":"profile:personal.email"}]}`),
 		Screenshot: "runs/1/execute.png",
+	}); err != nil {
+		t.Fatal(err)
+	}
+	// A second fill of the same page (after answers) replaces the field instead of listing it twice.
+	if err := runs.Checkpoint(ctx, ref, application.Checkpoint{
+		Step: "execute",
+		Page: 1,
+		URL:  "https://jobs.example.org/apply",
+		Data: []byte(`{"filled":[{"field_id":"f-1","label":"First name","shown":"Max","source":"profile:personal.first_name"}]}`),
 	}); err != nil {
 		t.Fatal(err)
 	}
