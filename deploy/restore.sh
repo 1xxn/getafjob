@@ -11,6 +11,7 @@ BACKUP_DIR="${GETAFJOB_BACKUP_DIR:-deploy/backups}"
 RESTIC_REPOSITORY="${RESTIC_REPOSITORY:-$BACKUP_DIR/restic}"
 SNAPSHOT_ID="${RESTIC_SNAPSHOT_ID:-latest}"
 RESTORE_SECRETS="${RESTORE_SECRETS:-0}"
+ASSUME_YES="${RESTORE_YES:-0}"
 
 usage() {
   cat <<EOF
@@ -21,6 +22,7 @@ Restore getafjob PostgreSQL database and blob store from an encrypted restic bac
 Options:
   --snapshot <id>         Snapshot ID to restore (default: latest)
   --restore-secrets       Restore secrets if present in the snapshot
+  --yes                   Do not ask before replacing the database and the blob store
   -h, --help              Show this help
 
 Environment variables:
@@ -37,6 +39,7 @@ while [ $# -gt 0 ]; do
   case "$1" in
     --snapshot) SNAPSHOT_ID="$2"; shift 2 ;;
     --restore-secrets) RESTORE_SECRETS=1; shift ;;
+    --yes) ASSUME_YES=1; shift ;;
     -h|--help) usage ;;
     -*) echo "Unknown option: $1" >&2; usage ;;
     *) SNAPSHOT_ID="$1"; shift ;;
@@ -79,7 +82,8 @@ run_restic() {
       for var in AWS_ACCESS_KEY_ID AWS_SECRET_ACCESS_KEY AWS_DEFAULT_REGION AWS_ENDPOINT \
                  B2_ACCOUNT_ID B2_ACCOUNT_KEY AZURE_ACCOUNT_NAME AZURE_ACCOUNT_KEY; do
         if [ -n "${!var:-}" ]; then
-          docker_args+=(-e "$var=${!var}")
+          export "${var?}"
+          docker_args+=(-e "$var") # by name: the value never shows in the process list
         fi
       done
     else
@@ -97,12 +101,25 @@ run_restic() {
 
     docker_args+=(
       -e "RESTIC_REPOSITORY=$repo_arg"
-      -e "RESTIC_PASSWORD=$RESTIC_PASSWORD"
+      -e RESTIC_PASSWORD
       "$RESTIC_IMAGE"
     )
-    "${docker_args[@]}" "$@"
+    RESTIC_PASSWORD="$RESTIC_PASSWORD" "${docker_args[@]}" "$@"
   fi
 }
+
+# A restore replaces all data of the project: ask first, unless --yes says it was meant.
+if [ "$ASSUME_YES" != "1" ]; then
+  if [ ! -t 0 ]; then
+    echo "ERROR: a restore replaces the database and the blob store of '$COMPOSE_PROJECT'; pass --yes to confirm." >&2
+    exit 1
+  fi
+  read -r -p "Replace all data of '$COMPOSE_PROJECT' with snapshot $SNAPSHOT_ID? Type the project name: " answer
+  if [ "$answer" != "$COMPOSE_PROJECT" ]; then
+    echo "Aborted." >&2
+    exit 1
+  fi
+fi
 
 echo "=== Starting getafjob restore ==="
 echo "Repository: $RESTIC_REPOSITORY"
@@ -169,7 +186,7 @@ if [ -n "$blobs_dir" ] && [ -d "$blobs_dir" ]; then
   docker run --rm \
     -v "${COMPOSE_PROJECT}_blobs:/dst" \
     -v "$(cd "$blobs_dir" && pwd):/src:ro" \
-    alpine sh -c "rm -rf /dst/* && cp -a /src/. /dst/ 2>/dev/null || true; chown -R 65532:65532 /dst"
+    alpine sh -c "find /dst -mindepth 1 -delete && cp -a /src/. /dst/ && chown -R 65532:65532 /dst"
 fi
 
 if [ "$RESTORE_SECRETS" = "1" ] && [ -n "$secrets_dir_restored" ] && [ -d "$secrets_dir_restored" ]; then

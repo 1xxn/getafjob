@@ -71,7 +71,7 @@ echo "Disaster simulated: tables=$wiped_tables, blobs=$wiped_blobs"
 echo "4. Running restore.sh..."
 RESTIC_REPOSITORY="$test_repo" \
 RESTIC_PASSWORD="$test_password" \
-deploy/restore.sh latest
+deploy/restore.sh --yes latest
 
 # 7. Verify restored state
 echo "5. Verifying restored data integrity..."
