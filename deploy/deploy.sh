@@ -287,23 +287,27 @@ else
   echo "==> [1/4] Skipping image pull (--skip-pull requested)..."
 fi
 
-# Cosign verification if requested/available
+# Cosign verification of every getafjob image (all three are signed in CI), if requested/available
 if [ "$VERIFY_COSIGN" != "false" ]; then
   if command -v cosign >/dev/null 2>&1; then
     echo "==> Verifying cosign signatures for $TARGET_VERSION..."
-    app_img="${GETAFJOB_APP_IMAGE:-ghcr.io/1xxn/getafjob}:${TARGET_VERSION}"
-    if [[ "$app_img" == ghcr.io/* ]]; then
-      if ! cosign verify "$app_img" \
-        --certificate-identity-regexp 'https://github.com/1xxn/getafjob/.github/workflows/' \
+    for img in "${GETAFJOB_APP_IMAGE:-ghcr.io/1xxn/getafjob}" "${GETAFJOB_RUNNER_IMAGE:-ghcr.io/1xxn/getafjob-runner}" \
+      "${GETAFJOB_EGRESS_IMAGE:-ghcr.io/1xxn/getafjob-egress}"; do
+      ref="$img:$TARGET_VERSION"
+      [[ "$ref" == ghcr.io/* ]] || continue
+      if ! cosign verify "$ref" \
+        --certificate-identity-regexp '^https://github\.com/1xxn/getafjob/\.github/workflows/' \
         --certificate-oidc-issuer https://token.actions.githubusercontent.com >/dev/null 2>&1; then
-        echo "ERROR: Cosign signature verification failed for $app_img!" >&2
+        echo "ERROR: Cosign signature verification failed for $ref!" >&2
         exit 1
       fi
-      echo "    Signature verified: $app_img"
-    fi
+      echo "    Signature verified: $ref"
+    done
   elif [ "$VERIFY_COSIGN" = "true" ]; then
     echo "ERROR: Cosign verification required (COSIGN_VERIFY=true) but cosign not found on PATH!" >&2
     exit 1
+  elif [ "$ENV_NAME" = "production" ]; then
+    echo "WARNING: cosign not found: image signatures are NOT verified. Install cosign or set COSIGN_VERIFY=true." >&2
   fi
 fi
 
