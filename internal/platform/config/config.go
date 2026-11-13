@@ -97,7 +97,7 @@ type Config struct {
 	AIEnabled bool
 	// AnthropicAPIKey is the operator's Anthropic API key. Empty: users must supply their own key.
 	AnthropicAPIKey Secret
-	// AnthropicModel is the default Anthropic model for AI operations. Default: claude-3-5-haiku-20241022.
+	// AnthropicModel is the default Anthropic model for AI operations. Default: claude-haiku-5-5.
 	AnthropicModel string
 	// AIBudgetPerUserCents is the budget cap per user in USD cents when using the operator key. Default: 500 (5 USD).
 	AIBudgetPerUserCents int
@@ -177,7 +177,7 @@ var specs = []spec{
 	{"LIMITS", "off", setLimits},
 	{"AI_ENABLED", "false", func(c *Config, v string) error { return setBool(&c.AIEnabled, v) }},
 	{"ANTHROPIC_API_KEY", "", func(c *Config, v string) error { c.AnthropicAPIKey = Secret(v); return nil }},
-	{"ANTHROPIC_MODEL", "claude-3-5-haiku-20241022", func(c *Config, v string) error { c.AnthropicModel = strings.TrimSpace(v); return nil }},
+	{"ANTHROPIC_MODEL", "claude-haiku-5-5", func(c *Config, v string) error { c.AnthropicModel = strings.TrimSpace(v); return nil }},
 	{"AI_BUDGET_PER_USER_CENTS", "500", func(c *Config, v string) error {
 		n, err := strconv.Atoi(v)
 		if err != nil || n < 0 {

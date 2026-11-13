@@ -58,7 +58,7 @@ func TestLoadDefaults(t *testing.T) {
 	if c.AIEnabled {
 		t.Errorf("AIEnabled default = true, want false")
 	}
-	if c.AnthropicModel != "claude-3-5-haiku-20241022" || c.AIBudgetPerUserCents != 500 {
+	if c.AnthropicModel != "claude-haiku-5-5" || c.AIBudgetPerUserCents != 500 {
 		t.Errorf("AI defaults wrong: model=%q, budget=%d", c.AnthropicModel, c.AIBudgetPerUserCents)
 	}
 }
@@ -75,7 +75,7 @@ func TestLoadValuesAndFiles(t *testing.T) {
 		"GETAFJOB_EASY_APPLY_ENABLED":       "true",
 		"GETAFJOB_AI_ENABLED":               "true",
 		"GETAFJOB_ANTHROPIC_API_KEY":        "sk-ant-test-key",
-		"GETAFJOB_ANTHROPIC_MODEL":          "claude-3-5-sonnet-20241022",
+		"GETAFJOB_ANTHROPIC_MODEL":          "claude-sonnet-5-5",
 		"GETAFJOB_AI_BUDGET_PER_USER_CENTS": "1000",
 		"GETAFJOB_SHUTDOWN_TIMEOUT":         "5s",
 		"GETAFJOB_HTTP_ADRR":                "typo",
@@ -107,7 +107,7 @@ func TestLoadValuesAndFiles(t *testing.T) {
 	if !c.Limits {
 		t.Errorf("Limits = off, want on")
 	}
-	if c.AnthropicAPIKey.Reveal() != "sk-ant-test-key" || c.AnthropicModel != "claude-3-5-sonnet-20241022" || c.AIBudgetPerUserCents != 1000 {
+	if c.AnthropicAPIKey.Reveal() != "sk-ant-test-key" || c.AnthropicModel != "claude-sonnet-5-5" || c.AIBudgetPerUserCents != 1000 {
 		t.Errorf("AI values wrong: key=%q, model=%q, budget=%d", c.AnthropicAPIKey.Reveal(), c.AnthropicModel, c.AIBudgetPerUserCents)
 	}
 	if len(c.Unknown) != 1 || c.Unknown[0] != "GETAFJOB_HTTP_ADRR" {

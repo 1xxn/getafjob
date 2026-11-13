@@ -36,11 +36,10 @@ const (
 	CategoryUnrelated    ClassifyCategory = "unrelated"
 )
 
-// Standard Anthropic models.
+// Anthropic models getafjob prices. The tasks are short structured calls, so the small model is the default.
 const (
-	ModelClaude35Haiku  = "claude-3-5-haiku-20241022"
-	ModelClaude35Sonnet = "claude-3-5-sonnet-20241022"
-	ModelClaude3Haiku   = "claude-3-haiku-20240307"
+	ModelHaiku  = "claude-haiku-5-5"
+	ModelSonnet = "claude-sonnet-5-5"
 )
 
 // Domain errors.
@@ -174,30 +173,23 @@ type ClassifyResult struct {
 	Reasoning  string           `json:"reasoning,omitempty"`
 }
 
-// CalculateCostCents computes the cost in USD cents for token consumption.
-// Prices per 1M tokens (cents):
-//   - Claude 3.5 Haiku:  80c prompt, 400c completion
-//   - Claude 3.5 Sonnet: 300c prompt, 1500c completion
-//   - Claude 3 Haiku:    25c prompt, 125c completion
-//   - Default:           300c prompt, 1500c completion
+// CalculateCostCents computes the cost in USD cents for token consumption, rounded up. Prices per 1M tokens
+// (cents): Haiku 5.5 10 in / 50 out (prompts over 100K tokens 50 / 250), Sonnet 5.5 200 / 1000. An unknown model
+// is priced like Opus 5.5 (400 / 2000) so that the budget is never undercounted.
 func CalculateCostCents(model string, tokensIn, tokensOut int) int {
 	if tokensIn <= 0 && tokensOut <= 0 {
 		return 0
 	}
 	var inCentsPerMTok, outCentsPerMTok int64
 	switch {
-	case strings.Contains(model, "3-5-haiku"):
-		inCentsPerMTok = 80
-		outCentsPerMTok = 400
-	case strings.Contains(model, "3-5-sonnet"):
-		inCentsPerMTok = 300
-		outCentsPerMTok = 1500
-	case strings.Contains(model, "3-haiku"):
-		inCentsPerMTok = 25
-		outCentsPerMTok = 125
+	case strings.HasPrefix(model, "claude-haiku-5-5") && tokensIn > 100_000:
+		inCentsPerMTok, outCentsPerMTok = 50, 250
+	case strings.HasPrefix(model, "claude-haiku-5-5"):
+		inCentsPerMTok, outCentsPerMTok = 10, 50
+	case strings.HasPrefix(model, "claude-sonnet-5-5"):
+		inCentsPerMTok, outCentsPerMTok = 200, 1000
 	default:
-		inCentsPerMTok = 300
-		outCentsPerMTok = 1500
+		inCentsPerMTok, outCentsPerMTok = 400, 2000
 	}
 
 	totalMillionths := int64(tokensIn)*inCentsPerMTok + int64(tokensOut)*outCentsPerMTok
