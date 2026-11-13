@@ -156,8 +156,16 @@ func parkReasonKey(reason string) string {
 		return "dash.park.check"
 	case strings.Contains(r, "navigation failed"), strings.Contains(r, "open the posting"):
 		return "dash.park.unreachable"
-	case strings.Contains(r, "submit not registered"), strings.Contains(r, "no click"):
+	case strings.Contains(r, "submit not registered"), strings.Contains(r, "no click"), strings.Contains(r, "no effect"):
 		return "dash.park.no_confirm"
+	case strings.Contains(r, "form rejected"):
+		return "dash.park.form_rejected"
+	case r == strings.ToLower(application.ErrExcluded.Error()):
+		return "dash.park.excluded"
+	case r == strings.ToLower(application.ErrDuplicate.Error()):
+		return "dash.park.duplicate"
+	case r == strings.ToLower(application.ErrCompanyWindow.Error()):
+		return "dash.park.company"
 	default:
 		return "dash.park.other"
 	}
