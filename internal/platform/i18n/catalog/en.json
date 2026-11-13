@@ -170,6 +170,7 @@
   "jobs.open_posting": "Open the posting",
   "jobs.pages": "Pages",
   "jobs.pending": "No results yet. Fill in your search preferences; jobs are rated after the next crawl.",
+  "jobs.pending_action": "Fill in search preferences",
   "jobs.prev": "Previous page",
   "jobs.reason_filter": "Filter",
   "jobs.reasons": "Why this score",
