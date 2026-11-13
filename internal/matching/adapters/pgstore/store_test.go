@@ -295,6 +295,22 @@ func TestAdvancedDiscoveryFiltersSortingAndBlocklist(t *testing.T) {
 			t.Fatalf("BlockedCount: got %d, want 2", l.BlockedCount)
 		}
 
+		// Patterns are words, not LIKE patterns: "_" and "%" block nothing more.
+		for _, p := range []string{"_", "%"} {
+			if err := ls.AddBlocklist(ctx, uID, "keyword", p); err != nil {
+				t.Fatal(err)
+			}
+		}
+		if l, err := ls.List(ctx, uID, matching.Filter{Decisions: []matching.Decision{matching.Match, matching.Maybe}}); err != nil ||
+			len(l.Items) != 3 || l.BlockedCount != 2 {
+			t.Fatalf("wildcard patterns: %d items, %d blocked, %v", len(l.Items), l.BlockedCount, err)
+		}
+		for _, p := range []string{"_", "%"} {
+			if err := ls.RemoveBlocklistByPattern(ctx, uID, "keyword", p); err != nil {
+				t.Fatal(err)
+			}
+		}
+
 		// Detail on blocked job reports Blocked == true
 		d4, err := ls.Detail(ctx, uID, j4)
 		if err != nil || !d4.Blocked {

@@ -22,8 +22,8 @@ SELECT j.id, j.title, j.company, j.location, j.workplace, j.posted, j.first_seen
     SELECT 1 FROM user_blocklist b
     WHERE b.user_id = m.user_id
       AND (
-        (b.kind = 'company' AND j.company ILIKE '%' || b.pattern || '%')
-        OR (b.kind = 'keyword' AND (j.company ILIKE '%' || b.pattern || '%' OR j.title ILIKE '%' || b.pattern || '%' OR j.description ILIKE '%' || b.pattern || '%'))
+        (b.kind = 'company' AND j.company ILIKE '%' || like_literal(b.pattern) || '%')
+        OR (b.kind = 'keyword' AND (j.company ILIKE '%' || like_literal(b.pattern) || '%' OR j.title ILIKE '%' || like_literal(b.pattern) || '%' OR j.description ILIKE '%' || like_literal(b.pattern) || '%'))
       )
   ) AS blocked,
   count(*) OVER () AS total
@@ -45,8 +45,8 @@ WHERE m.user_id = sqlc.arg(user_id) AND j.status = 'open'
         SELECT 1 FROM user_blocklist b
         WHERE b.user_id = m.user_id
           AND (
-            (b.kind = 'company' AND j.company ILIKE '%' || b.pattern || '%')
-            OR (b.kind = 'keyword' AND (j.company ILIKE '%' || b.pattern || '%' OR j.title ILIKE '%' || b.pattern || '%' OR j.description ILIKE '%' || b.pattern || '%'))
+            (b.kind = 'company' AND j.company ILIKE '%' || like_literal(b.pattern) || '%')
+            OR (b.kind = 'keyword' AND (j.company ILIKE '%' || like_literal(b.pattern) || '%' OR j.title ILIKE '%' || like_literal(b.pattern) || '%' OR j.description ILIKE '%' || like_literal(b.pattern) || '%'))
           )
       )
     ELSE
@@ -54,8 +54,8 @@ WHERE m.user_id = sqlc.arg(user_id) AND j.status = 'open'
         SELECT 1 FROM user_blocklist b
         WHERE b.user_id = m.user_id
           AND (
-            (b.kind = 'company' AND j.company ILIKE '%' || b.pattern || '%')
-            OR (b.kind = 'keyword' AND (j.company ILIKE '%' || b.pattern || '%' OR j.title ILIKE '%' || b.pattern || '%' OR j.description ILIKE '%' || b.pattern || '%'))
+            (b.kind = 'company' AND j.company ILIKE '%' || like_literal(b.pattern) || '%')
+            OR (b.kind = 'keyword' AND (j.company ILIKE '%' || like_literal(b.pattern) || '%' OR j.title ILIKE '%' || like_literal(b.pattern) || '%' OR j.description ILIKE '%' || like_literal(b.pattern) || '%'))
           )
       )
     END
@@ -75,8 +75,8 @@ WHERE m.user_id = $1 AND j.status = 'open'
     SELECT 1 FROM user_blocklist b
     WHERE b.user_id = m.user_id
       AND (
-        (b.kind = 'company' AND j.company ILIKE '%' || b.pattern || '%')
-        OR (b.kind = 'keyword' AND (j.company ILIKE '%' || b.pattern || '%' OR j.title ILIKE '%' || b.pattern || '%' OR j.description ILIKE '%' || b.pattern || '%'))
+        (b.kind = 'company' AND j.company ILIKE '%' || like_literal(b.pattern) || '%')
+        OR (b.kind = 'keyword' AND (j.company ILIKE '%' || like_literal(b.pattern) || '%' OR j.title ILIKE '%' || like_literal(b.pattern) || '%' OR j.description ILIKE '%' || like_literal(b.pattern) || '%'))
       )
   )
 GROUP BY m.decision;
@@ -88,8 +88,8 @@ WHERE m.user_id = $1 AND j.status = 'open'
     SELECT 1 FROM user_blocklist b
     WHERE b.user_id = m.user_id
       AND (
-        (b.kind = 'company' AND j.company ILIKE '%' || b.pattern || '%')
-        OR (b.kind = 'keyword' AND (j.company ILIKE '%' || b.pattern || '%' OR j.title ILIKE '%' || b.pattern || '%' OR j.description ILIKE '%' || b.pattern || '%'))
+        (b.kind = 'company' AND j.company ILIKE '%' || like_literal(b.pattern) || '%')
+        OR (b.kind = 'keyword' AND (j.company ILIKE '%' || like_literal(b.pattern) || '%' OR j.title ILIKE '%' || like_literal(b.pattern) || '%' OR j.description ILIKE '%' || like_literal(b.pattern) || '%'))
       )
   );
 
@@ -103,8 +103,8 @@ SELECT j.id, j.title, j.company, j.location, j.workplace, j.posted, j.first_seen
     SELECT 1 FROM user_blocklist b
     WHERE b.user_id = m.user_id
       AND (
-        (b.kind = 'company' AND j.company ILIKE '%' || b.pattern || '%')
-        OR (b.kind = 'keyword' AND (j.company ILIKE '%' || b.pattern || '%' OR j.title ILIKE '%' || b.pattern || '%' OR j.description ILIKE '%' || b.pattern || '%'))
+        (b.kind = 'company' AND j.company ILIKE '%' || like_literal(b.pattern) || '%')
+        OR (b.kind = 'keyword' AND (j.company ILIKE '%' || like_literal(b.pattern) || '%' OR j.title ILIKE '%' || like_literal(b.pattern) || '%' OR j.description ILIKE '%' || like_literal(b.pattern) || '%'))
       )
   ) AS blocked
 FROM matches m JOIN jobs j ON j.id = m.job_id WHERE m.user_id = $1 AND j.id = $2;
