@@ -411,6 +411,7 @@ type User struct {
 	CreatedAt   time.Time
 	DisabledAt  *time.Time
 	DockLayout  string
+	LastSeenAt  *time.Time
 }
 
 type UserAiSetting struct {
