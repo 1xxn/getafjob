@@ -392,6 +392,8 @@
   "profile.station.field_of_study": "Fachrichtung",
   "profile.station.grade": "Note",
   "profile.station.institution": "Institution / Universität",
+  "profile.station.invalid": "Der Eintrag wurde nicht gespeichert: Gib eine Position oder eine Firma an (einen Abschluss oder eine Hochschule) und halte jedes Feld kurz.",
+  "profile.station.too_many": "Der Eintrag wurde nicht gespeichert: Das Profil fasst höchstens 100 Stationen jeder Art.",
   "profile.station.is_current": "Ich arbeite derzeit hier",
   "profile.station.is_current_edu": "Aktuell im Studium / in Ausbildung",
   "profile.station.location": "Standort",
