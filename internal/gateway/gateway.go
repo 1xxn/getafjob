@@ -513,7 +513,7 @@ func (s *Server) Ask(ctx context.Context, req *runnerv1.AskRequest) (*runnerv1.A
 			opts = append(opts, clip(o, 200))
 		}
 		out[i] = application.Question{Kind: clip(q.GetKind(), 20), Label: clip(q.GetLabel(), 300),
-			Draft: clip(q.GetDraft(), 5000), Input: clip(q.GetInput(), 20), Options: opts}
+			Input: clip(q.GetInput(), 20), Options: opts}
 	}
 	if err := s.Runs.Ask(ctx, ref, out); err != nil {
 		return nil, code(err)

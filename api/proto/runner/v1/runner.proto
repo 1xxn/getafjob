@@ -177,8 +177,8 @@ message Question {
   // field or captcha.
   string kind = 1;
   string label = 2;
-  // An AI suggestion, used only after the user approved it.
-  string draft = 3;
+  reserved 3;
+  reserved "draft";
   // The field's kind as extracted (text, textarea, checkbox, checkbox_group, radio, select, combobox, date, file);
   // the web form renders a matching input.
   string input = 4;

@@ -15,10 +15,6 @@ import (
 	"github.com/google/uuid"
 	"github.com/riverqueue/river"
 
-	"github.com/1xxn/getafjob/internal/ai"
-	aianthropic "github.com/1xxn/getafjob/internal/ai/adapters/anthropic"
-	aicrypto "github.com/1xxn/getafjob/internal/ai/adapters/crypto"
-	aistore "github.com/1xxn/getafjob/internal/ai/adapters/pgstore"
 	"github.com/1xxn/getafjob/internal/application"
 	applicationstore "github.com/1xxn/getafjob/internal/application/adapters/pgstore"
 	"github.com/1xxn/getafjob/internal/discovery"
@@ -119,15 +115,6 @@ func serve(ctx context.Context, cfg config.Config, logger *slog.Logger) error {
 	portalsStore := portalsstore.New(pool)
 	portalsCipher := portalscrypto.NewCipher(env)
 	portalsSvc := portals.NewService(portalsStore, portalsCipher, newAutonomyAdapter(apps), cfg.EasyApplyEnabled)
-	aiStore := aistore.New(pool)
-	aiCipher := aicrypto.NewCipher(env)
-	var aiClient *aianthropic.Client
-	if cfg.EgressProxy != nil {
-		aiClient = aianthropic.NewClient(aianthropic.WithHTTPClient(netguard.NewClient(netguard.ClientOptions{Proxy: cfg.EgressProxy, Timeout: 45 * time.Second})))
-	} else {
-		aiClient = aianthropic.NewClient()
-	}
-	aiSvc := ai.NewService(aiStore, aiCipher, aiClient, cfg.AIEnabled, cfg.AnthropicAPIKey.Reveal(), cfg.AnthropicModel, cfg.AIBudgetPerUserCents)
 	liveEvents := events.NewHub()
 	go events.Listen(ctx, pool, liveEvents, logger)
 	var gw *gateway.Server
@@ -170,7 +157,7 @@ func serve(ctx context.Context, cfg config.Config, logger *slog.Logger) error {
 	})
 	(&web.Server{Identity: ids, Logger: logger, Profile: profiles, Documents: docs, Items: items, Stations: stations,
 		Importer: cvimport.NewImporter(docs, profiles, stations, extractor), Jobs: listings, Searches: matching.NewSavedSearches(mstore, listings), Discovery: discoverySvc,
-		PushStore: webpush.NewStore(pool), VAPIDPublicKey: vapidPub, Apps: apps, Tracking: trackingSvc, Notify: notifySvc, Assist: assistSvc, Portals: portalsSvc, AI: aiSvc, Privacy: privacySvc, Shots: sealedFiles, Handoffs: gw, Events: liveEvents, StyleGuide: cfg.DevStyleGuide,
+		PushStore: webpush.NewStore(pool), VAPIDPublicKey: vapidPub, Apps: apps, Tracking: trackingSvc, Notify: notifySvc, Assist: assistSvc, Portals: portalsSvc, Privacy: privacySvc, Shots: sealedFiles, Handoffs: gw, Events: liveEvents, StyleGuide: cfg.DevStyleGuide,
 		System: systemFacts{pool: pool, cfg: cfg}, Ops: adminOps{pool: pool, queue: inserter}}).Register(mux)
 
 	h := httpx.Instrument(httpx.Protect(httpx.Routes(mux), maxBody, cfg.PublicURL.Scheme == "https",

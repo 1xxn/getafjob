@@ -118,8 +118,6 @@ type SettingsSummary struct {
 	RunnerChoice     string          `json:"runner_choice,omitempty"`
 	EasyApplyEnabled bool            `json:"easy_apply_enabled,omitempty"`
 	Portals          []PortalSummary `json:"portals,omitempty"`
-	AIEnabled        bool            `json:"ai_enabled,omitempty"`
-	AISpentCents     int64           `json:"ai_spent_cents,omitempty"`
 }
 
 // PortalSummary holds portal session metadata.

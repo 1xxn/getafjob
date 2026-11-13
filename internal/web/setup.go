@@ -8,7 +8,6 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/1xxn/getafjob/internal/ai"
 	"github.com/1xxn/getafjob/internal/application"
 	"github.com/1xxn/getafjob/internal/identity"
 	"github.com/1xxn/getafjob/internal/matching"
@@ -106,7 +105,7 @@ func (s *Server) renderSetup(w http.ResponseWriter, r *http.Request, u *identity
 	d := views.SetupData{Name: u.DisplayName, Step: step, Passkeys: true}
 	switch step {
 	case "search", "automation":
-		d.Form = preferencesForm(snap.Preferences, s.automation(r.Context(), u), tracking.MailboxAccount{}, notify.Preferences{}, nil, false, ai.UserSettings{}, false)
+		d.Form = preferencesForm(snap.Preferences, s.automation(r.Context(), u), tracking.MailboxAccount{}, notify.Preferences{}, nil, false)
 	default:
 		d.Form = profileForm(snap)
 	}
@@ -238,7 +237,7 @@ func (s *Server) setupSaveSearch(w http.ResponseWriter, r *http.Request, u *iden
 	if serr == nil {
 		serr = s.Profile.SavePreferences(r.Context(), u.ID, keep)
 	}
-	f := preferencesForm(keep, s.automation(r.Context(), u), tracking.MailboxAccount{}, notify.Preferences{}, nil, false, ai.UserSettings{}, false)
+	f := preferencesForm(keep, s.automation(r.Context(), u), tracking.MailboxAccount{}, notify.Preferences{}, nil, false)
 	if serr != nil {
 		f.Values["min_salary"] = r.PostFormValue("min_salary")
 	}

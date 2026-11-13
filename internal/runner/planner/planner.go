@@ -46,16 +46,9 @@ type Document struct {
 	ID, File, Kind, Language string // Kind: cv, cover_letter, certificate
 }
 
-// Drafter optionally proposes answers for fields the planner cannot answer (off by default). A draft is only a
-// suggestion attached to the question; it is used after the user approved it.
-type Drafter interface {
-	Draft(ctx context.Context, f browser.Field) (string, error)
-}
-
 // Planner is the deterministic planner.
 type Planner struct {
-	K       Knowledge
-	Drafter Drafter // nil: no AI
+	K Knowledge
 }
 
 var _ engine.Planner = (*Planner)(nil)
@@ -101,11 +94,6 @@ func (p *Planner) Plan(ctx context.Context, st *browser.State) (executor.Plan, [
 		for _, o := range f.Options {
 			if l := strings.TrimSpace(o.Label); l != "" {
 				q.Options = append(q.Options, l)
-			}
-		}
-		if p.Drafter != nil {
-			if d, err := p.Drafter.Draft(ctx, f); err == nil {
-				q.Draft = d
 			}
 		}
 		qs = append(qs, q)

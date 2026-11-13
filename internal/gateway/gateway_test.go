@@ -196,7 +196,7 @@ func TestGatewayAskQuestionsSurviveRestartAndStreamHandoff(t *testing.T) {
 	tok := l.GetRun().GetToken()
 
 	if _, err := c.Ask(with(ctx, tok), &runnerv1.AskRequest{Questions: []*runnerv1.Question{
-		{Kind: "field", Label: "Earliest start date?", Draft: "2027-01-01"},
+		{Kind: "field", Label: "Earliest start date?"},
 	}}); err != nil {
 		t.Fatalf("ask: %v", err)
 	}
@@ -209,7 +209,7 @@ func TestGatewayAskQuestionsSurviveRestartAndStreamHandoff(t *testing.T) {
 	// Fresh service on the same pool simulates a server restart: questions are loaded from application_events.
 	restarted := application.NewService(pgstore.New(pool))
 	qs, err := restarted.Questions(ctx, u, appID)
-	if err != nil || len(qs) != 1 || qs[0].Label != "Earliest start date?" || qs[0].Draft != "2027-01-01" {
+	if err != nil || len(qs) != 1 || qs[0].Label != "Earliest start date?" {
 		t.Fatalf("questions after restart = %+v, %v", qs, err)
 	}
 

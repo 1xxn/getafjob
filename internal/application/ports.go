@@ -125,7 +125,6 @@ type Question struct {
 	// approval list and never become answers.
 	Kind    string   `json:"kind"`
 	Label   string   `json:"label"`
-	Draft   string   `json:"draft,omitempty"`
 	Input   string   `json:"input,omitempty"`   // field kind, so the form shows a matching control
 	Options []string `json:"options,omitempty"` // choices of radio, select and checkbox groups
 }

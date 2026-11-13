@@ -120,14 +120,10 @@ func TestChoicesFilesAndTexts(t *testing.T) {
 	}
 }
 
-type drafter struct{}
-
-func (drafter) Draft(context.Context, browser.Field) (string, error) { return "a draft", nil }
-
 func TestQuestionsInsteadOfGuesses(t *testing.T) {
 	k := know
 	k.Profile = map[string]string{"personal.country": "Spain", "preferences.diversity": "answer"}
-	p := &Planner{K: k, Drafter: drafter{}}
+	p := &Planner{K: k}
 	st := state(
 		browser.Field{Kind: "select", Label: "Country", Required: true, Options: []browser.Option{{Label: "Germany"}, {Label: "France"}}},
 		browser.Field{Kind: "text", Label: "Favorite color", Required: true},
@@ -138,11 +134,6 @@ func TestQuestionsInsteadOfGuesses(t *testing.T) {
 	plan, qs, _ := p.Plan(context.Background(), st)
 	if len(plan.Values) != 0 || len(qs) != 3 {
 		t.Fatalf("values %+v, questions %+v", plan.Values, qs)
-	}
-	for _, q := range qs {
-		if q.Draft != "a draft" {
-			t.Errorf("no draft on %+v", q)
-		}
 	}
 }
 
@@ -172,7 +163,7 @@ func TestSecurityCodeAlwaysGoesToHumanEvenWhenInAnswerBank(t *testing.T) {
 		Question: "Security code sent to your email *",
 		Answer:   "12345678",
 	}}, k.Answers...)
-	p := &Planner{K: k, Drafter: drafter{}}
+	p := &Planner{K: k}
 	st := state(
 		browser.Field{ID: "0-1", Kind: "text", Label: "First Name", Required: true},
 		browser.Field{ID: "0-2", Kind: "text", Label: "Security code sent to your email *", Name: "security_code", Required: true},
@@ -184,7 +175,7 @@ func TestSecurityCodeAlwaysGoesToHumanEvenWhenInAnswerBank(t *testing.T) {
 	if len(plan.Values) != 1 || plan.Values[0].FieldID != "0-1" {
 		t.Fatalf("plan values = %+v", plan.Values)
 	}
-	if len(qs) != 1 || qs[0].Kind != "security_code" || qs[0].FieldID != "0-2" || qs[0].Draft != "" {
+	if len(qs) != 1 || qs[0].Kind != "security_code" || qs[0].FieldID != "0-2" {
 		t.Fatalf("security code question = %+v", qs)
 	}
 }

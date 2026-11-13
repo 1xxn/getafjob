@@ -157,10 +157,9 @@ type RuleInput struct {
 	AdapterSubmitted int
 }
 
-// sourceRx is the provenance of a value (ADR 0013): a profile field, an answer, a text block, a document or an AI
-// draft the user approved. It mirrors the executor's check; the server does not trust the runner's report.
-var sourceRx = regexp.MustCompile(`^(profile\.[a-z][a-z0-9_.]{0,60}|(answer|textblock)#(` + idRx + `)|document#` + uuidRx +
-	`|ai_draft#(` + idRx + `) \(approved\))$`)
+// sourceRx is the provenance of a value (ADR 0013): a profile field, an answer, a text block or a document. It
+// mirrors the executor's check; the server does not trust the runner's report.
+var sourceRx = regexp.MustCompile(`^(profile\.[a-z][a-z0-9_.]{0,60}|(answer|textblock)#(` + idRx + `)|document#` + uuidRx + `)$`)
 
 const (
 	uuidRx = `[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}`
@@ -170,11 +169,9 @@ const (
 // freeText reports field kinds that take free text.
 func freeText(kind string) bool { return kind == "textarea" || kind == "richtext" }
 
-// userText reports sources of free text the user wrote or approved: a text block, an answer from the answer bank
-// or an approved AI draft.
+// userText reports sources of free text the user wrote: a text block or an answer from the answer bank.
 func userText(source string) bool {
-	return strings.HasPrefix(source, "textblock#") || strings.HasPrefix(source, "answer#") ||
-		(strings.HasPrefix(source, "ai_draft#") && strings.HasSuffix(source, " (approved)"))
+	return strings.HasPrefix(source, "textblock#") || strings.HasPrefix(source, "answer#")
 }
 
 // Rule returns the parts of the green rule that fail; none means green. The level is part of the answer, so the
