@@ -138,24 +138,44 @@ func (s *Server) profilePage(w http.ResponseWriter, r *http.Request, u *identity
 		http.Redirect(w, r, "/login", http.StatusSeeOther)
 		return
 	}
+	notice := ""
+	switch {
+	case r.URL.Query().Get("saved") == "1":
+		notice = views.T(r.Context(), "profile.saved")
+	case r.URL.Query().Get("imported") == "1":
+		notice = views.T(r.Context(), "profile.imported")
+	}
+	s.renderProfile(w, r, u, http.StatusOK, notice, false)
+}
+
+func (s *Server) renderProfile(w http.ResponseWriter, r *http.Request, u *identity.User, status int, notice string, failed bool) {
 	snap, err := s.Profile.Get(r.Context(), u.ID)
 	if err != nil {
 		s.failed(w, r, u, err)
 		return
 	}
 	f := profileForm(snap)
-	switch {
-	case r.URL.Query().Get("saved") == "1":
-		f.Notice = views.T(r.Context(), "profile.saved")
-	case r.URL.Query().Get("imported") == "1":
-		f.Notice = views.T(r.Context(), "profile.imported")
-	}
+	f.Notice, f.Failed = notice, failed
 	expRows, eduRows, err := s.stationRows(r.Context(), u.ID)
 	if err != nil {
 		s.failed(w, r, u, err)
 		return
 	}
-	s.render(w, r, http.StatusOK, views.ProfilePage(u.DisplayName, s.candidateHead(r.Context(), u, "profile"), f, expRows, eduRows))
+	s.render(w, r, status, views.ProfilePage(u.DisplayName, s.candidateHead(r.Context(), u, "profile"), f, expRows, eduRows))
+}
+
+// stationFailed shows the profile again when a station was refused for a reason the user can fix (an empty or too
+// long entry, the station limit); other errors fail the request.
+func (s *Server) stationFailed(w http.ResponseWriter, r *http.Request, u *identity.User, err error) {
+	var ve *profile.ValidationError
+	switch {
+	case errors.Is(err, profile.ErrTooManyStations):
+		s.renderProfile(w, r, u, http.StatusUnprocessableEntity, views.T(r.Context(), "profile.station.too_many"), true)
+	case errors.As(err, &ve):
+		s.renderProfile(w, r, u, http.StatusUnprocessableEntity, views.T(r.Context(), "profile.station.invalid"), true)
+	default:
+		s.failed(w, r, u, err)
+	}
 }
 
 func (s *Server) profileSave(w http.ResponseWriter, r *http.Request, u *identity.User) {
@@ -209,7 +229,7 @@ func (s *Server) experienceAdd(w http.ResponseWriter, r *http.Request, u *identi
 	}
 	id, err := s.Stations.SaveWorkExperience(r.Context(), u.ID, we)
 	if err != nil {
-		s.failed(w, r, u, err)
+		s.stationFailed(w, r, u, err)
 		return
 	}
 	// Land on the new entry's first field: the page focuses and scrolls to a field named in the hash.
@@ -232,7 +252,7 @@ func (s *Server) experienceSave(w http.ResponseWriter, r *http.Request, u *ident
 	}
 	_, err = s.Stations.SaveWorkExperience(r.Context(), u.ID, readExperience(r, id))
 	if err != nil {
-		s.failed(w, r, u, err)
+		s.stationFailed(w, r, u, err)
 		return
 	}
 	http.Redirect(w, r, "/profile?saved=1#f-title-"+id.String(), http.StatusSeeOther)
@@ -302,7 +322,7 @@ func (s *Server) educationAdd(w http.ResponseWriter, r *http.Request, u *identit
 	}
 	id, err := s.Stations.SaveEducation(r.Context(), u.ID, e)
 	if err != nil {
-		s.failed(w, r, u, err)
+		s.stationFailed(w, r, u, err)
 		return
 	}
 	// Land on the new entry's first field: the page focuses and scrolls to a field named in the hash.
@@ -325,7 +345,7 @@ func (s *Server) educationSave(w http.ResponseWriter, r *http.Request, u *identi
 	}
 	_, err = s.Stations.SaveEducation(r.Context(), u.ID, readEducation(r, id))
 	if err != nil {
-		s.failed(w, r, u, err)
+		s.stationFailed(w, r, u, err)
 		return
 	}
 	http.Redirect(w, r, "/profile?saved=1#f-degree-"+id.String(), http.StatusSeeOther)

@@ -392,6 +392,8 @@
   "profile.station.field_of_study": "Field of study",
   "profile.station.grade": "Grade",
   "profile.station.institution": "Institution",
+  "profile.station.invalid": "The entry was not saved: give it a title or a company (a degree or a school), and keep each field short.",
+  "profile.station.too_many": "The entry was not saved: the profile holds at most 100 stations of each kind.",
   "profile.station.is_current": "I currently work here",
   "profile.station.is_current_edu": "Currently studying here",
   "profile.station.location": "Location",

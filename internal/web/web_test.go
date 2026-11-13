@@ -644,6 +644,11 @@ func TestProfilePages(t *testing.T) {
 	if rec.Code != http.StatusSeeOther {
 		t.Fatalf("add experience failed: %d", rec.Code)
 	}
+	// An empty entry comes back on the profile page instead of the error page.
+	if rec := a.do(http.MethodPost, "/profile/experiences", url.Values{"title": {""}}, session, nil); rec.Code != http.StatusUnprocessableEntity ||
+		!strings.Contains(rec.Body.String(), "was not saved") {
+		t.Errorf("empty experience %d", rec.Code)
+	}
 	// The redirect lands on the new entry's first field, which the page focuses.
 	field := strings.TrimPrefix(rec.Header().Get("Location"), "/profile?saved=1#")
 	body = a.do(http.MethodGet, "/profile", nil, session, nil).Body.String()
