@@ -97,7 +97,7 @@ func (s *Server) renderAdminUsers(w http.ResponseWriter, r *http.Request, u *ide
 		}
 		d.Users = append(d.Users, views.AdminUserRow{ID: x.ID.String(), Email: x.Email, Name: name, Role: string(x.Role),
 			Created: views.When(ctx, x.CreatedAt), LastSeen: views.When(ctx, x.LastSeen), Sessions: x.Sessions,
-			Passkey: x.Passkey, Self: x.ID == u.ID})
+			Passkey: x.Passkey, Disabled: x.Disabled, Self: x.ID == u.ID})
 	}
 	for _, i := range invites {
 		d.Invites = append(d.Invites, views.AdminInviteRow{ID: i.ID.String(), Email: i.Email, Role: string(i.Role),
@@ -131,6 +131,8 @@ func auditText(ctx context.Context, a identity.AuditEntry, emails map[uuid.UUID]
 		return views.T(ctx, "admin.audit.role", "user", who(), "role", views.T(ctx, "admin.role."+fmt.Sprint(a.Params["role"])))
 	case "admin.signed_out":
 		return views.T(ctx, "admin.audit.signed_out", "user", who())
+	case "admin.user_disabled", "admin.user_enabled":
+		return views.T(ctx, "admin.audit."+strings.TrimPrefix(a.Code, "admin.user_"), "user", who())
 	case "admin.user_deleted":
 		return views.T(ctx, "admin.audit.deleted")
 	case "admin.source_enabled", "admin.source_disabled":
@@ -222,6 +224,22 @@ func (s *Server) adminSignOut(w http.ResponseWriter, r *http.Request, u *identit
 	}
 	_, err := s.Identity.SignOutAccount(r.Context(), u.ID, id)
 	s.adminDone(w, r, u, "signed_out", err)
+}
+
+// adminDisable disables (disabled) or enables an account.
+func (s *Server) adminDisable(disabled bool) func(http.ResponseWriter, *http.Request, *identity.User) {
+	done := "enabled"
+	if disabled {
+		done = "disabled"
+	}
+	return func(w http.ResponseWriter, r *http.Request, u *identity.User) {
+		id, ok := pathID(r)
+		if !ok {
+			s.notFound(w, r, u)
+			return
+		}
+		s.adminDone(w, r, u, done, s.Identity.SetDisabled(r.Context(), u.ID, id, disabled))
+	}
 }
 
 // adminDelete removes an account with all its data, the same way the account owner can.

@@ -114,3 +114,40 @@ func adminSignOut(ctx context.Context, args []string, env Env) int {
 	_, _ = fmt.Fprintf(env.Stdout, "%d sessions ended\n", n)
 	return ExitOK
 }
+
+// adminDisable disables (cmd "disable") or enables (cmd "enable") the account of an address.
+func adminDisable(ctx context.Context, cmd string, args []string, env Env) int {
+	fs := flag.NewFlagSet("admin "+cmd, flag.ContinueOnError)
+	fs.SetOutput(env.Stderr)
+	email := fs.String("email", "", "e-mail address of the account (required)")
+	if err := fs.Parse(args); err != nil || *email == "" || fs.NArg() != 0 {
+		_, _ = fmt.Fprintln(env.Stderr, "usage: getafjob admin "+cmd+" -email max.mustermann@example.com")
+		return ExitUsage
+	}
+	cfg, err := config.Load(env.Config)
+	if err != nil {
+		_, _ = fmt.Fprintln(env.Stderr, "configuration error:")
+		_, _ = fmt.Fprintln(env.Stderr, err)
+		return ExitUsage
+	}
+	pool, err := db.Open(ctx, cfg.DatabaseURL, cfg.DatabasePassword, "getafjob-admin")
+	if err != nil {
+		_, _ = fmt.Fprintln(env.Stderr, err)
+		return ExitError
+	}
+	defer pool.Close()
+	err = identity.NewService(pgstore.New(pool), nil, cfg.PublicURL).SetDisabledByEmail(ctx, *email, cmd == "disable")
+	switch {
+	case errors.Is(err, identity.ErrNotFound) || errors.Is(err, identity.ErrInvalidEmail):
+		_, _ = fmt.Fprintln(env.Stderr, "no account with this address")
+		return ExitError
+	case errors.Is(err, identity.ErrLastAdmin):
+		_, _ = fmt.Fprintln(env.Stderr, "the last admin cannot be disabled")
+		return ExitError
+	case err != nil:
+		_, _ = fmt.Fprintln(env.Stderr, cmd+" failed:", err)
+		return ExitError
+	}
+	_, _ = fmt.Fprintln(env.Stdout, "account "+cmd+"d")
+	return ExitOK
+}

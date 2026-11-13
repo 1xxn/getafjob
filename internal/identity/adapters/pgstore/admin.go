@@ -86,6 +86,35 @@ func (s *Store) LastAdmin(ctx context.Context, userID uuid.UUID) (last bool, err
 	return last, err
 }
 
+// SetDisabled disables (at set) or enables (at nil) an account. Disabling ends all its sessions and refuses the last
+// active admin (ErrLastAdmin).
+func (s *Store) SetDisabled(ctx context.Context, userID uuid.UUID, at *time.Time, e identity.AuditEvent) error {
+	return s.system(ctx, func(qs *q.Queries) error {
+		if at != nil {
+			admins, err := qs.LockAdmins(ctx)
+			if err != nil {
+				return err
+			}
+			if len(admins) == 1 && admins[0] == userID {
+				return identity.ErrLastAdmin
+			}
+		}
+		n, err := qs.SetUserDisabled(ctx, q.SetUserDisabledParams{ID: userID, DisabledAt: at})
+		if err != nil {
+			return err
+		}
+		if n == 0 {
+			return identity.ErrNotFound
+		}
+		if at != nil {
+			if _, err := qs.DeleteUserSessions(ctx, userID); err != nil {
+				return err
+			}
+		}
+		return audit(ctx, qs, e)
+	})
+}
+
 // AdminAudit returns the newest admin actions.
 func (s *Store) AdminAudit(ctx context.Context, limit int) ([]identity.AuditEntry, error) {
 	var out []identity.AuditEntry

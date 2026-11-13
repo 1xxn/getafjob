@@ -37,6 +37,8 @@ Commands:
   notify         queue daily summary notification (admin notify summary)
   plan           queue planning now (the worker runs it)
   sign-out       end all sessions of one account (admin sign-out -email …)
+  disable        disable one account and end its sessions (admin disable -email …)
+  enable         let a disabled account sign in again (admin enable -email …)
   rotate-master-key  re-wrap all data keys with GETAFJOB_MASTER_KEY (the previous key in GETAFJOB_MASTER_KEY_OLD)
 `
 
@@ -70,6 +72,8 @@ func admin(ctx context.Context, args []string, env Env) int {
 		return adminBoards(ctx, args[1:], env)
 	case "sign-out":
 		return adminSignOut(ctx, args[1:], env)
+	case "disable", "enable":
+		return adminDisable(ctx, cmd, args[1:], env)
 	case "rotate-master-key":
 		return adminRotate(ctx, args[1:], env)
 	case "demo":

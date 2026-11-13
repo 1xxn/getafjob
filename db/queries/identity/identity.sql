@@ -150,6 +150,9 @@ SELECT id FROM users WHERE role = 'admin' AND disabled_at IS NULL FOR UPDATE;
 -- name: SetUserRole :execrows
 UPDATE users SET role = $2 WHERE id = $1;
 
+-- name: SetUserDisabled :execrows
+UPDATE users SET disabled_at = sqlc.narg(disabled_at) WHERE id = sqlc.arg(id);
+
 -- name: AdminAuditEvents :many
 SELECT id, user_id, actor, code, params, created_at FROM audit_events
 WHERE actor = 'admin' ORDER BY id DESC LIMIT $1;

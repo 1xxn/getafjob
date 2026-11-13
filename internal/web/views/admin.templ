@@ -12,6 +12,7 @@ type AdminUserRow struct {
 	LastSeen string
 	Sessions int
 	Passkey  bool
+	Disabled bool
 	Self     bool // the admin looking at the page
 }
 
@@ -153,6 +154,9 @@ templ AdminUsersPage(d AdminUsersData) {
 								if u.Role == "admin" {
 									@ui.Badge(T(ctx, "admin.role.admin"), ui.Accent)
 								}
+								if u.Disabled {
+									@ui.Badge(T(ctx, "admin.users.disabled"), ui.Danger)
+								}
 							</span>
 							<span class="adm-meta">{ u.Email }</span>
 							<span class="adm-meta">{ T(ctx, "admin.users.seen", "time", u.LastSeen, "n", u.Sessions) }</span>
@@ -174,6 +178,17 @@ templ AdminUsersPage(d AdminUsersData) {
 									@ui.Button(ui.ButtonProps{Label: T(ctx, "admin.users.sign_out"), Type: "submit", Size: "sm", Icon: "logout",
 										Disabled: u.Sessions == 0, Attrs: templ.Attributes{"data-sign-out": ""}})
 								</form>
+								if u.Disabled {
+									<form method="post" action={ templ.SafeURL("/admin/users/" + u.ID + "/enable") }>
+										@ui.Button(ui.ButtonProps{Label: T(ctx, "admin.users.enable"), Type: "submit", Size: "sm", Icon: "check",
+											Attrs: templ.Attributes{"data-enable": ""}})
+									</form>
+								} else {
+									<form method="post" action={ templ.SafeURL("/admin/users/" + u.ID + "/disable") } data-confirm={ T(ctx, "admin.users.disable_confirm", "email", u.Email) }>
+										@ui.Button(ui.ButtonProps{Label: T(ctx, "admin.users.disable"), Type: "submit", Size: "sm", Icon: "ban",
+											Attrs: templ.Attributes{"data-disable": ""}})
+									</form>
+								}
 								<form method="post" action={ templ.SafeURL("/admin/users/" + u.ID + "/delete") } data-confirm={ T(ctx, "admin.users.delete_confirm", "email", u.Email) }>
 									@ui.Button(ui.ButtonProps{Label: T(ctx, "admin.users.delete"), Type: "submit", Size: "sm", Variant: "danger", Icon: "trash"})
 								</form>
