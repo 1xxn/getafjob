@@ -51,7 +51,7 @@ var (
 	// anyPlaceholderRx finds everything that looks like a placeholder, so {Company} or {Firma} is refused instead
 	// of reaching an application as typed.
 	anyPlaceholderRx = regexp.MustCompile(`\{([\p{L}\p{N}_ -]{1,40})\}`)
-	optionalRx    = regexp.MustCompile(`\((optional|required|pflichtfeld|freiwillig)\)`)
+	optionalRx       = regexp.MustCompile(`\((optional|required|pflichtfeld|freiwillig)\)`)
 )
 
 // NormalizeQuestion is the key under which an answer is found: lower case, no punctuation or required markers.
