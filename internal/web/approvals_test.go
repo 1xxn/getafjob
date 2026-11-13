@@ -259,12 +259,10 @@ func TestPreferencesAutonomySettings(t *testing.T) {
 	rec = httptest.NewRecorder()
 	req = httptest.NewRequest(http.MethodPost, "/preferences/runner/token", nil)
 	srv.runnerToken(rec, req, u)
-	if rec.Code != http.StatusSeeOther {
-		t.Fatalf("runnerToken status = %d, want 303", rec.Code)
-	}
-	loc := rec.Header().Get("Location")
-	if !strings.HasPrefix(loc, "/settings/integrations?runner_token=") {
-		t.Fatalf("runnerToken redirect = %q, want /settings/integrations?runner_token=...", loc)
+	// The token is shown in the answer itself, never in a URL, and the answer is not cached.
+	if rec.Code != http.StatusOK || rec.Header().Get("Location") != "" || rec.Header().Get("Cache-Control") != "no-store" {
+		t.Fatalf("runnerToken = %d, location %q, cache %q; want 200 without redirect, no-store",
+			rec.Code, rec.Header().Get("Location"), rec.Header().Get("Cache-Control"))
 	}
 	if len(st.tokenHash) != 32 {
 		t.Fatalf("expected 32-byte token hash, got %d bytes", len(st.tokenHash))

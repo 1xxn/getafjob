@@ -5,7 +5,6 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
-	"net/url"
 	"slices"
 	"strconv"
 	"strings"
@@ -518,11 +517,8 @@ func (s *Server) preferencesPage(w http.ResponseWriter, r *http.Request, u *iden
 	if r.URL.Query().Get("tested") == "1" {
 		f.Notice = views.T(r.Context(), "profile.notify.tested")
 	}
-	if code := r.URL.Query().Get("assist_code"); code != "" {
-		f.Notice = views.T(r.Context(), "profile.assist.code", "code", code)
-	}
-	if tok := r.URL.Query().Get("runner_token"); tok != "" {
-		f.Notice = views.T(r.Context(), "profile.home_runner.token_notice", "token", tok)
+	if n, ok := r.Context().Value(secretNoticeKey{}).(string); ok {
+		f.Notice = n
 	}
 	s.render(w, r, http.StatusOK, views.PreferencesPage(u.DisplayName, f, settingsSection(r.PathValue("section"))))
 }
@@ -849,6 +845,18 @@ func (s *Server) notifyTest(w http.ResponseWriter, r *http.Request, u *identity.
 	http.Redirect(w, r, "/settings/notifications?tested=1", http.StatusSeeOther)
 }
 
+// secretNoticeKey carries a notice with a fresh secret (pairing code, runner token) into the settings page.
+type secretNoticeKey struct{}
+
+// showSecret answers the POST with the integrations page and the secret in its notice. A redirect would put the
+// secret into the URL, and with it into the history, logs and referrers; the answer is never cached.
+func (s *Server) showSecret(w http.ResponseWriter, r *http.Request, u *identity.User, notice string) {
+	w.Header().Set("Cache-Control", "no-store")
+	r = r.WithContext(context.WithValue(r.Context(), secretNoticeKey{}, notice))
+	r.SetPathValue("section", "integrations")
+	s.preferencesPage(w, r, u)
+}
+
 func (s *Server) assistPair(w http.ResponseWriter, r *http.Request, u *identity.User) {
 	if u == nil {
 		http.Redirect(w, r, "/login", http.StatusSeeOther)
@@ -860,7 +868,7 @@ func (s *Server) assistPair(w http.ResponseWriter, r *http.Request, u *identity.
 			s.failed(w, r, u, err)
 			return
 		}
-		http.Redirect(w, r, "/settings/integrations?assist_code="+url.QueryEscape(code), http.StatusSeeOther)
+		s.showSecret(w, r, u, views.T(r.Context(), "profile.assist.code", "code", code))
 		return
 	}
 	http.Redirect(w, r, "/settings/integrations", http.StatusSeeOther)
@@ -877,7 +885,7 @@ func (s *Server) runnerToken(w http.ResponseWriter, r *http.Request, u *identity
 			s.failed(w, r, u, err)
 			return
 		}
-		http.Redirect(w, r, "/settings/integrations?runner_token="+url.QueryEscape(tok), http.StatusSeeOther)
+		s.showSecret(w, r, u, views.T(r.Context(), "profile.home_runner.token_notice", "token", tok))
 		return
 	}
 	http.Redirect(w, r, "/settings/integrations", http.StatusSeeOther)
