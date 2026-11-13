@@ -45,6 +45,8 @@ type PasswordCipher interface {
 // ApplicationUpdater executes status transitions on applications when suggestions are accepted.
 type ApplicationUpdater interface {
 	Transition(ctx context.Context, userID, appID uuid.UUID, state string, detail map[string]any) error
+	// Allowed reports whether the state machine allows moving from one state to the other.
+	Allowed(from, to string) bool
 }
 
 // Store persists mailbox configurations, cursors, and suggestions.

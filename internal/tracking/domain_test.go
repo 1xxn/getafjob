@@ -1,6 +1,7 @@
 package tracking_test
 
 import (
+	"strings"
 	"testing"
 	"time"
 
@@ -176,5 +177,43 @@ func TestMatchApplication(t *testing.T) {
 	matched3, _ := tracking.MatchApplication(msg3, apps)
 	if matched3 != nil {
 		t.Errorf("MatchApplication(msg3) = %+v, want nil", matched3)
+	}
+}
+
+// Audit findings (#362): a no after an interview is a rejection, "otp" counts only as a word, a shared ATS
+// sender domain matches no application by itself, and a tie is no match.
+func TestClassifyAndMatchEdgeCases(t *testing.T) {
+	if cat, _ := tracking.Classify(tracking.EmailMessage{Subject: "Ihre Bewerbung",
+		Body: "Vielen Dank für das Vorstellungsgespräch. Leider müssen wir Ihnen mitteilen, dass wir uns anderweitig entschieden haben."}); cat != tracking.CategoryRejection {
+		t.Errorf("rejection after interview = %s", cat)
+	}
+	if cat, _ := tracking.Classify(tracking.EmailMessage{Subject: "Thank you for your application",
+		Body: "We care about our carbon footprint."}); cat != tracking.CategoryReceived {
+		t.Errorf("footprint mail = %s, want received", cat)
+	}
+	if cat, _ := tracking.Classify(tracking.EmailMessage{Subject: "Your OTP"}); cat != tracking.CategorySecurityCode {
+		t.Errorf("otp mail = %s, want security code", cat)
+	}
+	gh := func(company string) tracking.ApplicationSummary {
+		return tracking.ApplicationSummary{ID: uuid.New(), Company: company, Title: "Go Developer",
+			URL: "https://job-boards.greenhouse.io/" + strings.ToLower(company) + "/jobs/1"}
+	}
+	apps := []tracking.ApplicationSummary{gh("Musterfirma"), gh("Beispielwerk")}
+	if m, _ := tracking.MatchApplication(tracking.EmailMessage{From: "no-reply@us.greenhouse-mail.io",
+		Subject: "Update", Body: "Regarding your application."}, apps); m != nil {
+		t.Errorf("unrelated greenhouse mail matched %s", m.Company)
+	}
+	if m, _ := tracking.MatchApplication(tracking.EmailMessage{From: "no-reply@greenhouse.io",
+		Subject: "Update", Body: "Regarding your application."}, apps); m != nil {
+		t.Errorf("shared ATS domain matched %s", m.Company)
+	}
+	if m, _ := tracking.MatchApplication(tracking.EmailMessage{From: "no-reply@greenhouse.io",
+		Subject: "Your application at Beispielwerk", Body: "Thanks."}, apps); m == nil || m.Company != "Beispielwerk" {
+		t.Errorf("company in subject = %+v, want Beispielwerk", m)
+	}
+	twins := []tracking.ApplicationSummary{gh("Musterfirma"), gh("Musterfirma")}
+	if m, _ := tracking.MatchApplication(tracking.EmailMessage{From: "jobs@musterfirma.example.org",
+		Subject: "Musterfirma: your application", Body: "Thanks."}, twins); m != nil {
+		t.Errorf("tie matched %s", m.ID)
 	}
 }

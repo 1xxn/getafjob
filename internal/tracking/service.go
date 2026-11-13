@@ -162,8 +162,8 @@ func (s *Service) CheckMailbox(ctx context.Context, userID uuid.UUID) ([]StatusS
 			continue
 		}
 
-		// Don't suggest state if application is already in or beyond that state
-		if matchedApp.CurrentState == targetState {
+		// Only suggest what the state machine allows from where the application stands (no step back).
+		if matchedApp.CurrentState == targetState || (s.apps != nil && !s.apps.Allowed(matchedApp.CurrentState, targetState)) {
 			continue
 		}
 

@@ -3,6 +3,7 @@ package tracking_test
 import (
 	"context"
 	"errors"
+	"slices"
 	"testing"
 	"time"
 
@@ -144,6 +145,13 @@ func (f *fakeAppUpdater) Transition(_ context.Context, _, appID uuid.UUID, state
 	return nil
 }
 
+// Allowed follows the application state machine for the suggestion states.
+func (f *fakeAppUpdater) Allowed(from, to string) bool {
+	next := map[string][]string{"submitted": {"confirmed", "rejected", "interview"}, "confirmed": {"rejected", "interview"},
+		"interview": {"rejected"}, "submit_unknown": {"confirmed"}}
+	return slices.Contains(next[from], to)
+}
+
 func TestTrackingService(t *testing.T) {
 	ctx := context.Background()
 	u := uuid.New()
@@ -247,5 +255,26 @@ func TestTrackingService(t *testing.T) {
 	updatedSug, err := st.Suggestion(ctx, u, sug.ID)
 	if err != nil || updatedSug.Status != tracking.SuggestionAccepted {
 		t.Errorf("updatedSug.Status = %v, want accepted", updatedSug.Status)
+	}
+}
+
+// A mail never suggests a step back: "thanks for your application" after the interview stays without suggestion.
+func TestNoSuggestionBackwards(t *testing.T) {
+	ctx := context.Background()
+	u := uuid.New()
+	st := newFakeStore()
+	cl := &fakeClient{}
+	svc := tracking.NewService(st, cl, &fakeCipher{}, &fakeAppUpdater{})
+	if err := svc.SaveMailbox(ctx, u, "imap.example.com", 993, true, "user@example.com", "app-pass-123", true); err != nil {
+		t.Fatal(err)
+	}
+	st.apps = []tracking.ApplicationSummary{{ID: uuid.New(), UserID: u, CurrentState: "interview", Company: "Acme Cloud",
+		Title: "Go Engineer", URL: "https://jobs.acmecloud.example.org/1"}}
+	cl.nextUID, cl.validity = 2, 1
+	cl.messages = []tracking.EmailMessage{{UID: 2, From: "hiring@acmecloud.example.org",
+		Subject: "Thank you for your application", Body: "We have received your application."}}
+	sugs, err := svc.CheckMailbox(ctx, u)
+	if err != nil || len(sugs) != 0 {
+		t.Fatalf("suggestions = %+v, %v; want none", sugs, err)
 	}
 }
