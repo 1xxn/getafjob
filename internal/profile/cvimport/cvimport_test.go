@@ -238,13 +238,19 @@ func docx(t *testing.T, text string) []byte {
 	return buf.Bytes()
 }
 
-// pdfFile builds a one-page PDF with the lines as text (Helvetica), with a correct cross-reference table.
-func pdfFile(lines []string) []byte {
+// pdfFile builds a one-page PDF with the lines as text (Helvetica), with a correct cross-reference table. Lines end
+// with T*; positioned places each line with Td instead, as most PDF writers do, and splits it into two text runs.
+func pdfFile(lines []string, positioned bool) []byte {
 	var content strings.Builder
 	content.WriteString("BT /F1 10 Tf 12 TL 50 780 Td\n")
+	esc := strings.NewReplacer(`\`, `\\`, "(", `\(`, ")", `\)`)
 	for _, l := range lines {
-		l = strings.NewReplacer(`\`, `\\`, "(", `\(`, ")", `\)`).Replace(l)
-		fmt.Fprintf(&content, "(%s) Tj T*\n", l)
+		if !positioned {
+			fmt.Fprintf(&content, "(%s) Tj T*\n", esc.Replace(l))
+			continue
+		}
+		first, rest, _ := strings.Cut(l, " ")
+		fmt.Fprintf(&content, "(%s) Tj %d 0 Td (%s) Tj %d -12 Td\n", esc.Replace(first), 6*len(first)+4, esc.Replace(rest), -6*len(first)-4)
 	}
 	content.WriteString("ET")
 	objs := []string{
@@ -275,11 +281,16 @@ func TestTextFromFiles(t *testing.T) {
 	if err != nil || !strings.Contains(got, "Senior Platform Engineer at Muster GmbH") || Parse(got).Personal.LastName != "Mustermann" {
 		t.Fatalf("docx text = %q, %v", got, err)
 	}
-	got, err = Text(profile.MimePDF, pdfFile(strings.Split(cvEN, "\n")))
-	if err != nil || !strings.Contains(got, "max.mustermann@example.org") {
-		t.Fatalf("pdf text = %q, %v", got, err)
+	for _, positioned := range []bool{false, true} {
+		got, err = Text(profile.MimePDF, pdfFile(strings.Split(cvEN, "\n"), positioned))
+		if err != nil || !strings.Contains(got, "\nmax.mustermann@example.org") || !strings.Contains(got, "Senior Platform Engineer at Muster GmbH") {
+			t.Fatalf("pdf text (positioned %v) = %q, %v", positioned, got, err)
+		}
+		if cv := ParseAll(got); cv.Profile.Personal.LastName != "Mustermann" || len(cv.Profile.Skills) == 0 || len(cv.Experiences) == 0 {
+			t.Errorf("pdf import (positioned %v) = %+v", positioned, cv)
+		}
 	}
-	if _, err := Text(profile.MimePDF, pdfFile([]string{"short"})); !errors.Is(err, ErrNoText) {
+	if _, err := Text(profile.MimePDF, pdfFile([]string{"short"}, false)); !errors.Is(err, ErrNoText) {
 		t.Errorf("scan-like pdf: %v", err)
 	}
 	if _, err := Text(profile.MimePDF, []byte("%PDF-1.4 garbage")); !errors.Is(err, profile.ErrFileType) {
