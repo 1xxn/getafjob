@@ -207,12 +207,13 @@ func (s *Server) experienceAdd(w http.ResponseWriter, r *http.Request, u *identi
 		IsCurrent:          r.PostFormValue("is_current") == "on",
 		DescriptionBullets: profile.Lines(r.PostFormValue("bullets")),
 	}
-	_, err := s.Stations.SaveWorkExperience(r.Context(), u.ID, we)
+	id, err := s.Stations.SaveWorkExperience(r.Context(), u.ID, we)
 	if err != nil {
 		s.failed(w, r, u, err)
 		return
 	}
-	http.Redirect(w, r, "/profile?saved=1#stations", http.StatusSeeOther)
+	// Land on the new entry's first field: the page focuses and scrolls to a field named in the hash.
+	http.Redirect(w, r, "/profile?saved=1#f-title-"+id.String(), http.StatusSeeOther)
 }
 
 func (s *Server) experienceSave(w http.ResponseWriter, r *http.Request, u *identity.User) {
@@ -234,7 +235,7 @@ func (s *Server) experienceSave(w http.ResponseWriter, r *http.Request, u *ident
 		s.failed(w, r, u, err)
 		return
 	}
-	http.Redirect(w, r, "/profile?saved=1#stations", http.StatusSeeOther)
+	http.Redirect(w, r, "/profile?saved=1#f-title-"+id.String(), http.StatusSeeOther)
 }
 
 func (s *Server) experienceMove(direction string) func(http.ResponseWriter, *http.Request, *identity.User) {
@@ -299,12 +300,13 @@ func (s *Server) educationAdd(w http.ResponseWriter, r *http.Request, u *identit
 		IsCurrent:    r.PostFormValue("is_current") == "on",
 		Grade:        strings.TrimSpace(r.PostFormValue("grade")),
 	}
-	_, err := s.Stations.SaveEducation(r.Context(), u.ID, e)
+	id, err := s.Stations.SaveEducation(r.Context(), u.ID, e)
 	if err != nil {
 		s.failed(w, r, u, err)
 		return
 	}
-	http.Redirect(w, r, "/profile?saved=1#stations", http.StatusSeeOther)
+	// Land on the new entry's first field: the page focuses and scrolls to a field named in the hash.
+	http.Redirect(w, r, "/profile?saved=1#f-degree-"+id.String(), http.StatusSeeOther)
 }
 
 func (s *Server) educationSave(w http.ResponseWriter, r *http.Request, u *identity.User) {
@@ -326,7 +328,7 @@ func (s *Server) educationSave(w http.ResponseWriter, r *http.Request, u *identi
 		s.failed(w, r, u, err)
 		return
 	}
-	http.Redirect(w, r, "/profile?saved=1#stations", http.StatusSeeOther)
+	http.Redirect(w, r, "/profile?saved=1#f-degree-"+id.String(), http.StatusSeeOther)
 }
 
 func (s *Server) educationMove(direction string) func(http.ResponseWriter, *http.Request, *identity.User) {
