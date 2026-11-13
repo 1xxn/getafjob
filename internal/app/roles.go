@@ -146,7 +146,7 @@ func serve(ctx context.Context, cfg config.Config, logger *slog.Logger) error {
 
 	tstore := trackingstore.New(pool)
 	tcipher := trackingcrypto.NewCipher(env)
-	trackingSvc := tracking.NewService(tstore, trackingimap.NewClient(), tcipher, newAppTransitionAdapter(apps))
+	trackingSvc := tracking.NewService(tstore, trackingimap.NewClient(cfg.EgressProxy), tcipher, newAppTransitionAdapter(apps))
 	items := profile.NewItems(pstore, env)
 	assistSvc := newAssistService(pool, profiles, items, docs, apps, logger)
 	apiv1.Mount(mux, assistSvc)
@@ -252,7 +252,7 @@ func worker(ctx context.Context, cfg config.Config, logger *slog.Logger) error {
 	river.AddWorker(workers, &planWorker{svc: apps, logger: logger})
 	tstore := trackingstore.New(pool)
 	tcipher := trackingcrypto.NewCipher(env)
-	trackingSvc := tracking.NewService(tstore, trackingimap.NewClient(), tcipher, newAppTransitionAdapter(apps))
+	trackingSvc := tracking.NewService(tstore, trackingimap.NewClient(cfg.EgressProxy), tcipher, newAppTransitionAdapter(apps))
 	river.AddWorker(workers, &inboxWorker{svc: trackingSvc, logger: logger})
 	jobs, err := queue.NewWorker(pool, queue.Options{Workers: workers, Periodic: periodicJobs(cfg), Logger: logger})
 	if err != nil {

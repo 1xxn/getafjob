@@ -15,31 +15,43 @@ import (
 	"net"
 	"net/mail"
 	"net/textproto"
+	"net/url"
 	"strconv"
 	"strings"
 	"time"
 
+	"github.com/1xxn/getafjob/internal/platform/netguard"
 	"github.com/1xxn/getafjob/internal/tracking"
 )
 
 // DialFunc establishes a connection to the IMAP server.
 type DialFunc func(ctx context.Context, network, addr string, tlsConfig *tls.Config) (net.Conn, error)
 
+// ErrPlaintext reports a mailbox without TLS; getafjob only logs in over TLS (IMAPS).
+var ErrPlaintext = errors.New("imap: TLS is required")
+
 // Client is a read-only IMAP client.
 type Client struct {
 	dial DialFunc
 }
 
-// NewClient returns an IMAP client.
-func NewClient() *Client {
+// NewClient returns an IMAP client that reaches mail servers like every foreign service: through the egress proxy
+// when one is set, otherwise directly to public addresses only (netguard), never into the own network.
+func NewClient(proxy *url.URL) *Client {
 	return &Client{
-		dial: func(ctx context.Context, network, addr string, tlsConfig *tls.Config) (net.Conn, error) {
-			d := &net.Dialer{Timeout: 15 * time.Second}
-			if tlsConfig != nil {
-				td := &tls.Dialer{NetDialer: d, Config: tlsConfig}
-				return td.DialContext(ctx, network, addr)
+		dial: func(ctx context.Context, _, addr string, tlsConfig *tls.Config) (net.Conn, error) {
+			ctx, cancel := context.WithTimeout(ctx, 30*time.Second)
+			defer cancel()
+			conn, err := netguard.Dial(ctx, proxy, addr)
+			if err != nil || tlsConfig == nil {
+				return conn, err
 			}
-			return d.DialContext(ctx, network, addr)
+			tc := tls.Client(conn, tlsConfig)
+			if err := tc.HandshakeContext(ctx); err != nil {
+				_ = conn.Close()
+				return nil, err
+			}
+			return tc, nil
 		},
 	}
 }
@@ -131,15 +143,11 @@ func (c *Client) FetchNewMessages(ctx context.Context, acc tracking.MailboxAccou
 }
 
 func (c *Client) connect(ctx context.Context, acc tracking.MailboxAccount) (net.Conn, error) {
-	addr := net.JoinHostPort(acc.Host, strconv.Itoa(acc.Port))
-	var tlsConfig *tls.Config
-	if acc.TLS {
-		tlsConfig = &tls.Config{
-			ServerName: acc.Host,
-			MinVersion: tls.VersionTLS12,
-		}
+	if !acc.TLS {
+		return nil, ErrPlaintext // the password never goes over an unencrypted connection
 	}
-	return c.dial(ctx, "tcp", addr, tlsConfig)
+	addr := net.JoinHostPort(acc.Host, strconv.Itoa(acc.Port))
+	return c.dial(ctx, "tcp", addr, &tls.Config{ServerName: acc.Host, MinVersion: tls.VersionTLS12})
 }
 
 type session struct {

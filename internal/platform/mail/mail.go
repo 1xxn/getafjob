@@ -2,7 +2,6 @@
 package mail
 
 import (
-	"bufio"
 	"context"
 	"crypto/rand"
 	"crypto/tls"
@@ -12,11 +11,12 @@ import (
 	"mime"
 	"mime/quotedprintable"
 	"net"
-	"net/http"
 	"net/smtp"
 	"net/url"
 	"strings"
 	"time"
+
+	"github.com/1xxn/getafjob/internal/platform/netguard"
 )
 
 // Message is a plain-text mail.
@@ -130,35 +130,8 @@ func (s *Sender) dial(ctx context.Context) (net.Conn, error) {
 	if s.proxy == nil {
 		return d.DialContext(ctx, "tcp", s.host)
 	}
-	conn, err := d.DialContext(ctx, "tcp", s.proxy.Host)
-	if err != nil {
-		return nil, err
-	}
-	if _, err := fmt.Fprintf(conn, "CONNECT %s HTTP/1.1\r\nHost: %s\r\n\r\n", s.host, s.host); err != nil {
-		_ = conn.Close()
-		return nil, err
-	}
-	br := bufio.NewReader(conn)
-	resp, err := http.ReadResponse(br, &http.Request{Method: http.MethodConnect})
-	if err != nil {
-		_ = conn.Close()
-		return nil, err
-	}
-	_ = resp.Body.Close()
-	if resp.StatusCode != http.StatusOK {
-		_ = conn.Close()
-		return nil, fmt.Errorf("proxy refused: %s", resp.Status)
-	}
-	// The server greeting may already sit in the buffer; read it from there first.
-	return bufferedConn{Conn: conn, r: br}, nil
+	return netguard.Connect(ctx, d, s.proxy, s.host)
 }
-
-type bufferedConn struct {
-	net.Conn
-	r *bufio.Reader
-}
-
-func (c bufferedConn) Read(p []byte) (int, error) { return c.r.Read(p) }
 
 // Compose renders an RFC 5322 message (UTF-8, quoted-printable).
 func Compose(from string, m Message, now time.Time) []byte {

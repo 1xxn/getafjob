@@ -4,6 +4,7 @@ import (
 	"bufio"
 	"context"
 	"crypto/tls"
+	"errors"
 	"fmt"
 	"net"
 	"strings"
@@ -165,5 +166,18 @@ func TestImapClientReadOnlyAndPeek(t *testing.T) {
 	}
 	if !hasPeek {
 		t.Errorf("Client must use BODY.PEEK so flags like \\Seen are never modified")
+	}
+}
+
+// The password never goes over an unencrypted connection: a mailbox without TLS is refused before any dial.
+func TestPlaintextMailboxIsRefused(t *testing.T) {
+	dialed := false
+	c := imap.NewClientWithDialer(func(context.Context, string, string, *tls.Config) (net.Conn, error) {
+		dialed = true
+		return nil, fmt.Errorf("unexpected dial")
+	})
+	err := c.TestConnection(t.Context(), tracking.MailboxAccount{Host: "imap.example.org", Port: 143}, "secret")
+	if !errors.Is(err, imap.ErrPlaintext) || dialed {
+		t.Fatalf("err = %v, dialed = %v; want ErrPlaintext without a dial", err, dialed)
 	}
 }
