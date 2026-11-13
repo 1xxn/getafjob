@@ -116,8 +116,9 @@ func (e *Engine) clock() time.Time {
 	return time.Now()
 }
 
-// finalRx names a button that sends the application; anything else in a form moves to the next page.
-var finalRx = regexp.MustCompile(`(?i)\b(submit|send|apply)\b|absenden|abschicken|einreichen|bewerbung senden|jetzt bewerben`)
+// finalRx names a button that sends the application, nextRx one that moves to the next form page. A form button
+// that matches neither parks the run: a click whose effect is unclear must never bypass the submit register.
+var finalRx = regexp.MustCompile(`(?i)\b(submit|send|apply|senden|bewerben)\b|absenden|abschicken|einreichen`)
 
 // confirmRx recognizes a confirmation page.
 var confirmRx = regexp.MustCompile(`(?i)thank you for (your )?appl|application (has been )?(received|submitted|sent)|` +
@@ -244,7 +245,12 @@ func formButton(st *browser.State, plan executor.Plan) (browser.Button, bool, er
 			return b, true, nil
 		}
 	}
-	return candidates[0], false, nil
+	for _, b := range candidates {
+		if nextRx.MatchString(b.Text) {
+			return b, false, nil
+		}
+	}
+	return browser.Button{}, false, fmt.Errorf("unclear form button %q: neither send nor next", candidates[0].Text)
 }
 
 var nextRx = regexp.MustCompile(`(?i)\b(next|continue)\b|weiter|fortfahren`)
