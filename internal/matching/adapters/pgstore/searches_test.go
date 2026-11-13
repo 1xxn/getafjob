@@ -27,7 +27,8 @@ func TestSavedSearchesAndAlerts(t *testing.T) {
 	max := user(t, pool, "max@example.org")
 	erika := user(t, pool, "erika@example.org")
 
-	job := func(fp, title string, seen time.Time) {
+	// insert adds an open job first seen at seen; job also matches it for Max, computed at seen.
+	insert := func(fp, title string, seen time.Time) int64 {
 		t.Helper()
 		var id int64
 		if err := db.InSystemTx(ctx, pool, func(tx pgx.Tx) error {
@@ -37,10 +38,15 @@ func TestSavedSearchesAndAlerts(t *testing.T) {
 		}); err != nil {
 			t.Fatal(err)
 		}
-		if err := st.SaveMatches(ctx, max, []matching.Result{{JobID: id, Score: 90, Decision: matching.Match}}, seen); err != nil {
+		return id
+	}
+	match := func(id int64, at time.Time) {
+		t.Helper()
+		if err := st.SaveMatches(ctx, max, []matching.Result{{JobID: id, Score: 90, Decision: matching.Match}}, at); err != nil {
 			t.Fatal(err)
 		}
 	}
+	job := func(fp, title string, seen time.Time) { match(insert(fp, title, seen), seen) }
 	job("old-go", "Go Developer", now.Add(-time.Hour))
 
 	if _, err := svc.Save(ctx, max, "  ", "q=go", true); !errors.Is(err, matching.ErrInvalidSearch) {
@@ -92,6 +98,22 @@ func TestSavedSearchesAndAlerts(t *testing.T) {
 	now = now.Add(24 * time.Hour)
 	if n, _ := svc.CheckAlerts(ctx, filter, send); n != 0 {
 		t.Fatal("alert without new jobs")
+	}
+
+	// Crawl and matching run apart: a job first seen after the last matching has no result yet. The check leaves it
+	// for later instead of skipping it, and the check after the next matching counts it once.
+	oldGo := insert("old-go-2", "Go Platform Engineer", now.Add(-48*time.Hour))
+	match(oldGo, now.Add(-time.Minute))
+	late := insert("late-go", "Go Backend Developer", now)
+	now = now.Add(25 * time.Hour)
+	if n, _ := svc.CheckAlerts(ctx, filter, send); n != 0 {
+		t.Fatal("alert for a job the matching has not reached")
+	}
+	match(late, now)
+	match(oldGo, now)
+	now = now.Add(25 * time.Hour)
+	if n, err := svc.CheckAlerts(ctx, filter, send); err != nil || n != 1 || sent[len(sent)-1].New != 1 {
+		t.Fatalf("late job: %d, %v, %+v", n, err, sent)
 	}
 
 	if ok, _ := svc.SetAlert(ctx, max, id, false); !ok {

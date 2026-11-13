@@ -102,7 +102,8 @@ func (s *Store) ListMatches(ctx context.Context, userID uuid.UUID, f matching.Fi
 			FreshnessDays: int32(min(max(f.FreshnessDays, 0), 365)),
 			Query:         f.Query,
 			ShowBlocked:   f.Blocked,
-			SeenAfter:     seenAfter(f.SeenAfter),
+			SeenAfter:     optTime(f.SeenAfter),
+			SeenBefore:    optTime(f.SeenBefore),
 			Sort:          f.Sort,
 			PageOffset:    int32(min(max(offset, 0), 1_000_000)),
 			PageSize:      int32(min(max(limit, 0), 1000)),
@@ -277,7 +278,7 @@ func (s *Store) RemoveBlocklistByPattern(ctx context.Context, userID uuid.UUID, 
 	})
 }
 
-func seenAfter(t time.Time) *time.Time {
+func optTime(t time.Time) *time.Time {
 	if t.IsZero() {
 		return nil
 	}
@@ -357,4 +358,16 @@ func (s *Store) MarkSearchChecked(ctx context.Context, userID uuid.UUID, id int6
 	return db.InUserTx(ctx, s.pool, userID, func(tx pgx.Tx) error {
 		return q.New(tx).MarkSearchChecked(ctx, q.MarkSearchCheckedParams{UserID: userID, ID: id, CheckedAt: at})
 	})
+}
+
+// MatchedUntil returns when the user's matches were last computed; zero when never.
+func (s *Store) MatchedUntil(ctx context.Context, userID uuid.UUID) (at time.Time, err error) {
+	err = db.InUserTx(ctx, s.pool, userID, func(tx pgx.Tx) error {
+		at, err = q.New(tx).MatchedUntil(ctx, userID)
+		return err
+	})
+	if at.Unix() == 0 {
+		at = time.Time{}
+	}
+	return at, err
 }

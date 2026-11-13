@@ -24,3 +24,7 @@ WHERE alert AND checked_at <= $1 ORDER BY checked_at, id LIMIT 500;
 
 -- name: MarkSearchChecked :exec
 UPDATE saved_searches SET checked_at = $3 WHERE user_id = $1 AND id = $2;
+
+-- name: MatchedUntil :one
+-- When the user's matches were last computed; jobs first seen up to then have a result.
+SELECT coalesce(max(computed_at), 'epoch'::timestamptz)::timestamptz FROM matches WHERE user_id = $1;

@@ -36,6 +36,7 @@ WHERE m.user_id = sqlc.arg(user_id) AND j.status = 'open'
   AND (sqlc.arg(min_salary)::integer = 0 OR coalesce(j.salary_max, j.salary_min, 0) >= sqlc.arg(min_salary)::integer)
   AND (sqlc.arg(freshness_days)::integer = 0 OR coalesce(j.posted::timestamptz, j.first_seen) >= (now() - (sqlc.arg(freshness_days)::text || ' days')::interval))
   AND (sqlc.narg(seen_after)::timestamptz IS NULL OR j.first_seen > sqlc.narg(seen_after)::timestamptz)
+  AND (sqlc.narg(seen_before)::timestamptz IS NULL OR j.first_seen <= sqlc.narg(seen_before)::timestamptz)
   AND (sqlc.arg(query)::text = '' OR j.search @@ (websearch_to_tsquery('simple', sqlc.arg(query)::text)
     || websearch_to_tsquery('english', sqlc.arg(query)::text) || websearch_to_tsquery('german', sqlc.arg(query)::text)))
   AND (
