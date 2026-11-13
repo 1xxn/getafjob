@@ -43,6 +43,14 @@ func TestTextBlock(t *testing.T) {
 	if got := fields(bad.Validate()); !slices.Equal(got, []string{"body:profile.error.placeholder", "language:profile.error.invalid"}) {
 		t.Errorf("errors = %v", got)
 	}
+	for _, body := range []string{"Hello {Company}", "Hallo {Firma}", "Hi {job title}"} {
+		if got := fields(TextBlock{Name: "x", Body: body}.Validate()); !slices.Equal(got, []string{"body:profile.error.placeholder"}) {
+			t.Errorf("%q: errors = %v", body, got)
+		}
+	}
+	if errs := (TextBlock{Name: "x", Body: "Set notation {} and JSON {\"a\": 1} stay text"}).Validate(); len(errs) != 0 {
+		t.Errorf("braces without a placeholder name refused: %v", errs)
+	}
 	if v := ProfileValues(Profile{Personal: Personal{FirstName: "Max", LastName: "Mustermann"}}); v["full_name"] != "Max Mustermann" {
 		t.Errorf("values = %v", v)
 	}

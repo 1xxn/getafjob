@@ -18,7 +18,7 @@ func fields(errs []FieldError) []string {
 func TestProfileValidate(t *testing.T) {
 	ok := Profile{
 		Personal: Personal{FirstName: "Max", LastName: "Mustermann", Email: "max.mustermann@example.org",
-			Phone: "+49 30 1234567", PostalCode: "10115", City: "Berlin", LinkedIn: "https://linkedin.com/in/max"},
+			Phone: "+49 30 1234567", PostalCode: "10115", City: "Berlin", LinkedIn: "https://linkedin.com/in/max", Website: "HTTPS://max.example.org"},
 		Work:      Work{NoticePeriod: "3 months", SalaryExpectation: "75000", WorkAuthorizedEU: true},
 		Skills:    []string{"Go", "PostgreSQL"},
 		Languages: []Language{{Name: "German", Level: "native"}},
