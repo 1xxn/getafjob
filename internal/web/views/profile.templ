@@ -257,7 +257,7 @@ templ ProfilePage(name string, h CandidateHead, f Form, experiences []ProfileExp
 			}
 		</form>
 		<h2 class="form-section" id="stations">{ T(ctx, "profile.section.experience") }</h2>
-		<form method="post" data-dirty-guard action="/profile/experiences" class="stack" novalidate>
+		<form { HX(ctx, "hx-replace-url", "/profile")... } method="post" data-dirty-guard action="/profile/experiences" class="stack" novalidate>
 			<h3>{ T(ctx, "profile.station.add_experience") }</h3>
 			@ui.Input(station(ctx, "title", "new-exp", "", 200))
 			@ui.Input(station(ctx, "company", "new-exp", "", 200))
@@ -291,7 +291,7 @@ templ ProfilePage(name string, h CandidateHead, f Form, experiences []ProfileExp
 			</ol>
 		</div>
 		<h2 class="form-section">{ T(ctx, "profile.section.education") }</h2>
-		<form method="post" data-dirty-guard action="/profile/educations" class="stack" novalidate>
+		<form { HX(ctx, "hx-replace-url", "/profile")... } method="post" data-dirty-guard action="/profile/educations" class="stack" novalidate>
 			<h3>{ T(ctx, "profile.station.add_education") }</h3>
 			@ui.Input(station(ctx, "degree", "new-edu", "", 200))
 			@ui.Input(station(ctx, "institution", "new-edu", "", 200))
