@@ -640,10 +640,16 @@ func TestProfilePages(t *testing.T) {
 		"is_current":     {"on"},
 		"bullets":        {"Built scalable infra\nImproved uptime to 99.99%"},
 	}
-	if rec := a.do(http.MethodPost, "/profile/experiences", expForm, session, nil); rec.Code != http.StatusSeeOther {
+	rec = a.do(http.MethodPost, "/profile/experiences", expForm, session, nil)
+	if rec.Code != http.StatusSeeOther {
 		t.Fatalf("add experience failed: %d", rec.Code)
 	}
+	// The redirect lands on the new entry's first field, which the page focuses.
+	field := strings.TrimPrefix(rec.Header().Get("Location"), "/profile?saved=1#")
 	body = a.do(http.MethodGet, "/profile", nil, session, nil).Body.String()
+	if !strings.HasPrefix(field, "f-title-") || !strings.Contains(body, `id="`+field+`"`) {
+		t.Errorf("add experience lands on %q, not on a field of the page", field)
+	}
 	for _, want := range []string{"Staff Platform Engineer", "Acme Corp", "Munich", "Built scalable infra"} {
 		if !strings.Contains(body, want) {
 			t.Errorf("profile page lacks experience field %q", want)
