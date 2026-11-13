@@ -82,6 +82,26 @@ func TestAdminConsole(t *testing.T) {
 		t.Errorf("last admin demoted: %v", err)
 	}
 
+	// Disable ends the sessions and shows the account as disabled; enable lets it sign in again.
+	if r := post("/admin/users/"+adm.ID.String()+"/disable", nil); r.StatusCode != http.StatusConflict {
+		t.Errorf("disabled the own account: %d", r.StatusCode)
+	}
+	if r := post("/admin/users/"+maxUser.ID.String()+"/disable", nil); r.Header.Get("Location") != "/admin/users?done=disabled" {
+		t.Fatalf("disable %d", r.StatusCode)
+	}
+	if rec := a.do(http.MethodGet, "/profile", nil, user, nil); rec.Code != http.StatusSeeOther {
+		t.Errorf("disabled session still valid: %d", rec.Code)
+	}
+	if page := a.do(http.MethodGet, "/admin/users", nil, admin, nil).Body.String(); !strings.Contains(page, "data-enable") || !strings.Contains(page, "max.mustermann@example.com disabled") {
+		t.Errorf("users page lacks the disabled account")
+	}
+	if r := post("/admin/users/"+maxUser.ID.String()+"/enable", nil); r.Header.Get("Location") != "/admin/users?done=enabled" {
+		t.Fatalf("enable %d", r.StatusCode)
+	}
+	if u, _ := a.ids.UserByID(t.Context(), maxUser.ID); u.Disabled {
+		t.Error("account still disabled")
+	}
+
 	// Sign out ends the user's session; delete removes the account.
 	if r := post("/admin/users/"+maxUser.ID.String()+"/sign-out", nil); r.Header.Get("Location") != "/admin/users?done=signed_out" {
 		t.Fatalf("sign out %d", r.StatusCode)

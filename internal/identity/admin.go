@@ -47,6 +47,9 @@ type AdminStore interface {
 	SetRole(ctx context.Context, userID uuid.UUID, role Role, audit AuditEvent) error
 	AdminAudit(ctx context.Context, limit int) ([]AuditEntry, error)
 	Audit(ctx context.Context, e AuditEvent) error
+	// SetDisabled disables (at set) or enables (at nil) an account; disabling ends its sessions and refuses the last
+	// active admin (ErrLastAdmin).
+	SetDisabled(ctx context.Context, userID uuid.UUID, at *time.Time, audit AuditEvent) error
 	// LastAdmin reports whether userID is the only active admin.
 	LastAdmin(ctx context.Context, userID uuid.UUID) (bool, error)
 }
@@ -97,6 +100,41 @@ func (s *Service) SignOutAccount(ctx context.Context, by, userID uuid.UUID) (int
 		return 0, err
 	}
 	return n, s.admin().Audit(ctx, adminAudit(by, "admin.signed_out", map[string]any{"user": userID, "count": n}))
+}
+
+// SetDisabled disables or enables an account from the admin console; a disabled account cannot sign in and its
+// sessions end. An admin cannot disable their own account.
+func (s *Service) SetDisabled(ctx context.Context, by, userID uuid.UUID, disabled bool) error {
+	if by == userID {
+		return ErrSelf
+	}
+	code := "admin.user_enabled"
+	if disabled {
+		code = "admin.user_disabled"
+	}
+	return s.setDisabled(ctx, userID, disabled, adminAudit(by, code, map[string]any{"user": userID}))
+}
+
+// SetDisabledByEmail disables or enables the account with email (admin command).
+func (s *Service) SetDisabledByEmail(ctx context.Context, email string, disabled bool) error {
+	u, err := s.UserByEmail(ctx, email)
+	if err != nil {
+		return err
+	}
+	code := "identity.enabled_by_admin"
+	if disabled {
+		code = "identity.disabled_by_admin"
+	}
+	return s.setDisabled(ctx, u.ID, disabled, AuditEvent{UserID: &u.ID, Actor: "admin", Code: code})
+}
+
+func (s *Service) setDisabled(ctx context.Context, userID uuid.UUID, disabled bool, audit AuditEvent) error {
+	var at *time.Time
+	if disabled {
+		now := s.now()
+		at = &now
+	}
+	return s.admin().SetDisabled(ctx, userID, at, audit)
 }
 
 // CheckDeletion allows users to delete their own account only from a fresh session (ErrReauthRequired), so a

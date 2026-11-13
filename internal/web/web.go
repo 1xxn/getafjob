@@ -250,6 +250,8 @@ func (s *Server) Register(mux *http.ServeMux) {
 	mux.Handle("POST /admin/invites/{id}/revoke", s.adminOnly(s.adminRevoke))
 	mux.Handle("POST /admin/users/{id}/role", s.adminOnly(s.adminRole))
 	mux.Handle("POST /admin/users/{id}/sign-out", s.adminOnly(s.adminSignOut))
+	mux.Handle("POST /admin/users/{id}/disable", s.adminOnly(s.adminDisable(true)))
+	mux.Handle("POST /admin/users/{id}/enable", s.adminOnly(s.adminDisable(false)))
 	mux.Handle("POST /admin/users/{id}/delete", s.adminOnly(s.adminDelete))
 	mux.Handle("GET /admin/system", s.adminOnly(s.adminSystem))
 	mux.Handle("GET /admin/runners", s.adminOnly(s.adminRunners))

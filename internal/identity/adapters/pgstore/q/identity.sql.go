@@ -706,6 +706,23 @@ func (q *Queries) SetDockLayout(ctx context.Context, arg SetDockLayoutParams) (i
 	return result.RowsAffected(), nil
 }
 
+const setUserDisabled = `-- name: SetUserDisabled :execrows
+UPDATE users SET disabled_at = $1 WHERE id = $2
+`
+
+type SetUserDisabledParams struct {
+	DisabledAt *time.Time
+	ID         uuid.UUID
+}
+
+func (q *Queries) SetUserDisabled(ctx context.Context, arg SetUserDisabledParams) (int64, error) {
+	result, err := q.db.Exec(ctx, setUserDisabled, arg.DisabledAt, arg.ID)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
+}
+
 const setUserLocale = `-- name: SetUserLocale :execrows
 UPDATE users SET locale = $2 WHERE id = $1
 `
