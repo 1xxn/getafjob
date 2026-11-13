@@ -413,7 +413,7 @@ templ PreferencesPage(name string, f Form, section string) {
 					</div>
 				</form>
 			case "integrations":
-				<form method="post" action="/preferences" class="stack set-form" novalidate data-dirty-guard>
+				<form { HX(ctx, "hx-replace-url", "/settings/integrations")... } method="post" action="/preferences" class="stack set-form" novalidate data-dirty-guard>
 					<input type="hidden" name="section" value="integrations"/>
 					<h2>{ T(ctx, "profile.ai.title") }</h2>
 					<p class="muted">{ T(ctx, "profile.ai.hint") }</p>
