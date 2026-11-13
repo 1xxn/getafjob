@@ -214,10 +214,9 @@ func (a *Agent) RunOne(ctx context.Context, run *runnerv1.Run) error {
 		return c.Park(ctx, "open the posting: "+err.Error(), nil)
 	}
 	_ = p.Context(ctx).WaitLoad()
-	if (ats.IsPortal(ad.Name) || run.GetPortal() != "") && p.MustInfo() != nil {
-		curURL := p.MustInfo().URL
+	if info, err := p.Info(); err == nil && (ats.IsPortal(ad.Name) || run.GetPortal() != "") {
 		html, _ := p.HTML()
-		if ats.IsSessionExpired(run.GetPortal(), curURL, html) {
+		if ats.IsSessionExpired(run.GetPortal(), info.URL, html) {
 			a.Logger.WarnContext(ctx, "portal session expired, requesting handoff", "portal", run.GetPortal())
 			if err := c.Ask(ctx, []engine.Question{{
 				Kind:  "session_expired",
@@ -235,9 +234,11 @@ func (a *Agent) RunOne(ctx context.Context, run *runnerv1.Run) error {
 			if res, err := (proto.NetworkGetCookies{}).Call(p); err == nil && len(res.Cookies) > 0 {
 				params := proto.CookiesToParams(res.Cookies)
 				if updatedJSON, err := json.Marshal(params); err == nil {
-					_ = c.CheckpointWithCookies(ctx, engine.Checkpoint{
-						Page: 1, Step: engine.StepPrepare, URL: p.MustInfo().URL,
-					}, updatedJSON)
+					cp := engine.Checkpoint{Page: 1, Step: engine.StepPrepare}
+					if info, err := p.Info(); err == nil {
+						cp.URL = info.URL
+					}
+					_ = c.CheckpointWithCookies(ctx, cp, updatedJSON)
 				}
 			}
 			if err := p.Context(ctx).Navigate(run.GetStartUrl()); err != nil {
