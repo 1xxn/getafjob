@@ -15,6 +15,11 @@
 }
 
 @layer layout {
+  /* fields and link targets scroll clear of the sticky top bar (with their label) and of the phone tab bar */
+  body.shell :is(input, textarea, select, :target) {
+    scroll-margin-block: calc(var(--top-h, 0px) + var(--space-8)) calc(var(--bottom-h, 0px) + var(--space-8));
+  }
+
   main {
     max-width: var(--measure);
     margin: 0 auto;

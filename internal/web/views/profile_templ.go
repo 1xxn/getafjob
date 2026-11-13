@@ -179,7 +179,7 @@ func formNotice(f Form) templ.Component {
 					return templ_7745c5c3_Err
 				}
 			} else {
-				templ_7745c5c3_Err = ui.Alert(ui.AlertProps{Tone: ui.Info, Text: f.Notice}).Render(ctx, templ_7745c5c3_Buffer)
+				templ_7745c5c3_Err = ui.Alert(ui.AlertProps{Tone: ui.Success, Text: f.Notice}).Render(ctx, templ_7745c5c3_Buffer)
 				if templ_7745c5c3_Err != nil {
 					return templ_7745c5c3_Err
 				}

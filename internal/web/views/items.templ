@@ -45,7 +45,11 @@ templ AnswersPage(name string, h CandidateHead, f Form, d AnswersData) {
 			@ui.Button(ui.ButtonProps{Label: T(ctx, "answers.add"), Icon: "plus", Attrs: ui.OpenDialog("dlg-answer")})
 		</div>
 		<div id="answer-list" class="cand-list">
-			<p class="app-hint" role="status">{ T(ctx, "answers.count", "shown", len(d.Rows), "total", d.Total) }</p>
+			if d.Total == 0 {
+				@ui.EmptyState(ui.EmptyProps{Icon: "message", Title: T(ctx, "answers.empty")})
+			} else {
+				<p class="app-hint" role="status">{ T(ctx, "answers.count", "shown", len(d.Rows), "total", d.Total) }</p>
+			}
 			for _, a := range d.Rows {
 				<details class="cand-item" data-answer={ a.ID }>
 					<summary>
@@ -84,7 +88,7 @@ templ AnswersPage(name string, h CandidateHead, f Form, d AnswersData) {
 		@ui.Dialog(ui.DialogProps{ID: "dlg-answer", Title: T(ctx, "answers.add"), CloseLabel: T(ctx, "shell.close")}) {
 			<form method="post" action="/answers" class="app-notes" data-dirty-guard>
 				@ui.Input(ui.InputProps{FieldProps: ui.FieldProps{Name: "question", Label: T(ctx, "answers.question"), Hint: T(ctx, "answers.question_hint"),
-					Error: f.Errors["question"]}, Value: f.Values["question"], MaxLength: 300})
+					Error: f.Errors["question"]}, Value: f.Values["question"], MaxLength: 300, Attrs: templ.Attributes{"autofocus": true}})
 				@ui.Textarea(ui.TextareaProps{FieldProps: ui.FieldProps{Name: "answer", Label: T(ctx, "answers.answer"), Error: f.Errors["answer"]},
 					Value: f.Values["answer"], MaxLength: 5000})
 				<div class="ui-dialog-actions">
@@ -112,6 +116,9 @@ templ TextsPage(name string, h CandidateHead, f Form, texts []TextRow, placehold
 			@ui.Button(ui.ButtonProps{Label: T(ctx, "texts.add"), Icon: "plus", Attrs: ui.OpenDialog("dlg-text")})
 		</div>
 		<div class="cand-list">
+			if len(texts) == 0 {
+				@ui.EmptyState(ui.EmptyProps{Icon: "type", Title: T(ctx, "texts.empty")})
+			}
 			for _, t := range texts {
 				<details class="cand-item" data-text={ t.ID }>
 					<summary>
@@ -148,7 +155,8 @@ templ TextsPage(name string, h CandidateHead, f Form, texts []TextRow, placehold
 		</div>
 		@ui.Dialog(ui.DialogProps{ID: "dlg-text", Title: T(ctx, "texts.add"), CloseLabel: T(ctx, "shell.close")}) {
 			<form method="post" action="/texts" class="app-notes" data-dirty-guard>
-				@ui.Input(ui.InputProps{FieldProps: ui.FieldProps{Name: "name", Label: T(ctx, "texts.name"), Error: f.Errors["name"]}, Value: f.Values["name"], MaxLength: 100})
+				@ui.Input(ui.InputProps{FieldProps: ui.FieldProps{Name: "name", Label: T(ctx, "texts.name"), Error: f.Errors["name"]}, Value: f.Values["name"], MaxLength: 100,
+					Attrs: templ.Attributes{"autofocus": true}})
 				@ui.Select(ui.SelectProps{FieldProps: ui.FieldProps{ID: "f-language-new", Name: "language", Label: T(ctx, "documents.language")},
 					Options: languageOptions(ctx, f.Values["language"])})
 				@ui.Textarea(ui.TextareaProps{FieldProps: ui.FieldProps{Name: "body", Label: T(ctx, "texts.body"), Error: f.Errors["body"]}, Value: f.Values["body"],
