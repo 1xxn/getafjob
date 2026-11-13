@@ -130,7 +130,7 @@ func (s *Server) inviteSubmit(w http.ResponseWriter, r *http.Request, _ *identit
 			s.problem(w, r, nil, http.StatusBadRequest, "invite.title", views.T(ctx, "msg.identity.invitation_invalid"))
 			return
 		}
-		s.render(w, r, http.StatusUnprocessableEntity, views.Invite("/invite/"+token, inv.Email, "", views.T(ctx, "invite.name_label")))
+		s.render(w, r, http.StatusUnprocessableEntity, views.Invite("/invite/"+token, inv.Email, "", views.T(ctx, "invite.name_required")))
 		return
 	}
 	_, session, err := s.Identity.AcceptInvitation(ctx, token, name, locale)

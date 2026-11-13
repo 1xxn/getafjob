@@ -1142,7 +1142,7 @@ func TestPrivacyExportAndDelete(t *testing.T) {
 
 	// 4. View account page and verify privacy section is present
 	accPage := a.do(http.MethodGet, "/settings/account", nil, session, nil).Body.String()
-	if !strings.Contains(accPage, "Privacy &amp; your data") && !strings.Contains(accPage, "Privacy & your data") {
+	if !strings.Contains(accPage, "Privacy and your data") {
 		t.Errorf("account page lacks privacy section: %s", accPage)
 	}
 

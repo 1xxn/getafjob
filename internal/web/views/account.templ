@@ -122,7 +122,7 @@ templ Account(d AccountData) {
 		</table>
 		if len(d.Sessions) > 1 {
 			<form method="post" action="/account/sessions/others">
-				<button type="submit">{ T(ctx, "account.sessions.sign_out_others") }</button>
+				@ui.Button(ui.ButtonProps{Label: T(ctx, "account.sessions.sign_out_others"), Type: "submit"})
 			</form>
 		}
 		<h2>{ T(ctx, "account.privacy.title") }</h2>
@@ -132,7 +132,7 @@ templ Account(d AccountData) {
 			<h3>{ T(ctx, "account.privacy.export_title") }</h3>
 			<p class="muted">{ T(ctx, "account.privacy.export_text") }</p>
 			<form method="get" action="/account/export" { HX(ctx, "hx-boost", "false")... }>
-				<button type="submit">{ T(ctx, "account.privacy.export_button") }</button>
+				@ui.Button(ui.ButtonProps{Label: T(ctx, "account.privacy.export_button"), Type: "submit"})
 			</form>
 			<h3>{ T(ctx, "account.privacy.delete_title") }</h3>
 			<p class="muted">{ T(ctx, "account.privacy.delete_text") }</p>
