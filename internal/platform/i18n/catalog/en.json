@@ -757,6 +757,7 @@
   "dash.park.check": "needs you to pass a check",
   "dash.park.unreachable": "the job page did not open",
   "dash.park.no_confirm": "sending was not confirmed",
+  "dash.park.runner_lost": "the browser of the run stopped",
   "dash.park.form_rejected": "the form refused a field",
   "dash.park.excluded": "your filters exclude this job",
   "dash.park.duplicate": "already applied through another source",
