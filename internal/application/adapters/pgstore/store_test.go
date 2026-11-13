@@ -190,6 +190,9 @@ func TestGuardsBeforeStart(t *testing.T) {
 	if a, _ := st.Get(ctx, max, id); a.State != application.Parked {
 		t.Fatalf("duplicate not parked: %s", a.State)
 	}
+	if reason, err := svc.ParkReason(ctx, max, id); err != nil || reason != application.ErrDuplicate.Error() {
+		t.Fatalf("park reason = %q, %v; want the guard", reason, err)
+	}
 	// A second job at the same company is fine, a third within 30 days is not.
 	submit(job(t, pool, "greenhouse:muster", "Muster AG", "muster|frontend"))
 	if _, err := start(job(t, pool, "greenhouse:muster", "MUSTER AG", "muster|data")); !errors.Is(err, application.ErrCompanyWindow) {

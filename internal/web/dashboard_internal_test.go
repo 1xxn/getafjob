@@ -17,8 +17,13 @@ func TestParkReasonKey(t *testing.T) {
 		"handoff window closed": "dash.park.timeout",
 		"open the posting: navigation failed: net::ERR_TUNNEL_CONNECTION_FAILED": "dash.park.unreachable",
 		"run: submit not registered, no click: unknown":                          "dash.park.no_confirm",
-		"captcha needs a human": "dash.park.check",
-		"":                      "dash.park.other",
+		"captcha needs a human":                 "dash.park.check",
+		"submit had no effect after one retry":  "dash.park.no_confirm",
+		"the form rejected the submit: [email]": "dash.park.form_rejected",
+		application.ErrExcluded.Error():         "dash.park.excluded",
+		application.ErrDuplicate.Error():        "dash.park.duplicate",
+		application.ErrCompanyWindow.Error():    "dash.park.company",
+		"":                                      "dash.park.other",
 	} {
 		if got := parkReasonKey(reason); got != want {
 			t.Errorf("%q: %s, want %s", reason, got, want)

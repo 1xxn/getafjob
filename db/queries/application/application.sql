@@ -202,7 +202,7 @@ ORDER BY r.leased_at
 LIMIT 500;
 
 -- name: ParkReasons :many
-SELECT DISTINCT ON (e.application_id) e.application_id, coalesce(e.detail->>'reason', '')::text AS reason
+SELECT DISTINCT ON (e.application_id) e.application_id, coalesce(e.detail->>'reason', e.detail->>'guard', '')::text AS reason
 FROM application_events e
 JOIN applications a ON a.id = e.application_id
 WHERE a.user_id = $1 AND a.state = 'parked' AND e.to_state = 'parked'
