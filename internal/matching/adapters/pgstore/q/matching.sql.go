@@ -210,10 +210,11 @@ WHERE m.user_id = $1 AND j.status = 'open'
   AND ($6::integer = 0 OR coalesce(j.salary_max, j.salary_min, 0) >= $6::integer)
   AND ($7::integer = 0 OR coalesce(j.posted::timestamptz, j.first_seen) >= (now() - ($7::text || ' days')::interval))
   AND ($8::timestamptz IS NULL OR j.first_seen > $8::timestamptz)
-  AND ($9::text = '' OR j.search @@ (websearch_to_tsquery('simple', $9::text)
-    || websearch_to_tsquery('english', $9::text) || websearch_to_tsquery('german', $9::text)))
+  AND ($9::timestamptz IS NULL OR j.first_seen <= $9::timestamptz)
+  AND ($10::text = '' OR j.search @@ (websearch_to_tsquery('simple', $10::text)
+    || websearch_to_tsquery('english', $10::text) || websearch_to_tsquery('german', $10::text)))
   AND (
-    CASE WHEN $10::boolean THEN
+    CASE WHEN $11::boolean THEN
       EXISTS (
         SELECT 1 FROM user_blocklist b
         WHERE b.user_id = m.user_id
@@ -234,12 +235,12 @@ WHERE m.user_id = $1 AND j.status = 'open'
     END
   )
 ORDER BY
-  CASE WHEN $11::text = 'newest' THEN coalesce(j.posted::timestamptz, j.first_seen) END DESC NULLS LAST,
-  CASE WHEN $11::text = 'salary' THEN coalesce(j.salary_max, j.salary_min, 0) END DESC NULLS LAST,
-  CASE WHEN $11::text = 'company' THEN lower(j.company) END ASC,
-  CASE WHEN $11::text = 'match' OR $11::text = '' THEN m.score END DESC,
+  CASE WHEN $12::text = 'newest' THEN coalesce(j.posted::timestamptz, j.first_seen) END DESC NULLS LAST,
+  CASE WHEN $12::text = 'salary' THEN coalesce(j.salary_max, j.salary_min, 0) END DESC NULLS LAST,
+  CASE WHEN $12::text = 'company' THEN lower(j.company) END ASC,
+  CASE WHEN $12::text = 'match' OR $12::text = '' THEN m.score END DESC,
   j.id DESC
-LIMIT $13::integer OFFSET $12::integer
+LIMIT $14::integer OFFSET $13::integer
 `
 
 type ListMatchesParams struct {
@@ -251,6 +252,7 @@ type ListMatchesParams struct {
 	MinSalary     int32
 	FreshnessDays int32
 	SeenAfter     *time.Time
+	SeenBefore    *time.Time
 	Query         string
 	ShowBlocked   bool
 	Sort          string
@@ -287,6 +289,7 @@ func (q *Queries) ListMatches(ctx context.Context, arg ListMatchesParams) ([]Lis
 		arg.MinSalary,
 		arg.FreshnessDays,
 		arg.SeenAfter,
+		arg.SeenBefore,
 		arg.Query,
 		arg.ShowBlocked,
 		arg.Sort,

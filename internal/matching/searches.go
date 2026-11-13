@@ -37,6 +37,8 @@ type Searches interface {
 	// DueSearchAlerts lists searches with an alert last checked at or before (system role).
 	DueSearchAlerts(ctx context.Context, before time.Time) ([]SavedSearch, error)
 	MarkSearchChecked(ctx context.Context, userID uuid.UUID, id int64, at time.Time) error
+	// MatchedUntil returns when the user's matches were last computed; zero when never.
+	MatchedUntil(ctx context.Context, userID uuid.UUID) (time.Time, error)
 }
 
 // cleanName trims a search name and checks its length.
@@ -105,7 +107,9 @@ type Alert struct {
 
 // CheckAlerts looks at every saved search whose alert is due (at most once per AlertInterval), counts the jobs
 // first seen since its last check with filter (the search's query turned into a list filter) and calls send for
-// those with new jobs. A search is marked checked whether or not it had new jobs, so every job counts once.
+// those with new jobs. Crawl and matching run apart: a check counts only jobs first seen up to the user's last
+// matching and moves the search to that time, so a job the matching has not reached yet counts on a later check,
+// never twice and never not at all.
 func (s *SavedSearchService) CheckAlerts(ctx context.Context, filter func(query string) Filter,
 	send func(ctx context.Context, a Alert) error,
 ) (int, error) {
@@ -117,8 +121,19 @@ func (s *SavedSearchService) CheckAlerts(ctx context.Context, filter func(query 
 	sent := 0
 	var errs []error
 	for _, ss := range due {
+		until, err := s.store.MatchedUntil(ctx, ss.UserID)
+		if err != nil {
+			errs = append(errs, err)
+			continue
+		}
+		if until = until.UTC(); until.After(now) {
+			until = now
+		}
+		if !until.After(ss.CheckedAt) {
+			continue // no matching since the last check: nothing new can be counted yet
+		}
 		f := filter(ss.Query)
-		f.SeenAfter, f.Page = ss.CheckedAt, 1
+		f.SeenAfter, f.SeenBefore, f.Page = ss.CheckedAt, until, 1
 		list, err := s.listings.List(ctx, ss.UserID, f)
 		if err != nil {
 			errs = append(errs, err)
@@ -131,7 +146,7 @@ func (s *SavedSearchService) CheckAlerts(ctx context.Context, filter func(query 
 			}
 			sent++
 		}
-		if err := s.store.MarkSearchChecked(ctx, ss.UserID, ss.ID, now); err != nil {
+		if err := s.store.MarkSearchChecked(ctx, ss.UserID, ss.ID, until); err != nil {
 			errs = append(errs, err)
 		}
 	}

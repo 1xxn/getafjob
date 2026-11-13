@@ -111,6 +111,18 @@ func (q *Queries) MarkSearchChecked(ctx context.Context, arg MarkSearchCheckedPa
 	return err
 }
 
+const matchedUntil = `-- name: MatchedUntil :one
+SELECT coalesce(max(computed_at), 'epoch'::timestamptz)::timestamptz FROM matches WHERE user_id = $1
+`
+
+// When the user's matches were last computed; jobs first seen up to then have a result.
+func (q *Queries) MatchedUntil(ctx context.Context, userID uuid.UUID) (time.Time, error) {
+	row := q.db.QueryRow(ctx, matchedUntil, userID)
+	var column_1 time.Time
+	err := row.Scan(&column_1)
+	return column_1, err
+}
+
 const renameSavedSearch = `-- name: RenameSavedSearch :execrows
 UPDATE saved_searches SET name = $3 WHERE user_id = $1 AND id = $2
 `
