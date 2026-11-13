@@ -49,6 +49,11 @@ func TestT(t *testing.T) {
 	if got := fill("{a} and {b}", map[string]any{"a": 1}); got != "1 and {b}" {
 		t.Errorf("fill = %q", got)
 	}
+	for n, want := range map[int]string{0: "0 runs", 1: "1 run", 2: "2 runs"} {
+		if got := fill("{n} {n|run|runs}", map[string]any{"n": n}); got != want {
+			t.Errorf("plural %d = %q, want %q", n, got, want)
+		}
+	}
 	if got := (Msg{Code: "identity.session_expired"}).Render(DE); !strings.HasPrefix(got, "Deine Sitzung") {
 		t.Errorf("Msg.Render = %q", got)
 	}

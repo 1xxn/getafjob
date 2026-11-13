@@ -8,6 +8,7 @@ import (
 	"embed"
 	"encoding/json"
 	"fmt"
+	"slices"
 	"sort"
 	"strings"
 )
@@ -90,7 +91,8 @@ func T(l Locale, key string, params map[string]any) string {
 	return fill(msg, params)
 }
 
-// fill replaces {name} placeholders; unknown placeholders stay visible so they are noticed.
+// fill replaces {name} placeholders; unknown placeholders stay visible so they are noticed. {name|one|other} is the
+// word for a count: one when the parameter is 1, other otherwise ("{n} {n|Lauf|Läufe}").
 func fill(msg string, params map[string]any) string {
 	if len(params) == 0 || !strings.Contains(msg, "{") {
 		return msg
@@ -107,10 +109,18 @@ func fill(msg string, params map[string]any) string {
 			b.WriteString(msg)
 			return b.String()
 		}
-		name := msg[i+1 : i+j]
+		name, forms, plural := strings.Cut(msg[i+1:i+j], "|")
 		b.WriteString(msg[:i])
 		if v, ok := params[name]; ok {
-			fmt.Fprint(&b, v)
+			if plural {
+				one, other, _ := strings.Cut(forms, "|")
+				if fmt.Sprint(v) != "1" {
+					one = other
+				}
+				b.WriteString(one)
+			} else {
+				fmt.Fprint(&b, v)
+			}
 		} else {
 			b.WriteString(msg[i : i+j+1])
 		}
@@ -139,7 +149,10 @@ func placeholders(msg string) []string {
 		if j < 0 {
 			break
 		}
-		out = append(out, msg[i+1:i+j])
+		name, _, _ := strings.Cut(msg[i+1:i+j], "|")
+		if !slices.Contains(out, name) {
+			out = append(out, name)
+		}
 		msg = msg[i+j+1:]
 	}
 	sort.Strings(out)
