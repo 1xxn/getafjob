@@ -126,7 +126,7 @@ func (s *Service) SetJobCV(ctx context.Context, userID uuid.UUID, jobID int64, c
 	return s.store.SetJobCvDocument(ctx, userID, jobID, cvID, s.now())
 }
 
-// outcomes finishes the submit attempt for transitions out of submitting and submit_unknown.
+// outcome is how a transition out of submitting or submit_unknown finishes the submit attempt ("" for others).
 func outcome(from State, ev Event) string {
 	switch {
 	case from == Submitting && ev == EvSubmitted, from == SubmitUnknown && (ev == EvReconciled || ev == EvConfirm):
