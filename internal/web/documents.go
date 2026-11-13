@@ -160,7 +160,7 @@ func (s *Server) documentVariant(w http.ResponseWriter, r *http.Request, u *iden
 		s.renderDocuments(w, r, u, http.StatusOK, views.T(r.Context(), "profile.saved"), false)
 	case errors.Is(err, profile.ErrNotFound):
 		s.notFound(w, r, u)
-	case errors.Is(err, profile.ErrFileType):
+	case errors.Is(err, profile.ErrVariant):
 		s.renderDocuments(w, r, u, http.StatusUnprocessableEntity, views.T(r.Context(), "profile.invalid"), true)
 	default:
 		s.failed(w, r, u, err)

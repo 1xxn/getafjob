@@ -44,6 +44,7 @@ var (
 	ErrFileTooLarge = errors.New("profile: file too large")
 	ErrTooManyFiles = errors.New("profile: too many documents")
 	ErrNotFound     = errors.New("profile: not found")
+	ErrVariant      = errors.New("profile: invalid CV variant")
 )
 
 // Document is a stored file of the user. A CV is also a variant: Label, Language and Focus choose it per job.
@@ -135,7 +136,7 @@ func CleanName(name, mime string) string {
 func CleanVariant(label, language string, focus []string) (string, string, []string, error) {
 	label = strings.Join(strings.Fields(label), " ")
 	if utf8.RuneCountInString(label) > 100 || (language != "" && language != "en" && language != "de") || len(focus) > maxFocus {
-		return "", "", nil, ErrFileType
+		return "", "", nil, ErrVariant
 	}
 	out := make([]string, 0, len(focus))
 	for _, f := range focus {
@@ -146,28 +147,41 @@ func CleanVariant(label, language string, focus []string) (string, string, []str
 	return label, language, out, nil
 }
 
-// ChooseCV picks the CV for a job: same language first, then the most focus words found in the job title and
-// description, then the newest. It returns false when the user has no CV.
+// ChooseCV picks the CV for a job: same language first, then a CV for any language, then the others; among those
+// the most focus words found as whole words in the job title and description, then the newest. It returns false
+// when the user has no CV.
 func ChooseCV(docs []Document, lang, title, description string) (Document, bool) {
-	text := strings.ToLower(title + " " + title + " " + description) // the title counts twice
-	best, found, bestScore := Document{}, false, -1
+	text := " " + words(title+" "+description) + " "
+	var best Document
+	found, bestLang, bestHits := false, -1, -1
 	for _, d := range docs {
 		if d.Kind != KindCV {
 			continue
 		}
-		score := 0
+		rank := 0
 		switch {
 		case d.Language != "" && d.Language == lang:
-			score += 1000
+			rank = 2
 		case d.Language == "":
-			score += 500
+			rank = 1
 		}
+		hits := 0
 		for _, f := range d.Focus {
-			score += 10 * strings.Count(text, f)
+			if w := words(f); w != "" && strings.Contains(text, " "+w+" ") {
+				hits++
+			}
 		}
-		if score > bestScore || (score == bestScore && d.CreatedAt.After(best.CreatedAt)) {
-			best, found, bestScore = d, true, score
+		better := rank > bestLang || (rank == bestLang && (hits > bestHits || (hits == bestHits && d.CreatedAt.After(best.CreatedAt))))
+		if !found || better {
+			best, found, bestLang, bestHits = d, true, rank, hits
 		}
 	}
 	return best, found
+}
+
+// words lower-cases s and keeps its words (letters, digits, + and #, so "C++" and "C#" stay) separated by spaces.
+func words(s string) string {
+	return strings.Join(strings.FieldsFunc(strings.ToLower(s), func(r rune) bool {
+		return !unicode.IsLetter(r) && !unicode.IsDigit(r) && r != '+' && r != '#'
+	}), " ")
 }
