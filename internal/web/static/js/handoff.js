@@ -33,6 +33,7 @@ function initLiveView(box) {
   const canvas = box.querySelector("[data-screen]");
   const statusEl = box.querySelector("[data-screen-status]");
   const resumeBtn = box.querySelector("[data-resume]");
+  const answersLink = box.querySelector("[data-answers]");
   const appId = box.dataset.app;
   if (!canvas || !appId) return () => {
   };
@@ -44,6 +45,7 @@ function initLiveView(box) {
     waiting: box.dataset.tWaiting ?? "",
     view: box.dataset.tViewOnly ?? "",
     interactive: box.dataset.tYourTurn ?? "",
+    answers: box.dataset.tAnswers ?? "",
     ended: box.dataset.tEnded ?? "",
     reconnecting: box.dataset.tReconnecting ?? "",
     unavailable: box.dataset.tUnavailable ?? ""
@@ -58,8 +60,12 @@ function initLiveView(box) {
     box.dataset.mode = mode;
     if (statusEl) statusEl.textContent = texts[mode];
     if (resumeBtn) resumeBtn.hidden = mode !== "interactive";
-    if (mode === "interactive" || mode === "view") {
-      const want = mode === "interactive" ? "waiting" : "running";
+    if (answersLink) {
+      answersLink.hidden = mode !== "answers";
+      answersLink.href = `/needs-input?app=${encodeURIComponent(appId ?? "")}`;
+    }
+    if (mode === "interactive" || mode === "answers" || mode === "view") {
+      const want = mode === "view" ? "running" : "waiting";
       box.closest(".live-focus")?.querySelectorAll("[data-live-state]").forEach((el) => {
         el.hidden = el.dataset.liveState !== want;
       });
@@ -88,7 +94,7 @@ function initLiveView(box) {
           const msg = JSON.parse(e.data);
           if (msg.type === "status") {
             interactive = msg.interactive === true;
-            setMode(interactive ? "interactive" : "view");
+            setMode(interactive ? msg.answers === true ? "answers" : "interactive" : "view");
           }
         } catch {
         }

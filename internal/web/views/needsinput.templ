@@ -154,7 +154,7 @@ templ niPanel(o NIOpen) {
 			</div>
 			if o.Live {
 				<div class="ni-live">
-					@LiveScreen(LiveScreenProps{AppID: o.AppID, Size: "full", Controls: true})
+					@LiveScreen(LiveScreenProps{AppID: o.AppID, Size: "full", Controls: true, AnswerPage: true})
 				</div>
 			}
 		</div>

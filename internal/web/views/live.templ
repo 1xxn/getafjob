@@ -14,6 +14,7 @@ type LiveScreenProps struct {
 	Controls    bool   // keyboard focus, take over input and the Continue button
 	FPS         int    // draw at most this many frames per second; 0: every frame
 	ReloadOnEnd bool   // reload the page when the run ends (application page)
+	AnswerPage  bool   // shown next to the answer form: open questions need no link there
 }
 
 templ LiveScreen(p LiveScreenProps) {
@@ -34,6 +35,11 @@ templ LiveScreen(p LiveScreenProps) {
 		data-t-waiting={ T(ctx, "live.waiting") }
 		data-t-view-only={ T(ctx, "live.view_only") }
 		data-t-your-turn={ T(ctx, "live.your_turn") }
+		if p.AnswerPage {
+			data-t-answers={ T(ctx, "live.answers_here") }
+		} else {
+			data-t-answers={ T(ctx, "live.answers") }
+		}
 		data-t-ended={ T(ctx, "live.ended") }
 		data-t-reconnecting={ T(ctx, "live.reconnecting") }
 		data-t-unavailable={ T(ctx, "live.unavailable") }
@@ -59,6 +65,9 @@ templ LiveScreen(p LiveScreenProps) {
 		</div>
 		if p.Controls {
 			<button type="button" data-resume class="ui-btn ui-btn-primary" hidden>{ T(ctx, "handoff.continue") }</button>
+			if !p.AnswerPage {
+				<a data-answers class="ui-btn ui-btn-primary" href={ templ.SafeURL("/needs-input?app=" + p.AppID) } hidden>{ T(ctx, "live.answer_link") }</a>
+			}
 		}
 	</div>
 }

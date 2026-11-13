@@ -37,13 +37,14 @@ const NOT_LIVE = 4000;
 const WAITING = 4001;
 const MAX_FAILURES = 8;
 
-type Mode = 'connecting' | 'waiting' | 'view' | 'interactive' | 'ended' | 'reconnecting' | 'unavailable';
+type Mode = 'connecting' | 'waiting' | 'view' | 'interactive' | 'answers' | 'ended' | 'reconnecting' | 'unavailable';
 
 // initLiveView connects the live view in box and returns a function that closes it.
 function initLiveView(box: HTMLElement): () => void {
   const canvas = box.querySelector<HTMLCanvasElement>('[data-screen]');
   const statusEl = box.querySelector<HTMLElement>('[data-screen-status]');
   const resumeBtn = box.querySelector<HTMLButtonElement>('[data-resume]');
+  const answersLink = box.querySelector<HTMLAnchorElement>('[data-answers]');
   const appId = box.dataset.app;
   if (!canvas || !appId) return () => {};
   const ctx2d = canvas.getContext('2d');
@@ -55,6 +56,7 @@ function initLiveView(box: HTMLElement): () => void {
     waiting: box.dataset.tWaiting ?? '',
     view: box.dataset.tViewOnly ?? '',
     interactive: box.dataset.tYourTurn ?? '',
+    answers: box.dataset.tAnswers ?? '',
     ended: box.dataset.tEnded ?? '',
     reconnecting: box.dataset.tReconnecting ?? '',
     unavailable: box.dataset.tUnavailable ?? '',
@@ -71,8 +73,13 @@ function initLiveView(box: HTMLElement): () => void {
     box.dataset.mode = mode;
     if (statusEl) statusEl.textContent = texts[mode];
     if (resumeBtn) resumeBtn.hidden = mode !== 'interactive';
-    if (mode === 'interactive' || mode === 'view') {
-      const want = mode === 'interactive' ? 'waiting' : 'running';
+    // Field questions are answered on the answer form: Continue would send no answer and the run would ask again.
+    if (answersLink) {
+      answersLink.hidden = mode !== 'answers';
+      answersLink.href = `/needs-input?app=${encodeURIComponent(appId ?? '')}`;
+    }
+    if (mode === 'interactive' || mode === 'answers' || mode === 'view') {
+      const want = mode === 'view' ? 'running' : 'waiting';
       box.closest('.live-focus')?.querySelectorAll<HTMLElement>('[data-live-state]').forEach((el) => {
         el.hidden = el.dataset.liveState !== want;
       });
@@ -102,10 +109,10 @@ function initLiveView(box: HTMLElement): () => void {
     sock.onmessage = async (e: MessageEvent) => {
       if (typeof e.data === 'string') {
         try {
-          const msg = JSON.parse(e.data) as { type?: string; interactive?: boolean };
+          const msg = JSON.parse(e.data) as { type?: string; interactive?: boolean; answers?: boolean };
           if (msg.type === 'status') {
             interactive = msg.interactive === true;
-            setMode(interactive ? 'interactive' : 'view');
+            setMode(interactive ? (msg.answers === true ? 'answers' : 'interactive') : 'view');
           }
         } catch {
           // ignore malformed status
