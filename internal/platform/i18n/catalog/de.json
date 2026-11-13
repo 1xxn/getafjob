@@ -1089,7 +1089,7 @@
   "admin.title": "Admin",
   "admin.users": "Nutzer",
   "admin.system": "System",
-  "admin.users.intro": "Lade Leute ein, ändere Rollen, beende Sitzungen oder lösche Konten. Jede Aktion wird unten festgehalten.",
+  "admin.users.intro": "Lade Leute ein, ändere Rollen, beende Sitzungen, sperre oder lösche Konten. Jede Aktion wird unten festgehalten.",
   "admin.invite.title": "Jemanden einladen",
   "admin.invite.email": "E-Mail-Adresse",
   "admin.invite.hint": "Du bekommst einen Link, den du selbst weitergibst. Er gilt einmal und läuft nach 7 Tagen ab. Es wird keine Mail gesendet.",

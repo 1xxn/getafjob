@@ -1089,7 +1089,7 @@
   "admin.title": "Admin",
   "admin.users": "Users",
   "admin.system": "System",
-  "admin.users.intro": "Invite people, change roles, end sessions or delete accounts. Every action is recorded below.",
+  "admin.users.intro": "Invite people, change roles, end sessions, disable or delete accounts. Every action is recorded below.",
   "admin.invite.title": "Invite someone",
   "admin.invite.email": "E-mail address",
   "admin.invite.hint": "You get a link to pass on yourself. It works once and expires after 7 days. No mail is sent.",
