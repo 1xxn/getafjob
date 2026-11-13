@@ -310,6 +310,35 @@ func TestGatewayHomeRunnerAuthenticationAndLeasing(t *testing.T) {
 	}
 }
 
+// A home runner token leases only its own user's runs, also when it sends the server runner's id.
+func TestGatewayHomeRunnerCannotUseAnotherRunnerID(t *testing.T) {
+	pool, apps, c, _ := setup(t)
+	ctx := t.Context()
+	queue(t, pool, apps) // Max's run for the server runner
+	var erika uuid.UUID
+	if err := db.InSystemTx(ctx, pool, func(tx pgx.Tx) error {
+		return tx.QueryRow(ctx, "INSERT INTO users (email) VALUES ('erika@example.org') RETURNING id").Scan(&erika)
+	}); err != nil {
+		t.Fatal(err)
+	}
+	if err := apps.SaveSettings(ctx, erika, application.Settings{Level: application.LevelAutonomous,
+		RunnerChoice: application.RunnerHomeRunner, DailyLimit: 10}); err != nil {
+		t.Fatal(err)
+	}
+	token, err := apps.GenerateHomeRunnerToken(ctx, erika)
+	if err != nil {
+		t.Fatal(err)
+	}
+	sreg, err := c.Register(with(ctx, secret), &runnerv1.RegisterRequest{Version: "test"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	l, err := c.Lease(with(ctx, token), &runnerv1.LeaseRequest{RunnerId: sreg.GetRunnerId()})
+	if err != nil || l.GetRun() != nil {
+		t.Fatalf("home runner leased with the server runner id: %v, %+v", err, l.GetRun())
+	}
+}
+
 func TestGatewayStepDurationMetrics(t *testing.T) {
 	reader := sdkmetric.NewManualReader()
 	prev := gotel.GetMeterProvider()

@@ -390,20 +390,19 @@ func (s *Server) Lease(ctx context.Context, req *runnerv1.LeaseRequest) (*runner
 	if runnerID == "" || len(runnerID) > 100 {
 		return nil, connect.NewError(connect.CodeInvalidArgument, "runner id")
 	}
+	// Kind and user come from the token: a home runner leases only its own user's runs, whatever runner id it
+	// sends. Only the server secret may use a session registered as a home runner without a user.
 	choice := application.RunnerServer
 	var userPtr *uuid.UUID
-	if v, ok := s.runners.Load(runnerID); ok {
-		sess := v.(runnerSession)
-		if sess.kind == runnerv1.RunnerKind_RUNNER_KIND_HOME {
-			choice = application.RunnerHomeRunner
-			if sess.userID != uuid.Nil {
-				userPtr = &sess.userID
-			}
+	switch {
+	case ident.kind == runnerv1.RunnerKind_RUNNER_KIND_HOME:
+		if ident.userID == uuid.Nil {
+			return nil, connect.NewError(connect.CodeUnauthenticated, "home runner without a user")
 		}
-	} else if ident.kind == runnerv1.RunnerKind_RUNNER_KIND_HOME {
-		choice = application.RunnerHomeRunner
-		if ident.userID != uuid.Nil {
-			userPtr = &ident.userID
+		choice, userPtr = application.RunnerHomeRunner, &ident.userID
+	default:
+		if v, ok := s.runners.Load(runnerID); ok && v.(runnerSession).kind == runnerv1.RunnerKind_RUNNER_KIND_HOME {
+			choice = application.RunnerHomeRunner
 		}
 	}
 	l, ok, err := s.Runs.Lease(ctx, runnerID, choice, userPtr)
