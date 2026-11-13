@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
+	"regexp"
 	"strings"
 	"time"
 
@@ -12,6 +13,9 @@ import (
 
 	"github.com/1xxn/getafjob/internal/platform/i18n"
 )
+
+// ntfyTopicRx is the topic shape ntfy accepts; it keeps the topic one path segment of the server URL.
+var ntfyTopicRx = regexp.MustCompile(`^[A-Za-z0-9_-]{1,64}$`)
 
 // Service dispatches notifications and generates daily summaries.
 type Service struct {
@@ -66,6 +70,9 @@ func (s *Service) SavePreferences(ctx context.Context, prefs Preferences) error 
 	if prefs.NtfyEnabled && strings.TrimSpace(prefs.NtfyTopic) == "" {
 		return fmt.Errorf("%w: ntfy topic is required when ntfy is enabled", ErrInvalidPreferences)
 	}
+	if t := strings.TrimSpace(prefs.NtfyTopic); t != "" && !ntfyTopicRx.MatchString(t) {
+		return fmt.Errorf("%w: ntfy topic may hold letters, digits, - and _ only", ErrInvalidPreferences)
+	}
 	return s.store.SavePreferences(ctx, prefs)
 }
 
@@ -106,10 +113,8 @@ func (s *Service) Notify(ctx context.Context, n Notification) error {
 
 	// 2. Email
 	if prefs.EmailEnabled && s.email != nil {
-		to := strings.TrimSpace(prefs.EmailAddress)
-		if to == "" {
-			to, _ = s.store.GetUserEmail(ctx, n.UserID)
-		}
+		// Only the account address, which sign-in has verified: getafjob never mails an address the user typed.
+		to, _ := s.store.GetUserEmail(ctx, n.UserID)
 		if to != "" {
 			emailBody := n.Body
 			if n.URL != "" {

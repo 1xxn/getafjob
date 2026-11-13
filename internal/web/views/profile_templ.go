@@ -1657,10 +1657,6 @@ func PreferencesPage(name string, f Form, section string) templ.Component {
 				if templ_7745c5c3_Err != nil {
 					return templ_7745c5c3_Err
 				}
-				templ_7745c5c3_Err = ui.Input(input(ctx, f, "notify_email_address", "email", "", 254)).Render(ctx, templ_7745c5c3_Buffer)
-				if templ_7745c5c3_Err != nil {
-					return templ_7745c5c3_Err
-				}
 				templ_7745c5c3_Err = ui.Checkbox(check(ctx, f, "notify_webpush_enabled")).Render(ctx, templ_7745c5c3_Buffer)
 				if templ_7745c5c3_Err != nil {
 					return templ_7745c5c3_Err
@@ -1742,7 +1738,7 @@ func PreferencesPage(name string, f Form, section string) templ.Component {
 				var templ_7745c5c3_Var52 string
 				templ_7745c5c3_Var52, templ_7745c5c3_Err = templ.JoinStringErrs(T(ctx, "profile.notify.test"))
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `profile.templ`, Line: 413, Col: 144}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `profile.templ`, Line: 412, Col: 144}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var52))
 				if templ_7745c5c3_Err != nil {
@@ -1760,7 +1756,7 @@ func PreferencesPage(name string, f Form, section string) templ.Component {
 				var templ_7745c5c3_Var53 string
 				templ_7745c5c3_Var53, templ_7745c5c3_Err = templ.JoinStringErrs(T(ctx, "profile.ai.title"))
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `profile.templ`, Line: 419, Col: 37}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `profile.templ`, Line: 418, Col: 37}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var53))
 				if templ_7745c5c3_Err != nil {
@@ -1773,7 +1769,7 @@ func PreferencesPage(name string, f Form, section string) templ.Component {
 				var templ_7745c5c3_Var54 string
 				templ_7745c5c3_Var54, templ_7745c5c3_Err = templ.JoinStringErrs(T(ctx, "profile.ai.hint"))
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `profile.templ`, Line: 420, Col: 49}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `profile.templ`, Line: 419, Col: 49}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var54))
 				if templ_7745c5c3_Err != nil {
@@ -1800,7 +1796,7 @@ func PreferencesPage(name string, f Form, section string) templ.Component {
 					var templ_7745c5c3_Var55 string
 					templ_7745c5c3_Var55, templ_7745c5c3_Err = templ.JoinStringErrs(T(ctx, "profile.ai.budget_notice", "spent", f.Values["ai_spent"], "budget", f.Values["ai_budget"]))
 					if templ_7745c5c3_Err != nil {
-						return templ.Error{Err: templ_7745c5c3_Err, FileName: `profile.templ`, Line: 425, Col: 125}
+						return templ.Error{Err: templ_7745c5c3_Err, FileName: `profile.templ`, Line: 424, Col: 125}
 					}
 					_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var55))
 					if templ_7745c5c3_Err != nil {
@@ -1828,7 +1824,7 @@ func PreferencesPage(name string, f Form, section string) templ.Component {
 				var templ_7745c5c3_Var56 string
 				templ_7745c5c3_Var56, templ_7745c5c3_Err = templ.JoinStringErrs(T(ctx, "profile.mailbox.title"))
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `profile.templ`, Line: 431, Col: 42}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `profile.templ`, Line: 430, Col: 42}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var56))
 				if templ_7745c5c3_Err != nil {
@@ -1841,7 +1837,7 @@ func PreferencesPage(name string, f Form, section string) templ.Component {
 				var templ_7745c5c3_Var57 string
 				templ_7745c5c3_Var57, templ_7745c5c3_Err = templ.JoinStringErrs(T(ctx, "profile.mailbox.hint"))
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `profile.templ`, Line: 432, Col: 54}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `profile.templ`, Line: 431, Col: 54}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var57))
 				if templ_7745c5c3_Err != nil {
@@ -1878,7 +1874,7 @@ func PreferencesPage(name string, f Form, section string) templ.Component {
 				var templ_7745c5c3_Var58 string
 				templ_7745c5c3_Var58, templ_7745c5c3_Err = templ.JoinStringErrs(T(ctx, "profile.assist.title"))
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `profile.templ`, Line: 438, Col: 41}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `profile.templ`, Line: 437, Col: 41}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var58))
 				if templ_7745c5c3_Err != nil {
@@ -1891,7 +1887,7 @@ func PreferencesPage(name string, f Form, section string) templ.Component {
 				var templ_7745c5c3_Var59 string
 				templ_7745c5c3_Var59, templ_7745c5c3_Err = templ.JoinStringErrs(T(ctx, "profile.assist.hint"))
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `profile.templ`, Line: 439, Col: 53}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `profile.templ`, Line: 438, Col: 53}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var59))
 				if templ_7745c5c3_Err != nil {
@@ -1934,7 +1930,7 @@ func PreferencesPage(name string, f Form, section string) templ.Component {
 				var templ_7745c5c3_Var60 string
 				templ_7745c5c3_Var60, templ_7745c5c3_Err = templ.JoinStringErrs(T(ctx, "profile.assist.generate_code"))
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `profile.templ`, Line: 440, Col: 152}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `profile.templ`, Line: 439, Col: 152}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var60))
 				if templ_7745c5c3_Err != nil {
@@ -1947,7 +1943,7 @@ func PreferencesPage(name string, f Form, section string) templ.Component {
 				var templ_7745c5c3_Var61 string
 				templ_7745c5c3_Var61, templ_7745c5c3_Err = templ.JoinStringErrs(T(ctx, "profile.home_runner.title"))
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `profile.templ`, Line: 441, Col: 46}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `profile.templ`, Line: 440, Col: 46}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var61))
 				if templ_7745c5c3_Err != nil {
@@ -1960,7 +1956,7 @@ func PreferencesPage(name string, f Form, section string) templ.Component {
 				var templ_7745c5c3_Var62 string
 				templ_7745c5c3_Var62, templ_7745c5c3_Err = templ.JoinStringErrs(T(ctx, "profile.home_runner.hint"))
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `profile.templ`, Line: 442, Col: 58}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `profile.templ`, Line: 441, Col: 58}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var62))
 				if templ_7745c5c3_Err != nil {
@@ -2003,7 +1999,7 @@ func PreferencesPage(name string, f Form, section string) templ.Component {
 				var templ_7745c5c3_Var63 string
 				templ_7745c5c3_Var63, templ_7745c5c3_Err = templ.JoinStringErrs(T(ctx, "profile.home_runner.generate_token"))
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `profile.templ`, Line: 443, Col: 159}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `profile.templ`, Line: 442, Col: 159}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var63))
 				if templ_7745c5c3_Err != nil {
