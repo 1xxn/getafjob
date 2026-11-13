@@ -9,7 +9,7 @@ import (
 )
 
 // RulesVersion changes whenever the rules do, so stored results can be recomputed.
-const RulesVersion = 1
+const RulesVersion = 2
 
 // Criteria is what a user wants and brings. Empty fields do not filter.
 type Criteria struct {
@@ -138,16 +138,33 @@ func (m *Matcher) name(t term) string {
 
 // Evaluate scores one job.
 func (m *Matcher) Evaluate(j Job, now time.Time) Result {
+	r, _ := m.evaluate(j, now)
+	return r
+}
+
+// scored keeps the parts of one evaluation for InspectFit; all zero when the title is excluded.
+type scored struct {
+	title, skills, level, location, language, salary, recency Reason
+	hits, missing                                             []string
+}
+
+// evaluate scores one job once and returns the parts it added up.
+func (m *Matcher) evaluate(j Job, now time.Time) (Result, scored) {
 	r := Result{JobID: j.ID, Decision: Skip}
 	title := normalize(j.Title)
 	if ex, ok := anyIn(m.exclude, title); ok {
 		r.Reasons = []Reason{{Code: "title.excluded", Hard: true, Params: map[string]string{"term": m.name(ex)}}}
-		return r
+		return r, scored{}
 	}
 	text := title + normalize(j.Description)
+	var sc scored
+	var skillPoints int
+	var skillCode string
+	sc.hits, sc.missing, skillPoints, skillCode = m.skillHitsAndMissing(text)
+	sc.title, sc.skills, sc.level = m.title(title), skillReason(sc.hits, sc.missing, skillPoints, skillCode), m.seniority(title)
+	sc.location, sc.language, sc.salary, sc.recency = m.location(j), m.language(text), m.salary(j.Description), recency(j, now)
 	hard := false
-	for _, p := range []Reason{m.title(title), m.skillFit(text), m.seniority(title), m.location(j),
-		m.language(text), m.salary(j.Description), recency(j, now)} {
+	for _, p := range []Reason{sc.title, sc.skills, sc.level, sc.location, sc.language, sc.salary, sc.recency} {
 		if p.Code == "" {
 			continue
 		}
@@ -163,7 +180,7 @@ func (m *Matcher) Evaluate(j Job, now time.Time) Result {
 	case r.Score >= maybeFrom:
 		r.Decision = Maybe
 	}
-	return r
+	return r, sc
 }
 
 // FitInspection is a granular breakdown of how a candidate matches a job.
@@ -191,45 +208,31 @@ type FitInspection struct {
 	Reasons            []Reason          `json:"reasons"`
 }
 
-// InspectFit provides a detailed fit breakdown including all matching skills and missing keywords.
+// InspectFit breaks a job's result down into its parts, the same evaluation as Evaluate; an excluded title shows
+// no points, as its score is 0.
 func (m *Matcher) InspectFit(j Job, now time.Time) FitInspection {
-	title := normalize(j.Title)
-	text := title + normalize(j.Description)
-
-	hits, missing, skillPts, _ := m.skillHitsAndMissing(text)
-	titleReason := m.title(title)
-	seniorityReason := m.seniority(title)
-	locationReason := m.location(j)
-	langReason := m.language(text)
-	salReason := m.salary(j.Description)
-	recReason := recency(j, now)
-
-	res := m.Evaluate(j, now)
-
-	candLevel := levelNames[m.level]
-	jobLvl := levelNames[levelOf(title)]
-
+	res, sc := m.evaluate(j, now)
 	return FitInspection{
 		Score:              res.Score,
 		Decision:           res.Decision,
-		MatchingSkills:     hits,
-		MissingSkills:      missing,
-		SkillPoints:        skillPts,
+		MatchingSkills:     sc.hits,
+		MissingSkills:      sc.missing,
+		SkillPoints:        sc.skills.Points,
 		MaxSkillPoints:     maxSkills,
-		TitlePoints:        titleReason.Points,
+		TitlePoints:        sc.title.Points,
 		MaxTitlePoints:     maxTitle,
-		SeniorityPoints:    seniorityReason.Points,
+		SeniorityPoints:    sc.level.Points,
 		MaxSeniorityPoints: maxLevel,
-		CandidateLevel:     candLevel,
-		JobLevel:           jobLvl,
-		LocationPoints:     locationReason.Points,
+		CandidateLevel:     levelNames[m.level],
+		JobLevel:           levelNames[levelOf(normalize(j.Title))],
+		LocationPoints:     sc.location.Points,
 		MaxLocationPoints:  maxLocation,
-		LocationReason:     locationReason.Code,
-		LocationParams:     locationReason.Params,
+		LocationReason:     sc.location.Code,
+		LocationParams:     sc.location.Params,
 		Workplace:          j.Workplace,
-		LanguagePoints:     langReason.Points,
-		SalaryPoints:       salReason.Points,
-		RecencyPoints:      recReason.Points,
+		LanguagePoints:     sc.language.Points,
+		SalaryPoints:       sc.salary.Points,
+		RecencyPoints:      sc.recency.Points,
 		Reasons:            res.Reasons,
 	}
 }

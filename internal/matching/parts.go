@@ -113,10 +113,9 @@ func (m *Matcher) skillHitsAndMissing(text string) (hits []string, missing []str
 	return hits, missing, points, code
 }
 
-// skillFit compares the weighted skills a job names with the user's. Known skills the user lacks lower the fit;
-// a job that names no known skill is neutral.
-func (m *Matcher) skillFit(text string) Reason {
-	hits, missing, points, code := m.skillHitsAndMissing(text)
+// skillReason puts the skill comparison of skillHitsAndMissing into a reason. Known skills the user lacks lower the
+// fit; a job that names no known skill is neutral.
+func skillReason(hits, missing []string, points int, code string) Reason {
 	if code == "skills.unknown" {
 		return Reason{Code: code, Points: points}
 	}
@@ -273,23 +272,28 @@ func (m *Matcher) remoteInRegion(location string, remoteJob bool) bool {
 	return (bare || remoteJob) && inRegion(normalize(location))
 }
 
-// spoken returns the languages a user can work in: level B2 and up, or no level given.
+// spoken returns the languages a user can work in: level B2 and up, or no level given. It is nil (unknown, no
+// filter) when the list names neither German nor English: a profile with only other languages says nothing about
+// the languages of the jobs here and must not hide all of them.
 func spoken(list []Language) map[string]bool {
-	if len(list) == 0 {
-		return nil
-	}
-	out := map[string]bool{}
+	out, named := map[string]bool{}, false
 	for _, l := range list {
-		lv := normalize(l.Level)
-		if _, low := anyIn(lowLevels, lv); low {
-			continue
-		}
+		var lang string
 		switch n := normalize(l.Name); {
 		case strings.Contains(n, " deutsch") || strings.Contains(n, " german"):
-			out["de"] = true
+			lang = "de"
 		case strings.Contains(n, " englisch") || strings.Contains(n, " english"):
-			out["en"] = true
+			lang = "en"
+		default:
+			continue
 		}
+		named = true
+		if _, low := anyIn(lowLevels, normalize(l.Level)); !low {
+			out[lang] = true
+		}
+	}
+	if !named {
+		return nil
 	}
 	return out
 }
