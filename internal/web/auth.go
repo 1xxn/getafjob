@@ -280,6 +280,17 @@ func (s *Server) accountDelete(w http.ResponseWriter, r *http.Request, u *identi
 		http.Error(w, "deletion not configured", http.StatusInternalServerError)
 		return
 	}
+	switch err := s.Identity.CheckDeletion(r.Context(), u.ID, sessionToken(r)); {
+	case errors.Is(err, identity.ErrReauthRequired):
+		http.Redirect(w, r, "/login?reauth=1", http.StatusSeeOther)
+		return
+	case errors.Is(err, identity.ErrLastAdmin):
+		s.renderAccount(w, r, u, views.T(r.Context(), "admin.error.last_admin"))
+		return
+	case err != nil:
+		s.failed(w, r, u, err)
+		return
+	}
 	if err := s.Privacy.DeleteAccount(r.Context(), u.ID); err != nil {
 		s.Logger.ErrorContext(r.Context(), "account deletion failed", "err", err, "user", u.ID)
 		s.failed(w, r, u, err)

@@ -47,6 +47,8 @@ type AdminStore interface {
 	SetRole(ctx context.Context, userID uuid.UUID, role Role, audit AuditEvent) error
 	AdminAudit(ctx context.Context, limit int) ([]AuditEntry, error)
 	Audit(ctx context.Context, e AuditEvent) error
+	// LastAdmin reports whether userID is the only active admin.
+	LastAdmin(ctx context.Context, userID uuid.UUID) (bool, error)
 }
 
 func (s *Service) admin() AdminStore { return s.store.(AdminStore) }
@@ -95,6 +97,22 @@ func (s *Service) SignOutAccount(ctx context.Context, by, userID uuid.UUID) (int
 		return 0, err
 	}
 	return n, s.admin().Audit(ctx, adminAudit(by, "admin.signed_out", map[string]any{"user": userID, "count": n}))
+}
+
+// CheckDeletion allows users to delete their own account only from a fresh session (ErrReauthRequired), so a
+// stolen session cannot wipe it, and never as the last admin (ErrLastAdmin).
+func (s *Service) CheckDeletion(ctx context.Context, userID uuid.UUID, token string) error {
+	if _, err := s.freshSession(ctx, userID, token); err != nil {
+		return err
+	}
+	last, err := s.admin().LastAdmin(ctx, userID)
+	if err != nil {
+		return err
+	}
+	if last {
+		return ErrLastAdmin
+	}
+	return nil
 }
 
 // RecordDeletion notes on the admin's own log that an account was deleted (the account's log goes with it).

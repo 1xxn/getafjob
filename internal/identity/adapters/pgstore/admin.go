@@ -76,6 +76,16 @@ func (s *Store) SetRole(ctx context.Context, userID uuid.UUID, role identity.Rol
 	})
 }
 
+// LastAdmin reports whether userID is the only active admin.
+func (s *Store) LastAdmin(ctx context.Context, userID uuid.UUID) (last bool, err error) {
+	err = s.system(ctx, func(qs *q.Queries) error {
+		admins, err := qs.LockAdmins(ctx)
+		last = len(admins) == 1 && admins[0] == userID
+		return err
+	})
+	return last, err
+}
+
 // AdminAudit returns the newest admin actions.
 func (s *Store) AdminAudit(ctx context.Context, limit int) ([]identity.AuditEntry, error) {
 	var out []identity.AuditEntry

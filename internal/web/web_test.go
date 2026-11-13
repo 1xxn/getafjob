@@ -1169,7 +1169,14 @@ func TestPrivacyExportAndDelete(t *testing.T) {
 		}
 	}
 
-	// 6. POST /account/delete removes user, clears cookie, redirects to /login?deleted=1
+	// 6. A session older than SessionFresh must sign in again first
+	a.ids.WithClock(func() time.Time { return time.Now().Add(identity.SessionFresh) })
+	if rec := a.do(http.MethodPost, "/account/delete", nil, session, nil); rec.Header().Get("Location") != "/login?reauth=1" {
+		t.Fatalf("stale delete = %d, loc = %q", rec.Code, rec.Header().Get("Location"))
+	}
+	a.ids.WithClock(time.Now)
+
+	// 7. POST /account/delete removes user, clears cookie, redirects to /login?deleted=1
 	delRec := a.do(http.MethodPost, "/account/delete", nil, session, nil)
 	if delRec.Code != http.StatusSeeOther || delRec.Header().Get("Location") != "/login?deleted=1" {
 		t.Fatalf("delete account = %d, loc = %q", delRec.Code, delRec.Header().Get("Location"))
@@ -1184,7 +1191,7 @@ func TestPrivacyExportAndDelete(t *testing.T) {
 		t.Errorf("session cookie was not cleared on deletion")
 	}
 
-	// 7. Login page with ?deleted=1 shows deletion notice
+	// 8. Login page with ?deleted=1 shows deletion notice
 	loginPage := a.do(http.MethodGet, "/login?deleted=1", nil, "", nil).Body.String()
 	if !strings.Contains(loginPage, "permanently deleted") {
 		t.Errorf("login page lacks deletion notice: %s", loginPage)

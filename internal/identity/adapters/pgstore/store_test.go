@@ -465,6 +465,39 @@ func TestSignOutOthersNeedsFreshSignIn(t *testing.T) {
 	}
 }
 
+func TestCheckDeletion(t *testing.T) {
+	e := newEnv(t)
+	ctx := t.Context()
+	u, here := signIn(t, e)
+	if err := e.svc.CheckDeletion(ctx, u.ID, string(here)); err != nil {
+		t.Fatalf("fresh user session: %v", err)
+	}
+	link, _, err := e.svc.Invite(ctx, identity.InviteRequest{Email: "erika.mustermann@example.com", Role: identity.RoleAdmin})
+	if err != nil {
+		t.Fatal(err)
+	}
+	erika, _, err := e.svc.AcceptInvitation(ctx, tokenFrom(link), "Erika", i18n.EN)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := e.svc.SetRole(ctx, erika.ID, u.ID, identity.RoleAdmin); err != nil {
+		t.Fatal(err)
+	}
+	if err := e.svc.CheckDeletion(ctx, u.ID, string(here)); err != nil {
+		t.Fatalf("second admin exists: %v", err)
+	}
+	if err := e.svc.SetRole(ctx, u.ID, erika.ID, identity.RoleUser); err != nil {
+		t.Fatal(err)
+	}
+	if err := e.svc.CheckDeletion(ctx, u.ID, string(here)); !errors.Is(err, identity.ErrLastAdmin) {
+		t.Fatalf("last admin: %v", err)
+	}
+	e.now = e.now.Add(identity.SessionFresh)
+	if err := e.svc.CheckDeletion(ctx, u.ID, string(here)); !errors.Is(err, identity.ErrReauthRequired) {
+		t.Fatalf("stale session: %v", err)
+	}
+}
+
 // signInAgain signs Max in with a magic link and returns the session.
 func signInAgain(t *testing.T, e *env) (identity.Token, identity.User) {
 	t.Helper()
