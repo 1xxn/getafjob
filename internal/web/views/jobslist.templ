@@ -303,7 +303,9 @@ templ JobResults(d JobsData) {
 				</ul>
 			}
 			if d.Pending {
-				@ui.EmptyState(ui.EmptyProps{Icon: "clock", Title: T(ctx, "jobs.pending")})
+				@ui.EmptyState(ui.EmptyProps{Icon: "clock", Title: T(ctx, "jobs.pending")}) {
+					@ui.Button(ui.ButtonProps{Label: T(ctx, "jobs.pending_action"), Href: "/settings/search"})
+				}
 			} else {
 				<p class="jobs-count" role="status">
 					{ T(ctx, "jobs.count", "total", d.Total) }
