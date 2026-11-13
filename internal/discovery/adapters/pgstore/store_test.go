@@ -530,3 +530,17 @@ func TestSaveBoardStates(t *testing.T) {
 		t.Fatalf("after answer without validators: %+v, %q", got, e)
 	}
 }
+
+// A posting added by URL that the index has already gets that job's ID, never 0.
+func TestUpsertPostingDuplicate(t *testing.T) {
+	st := pgstore.New(dbtest.AppPool(t))
+	ctx, now := context.Background(), time.Now()
+	id, _, err := st.UpsertPosting(ctx, posting("greenhouse:acme", "1", "ACME GmbH", "Backend Engineer", "Berlin"), now)
+	if err != nil || id == 0 {
+		t.Fatalf("first = %d, %v", id, err)
+	}
+	dup, change, err := st.UpsertPosting(ctx, posting("arbeitnow", "77", "ACME", "Backend Engineer (m/w/d)", "Berlin"), now)
+	if err != nil || dup != id || change != discovery.ChangeUnchanged {
+		t.Fatalf("duplicate = %d %q, %v; want %d", dup, change, err, id)
+	}
+}

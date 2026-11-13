@@ -2,6 +2,7 @@ package urlimport
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"net/http"
 	"net/url"
@@ -259,13 +260,19 @@ func (s *Service) AddBoard(ctx context.Context, rawURL string) (discovery.Board,
 
 	// 3. Check for Schema.org JobPostings on the career page itself
 	if len(sources.JobPostings(body)) > 0 {
-		u, _ := url.Parse(rawURL)
-		company := cleanHost(u.Hostname())
+		u, err := url.Parse(rawURL)
+		if err != nil {
+			return discovery.Board{}, ErrInvalidURL
+		}
+		config, err := json.Marshal(map[string]string{"url": rawURL})
+		if err != nil {
+			return discovery.Board{}, err
+		}
 		b := discovery.Board{
 			ATS:     "careers",
 			Slug:    strings.TrimPrefix(u.Hostname(), "www."),
-			Company: company,
-			Config:  []byte(`{"url":"` + rawURL + `"}`),
+			Company: cleanHost(u.Hostname()),
+			Config:  config,
 		}
 		if s.boards != nil {
 			if _, _, err := s.boards.ImportBoards(ctx, []discovery.Board{b}); err != nil {
