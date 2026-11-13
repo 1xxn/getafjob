@@ -89,11 +89,6 @@ func Parse(text string) profile.Profile {
 	p.Skills = items(parts["skills"], 60, 80)
 	p.Certifications = items(parts["certifications"], 120, 40)
 	p.Languages = languages(parts["languages"])
-	p.Experience = experience(parts["experience"])
-	if len(p.Experience) > 0 && p.Experience[0].End == "" {
-		p.Work.CurrentTitle, p.Work.CurrentEmployer = p.Experience[0].Title, p.Experience[0].Company
-	}
-	p.Education = education(parts["education"])
 	return p
 }
 
@@ -210,38 +205,6 @@ func isOngoing(s string) bool {
 	return false
 }
 
-// experience reads entries that start at a line with a date range; title and company come from the text around
-// it ("Title at Company", "Title, Company", "Title | Company"), the bullets after it are highlights.
-func experience(lines []string) []profile.Experience {
-	var out []profile.Experience
-	for i, l := range lines {
-		m := rangeRx.FindStringSubmatchIndex(l)
-		if m == nil {
-			if n := len(out); n > 0 && bulletRx.MatchString(l) && len(out[n-1].Highlights) < 10 {
-				out[n-1].Highlights = append(out[n-1].Highlights, bulletRx.ReplaceAllString(l, ""))
-			}
-			continue
-		}
-		e := profile.Experience{Start: l[m[2]:m[3]], End: l[m[4]:m[5]]}
-		if isOngoing(e.End) {
-			e.End = ""
-		}
-		rest := strings.Trim(l[:m[0]]+" "+l[m[1]:], " |,-:"+enDash+emDash)
-		if rest == "" && i > 0 {
-			rest = lines[i-1]
-		}
-		e.Title, e.Company = titleCompany(rest)
-		if e.Company == "" && i+1 < len(lines) && rangeRx.FindStringIndex(lines[i+1]) == nil && !bulletRx.MatchString(lines[i+1]) {
-			e.Company = cut(lines[i+1], 200)
-		}
-		out = append(out, e)
-		if len(out) >= 30 {
-			break
-		}
-	}
-	return out
-}
-
 func titleCompany(s string) (title, company string) {
 	s = strings.Join(strings.Fields(s), " ")
 	for _, sep := range []string{" at ", " bei ", " @ ", " | ", ", ", " " + enDash + " ", " - "} {
@@ -250,33 +213,6 @@ func titleCompany(s string) (title, company string) {
 		}
 	}
 	return cut(s, 200), ""
-}
-
-func education(lines []string) []profile.Education {
-	var out []profile.Education
-	for i, l := range lines {
-		m := rangeRx.FindStringSubmatchIndex(l)
-		if m == nil {
-			continue
-		}
-		e := profile.Education{Start: l[m[2]:m[3]], End: l[m[4]:m[5]]}
-		if isOngoing(e.End) {
-			e.End = ""
-		}
-		rest := strings.Trim(l[:m[0]]+" "+l[m[1]:], " |,-:"+enDash+emDash)
-		if rest == "" && i > 0 {
-			rest = lines[i-1]
-		}
-		e.Degree, e.Institution = titleCompany(rest)
-		if e.Institution == "" && i+1 < len(lines) && rangeRx.FindStringIndex(lines[i+1]) == nil {
-			e.Institution = cut(lines[i+1], 200)
-		}
-		out = append(out, e)
-		if len(out) >= 15 {
-			break
-		}
-	}
-	return out
 }
 
 func cut(s string, n int) string {
@@ -304,6 +240,9 @@ type ParsedCV struct {
 func ParseAll(text string) ParsedCV {
 	p := Parse(text)
 	exps, edus := ExtractStations(text)
+	if len(exps) > 0 && exps[0].IsCurrent {
+		p.Work.CurrentTitle, p.Work.CurrentEmployer = exps[0].Title, exps[0].Company
+	}
 	return ParsedCV{
 		Profile:     p,
 		Experiences: exps,
@@ -505,12 +444,6 @@ func Merge(cur, found profile.Profile) profile.Profile {
 	}
 	if len(cur.Languages) == 0 {
 		cur.Languages = found.Languages
-	}
-	if len(cur.Experience) == 0 {
-		cur.Experience = found.Experience
-	}
-	if len(cur.Education) == 0 {
-		cur.Education = found.Education
 	}
 	if len(cur.Certifications) == 0 {
 		cur.Certifications = found.Certifications

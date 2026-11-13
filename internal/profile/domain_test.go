@@ -54,7 +54,7 @@ func TestPreferencesValidate(t *testing.T) {
 
 func TestMissing(t *testing.T) {
 	p := Profile{Personal: Personal{FirstName: "Max", LastName: "Mustermann", Email: "max@example.org"}}
-	want := []string{"city", "earliest_start", "notice_period", "phone", "salary_expectation", "years_total"}
+	want := []string{"phone", "city", "years_total", "notice_period", "earliest_start", "salary_expectation"}
 	if got := p.Missing(); !slices.Equal(got, want) {
 		t.Errorf("missing = %v", got)
 	}
