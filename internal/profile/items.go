@@ -48,6 +48,9 @@ var Placeholders = []string{
 
 var (
 	placeholderRx = regexp.MustCompile(`\{([a-z_]{1,40})\}`)
+	// anyPlaceholderRx finds everything that looks like a placeholder, so {Company} or {Firma} is refused instead
+	// of reaching an application as typed.
+	anyPlaceholderRx = regexp.MustCompile(`\{([\p{L}\p{N}_ -]{1,40})\}`)
 	optionalRx    = regexp.MustCompile(`\((optional|required|pflichtfeld|freiwillig)\)`)
 )
 
@@ -114,7 +117,7 @@ func (t TextBlock) Validate() []FieldError {
 	for _, p := range Placeholders {
 		known[p] = true
 	}
-	for _, m := range placeholderRx.FindAllStringSubmatch(t.Body, -1) {
+	for _, m := range anyPlaceholderRx.FindAllStringSubmatch(t.Body, -1) {
 		if !known[m[1]] {
 			c.add("body", "profile.error.placeholder")
 			break

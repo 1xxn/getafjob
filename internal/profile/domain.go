@@ -141,7 +141,7 @@ func (c *checker) list(field string, vs []string) {
 
 func (c *checker) url(field, v string) {
 	c.text(field, v, maxShort)
-	if v != "" && !strings.HasPrefix(v, "https://") && !strings.HasPrefix(v, "http://") {
+	if low := strings.ToLower(v); v != "" && !strings.HasPrefix(low, "https://") && !strings.HasPrefix(low, "http://") {
 		c.add(field, "profile.error.url")
 	}
 }
