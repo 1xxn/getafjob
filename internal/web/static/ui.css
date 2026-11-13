@@ -480,6 +480,22 @@
     transition: border-color var(--dur-fast) var(--ease);
   }
 
+  .ui-input[type="file"] {
+    padding: calc(var(--space-1) + 1px) var(--space-2);
+    cursor: pointer;
+  }
+
+  .ui-input[type="file"]::file-selector-button {
+    margin-inline-end: var(--space-3);
+    padding: var(--space-1) var(--space-3);
+    border: 1px solid var(--border-strong);
+    border-radius: var(--radius-sm);
+    background: var(--surface-2);
+    color: var(--text);
+    font: inherit;
+    cursor: pointer;
+  }
+
   .ui-input::placeholder {
     color: var(--text-3);
   }
@@ -3620,7 +3636,7 @@
   .cand-upload {
     display: flex;
     flex-wrap: wrap;
-    align-items: end;
+    align-items: start;
     gap: var(--space-3);
     padding: var(--space-3);
     border: 1px dashed var(--border);
@@ -3630,6 +3646,11 @@
   .cand-upload .ui-field {
     flex: 1 1 14rem;
     margin: 0;
+  }
+
+  /* the button lines up with the controls, below the labels */
+  .cand-upload > .ui-btn {
+    margin-top: calc(var(--text-sm) * var(--leading) + var(--space-1));
   }
 
   .cand-doc {
