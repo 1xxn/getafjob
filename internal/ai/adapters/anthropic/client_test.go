@@ -14,7 +14,7 @@ import (
 
 func TestClientNoAPIKey(t *testing.T) {
 	c := NewClient()
-	_, _, _, err := c.CompletePlan(context.Background(), "", ai.ModelClaude35Haiku, ai.PlanRequest{})
+	_, _, _, err := c.CompletePlan(context.Background(), "", ai.ModelHaiku, ai.PlanRequest{})
 	if !errors.Is(err, ai.ErrNoAPIKey) {
 		t.Fatalf("expected ErrNoAPIKey, got %v", err)
 	}
@@ -34,7 +34,7 @@ func TestClientAPIError(t *testing.T) {
 	defer srv.Close()
 
 	c := NewClient(WithBaseURL(srv.URL))
-	_, _, _, err := c.CompletePlan(context.Background(), "sk-bad-key", ai.ModelClaude35Haiku, ai.PlanRequest{})
+	_, _, _, err := c.CompletePlan(context.Background(), "sk-bad-key", ai.ModelHaiku, ai.PlanRequest{})
 	if err == nil || !strings.Contains(err.Error(), "authentication_error") {
 		t.Fatalf("expected authentication_error, got %v", err)
 	}
@@ -47,6 +47,11 @@ func TestClientCompletePlan(t *testing.T) {
 		}
 		if r.Header.Get("anthropic-version") != "2023-06-01" {
 			t.Errorf("unexpected version header: %s", r.Header.Get("anthropic-version"))
+		}
+		var sent apiRequest
+		if err := json.NewDecoder(r.Body).Decode(&sent); err != nil || sent.Model != "claude-haiku-5-5" ||
+			sent.Thinking == nil || sent.Thinking.Type != "disabled" || sent.ToolChoice == nil {
+			t.Errorf("request = %+v, %v; want the current model, thinking off and a forced tool", sent, err)
 		}
 
 		planInput := map[string]any{
@@ -81,7 +86,7 @@ func TestClientCompletePlan(t *testing.T) {
 	defer srv.Close()
 
 	c := NewClient(WithBaseURL(srv.URL))
-	res, inTok, outTok, err := c.CompletePlan(context.Background(), "sk-test-key", ai.ModelClaude35Haiku, ai.PlanRequest{})
+	res, inTok, outTok, err := c.CompletePlan(context.Background(), "sk-test-key", ai.ModelHaiku, ai.PlanRequest{})
 	if err != nil {
 		t.Fatalf("CompletePlan: %v", err)
 	}
@@ -116,7 +121,7 @@ func TestClientCompleteDraft(t *testing.T) {
 	defer srv.Close()
 
 	c := NewClient(WithBaseURL(srv.URL))
-	res, _, _, err := c.CompleteDraft(context.Background(), "sk-test", ai.ModelClaude35Haiku, ai.DraftRequest{
+	res, _, _, err := c.CompleteDraft(context.Background(), "sk-test", ai.ModelHaiku, ai.DraftRequest{
 		Field: ai.FormField{ID: "f_exp"},
 	})
 	if err != nil {
@@ -156,7 +161,7 @@ func TestClientCompleteExtract(t *testing.T) {
 	defer srv.Close()
 
 	c := NewClient(WithBaseURL(srv.URL))
-	res, _, _, err := c.CompleteExtract(context.Background(), "sk-test", ai.ModelClaude35Haiku, ai.ExtractRequest{
+	res, _, _, err := c.CompleteExtract(context.Background(), "sk-test", ai.ModelHaiku, ai.ExtractRequest{
 		Text: "DevOps Specialist at Acme Tech in Berlin or Remote. Salary 90000 - 110000 EUR.",
 	})
 	if err != nil {
@@ -191,7 +196,7 @@ func TestClientCompleteClassify(t *testing.T) {
 	defer srv.Close()
 
 	c := NewClient(WithBaseURL(srv.URL))
-	res, _, _, err := c.CompleteClassify(context.Background(), "sk-test", ai.ModelClaude35Haiku, ai.ClassifyRequest{
+	res, _, _, err := c.CompleteClassify(context.Background(), "sk-test", ai.ModelHaiku, ai.ClassifyRequest{
 		Subject: "Invitation for interview",
 		Body:    "We would love to invite you for a virtual interview.",
 	})

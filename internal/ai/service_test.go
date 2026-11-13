@@ -135,7 +135,7 @@ func TestServiceAdminDisabled(t *testing.T) {
 	store := newFakeStore()
 	cipher := newFakeCipher()
 	client := &fakeClient{}
-	svc := NewService(store, cipher, client, false, "sk-operator", ModelClaude35Haiku, 500)
+	svc := NewService(store, cipher, client, false, "sk-operator", ModelHaiku, 500)
 
 	userID := uuid.New()
 	_ = store.SaveSettings(context.Background(), userID, true, nil)
@@ -150,7 +150,7 @@ func TestServiceUserNotOptedIn(t *testing.T) {
 	store := newFakeStore()
 	cipher := newFakeCipher()
 	client := &fakeClient{}
-	svc := NewService(store, cipher, client, true, "sk-operator", ModelClaude35Haiku, 500)
+	svc := NewService(store, cipher, client, true, "sk-operator", ModelHaiku, 500)
 
 	userID := uuid.New()
 	// Enabled is false by default
@@ -165,7 +165,7 @@ func TestServiceBudgetExceeded(t *testing.T) {
 	store := newFakeStore()
 	cipher := newFakeCipher()
 	client := &fakeClient{}
-	svc := NewService(store, cipher, client, true, "sk-operator", ModelClaude35Haiku, 500)
+	svc := NewService(store, cipher, client, true, "sk-operator", ModelHaiku, 500)
 
 	userID := uuid.New()
 	_ = store.SaveSettings(context.Background(), userID, true, nil)
@@ -187,7 +187,7 @@ func TestServiceCustomUserKey(t *testing.T) {
 		tokensIn:  1000,
 		tokensOut: 100,
 	}
-	svc := NewService(store, cipher, client, true, "sk-operator", ModelClaude35Haiku, 500)
+	svc := NewService(store, cipher, client, true, "sk-operator", ModelHaiku, 500)
 
 	userID := uuid.New()
 	err := svc.SaveSettings(context.Background(), userID, true, "sk-user-custom-key", false)
@@ -230,7 +230,7 @@ func TestServiceDraftApprovalAndCoverLetterRefusal(t *testing.T) {
 		tokensIn:  2000,
 		tokensOut: 200,
 	}
-	svc := NewService(store, cipher, client, true, "sk-operator", ModelClaude35Haiku, 500)
+	svc := NewService(store, cipher, client, true, "sk-operator", ModelHaiku, 500)
 
 	userID := uuid.New()
 	_ = svc.SaveSettings(context.Background(), userID, true, "", false)
@@ -276,7 +276,7 @@ func TestServiceExtractAndClassify(t *testing.T) {
 		tokensIn:  500,
 		tokensOut: 50,
 	}
-	svc := NewService(store, cipher, client, true, "sk-operator", ModelClaude35Haiku, 500)
+	svc := NewService(store, cipher, client, true, "sk-operator", ModelHaiku, 500)
 
 	userID := uuid.New()
 	_ = svc.SaveSettings(context.Background(), userID, true, "", false)

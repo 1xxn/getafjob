@@ -74,12 +74,18 @@ type message struct {
 }
 
 type apiRequest struct {
-	Model      string      `json:"model"`
-	MaxTokens  int         `json:"max_tokens"`
+	Model     string `json:"model"`
+	MaxTokens int    `json:"max_tokens"`
+	// Thinking is off: every call forces its result tool, which current models refuse together with thinking.
+	Thinking   *thinking   `json:"thinking,omitempty"`
 	System     string      `json:"system,omitempty"`
 	Messages   []message   `json:"messages"`
 	Tools      []Tool      `json:"tools,omitempty"`
 	ToolChoice *toolChoice `json:"tool_choice,omitempty"`
+}
+
+type thinking struct {
+	Type string `json:"type"`
 }
 
 type contentBlock struct {
@@ -192,6 +198,7 @@ func (c *Client) CompletePlan(ctx context.Context, apiKey, model string, req ai.
 
 	apiResp, err := c.call(ctx, apiKey, apiRequest{
 		Model:      model,
+		Thinking:   &thinking{Type: "disabled"},
 		MaxTokens:  2048,
 		System:     sys,
 		Messages:   []message{{Role: "user", Content: string(promptJSON)}},
@@ -237,6 +244,7 @@ func (c *Client) CompleteDraft(ctx context.Context, apiKey, model string, req ai
 
 	apiResp, err := c.call(ctx, apiKey, apiRequest{
 		Model:      model,
+		Thinking:   &thinking{Type: "disabled"},
 		MaxTokens:  1024,
 		System:     sys,
 		Messages:   []message{{Role: "user", Content: string(promptJSON)}},
@@ -295,6 +303,7 @@ func (c *Client) CompleteExtract(ctx context.Context, apiKey, model string, req 
 
 	apiResp, err := c.call(ctx, apiKey, apiRequest{
 		Model:      model,
+		Thinking:   &thinking{Type: "disabled"},
 		MaxTokens:  1024,
 		System:     sys,
 		Messages:   []message{{Role: "user", Content: content}},
@@ -348,6 +357,7 @@ func (c *Client) CompleteClassify(ctx context.Context, apiKey, model string, req
 
 	apiResp, err := c.call(ctx, apiKey, apiRequest{
 		Model:      model,
+		Thinking:   &thinking{Type: "disabled"},
 		MaxTokens:  512,
 		System:     sys,
 		Messages:   []message{{Role: "user", Content: input}},

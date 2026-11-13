@@ -12,11 +12,12 @@ func TestCalculateCostCents(t *testing.T) {
 		tokensOut int
 		wantCents int
 	}{
-		{"zero tokens", ModelClaude35Haiku, 0, 0, 0},
-		{"minimal tokens rounded up", ModelClaude35Haiku, 10, 10, 1},
-		{"haiku 100k in 10k out", ModelClaude35Haiku, 100_000, 10_000, 12},   // (100k * 0.80 + 10k * 4.00) / 1M = 0.08 + 0.04 = $0.12 -> 12 cents
-		{"sonnet 100k in 10k out", ModelClaude35Sonnet, 100_000, 10_000, 45}, // (100k * 3.00 + 10k * 15.00) / 1M = 0.30 + 0.15 = $0.45 -> 45 cents
-		{"claude 3 haiku cheap", ModelClaude3Haiku, 100_000, 10_000, 4},      // (100k * 0.25 + 10k * 1.25) / 1M = 0.025 + 0.0125 = $0.0375 -> ceil -> 4 cents
+		{"zero tokens", ModelHaiku, 0, 0, 0},
+		{"minimal tokens rounded up", ModelHaiku, 10, 10, 1},
+		{"haiku 100k in 10k out", ModelHaiku, 100_000, 10_000, 2},       // 0.01 + 0.005 = $0.015 -> 2 cents
+		{"haiku long prompt", ModelHaiku, 200_000, 10_000, 13},          // 0.10 + 0.025 = $0.125 -> 13 cents
+		{"sonnet 100k in 10k out", ModelSonnet, 100_000, 10_000, 30},    // 0.20 + 0.10 = $0.30
+		{"unknown priced high", "claude-future-x", 100_000, 10_000, 60}, // 0.40 + 0.20 = $0.60
 	}
 
 	for _, tt := range tests {

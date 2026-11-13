@@ -73,7 +73,7 @@ func TestPgstoreAI(t *testing.T) {
 	}
 
 	// 4. Record usage event
-	if err := store.RecordUsage(ctx, u1, ai.TaskDraft, ai.ModelClaude35Haiku, 250, 40, 2); err != nil {
+	if err := store.RecordUsage(ctx, u1, ai.TaskDraft, ai.ModelHaiku, 250, 40, 2); err != nil {
 		t.Fatalf("RecordUsage: %v", err)
 	}
 

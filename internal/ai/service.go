@@ -24,7 +24,7 @@ type Service struct {
 // NewService constructs an AI Service.
 func NewService(store Store, cipher KeyCipher, client Client, adminEnabled bool, operatorKey, defaultModel string, budgetPerUserCents int) *Service {
 	if defaultModel == "" {
-		defaultModel = ModelClaude35Haiku
+		defaultModel = ModelHaiku
 	}
 	if budgetPerUserCents <= 0 {
 		budgetPerUserCents = 500 // $5.00 default cap per user
