@@ -91,7 +91,8 @@ run_restic() {
       for var in AWS_ACCESS_KEY_ID AWS_SECRET_ACCESS_KEY AWS_DEFAULT_REGION AWS_ENDPOINT \
                  B2_ACCOUNT_ID B2_ACCOUNT_KEY AZURE_ACCOUNT_NAME AZURE_ACCOUNT_KEY; do
         if [ -n "${!var:-}" ]; then
-          docker_args+=(-e "$var=${!var}")
+          export "${var?}"
+          docker_args+=(-e "$var") # by name: the value never shows in the process list
         fi
       done
     else
@@ -111,10 +112,10 @@ run_restic() {
 
     docker_args+=(
       -e "RESTIC_REPOSITORY=$repo_arg"
-      -e "RESTIC_PASSWORD=$RESTIC_PASSWORD"
+      -e RESTIC_PASSWORD
       "$RESTIC_IMAGE"
     )
-    "${docker_args[@]}" "$@"
+    RESTIC_PASSWORD="$RESTIC_PASSWORD" "${docker_args[@]}" "$@"
   fi
 }
 
@@ -147,7 +148,7 @@ mkdir -p "$staging_dir/blobs"
 docker run --rm \
   -v "${COMPOSE_PROJECT}_blobs:/src:ro" \
   -v "$(cd "$staging_dir/blobs" && pwd):/dst" \
-  alpine sh -c "cp -a /src/. /dst/ 2>/dev/null || true; chmod -R a+rwX /dst 2>/dev/null || true"
+  alpine sh -c "cp -a /src/. /dst/ && chmod -R a+rwX /dst"
 
 # Write backup manifest
 timestamp="$(date -u +"%Y-%m-%dT%H:%M:%SZ")"

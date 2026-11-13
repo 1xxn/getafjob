@@ -61,7 +61,7 @@ RESTIC_PASSWORD_FILE=/etc/getafjob/secrets/backup_password \
 deploy/backup.sh --tag "manual-release"
 
 # Restore a specific snapshot ID
-deploy/restore.sh 8f371bc8
+deploy/restore.sh 8f371bc8   # asks for the project name; --yes in scripts
 ```
 
 ---
