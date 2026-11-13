@@ -1,17 +1,6 @@
 package ats
 
-import (
-	"regexp"
-	"strings"
-
-	"github.com/1xxn/getafjob/internal/runner/browser"
-)
-
-var (
-	easyApplyRx = regexp.MustCompile(`(?i)easy apply|einfach bewerben|indeed bewerbung|apply now|jetzt bewerben`)
-	reviewRx    = regexp.MustCompile(`(?i)\breview\b|überprüf|ueberpruef|zusammenfassung`)
-	submitRx    = regexp.MustCompile(`(?i)submit application|bewerbung (einreichen|absenden|abschicken)|send application`)
-)
+import "strings"
 
 // IsPortal reports whether the adapter name represents an Easy Apply portal.
 func IsPortal(adapterName string) bool {
@@ -44,50 +33,4 @@ func IsSessionExpired(portal, rawURL, htmlText string) bool {
 	}
 
 	return false
-}
-
-// FindEasyApplyButton locates the primary button that launches the Easy Apply flow on the portal.
-func FindEasyApplyButton(st *browser.State) (browser.Button, bool) {
-	for _, b := range st.Buttons() {
-		if b.Disabled || b.Cookie {
-			continue
-		}
-		if easyApplyRx.MatchString(b.Text) {
-			return b, true
-		}
-	}
-	return browser.Button{}, false
-}
-
-// IsReviewStep reports whether the current form page is the final review step before submitting.
-func IsReviewStep(st *browser.State) bool {
-	if st == nil {
-		return false
-	}
-	for _, f := range st.Frames {
-		for _, h := range f.Headings {
-			if reviewRx.MatchString(h) {
-				return true
-			}
-		}
-	}
-	for _, b := range st.Buttons() {
-		if submitRx.MatchString(b.Text) {
-			return true
-		}
-	}
-	return false
-}
-
-// FindSubmitButton locates the final submit button on a portal review step.
-func FindSubmitButton(st *browser.State) (browser.Button, bool) {
-	for _, b := range st.Buttons() {
-		if b.Disabled || b.Cookie {
-			continue
-		}
-		if submitRx.MatchString(b.Text) {
-			return b, true
-		}
-	}
-	return browser.Button{}, false
 }

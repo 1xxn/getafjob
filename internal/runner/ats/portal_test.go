@@ -1,10 +1,6 @@
 package ats
 
-import (
-	"testing"
-
-	"github.com/1xxn/getafjob/internal/runner/browser"
-)
+import "testing"
 
 func TestPortalHelpers(t *testing.T) {
 	if !IsPortal(LinkedIn) || !IsPortal(Indeed) {
@@ -22,23 +18,5 @@ func TestPortalHelpers(t *testing.T) {
 	}
 	if IsSessionExpired(LinkedIn, "https://www.linkedin.com/jobs/view/123", "<html>Welcome</html>") {
 		t.Errorf("expected session active")
-	}
-}
-
-func TestReviewStepDetection(t *testing.T) {
-	stReview := &browser.State{Frames: []*browser.Frame{{
-		Headings: []string{"Review your application"},
-		Buttons:  []browser.Button{{Text: "Submit application"}},
-	}}}
-	if !IsReviewStep(stReview) {
-		t.Errorf("IsReviewStep = false, want true")
-	}
-
-	stForm := &browser.State{Frames: []*browser.Frame{{
-		Headings: []string{"Contact info"},
-		Buttons:  []browser.Button{{Text: "Next"}},
-	}}}
-	if IsReviewStep(stForm) {
-		t.Errorf("IsReviewStep = true, want false")
 	}
 }
