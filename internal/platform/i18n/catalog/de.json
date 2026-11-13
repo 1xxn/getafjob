@@ -757,6 +757,7 @@
   "dash.park.check": "du musst eine Prüfung bestehen",
   "dash.park.unreachable": "die Jobseite ließ sich nicht öffnen",
   "dash.park.no_confirm": "das Senden wurde nicht bestätigt",
+  "dash.park.runner_lost": "der Browser des Laufs ist ausgefallen",
   "dash.park.form_rejected": "das Formular hat ein Feld abgelehnt",
   "dash.park.excluded": "deine Filter schließen diesen Job aus",
   "dash.park.duplicate": "schon über eine andere Quelle beworben",
