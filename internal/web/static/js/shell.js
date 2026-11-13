@@ -24,7 +24,8 @@ document.addEventListener("htmx:before:request", (e) => {
 });
 document.addEventListener("htmx:finally:request", () => html.classList.remove("is-navigating"));
 function hashField() {
-  const id = decodeURIComponent(location.hash.slice(1));
+  const named = document.querySelector("#main [data-focus-field]")?.dataset.focusField;
+  const id = decodeURIComponent(location.hash.slice(1)) || named || "";
   const el = id ? document.getElementById(id) : null;
   return el instanceof HTMLInputElement || el instanceof HTMLTextAreaElement || el instanceof HTMLSelectElement ? el : null;
 }

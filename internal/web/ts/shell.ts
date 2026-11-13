@@ -38,9 +38,11 @@ document.addEventListener('htmx:before:request', (e) => {
 });
 document.addEventListener('htmx:finally:request', () => html.classList.remove('is-navigating'));
 
-// hashField is the form field the URL points at (the profile gaps link to /profile#f-email), if any.
+// hashField is the form field the URL points at (the profile gaps link to /profile#f-email) or the page names
+// (data-focus-field, e.g. a station just added), if any.
 function hashField(): HTMLElement | null {
-  const id = decodeURIComponent(location.hash.slice(1));
+  const named = document.querySelector<HTMLElement>('#main [data-focus-field]')?.dataset.focusField;
+  const id = decodeURIComponent(location.hash.slice(1)) || named || '';
   const el = id ? document.getElementById(id) : null;
   return el instanceof HTMLInputElement || el instanceof HTMLTextAreaElement || el instanceof HTMLSelectElement ? el : null;
 }
