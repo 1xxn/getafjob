@@ -953,26 +953,26 @@ func TestCVImport(t *testing.T) {
 	if rec := a.upload("cv", "cv.docx", cv, session); rec.Code != http.StatusSeeOther {
 		t.Fatalf("upload %d", rec.Code)
 	}
+	// The documents page offers one import action per CV: the review.
 	page := a.do(http.MethodGet, "/documents", nil, session, nil).Body.String()
-	i := strings.Index(page, `formaction="/documents/`)
-	if i < 0 {
-		t.Fatalf("no import button: %s", page)
+	id := regexp.MustCompile(`href="/documents/([0-9a-f-]{36})/review"`).FindStringSubmatch(page)
+	if id == nil || strings.Contains(page, `formaction="/documents/`+id[1]+`/import"`) {
+		t.Fatalf("documents page should offer only the review: %s", page)
 	}
-	path := page[i+len(`formaction="`):i+len(`formaction="`)+len("/documents/")+36] + "/import"
-	rec := a.do(http.MethodPost, path, url.Values{}, session, nil)
-	if rec.Code != http.StatusSeeOther || rec.Header().Get("Location") != "/profile?imported=1" {
+	// Setup fills the profile directly.
+	rec := a.do(http.MethodPost, "/setup/cv/import/"+id[1], url.Values{}, session, nil)
+	if rec.Code != http.StatusSeeOther || rec.Header().Get("Location") != "/setup/profile?imported=1" {
 		t.Fatalf("import %d: %s", rec.Code, rec.Body.String())
 	}
-	body := a.do(http.MethodGet, "/profile?imported=1", nil, session, nil).Body.String()
+	if body := a.do(http.MethodGet, "/setup/profile?imported=1", nil, session, nil).Body.String(); !strings.Contains(body, "nothing you entered was changed") {
+		t.Error("setup lacks the import notice")
+	}
+	body := a.do(http.MethodGet, "/profile", nil, session, nil).Body.String()
 	for _, want := range []string{`value="Maximilian"`, `value="Mustermann"`, `value="max.mustermann@example.org"`, `value="Berlin"`,
-		"Go\nKubernetes\nPostgreSQL", "German: native", `value="Senior Platform Engineer"`, "nothing you entered was changed"} {
+		"Go\nKubernetes\nPostgreSQL", "German: native", `value="Senior Platform Engineer"`} {
 		if !strings.Contains(body, want) {
 			t.Errorf("profile lacks %q", want)
 		}
-	}
-	// A second import has nothing to add.
-	if rec := a.do(http.MethodPost, path, url.Values{}, session, nil); rec.Code != http.StatusOK || !strings.Contains(rec.Body.String(), "nothing to add") {
-		t.Errorf("second import %d", rec.Code)
 	}
 }
 

@@ -34,7 +34,7 @@ templ DocumentsPage(name string, h CandidateHead, notice string, failed bool, do
 			if failed {
 				@ui.Alert(ui.AlertProps{Tone: ui.Danger, Text: notice})
 			} else {
-				@ui.Alert(ui.AlertProps{Tone: ui.Info, Text: notice})
+				@ui.Alert(ui.AlertProps{Tone: ui.Success, Text: notice})
 			}
 		}
 		<form method="post" action="/documents" enctype="multipart/form-data" class="cand-upload" { HX(ctx, "hx-boost", "false")... }>
@@ -86,10 +86,6 @@ templ DocumentsPage(name string, h CandidateHead, notice string, failed bool, do
 										@ui.Button(ui.ButtonProps{Label: T(ctx, "profile.save"), Type: "submit", Variant: "primary", Icon: "check"})
 										if d.Import {
 											@ui.Button(ui.ButtonProps{Label: T(ctx, "documents.review"), Href: "/documents/" + d.ID + "/review", Icon: "eye"})
-											<button { HX(ctx)... } type="submit" class="ui-btn ui-btn-ghost" formaction={ templ.URL("/documents/" + d.ID + "/import") }>
-												@ui.Icon("download")
-												<span>{ T(ctx, "documents.import") }</span>
-											</button>
 										}
 									</div>
 								</form>
