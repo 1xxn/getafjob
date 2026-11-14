@@ -208,6 +208,8 @@ func (s *Store) Apply(ctx context.Context, userID uuid.UUID, a application.App, 
 			outcome := "parked"
 			if c.To == application.Submitted {
 				outcome = "submitted"
+			} else if c.From == application.NeedsInput && c.To == application.Parked && waitingForUserDetail(c.Detail) {
+				outcome = "asked"
 			}
 			if err := qs.FinishAppRuns(ctx, q.FinishAppRunsParams{ApplicationID: a.ID, UserID: userID,
 				FinishedAt: &c.At, Outcome: &outcome}); err != nil {
@@ -220,6 +222,11 @@ func (s *Store) Apply(ctx context.Context, userID uuid.UUID, a application.App, 
 		}
 		return nil
 	})
+}
+
+func waitingForUserDetail(detail map[string]any) bool {
+	r, _ := detail["reason"].(string)
+	return application.IsWaitingForUserPark(r)
 }
 
 // Candidate collects the guard inputs for a job of the user.
@@ -635,8 +642,13 @@ func (s *Store) RuleInput(ctx context.Context, userID uuid.UUID, app application
 		if err != nil {
 			return err
 		}
-		fieldKind := make(map[string]string)
-		filledMap := make(map[string]string)
+		type pageField struct {
+			page int32
+			id   string
+		}
+		fieldKind := make(map[pageField]string)
+		filledMap := make(map[pageField]string)
+		var filledOrder []pageField
 		for _, cp := range cps {
 			var d struct {
 				Fields []struct {
@@ -657,11 +669,15 @@ func (s *Store) RuleInput(ctx context.Context, userID uuid.UUID, app application
 			}
 			for _, f := range d.Fields {
 				if f.Kind != "" {
-					fieldKind[f.ID] = f.Kind
+					fieldKind[pageField{page: cp.Page, id: f.ID}] = f.Kind
 				}
 			}
 			for _, f := range d.Filled {
-				filledMap[f.FieldID] = f.Source
+				k := pageField{page: cp.Page, id: f.FieldID}
+				if _, exists := filledMap[k]; !exists {
+					filledOrder = append(filledOrder, k)
+				}
+				filledMap[k] = f.Source
 			}
 			if cp.Step == "submit" {
 				open := 0
@@ -678,10 +694,10 @@ func (s *Store) RuleInput(ctx context.Context, userID uuid.UUID, app application
 				in.FormErrors = formErrors
 			}
 		}
-		for fieldID, src := range filledMap {
+		for _, k := range filledOrder {
 			in.Filled = append(in.Filled, application.SubmitField{
-				Kind:   fieldKind[fieldID],
-				Source: src,
+				Kind:   fieldKind[k],
+				Source: filledMap[k],
 			})
 		}
 		return nil

@@ -58,6 +58,7 @@ func (DailySummaryArgs) Kind() string { return "daily_summary" }
 // InsertOpts ensures at most one daily summary check waits or runs.
 func (DailySummaryArgs) InsertOpts() river.InsertOpts {
 	return river.InsertOpts{
+		Queue:       queue.Mail,
 		MaxAttempts: 3,
 		UniqueOpts: river.UniqueOpts{
 			ByArgs: true,

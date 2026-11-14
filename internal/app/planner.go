@@ -23,7 +23,7 @@ func (PlanArgs) Kind() string { return "application_plan" }
 
 // InsertOpts: at most one planner run waits or runs.
 func (PlanArgs) InsertOpts() river.InsertOpts {
-	return river.InsertOpts{MaxAttempts: 3, UniqueOpts: river.UniqueOpts{ByArgs: true,
+	return river.InsertOpts{Queue: queue.Apply, MaxAttempts: 3, UniqueOpts: river.UniqueOpts{ByArgs: true,
 		ByState: []rivertype.JobState{rivertype.JobStateAvailable, rivertype.JobStatePending, rivertype.JobStateRunning,
 			rivertype.JobStateRetryable, rivertype.JobStateScheduled}}}
 }
