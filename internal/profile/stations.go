@@ -4,6 +4,9 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
+	"regexp"
+	"strconv"
 	"strings"
 	"time"
 
@@ -26,6 +29,28 @@ const (
 	WorkplaceHybrid = "hybrid"
 	WorkplaceOnsite = "onsite"
 )
+
+// monthDateRx matches the month and year notations CVs use: 04/2021, 4.2021, 04-2021 and 2021/04.
+var monthDateRx = regexp.MustCompile(`^(?:(\d{1,2})[./-](\d{4})|(\d{4})/(\d{1,2}))$`)
+
+// MonthDate cleans a station date and brings month notations to YYYY-MM, the form the planner fills from. Anything
+// else (YYYY-MM, YYYY, free text) stays as written.
+func MonthDate(s string) string {
+	s = cleanLine(s)
+	m := monthDateRx.FindStringSubmatch(s)
+	if m == nil {
+		return s
+	}
+	month, year := m[1], m[2]
+	if year == "" {
+		month, year = m[4], m[3]
+	}
+	n, _ := strconv.Atoi(month)
+	if n < 1 || n > 12 {
+		return s
+	}
+	return fmt.Sprintf("%s-%02d", year, n)
+}
 
 // WorkExperience represents a structured employment position station.
 type WorkExperience struct {
@@ -182,8 +207,8 @@ func (s *Stations) SaveWorkExperience(ctx context.Context, userID uuid.UUID, w W
 	w.Company = cleanLine(w.Company)
 	w.Title = cleanLine(w.Title)
 	w.Location = cleanLine(w.Location)
-	w.StartDate = cleanLine(w.StartDate)
-	w.EndDate = cleanLine(w.EndDate)
+	w.StartDate = MonthDate(w.StartDate)
+	w.EndDate = MonthDate(w.EndDate)
 	w.WorkplaceType = strings.TrimSpace(strings.ToLower(w.WorkplaceType))
 	if errs := w.Validate(); len(errs) > 0 {
 		return uuid.Nil, &ValidationError{Fields: errs}
@@ -348,8 +373,8 @@ func (s *Stations) SaveEducation(ctx context.Context, userID uuid.UUID, e Educat
 	e.Institution = cleanLine(e.Institution)
 	e.Degree = cleanLine(e.Degree)
 	e.FieldOfStudy = cleanLine(e.FieldOfStudy)
-	e.StartDate = cleanLine(e.StartDate)
-	e.EndDate = cleanLine(e.EndDate)
+	e.StartDate = MonthDate(e.StartDate)
+	e.EndDate = MonthDate(e.EndDate)
 	e.Grade = cleanLine(e.Grade)
 	if errs := e.Validate(); len(errs) > 0 {
 		return uuid.Nil, &ValidationError{Fields: errs}
