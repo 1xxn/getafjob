@@ -23,7 +23,8 @@ func WithZone(ctx context.Context, loc *time.Location) context.Context {
 	return context.WithValue(ctx, zoneKey{}, loc)
 }
 
-func zone(ctx context.Context) *time.Location {
+// Zone returns the instance time zone of the request (UTC without one).
+func Zone(ctx context.Context) *time.Location {
 	if loc, ok := ctx.Value(zoneKey{}).(*time.Location); ok {
 		return loc
 	}

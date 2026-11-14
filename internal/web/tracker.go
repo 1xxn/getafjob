@@ -34,7 +34,8 @@ func (s *Server) trackerSaveNotes(w http.ResponseWriter, r *http.Request, u *ide
 	salary := strings.TrimSpace(r.PostFormValue("salary"))
 	var interviewAt *time.Time
 	if val := strings.TrimSpace(r.PostFormValue("interview_at")); val != "" {
-		if t, err := time.Parse("2006-01-02T15:04", val); err == nil {
+		// datetime-local carries no zone: the user means the instance's local time.
+		if t, err := time.ParseInLocation("2006-01-02T15:04", val, views.Zone(r.Context())); err == nil {
 			interviewAt = &t
 		}
 	}

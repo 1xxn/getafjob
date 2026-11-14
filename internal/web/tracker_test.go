@@ -398,6 +398,11 @@ func TestTrackerSaveNotes(t *testing.T) {
 	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 	req.Header.Set("HX-Request", "true")
 	req.SetPathValue("id", appID.String())
+	berlin, err := time.LoadLocation("Europe/Berlin")
+	if err != nil {
+		t.Skip("no tzdata:", err)
+	}
+	req = req.WithContext(views.WithZone(req.Context(), berlin))
 
 	srv.trackerSaveNotes(rec, req, u)
 
@@ -412,8 +417,12 @@ func TestTrackerSaveNotes(t *testing.T) {
 	if savedNotes.SalaryDiscussed != "90.000 €" {
 		t.Errorf("salary = %q", savedNotes.SalaryDiscussed)
 	}
-	if savedNotes.InterviewAt == nil || savedNotes.InterviewAt.Format("2006-01-02T15:04") != "2026-11-15T14:30" {
+	// The form time is Berlin local time: 14:30 CET is 13:30 UTC, and the form shows 14:30 again.
+	if savedNotes.InterviewAt == nil || savedNotes.InterviewAt.UTC().Format("2006-01-02T15:04") != "2026-11-15T13:30" {
 		t.Errorf("interview_at = %v", savedNotes.InterviewAt)
+	}
+	if !strings.Contains(rec.Body.String(), `value="2026-11-15T14:30"`) {
+		t.Error("the form does not show the interview time in the instance zone")
 	}
 
 	body := rec.Body.String()

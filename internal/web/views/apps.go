@@ -1,6 +1,7 @@
 package views
 
 import (
+	"context"
 	"maps"
 	"strings"
 	"time"
@@ -8,12 +9,13 @@ import (
 	"github.com/a-h/templ"
 )
 
-// plDateTime and plDate format optional times for datetime-local and date inputs (stored in UTC).
-func plDateTime(t *time.Time) string {
+// plDateTime formats an optional time for a datetime-local input in the instance zone; plDate formats a date
+// input (dates are stored as UTC midnight and need no zone).
+func plDateTime(ctx context.Context, t *time.Time) string {
 	if t == nil {
 		return ""
 	}
-	return t.UTC().Format("2006-01-02T15:04")
+	return t.In(Zone(ctx)).Format("2006-01-02T15:04")
 }
 
 func plDate(t *time.Time) string {
