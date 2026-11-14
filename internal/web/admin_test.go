@@ -49,7 +49,8 @@ func TestAdminConsole(t *testing.T) {
 
 	// Invite: the link shows once; a taken address is refused.
 	rec := a.do(http.MethodPost, "/admin/invites", url.Values{"email": {"erika.musterfrau@example.org"}, "role": {"user"}}, admin, nil)
-	if rec.Code != http.StatusOK || !strings.Contains(rec.Body.String(), "https://jobs.example.org/invite/") || !strings.Contains(rec.Body.String(), "data-invite-row=\"erika.musterfrau@example.org\"") {
+	if rec.Code != http.StatusOK || !strings.Contains(rec.Body.String(), "https://jobs.example.org/invite/") || !strings.Contains(rec.Body.String(), "data-invite-row=\"erika.musterfrau@example.org\"") ||
+		rec.Header().Get("HX-Replace-Url") != "/admin/users" {
 		t.Fatalf("invite %d: %s", rec.Code, rec.Body.String())
 	}
 	if rec := a.do(http.MethodPost, "/admin/invites", url.Values{"email": {"max.mustermann@example.com"}, "role": {"user"}}, admin, nil); rec.Code != http.StatusUnprocessableEntity || !strings.Contains(rec.Body.String(), "exists already") {
