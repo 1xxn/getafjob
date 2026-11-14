@@ -1088,6 +1088,11 @@ func TestSetupAssistant(t *testing.T) {
 		}
 	}
 	resume("/setup/cv")
+	// Without a job title nothing is rated: the last step says so instead of waiting.
+	if page := a.do(http.MethodGet, "/setup/matches", nil, session, nil).Body.String(); !strings.Contains(page, "data-setup-no-titles") ||
+		strings.Contains(page, "Rating jobs") {
+		t.Error("last step waits for ratings without a job title")
+	}
 	cv := cvDocx(t, "Max Mustermann", "10115 Berlin", "max.mustermann@example.org | +49 30 1234567",
 		"Summary", "Platform engineer with eight years of experience in Go, Kubernetes and PostgreSQL in production.",
 		"Experience", "Senior Platform Engineer at Muster GmbH 01/2021 - present", "Backend Developer, Beispiel AG 2017 - 2020",
@@ -1138,6 +1143,9 @@ func TestSetupAssistant(t *testing.T) {
 		t.Fatalf("search save %d", rec.Code)
 	}
 	resume("/setup/matches")
+	if page := a.do(http.MethodGet, "/setup/matches", nil, session, nil).Body.String(); strings.Contains(page, "data-setup-no-titles") {
+		t.Error("job titles set, still asked for them")
+	}
 
 	// Nothing runs on its own until the user chooses it: suggest is preselected, and the last step says so.
 	if page := a.do(http.MethodGet, "/setup/automation", nil, session, nil).Body.String(); !strings.Contains(page, `value="suggest" checked`) {
