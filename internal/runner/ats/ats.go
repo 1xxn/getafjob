@@ -303,6 +303,15 @@ func Origins(source string, urls ...string) []string {
 	return out
 }
 
+// IsKnownOrigin reports whether rawOrigin belongs to a known ATS adapter host.
+func IsKnownOrigin(rawOrigin string) bool {
+	u, err := url.Parse(strings.TrimSpace(rawOrigin))
+	if err != nil || u.Hostname() == "" {
+		return false
+	}
+	return For("", rawOrigin).Name != Generic
+}
+
 func cleanSlug(slug string) string {
 	slug, _, _ = strings.Cut(strings.TrimSpace(slug), "/")
 	for _, r := range slug {

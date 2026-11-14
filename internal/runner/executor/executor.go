@@ -119,19 +119,30 @@ func (x *Executor) fill(st *browser.State, p Plan, v Value) (*browser.State, err
 		if f.MaxLength > 0 && utf8.RuneCountInString(v.Text) > f.MaxLength {
 			return st, fmt.Errorf("%w: %d > %d", ErrTooLong, utf8.RuneCountInString(v.Text), f.MaxLength)
 		}
-		err = st.Type(v.FieldID, v.Text)
+		if !sameText(f.Value, v.Text) {
+			err = st.Type(v.FieldID, v.Text)
+		}
 	case "date":
-		err = st.SetValue(v.FieldID, v.Text)
+		if !sameText(f.Value, v.Text) {
+			err = st.SetValue(v.FieldID, v.Text)
+		}
 	case "select":
 		i, ok := Match(v.Text, labels(f.Options))
 		if !ok {
 			return st, fmt.Errorf("%w: %q", ErrNoOption, v.Text)
 		}
 		want = f.Options[i].Label
-		err = st.SetValue(v.FieldID, f.Options[i].Value)
+		if !sameChoice(f.Value, want) {
+			err = st.SetValue(v.FieldID, f.Options[i].Value)
+		}
 	case "richtext":
-		err = st.Type(v.FieldID, v.Text)
+		if !sameText(f.Value, v.Text) {
+			err = st.Type(v.FieldID, v.Text)
+		}
 	case "combobox":
+		if f.Value != "" && sameChoice(f.Value, v.Text) {
+			return x.verify(st, v.FieldID, v.Text, sameChoice)
+		}
 		if want, err = x.combobox(st, v); err != nil {
 			return st, err
 		}
@@ -157,8 +168,10 @@ func (x *Executor) fill(st *browser.State, p Plan, v Value) (*browser.State, err
 	case "checkbox_group":
 		want, err = x.group(st, f, v)
 	case "file":
-		err = st.Upload(x.Docs, v.FieldID, v.Files, x.wait())
 		want = strings.Join(v.Files, ", ")
+		if want == "" || !sameText(f.Value, want) {
+			err = st.Upload(x.Docs, v.FieldID, v.Files, x.wait())
+		}
 	default:
 		return st, fmt.Errorf("%w: %s", ErrUnsupported, f.Kind)
 	}
@@ -266,6 +279,11 @@ func (x *Executor) combobox(st *browser.State, v Value) (string, error) {
 
 // isTypable reports a combobox that is a text input (react-select, autocompletes), not a listbox button.
 func isTypable(f browser.Field) bool { return f.InputType != "" }
+
+// sameText compares two plain text field values after trimming surrounding whitespace.
+func sameText(shown, want string) bool {
+	return strings.TrimSpace(shown) == strings.TrimSpace(want)
+}
 
 // sameChoice compares what a combobox shows with the chosen option: widgets often show a short form ("+49" for
 // "Germany +49").

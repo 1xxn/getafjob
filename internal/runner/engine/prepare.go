@@ -3,6 +3,7 @@ package engine
 import (
 	"context"
 	"errors"
+	"net/url"
 	"regexp"
 	"time"
 
@@ -18,8 +19,8 @@ var ErrNoForm = errors.New("no application form found")
 const maxHops = 4
 
 var (
-	// applyRx names the link or button that leads from a posting to its form.
-	applyRx = regexp.MustCompile(`(?i)\bapply\b|apply now|bewerb|zur bewerbung|jetzt bewerben|interessiert`)
+	// applyRx names the link or button that leads from a posting to its form or original company page (#509).
+	applyRx = regexp.MustCompile(`(?i)\bapply\b|apply now|apply on company site|view original|bewerb|zur bewerbung|jetzt bewerben|interessiert|externe seite|zur stellenanzeige|zum original|auf unternehmenswebsite`)
 	// rejectRx names the least consent a cookie banner offers.
 	rejectRx = regexp.MustCompile(`(?i)reject|decline|deny|ablehnen|nur (notwendige|erforderliche|essenzielle)|` +
 		`only (necessary|essential|required)|necessary only|essential only|nicht zustimmen|alle ablehnen`)
@@ -34,6 +35,7 @@ const scrollJS = `() => { window.scrollTo(0, document.documentElement.scrollHeig
 // are never used. It returns the page that shows the form.
 func (e *Engine) Prepare(ctx context.Context, p *rod.Page) (*rod.Page, error) {
 	p = p.Context(ctx)
+	e.log().InfoContext(ctx, "run step", "step", StepPrepare)
 	for hop := 0; ; hop++ {
 		st, err := browser.Extract(p)
 		if err != nil {
@@ -46,6 +48,7 @@ func (e *Engine) Prepare(ctx context.Context, p *rod.Page) (*rod.Page, error) {
 			if _, err := st.Click(b.ID, e.wait()); err != nil { //nolint:contextcheck // the page carries ctx
 				return p, err
 			}
+			e.log().InfoContext(ctx, "prepare dismissed cookie banner", "step", StepPrepare)
 			continue // the banner is gone; read the page again (does not count as a hop)
 		}
 		if _, err := p.Eval(scrollJS); err == nil {
@@ -80,6 +83,12 @@ func (e *Engine) Prepare(ctx context.Context, p *rod.Page) (*rod.Page, error) {
 			break
 		}
 		_ = p.Timeout(e.wait()).WaitLoad()
+		time.Sleep(150 * time.Millisecond)
+		if info, err := p.Info(); err == nil {
+			if u, err := url.Parse(info.URL); err == nil && u.Hostname() != "" {
+				e.log().InfoContext(ctx, "prepare hop", "step", StepPrepare, "hop", hop+1, "host", u.Hostname())
+			}
+		}
 	}
 }
 

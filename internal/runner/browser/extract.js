@@ -3,7 +3,9 @@
 // CAPTCHA signals.
 (frameIndex) => {
   const W = window;
-  if (!W.__gaj) W.__gaj = { n: 0 };
+  if (!W.__gaj) W.__gaj = { n: 0, byKey: {}, labels: {} };
+  if (!W.__gaj.byKey) W.__gaj.byKey = {};
+  if (!W.__gaj.labels) W.__gaj.labels = {};
   const PREFIX = `${frameIndex}-`;
   const clean = (s) => (s || "").replace(/\s+/g, " ").trim();
   const textOf = (el) => (el ? clean(el.innerText || el.textContent || "") : "");
@@ -86,13 +88,51 @@
     }
     return "";
   };
+  const tagged = new Map();
+  const stableKey = (el) => {
+    const t = el.tagName || "";
+    const type = (el.type || "").toLowerCase();
+    const name = el.getAttribute && (el.getAttribute("name") || "");
+    const htmlId = el.id || "";
+    const aria = el.getAttribute && (el.getAttribute("aria-label") || el.getAttribute("aria-labelledby") || el.getAttribute("data-automation-id") || "");
+    if (!name && !htmlId && !aria) return "";
+    const val = type === "radio" || type === "checkbox" ? el.value || "" : "";
+    let idx = 0;
+    if (name) {
+      const root = (el.getRootNode && el.getRootNode()) || document;
+      const same = Array.from(root.querySelectorAll(t)).filter((s) => (s.getAttribute("name") || "") === name);
+      idx = same.indexOf(el);
+    } else if (el.parentElement) {
+      const sibs = Array.from(el.parentElement.children).filter((s) => s.tagName === t);
+      idx = sibs.indexOf(el);
+    }
+    return `${PREFIX}${t}:${type}:${name}:${val}:${htmlId}:${aria}:${idx}`;
+  };
   const tag = (el) => {
     let id = el.getAttribute("data-gaj");
-    if (!id || !id.startsWith(PREFIX)) {
-      id = PREFIX + (++W.__gaj.n);
-      el.setAttribute("data-gaj", id);
+    if (id && id.startsWith(PREFIX) && (!tagged.has(id) || tagged.get(id) === el)) {
+      tagged.set(id, el);
+      return id;
     }
+    const key = stableKey(el);
+    const saved = key ? W.__gaj.byKey[key] : "";
+    if (saved && (!tagged.has(saved) || tagged.get(saved) === el)) {
+      tagged.set(saved, el);
+      el.setAttribute("data-gaj", saved);
+      return saved;
+    }
+    id = PREFIX + (++W.__gaj.n);
+    tagged.set(id, el);
+    if (key) W.__gaj.byKey[key] = id;
+    el.setAttribute("data-gaj", id);
     return id;
+  };
+  const stableLabel = (id, rawLabel) => {
+    const l = clean(rawLabel);
+    if (l && !W.__gaj.labels[id]) {
+      W.__gaj.labels[id] = l;
+    }
+    return W.__gaj.labels[id] || l;
   };
 
   const lookup = (root, id) => {
@@ -225,9 +265,11 @@
       if (["hidden", "submit", "button", "image", "reset"].includes(type)) continue;
       if (type === "file") {
         if (inHiddenSection(el)) continue;
-        let label = labelOf(el) || contextLabel(el.parentElement || el);
-        if (!label || GENERIC_UPLOAD_RX.test(label.split(" | ")[0].trim())) label = uploadContext(el) || label;
-        fields.push({ id: tag(el), kind: "file", label, required: isRequired(el, label), accept: el.accept || "",
+        const id = tag(el);
+        let rawLabel = labelOf(el) || contextLabel(el.parentElement || el);
+        if (!rawLabel || GENERIC_UPLOAD_RX.test(rawLabel.split(" | ")[0].trim())) rawLabel = uploadContext(el) || rawLabel;
+        const label = stableLabel(id, rawLabel);
+        fields.push({ id, kind: "file", label, required: isRequired(el, label), accept: el.accept || "",
           name: el.name || "", html_id: el.id || "",
           multiple: !!el.multiple, value: el.files && el.files.length ? Array.from(el.files).map((f) => f.name).join(", ") : "",
           hint: describedBy(el) });
@@ -242,8 +284,9 @@
           ? Array.from(root.querySelectorAll(`input[type="${type}"][name="${CSS.escape(name)}"]`))
           : [el];
         if (type === "checkbox" && members.length <= 1) {
-          const label = labelOf(el);
-          fields.push({ id: tag(el), kind: "checkbox", label, required: isRequired(el, label), value: el.checked ? "checked" : "",
+          const id = tag(el);
+          const label = stableLabel(id, labelOf(el));
+          fields.push({ id, kind: "checkbox", label, required: isRequired(el, label), value: el.checked ? "checked" : "",
             hint: describedBy(el) });
           continue;
         }
@@ -251,65 +294,74 @@
         if (seenGroups.has(key)) continue;
         seenGroups.add(key);
         const options = members.map((m) => ({ id: tag(m), label: clean(labelsOf(m).join(" ")) || m.value, checked: m.checked }));
-        const question = groupQuestion(members, options.map((o) => o.label));
-        fields.push({ id: tag(members[0]), kind: type === "radio" ? "radio" : "checkbox_group", label: question,
+        const id = tag(members[0]);
+        const question = stableLabel(id, groupQuestion(members, options.map((o) => o.label)));
+        fields.push({ id, kind: type === "radio" ? "radio" : "checkbox_group", label: question,
           required: members.some((m) => m.required) || /\*/.test(question), options,
           value: options.filter((o) => o.checked).map((o) => o.label).join("; ") });
         continue;
       }
       if (!visible(el) || ariaHidden(el) || shimInput(el)) continue;
       if (type === "password") {
-        fields.push({ id: tag(el), kind: "password", label: labelOf(el), required: !!el.required, value: "" });
+        const id = tag(el);
+        fields.push({ id, kind: "password", label: stableLabel(id, labelOf(el)), required: !!el.required, value: "" });
         continue;
       }
       if (!TEXT_TYPES.has(type)) continue;
-      const label = labelOf(el);
+      const id = tag(el);
+      const label = stableLabel(id, labelOf(el));
       const role = el.getAttribute("role");
       const combo = role === "combobox" || el.getAttribute("aria-autocomplete") === "list" || !!el.getAttribute("aria-controls") && el.getAttribute("aria-expanded") !== null;
-      fields.push({ id: tag(el), kind: combo ? "combobox" : (type === "date" ? "date" : "text"), input_type: type || "text",
+      fields.push({ id, kind: combo ? "combobox" : (type === "date" ? "date" : "text"), input_type: type || "text",
         label, required: isRequired(el, label), value: el.value || (combo ? chosenValue(el) : ""), hint: describedBy(el),
         autocomplete: el.getAttribute("autocomplete") || "", name: el.name || "", html_id: el.id || "",
         max_length: el.maxLength > 0 ? el.maxLength : 0, invalid: el.getAttribute("aria-invalid") === "true" });
     } else if (t === "TEXTAREA") {
       if (!visible(el) || ariaHidden(el) || shimInput(el)) continue;
-      const label = labelOf(el);
-      fields.push({ id: tag(el), kind: "textarea", label, required: isRequired(el, label), value: el.value || "",
+      const id = tag(el);
+      const label = stableLabel(id, labelOf(el));
+      fields.push({ id, kind: "textarea", label, required: isRequired(el, label), value: el.value || "",
         hint: describedBy(el), max_length: el.maxLength > 0 ? el.maxLength : 0, name: el.name || "",
         invalid: el.getAttribute("aria-invalid") === "true" });
     } else if (t === "SELECT") {
       if (!visible(el) && !(el.parentElement && visible(el.parentElement))) continue;
-      const label = labelOf(el);
+      const id = tag(el);
+      const label = stableLabel(id, labelOf(el));
       const options = Array.from(el.options).slice(0, 250).map((o) => ({ label: clean(o.text), value: o.value }));
       const chosen = Array.from(el.selectedOptions).filter((o) => o.value !== "" && !PLACEHOLDER_RX.test(clean(o.text)));
-      fields.push({ id: tag(el), kind: "select", label, required: isRequired(el, label), multiple: !!el.multiple, options,
+      fields.push({ id, kind: "select", label, required: isRequired(el, label), multiple: !!el.multiple, options,
         value: chosen.map((o) => clean(o.text)).join("; "), name: el.name || "",
         invalid: el.getAttribute("aria-invalid") === "true" });
     } else if (el.isContentEditable && el.getAttribute("contenteditable") !== null && !(el.parentElement && el.parentElement.isContentEditable)) {
       if (!visible(el)) continue;
-      const label = labelOf(el);
-      fields.push({ id: tag(el), kind: "richtext", label, required: isRequired(el, label), value: textOf(el).slice(0, 500) });
+      const id = tag(el);
+      const label = stableLabel(id, labelOf(el));
+      fields.push({ id, kind: "richtext", label, required: isRequired(el, label), value: textOf(el).slice(0, 500) });
     } else {
       const role = el.getAttribute && el.getAttribute("role");
       // Workday: selects are <button aria-haspopup="listbox"> without any role attribute
       const listButton = !!el.getAttribute && el.getAttribute("aria-haspopup") === "listbox" && (role === "button" || t === "BUTTON");
       if ((!role && !listButton) || !visible(el)) continue;
       if ((role === "combobox" || listButton) && t !== "INPUT") {
-        const label = labelOf(el);
+        const id = tag(el);
+        const label = stableLabel(id, labelOf(el));
         const shown = textOf(el).slice(0, 120);
-        fields.push({ id: tag(el), kind: "combobox", label, required: isRequired(el, label),
+        fields.push({ id, kind: "combobox", label, required: isRequired(el, label),
           value: PLACEHOLDER_RX.test(shown) ? "" : shown });
       } else if ((role === "radio" || role === "checkbox" || role === "switch") && !el.querySelector("input")) {
         // An ARIA radio or checkbox is named by its own label or text; the context would merge its neighbours.
+        const id = tag(el);
         const own = el.getAttribute("aria-label") || (el.getAttribute("aria-labelledby") ? labelOf(el) : "") || textOf(el);
-        const label = clean(own).slice(0, 300) || labelOf(el);
-        fields.push({ id: tag(el), kind: role === "radio" ? "aria_radio" : "aria_checkbox", label,
+        const label = stableLabel(id, clean(own).slice(0, 300) || labelOf(el));
+        fields.push({ id, kind: role === "radio" ? "aria_radio" : "aria_checkbox", label,
           required: isRequired(el, label), value: el.getAttribute("aria-checked") === "true" ? "checked" : "" });
       } else if (role === "group" || role === "radiogroup") {
         const btns = Array.from(el.querySelectorAll("button[aria-pressed]")).filter(visible);
         if (btns.length >= 2) {
           const options = btns.map((b) => ({ id: tag(b), label: textOf(b), checked: b.getAttribute("aria-pressed") === "true" }));
-          const question = groupQuestion(btns, options.map((o) => o.label)) || labelOf(el);
-          fields.push({ id: tag(el), kind: "radio", label: question,
+          const id = tag(el);
+          const question = stableLabel(id, groupQuestion(btns, options.map((o) => o.label)) || labelOf(el));
+          fields.push({ id, kind: "radio", label: question,
             required: isRequired(el, question), options,
             value: options.filter((o) => o.checked).map((o) => o.label).join("; ") });
         }
@@ -333,9 +385,10 @@
     if (t === "A" && !ACTION_RX.test(text)) continue;
     const isNativePortalApply = (/(linkedin|indeed)\.[a-z.]+$/i.test(window.location.hostname)) && /(easy apply|einfach bewerben|indeed bewerbung|apply now|jetzt bewerben)/i.test(text);
     const isAutofill = !isNativePortalApply && AUTOFILL_RX.test(text);
+    const COOKIE_TEXT_RX = /\b(all\s+cookies|alle\s+cookies|cookie[-\s]?(einstellungen|settings|preferences)|nur\s+(notwendige|erforderliche|essenzielle)\s+cookies|only\s+(necessary|essential|required)\s+cookies)\b/i;
     const btn = { id: tag(el), text, kind: t === "A" ? "link" : (el.type === "submit" || /submit/i.test(el.getAttribute("type") || "") ? "submit" : "button"),
       href: t === "A" ? (el.href || "").slice(0, 300) : "", disabled: !!el.disabled || el.getAttribute("aria-disabled") === "true",
-      form: formKey(el), section: sectionOf(el), autofill: isAutofill, cookie: inCookieBanner(el),
+      form: formKey(el), section: sectionOf(el), autofill: isAutofill, cookie: inCookieBanner(el) || COOKIE_TEXT_RX.test(text),
       // toggle buttons (Ashby yes/no): pressed = chosen; another click would clear the choice
       pressed: el.getAttribute("aria-pressed") === "true" };
     // Important ones first: form buttons, autofill, flow buttons; navigation last.

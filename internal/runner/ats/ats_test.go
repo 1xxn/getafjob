@@ -228,3 +228,20 @@ func TestFillBeforeAskOnlyWhereNoDraftsAreKept(t *testing.T) {
 		}
 	}
 }
+
+func TestIsKnownOrigin(t *testing.T) {
+	cases := map[string]bool{
+		"https://boards.greenhouse.io":       true,
+		"https://jobs.ashbyhq.com":           true,
+		"https://acme.wd5.myworkdayjobs.com": true,
+		"https://acme.jobs.personio.de":      true,
+		"https://evil.example.com":           false,
+		"not-a-url":                          false,
+		"":                                   false,
+	}
+	for raw, want := range cases {
+		if got := IsKnownOrigin(raw); got != want {
+			t.Errorf("IsKnownOrigin(%q) = %v, want %v", raw, got, want)
+		}
+	}
+}
