@@ -759,6 +759,7 @@
   "dash.parked_more": "{n} {n|weitere geparkte Bewerbung|weitere geparkte Bewerbungen} im Tracker",
   "dash.park.user": "von dir geparkt",
   "dash.park.answers": "pausiert, bis du antwortest",
+  "dash.park.approval": "wartet auf deine Freigabe",
   "dash.park.timeout": "hat zu lange auf dich gewartet",
   "dash.park.check": "du musst eine Prüfung bestehen",
   "dash.park.unreachable": "die Jobseite ließ sich nicht öffnen",

@@ -759,6 +759,7 @@
   "dash.parked_more": "{n} more parked {n|application|applications} in the tracker",
   "dash.park.user": "you parked it",
   "dash.park.answers": "paused until you answer",
+  "dash.park.approval": "waits for your approval",
   "dash.park.timeout": "waited too long for you",
   "dash.park.check": "needs you to pass a check",
   "dash.park.unreachable": "the job page did not open",

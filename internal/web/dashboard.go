@@ -150,6 +150,8 @@ func parkReasonKey(reason string) string {
 		return "dash.park.user"
 	case strings.Contains(r, "waiting for your answers"):
 		return "dash.park.answers"
+	case strings.Contains(r, "waiting for your approval"): // engine.ParkApproval
+		return "dash.park.approval"
 	case strings.Contains(r, "handoff window closed"):
 		return "dash.park.timeout"
 	case strings.Contains(r, "captcha"), strings.Contains(r, "verification"), strings.Contains(r, "sign-in"):

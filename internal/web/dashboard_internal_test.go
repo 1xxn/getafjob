@@ -19,6 +19,7 @@ func TestParkReasonKey(t *testing.T) {
 		"run: submit not registered, no click: unknown":                          "dash.park.no_confirm",
 		"captcha needs a human":                 "dash.park.check",
 		"submit had no effect after one retry":  "dash.park.no_confirm",
+		"waiting for your approval":             "dash.park.approval",
 		application.RunnerLost:                  "dash.park.runner_lost",
 		"the form rejected the submit: [email]": "dash.park.form_rejected",
 		application.ErrExcluded.Error():         "dash.park.excluded",

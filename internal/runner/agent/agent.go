@@ -541,6 +541,12 @@ func (c *coordinator) Ask(ctx context.Context, qs []engine.Question) error {
 
 func (c *coordinator) BeginSubmit(ctx context.Context) error {
 	if _, err := c.client.BeginSubmit(auth(ctx, c.token), &runnerv1.BeginSubmitRequest{}); err != nil {
+		if connect.CodeOf(err) == connect.CodeAborted { // the server asked the user for the approval
+			return errors.Join(engine.ErrNeedsApproval, err)
+		}
+		if connect.CodeOf(err) == connect.CodePermissionDenied { // a guard: the server parked the application
+			return errors.Join(engine.ErrParked, err)
+		}
 		return err
 	}
 	c.submitting = true
