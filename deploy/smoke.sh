@@ -15,7 +15,7 @@ bad() { echo "FAIL $*"; fail=1; }
 [ "$(curl -fsSk "$base/healthz")" = "ok" ] && ok "healthz through caddy" || bad "healthz through caddy"
 curl -fsSk "$base/api/v1/meta" | grep -q '"api":"v1"' && ok "api/v1/meta" || bad "api/v1/meta"
 curl -fsSk "$base/login" | grep -q 'action="/login"' && ok "login page" || bad "login page"
-curl -fsSk "$base/privacy" | grep -q 'Privacy Notice' && ok "privacy page" || bad "privacy page"
+curl -fsSk "$base/privacy" | grep -q 'Privacy notice' && ok "privacy page" || bad "privacy page"
 code="$(curl -sk -o /dev/null -w '%{http_code}' "$base/readyz")"
 [ "$code" = "404" ] && ok "readyz hidden from the outside" || bad "readyz answered $code from the outside"
 headers="$(curl -sSk -D - -o /dev/null "$base/healthz")"
