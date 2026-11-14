@@ -4,7 +4,7 @@ From an empty Ubuntu server to a running getafjob with TLS, mail and backups. Ev
 staging) is in [deploy.md](deploy.md); backups in [backup-restore.md](backup-restore.md).
 
 Placeholders: `example.org` is your domain, `203.0.113.10` / `2001:db8::10` the server's addresses, `<version>`
-the image tag you run (a release such as `v0.1.0`, or `main-<sha>`). Commands that start with `$` run on your own
+the image tag you run (a release such as `v0.1.0`, or `sha-<full commit hash>` for a commit on `main`; check out the same commit). Commands that start with `$` run on your own
 machine, `#` as root on the server, `deploy$` as the user `deploy` on the server.
 
 ## 1. What you need
