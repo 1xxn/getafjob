@@ -1107,7 +1107,7 @@ func TestSetupAssistant(t *testing.T) {
 		t.Fatalf("invalid profile %d", rec.Code)
 	}
 	form.Set("email", "max.mustermann@example.org")
-	for k, v := range map[string]string{"city": "Berlin", "years_total": "8", "notice_period": "3 months",
+	for k, v := range map[string]string{"city": "Berlin", "current_title": "Platform Engineer", "years_total": "8", "notice_period": "3 months",
 		"earliest_start": "2027-01-01", "salary_expectation": "80000", "skills": "Go\nKubernetes"} {
 		form.Set(k, v)
 	}
@@ -1115,6 +1115,10 @@ func TestSetupAssistant(t *testing.T) {
 		t.Fatalf("profile save %d: %s", rec.Code, rec.Body.String())
 	}
 	resume("/setup/search")
+	// The first search starts from the profile's current title and city.
+	if body := a.do(http.MethodGet, "/setup/search", nil, session, nil).Body.String(); !strings.Contains(body, "Platform Engineer</textarea>") || !strings.Contains(body, "Berlin</textarea>") {
+		t.Fatalf("search step not prefilled from the profile: %s", body)
+	}
 
 	if rec := a.do(http.MethodPost, "/setup/search", url.Values{"titles": {"Platform Engineer"}, "remote": {"on"}, "min_salary": {"x"}}, session, nil); rec.Code != http.StatusUnprocessableEntity || !strings.Contains(rec.Body.String(), `value="x"`) {
 		t.Fatalf("invalid salary %d", rec.Code)
