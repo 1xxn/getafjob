@@ -109,7 +109,7 @@ func serve(ctx context.Context, cfg config.Config, logger *slog.Logger) error {
 		return err
 	}
 	notifySvc, _, vapidPub := newNotifyService(pool, cfg, logger)
-	appNotifier := newNotifyAppNotifier(notifySvc)
+	appNotifier := newNotifyAppNotifier(notifySvc, cfg.TimeZone)
 	astore := applicationstore.New(pool)
 	apps := newApplications(astore, cfg)
 	portalsStore := portalsstore.New(pool)
@@ -231,7 +231,7 @@ func worker(ctx context.Context, cfg config.Config, logger *slog.Logger) error {
 	river.AddWorker(workers, &cleanupWorker{privacy: privacySvc})
 	river.AddWorker(workers, &recoverWorker{svc: apps, logger: logger})
 	notifySvc, _, _ := newNotifyService(pool, cfg, logger)
-	appNotifier := newNotifyAppNotifier(notifySvc)
+	appNotifier := newNotifyAppNotifier(notifySvc, cfg.TimeZone)
 	river.AddWorker(workers, &handoffWorker{svc: apps, notifier: appNotifier, logger: logger})
 	river.AddWorker(workers, &dailySummaryWorker{svc: notifySvc, logger: logger})
 	river.AddWorker(workers, &searchAlertWorker{searches: matching.NewSavedSearches(mstore, matching.NewListings(mstore)),

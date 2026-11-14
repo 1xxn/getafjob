@@ -96,10 +96,14 @@ func (w *dailySummaryWorker) Work(ctx context.Context, _ *river.Job[DailySummary
 // notifyAppNotifier adapts notify.Service to application.Notifier.
 type notifyAppNotifier struct {
 	svc *notify.Service
+	loc *time.Location // instance time zone for times in texts
 }
 
-func newNotifyAppNotifier(svc *notify.Service) *notifyAppNotifier {
-	return &notifyAppNotifier{svc: svc}
+func newNotifyAppNotifier(svc *notify.Service, loc *time.Location) *notifyAppNotifier {
+	if loc == nil {
+		loc = time.UTC
+	}
+	return &notifyAppNotifier{svc: svc, loc: loc}
 }
 
 func (n *notifyAppNotifier) HandoffClosing(ctx context.Context, r application.Ref, until time.Time) error {
@@ -107,13 +111,16 @@ func (n *notifyAppNotifier) HandoffClosing(ctx context.Context, r application.Re
 		UserID:    r.UserID,
 		Event:     notify.EventHandoffClosing,
 		Key:       "handoff_closing",
-		Params:    map[string]any{"time": until.UTC().Format("15:04") + " UTC"},
+		Params:    map[string]any{"time": clock(until, n.loc)},
 		URL:       "/needs-input?app=" + r.ID.String(),
 		Priority:  notify.PriorityHigh,
 		Tags:      []string{"warning", "hourglass"},
 		CreatedAt: time.Now(),
 	})
 }
+
+// clock formats t as a time of day in loc with the zone abbreviation, e.g. "14:30 CET".
+func clock(t time.Time, loc *time.Location) string { return t.In(loc).Format("15:04 MST") }
 
 func (n *notifyAppNotifier) YourTurn(ctx context.Context, userID, appID uuid.UUID) {
 	_ = n.svc.Notify(ctx, notify.Notification{
