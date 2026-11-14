@@ -1338,7 +1338,7 @@ func PipelineCardDetail(c PLCard, notice string) templ.Component {
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		templ_7745c5c3_Err = ui.Input(ui.InputProps{FieldProps: ui.FieldProps{ID: "card-interview", Name: "interview_at", Label: T(ctx, "apps.notes.interview")}, Type: "datetime-local", Value: plDateTime(c.InterviewAt)}).Render(ctx, templ_7745c5c3_Buffer)
+		templ_7745c5c3_Err = ui.Input(ui.InputProps{FieldProps: ui.FieldProps{ID: "card-interview", Name: "interview_at", Label: T(ctx, "apps.notes.interview")}, Type: "datetime-local", Value: plDateTime(ctx, c.InterviewAt)}).Render(ctx, templ_7745c5c3_Buffer)
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}

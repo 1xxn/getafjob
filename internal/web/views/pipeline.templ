@@ -251,7 +251,7 @@ templ PipelineCardDetail(c PLCard, notice string) {
 			<input type="hidden" name="back" value="/pipeline"/>
 			@ui.Textarea(ui.TextareaProps{FieldProps: ui.FieldProps{ID: "card-notes", Name: "notes", Label: T(ctx, "apps.notes.text")}, Value: c.Notes, Rows: 5, MaxLength: 10000})
 			@ui.Input(ui.InputProps{FieldProps: ui.FieldProps{ID: "card-salary", Name: "salary", Label: T(ctx, "apps.notes.salary")}, Value: c.Salary, MaxLength: 200})
-			@ui.Input(ui.InputProps{FieldProps: ui.FieldProps{ID: "card-interview", Name: "interview_at", Label: T(ctx, "apps.notes.interview")}, Type: "datetime-local", Value: plDateTime(c.InterviewAt)})
+			@ui.Input(ui.InputProps{FieldProps: ui.FieldProps{ID: "card-interview", Name: "interview_at", Label: T(ctx, "apps.notes.interview")}, Type: "datetime-local", Value: plDateTime(ctx, c.InterviewAt)})
 			@ui.Input(ui.InputProps{FieldProps: ui.FieldProps{ID: "card-follow", Name: "follow_up_at", Label: T(ctx, "apps.notes.follow_up")}, Type: "date", Value: plDate(c.FollowUpAt)})
 			@ui.Button(ui.ButtonProps{Label: T(ctx, "apps.notes.save"), Type: "submit", Variant: "primary", Icon: "check"})
 		</form>

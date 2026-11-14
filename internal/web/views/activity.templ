@@ -83,8 +83,9 @@ func activityTone(a ActivityRow) string {
 
 // shortWhen is the time of day for today (UTC) and the date before.
 func shortWhen(ctx context.Context, t, now time.Time) string {
-	if t.UTC().Format(time.DateOnly) == now.UTC().Format(time.DateOnly) {
-		return t.UTC().Format("15:04")
+	loc := Zone(ctx)
+	if t.In(loc).Format(time.DateOnly) == now.In(loc).Format(time.DateOnly) {
+		return t.In(loc).Format("15:04")
 	}
 	return dayLabel(ctx, t)
 }

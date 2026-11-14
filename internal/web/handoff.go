@@ -392,7 +392,7 @@ func (s *Server) applicationPage(w http.ResponseWriter, r *http.Request, u *iden
 		if n, err := s.Apps.GetNotes(r.Context(), u.ID, uuid.MustParse(d.AppID)); err == nil {
 			d.Notes = views.NoteForm{Notes: n.Notes, Salary: n.SalaryDiscussed}
 			if n.InterviewAt != nil {
-				d.Notes.InterviewAt = n.InterviewAt.Format("2006-01-02T15:04")
+				d.Notes.InterviewAt = n.InterviewAt.In(views.Zone(r.Context())).Format("2006-01-02T15:04")
 			}
 			if n.FollowUpAt != nil {
 				d.Notes.FollowUpAt = n.FollowUpAt.Format("2006-01-02")

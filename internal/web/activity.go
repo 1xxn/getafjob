@@ -97,12 +97,13 @@ func (s *Server) activityPage(w http.ResponseWriter, r *http.Request, u *identit
 	s.render(w, r, http.StatusOK, views.ActivityPage(d))
 }
 
-// activityGroups splits the rows by calendar day (UTC): today, yesterday, then the date.
+// activityGroups splits the rows by calendar day in the instance zone: today, yesterday, then the date.
 func activityGroups(ctx context.Context, rows []views.ActivityRow, now time.Time) []views.ActivityGroup {
 	var groups []views.ActivityGroup
+	loc := views.Zone(ctx)
 	day := func(t time.Time) time.Time {
-		y, m, d := t.UTC().Date()
-		return time.Date(y, m, d, 0, 0, 0, 0, time.UTC)
+		y, m, d := t.In(loc).Date()
+		return time.Date(y, m, d, 0, 0, 0, 0, loc)
 	}
 	today := day(now)
 	for _, a := range rows {

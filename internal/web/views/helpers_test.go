@@ -44,6 +44,22 @@ func TestWhenUsesTheInstanceZone(t *testing.T) {
 	}
 }
 
+// Short times and day labels follow the instance zone: 23:30 UTC is already the next day in Berlin.
+func TestShortTimesUseTheInstanceZone(t *testing.T) {
+	berlin, err := time.LoadLocation("Europe/Berlin")
+	if err != nil {
+		t.Skip("no tzdata:", err)
+	}
+	ctx := WithZone(WithLocale(t.Context(), i18n.Locale("de")), berlin)
+	at := time.Date(2026, 11, 13, 22, 23, 0, 0, time.UTC)
+	if got := shortWhen(ctx, at, at.Add(time.Minute)); got != "23:23" {
+		t.Errorf("shortWhen = %q, want 23:23", got)
+	}
+	if got := dayLabel(ctx, time.Date(2026, 11, 13, 23, 30, 0, 0, time.UTC)); got != "14.11." {
+		t.Errorf("dayLabel = %q, want 14.11.", got)
+	}
+}
+
 func TestTemplatesHaveNoInlineHandlers(t *testing.T) {
 	files, err := filepath.Glob("*.templ")
 	more, _ := filepath.Glob("ui/*.templ")
