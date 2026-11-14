@@ -28,9 +28,10 @@ rewritten once accepted: a changed decision gets a new ADR that supersedes the o
 | [0020](0020-authentication-invitations-passkeys.md) | Invitations, passkeys and magic links; no passwords | accepted |
 | [0021](0021-observability-slog-opentelemetry.md) | Observability with slog and OpenTelemetry | accepted |
 | [0022](0022-mail-link-as-delayed-recovery.md) | Mail link only as delayed recovery once a passkey exists | accepted |
-| [0023](0023-rule-based-matching.md) | Rule-based matching with stored reasons | accepted |
+| [0023](0023-rule-based-matching.md) | Rule-based matching with stored reasons | scoring superseded by 0029 |
 | [0024](0024-htmx-4-with-hx-csp.md) | htmx 4 with hx-csp under a nonce CSP and Trusted Types | accepted |
 | [0025](0025-boosted-navigation-and-live-dock.md) | Boosted navigation with a preserved live dock | accepted |
 | [0026](0026-ci-pipeline-build-once.md) | CI pipeline: a fast pull request gate, end to end tests after the merge | accepted |
 | [0027](0027-remove-the-ai-module.md) | Remove the AI module | accepted |
 | [0028](0028-nothing-runs-before-the-user-starts-it.md) | Nothing runs before the user starts it | accepted |
+| [0029](0029-hybrid-matching-with-static-embeddings.md) | Hybrid matching with a skill taxonomy and static embeddings | accepted |
