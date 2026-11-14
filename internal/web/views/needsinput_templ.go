@@ -776,8 +776,8 @@ func niPanel(o NIOpen) templ.Component {
 	})
 }
 
-// AnswerSent replaces the questions once the answers are on their way.
-func AnswerSent(appID string, resumed bool) templ.Component {
+// AnswerSent replaces the questions once the answers are on their way; more offers the next waiting run.
+func AnswerSent(appID string, resumed, more bool) templ.Component {
 	return templruntime.GeneratedTemplate(func(templ_7745c5c3_Input templruntime.GeneratedComponentInput) (templ_7745c5c3_Err error) {
 		templ_7745c5c3_W, ctx := templ_7745c5c3_Input.Writer, templ_7745c5c3_Input.Context
 		if templ_7745c5c3_CtxErr := ctx.Err(); templ_7745c5c3_CtxErr != nil {
@@ -813,13 +813,20 @@ func AnswerSent(appID string, resumed bool) templ.Component {
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		templ_7745c5c3_Err = ui.Button(ui.ButtonProps{Label: T(ctx, "ni.next"), Href: "/needs-input", Variant: "primary", Icon: "inbox"}).Render(ctx, templ_7745c5c3_Buffer)
-		if templ_7745c5c3_Err != nil {
-			return templ_7745c5c3_Err
-		}
-		templ_7745c5c3_Err = ui.Button(ui.ButtonProps{Label: T(ctx, "ni.details"), Href: "/applications/" + appID, Variant: "ghost"}).Render(ctx, templ_7745c5c3_Buffer)
-		if templ_7745c5c3_Err != nil {
-			return templ_7745c5c3_Err
+		if more {
+			templ_7745c5c3_Err = ui.Button(ui.ButtonProps{Label: T(ctx, "ni.next"), Href: "/needs-input", Variant: "primary", Icon: "inbox"}).Render(ctx, templ_7745c5c3_Buffer)
+			if templ_7745c5c3_Err != nil {
+				return templ_7745c5c3_Err
+			}
+			templ_7745c5c3_Err = ui.Button(ui.ButtonProps{Label: T(ctx, "ni.details"), Href: "/applications/" + appID, Variant: "ghost"}).Render(ctx, templ_7745c5c3_Buffer)
+			if templ_7745c5c3_Err != nil {
+				return templ_7745c5c3_Err
+			}
+		} else {
+			templ_7745c5c3_Err = ui.Button(ui.ButtonProps{Label: T(ctx, "ni.details"), Href: "/applications/" + appID, Variant: "primary"}).Render(ctx, templ_7745c5c3_Buffer)
+			if templ_7745c5c3_Err != nil {
+				return templ_7745c5c3_Err
+			}
 		}
 		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 57, "</div></div>")
 		if templ_7745c5c3_Err != nil {
