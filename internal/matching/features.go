@@ -17,6 +17,7 @@ type Prepared struct {
 	title     string // normalized
 	text      string // normalized title and description
 	preferred string // normalized sentences that name nice-to-have skills
+	skills    jobSkills
 	lang      string
 	salaryTop int
 	level     level
@@ -29,6 +30,7 @@ func Prepare(j Job, emb Embedder) *Prepared {
 	p := &Prepared{Job: j, title: normalize(j.Title)}
 	p.text = p.title + normalize(j.Description)
 	p.preferred = preferredText(j.Description)
+	p.skills = findSkills(p.text, p.preferred)
 	p.lang = detect(p.text)
 	if englishWelcome(p.text) {
 		p.lang = "en"

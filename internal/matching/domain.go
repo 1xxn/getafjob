@@ -12,7 +12,7 @@ import (
 )
 
 // RulesVersion changes whenever the rules do, so stored results can be recomputed.
-const RulesVersion = 4
+const RulesVersion = 5
 
 // Criteria is what a user wants and brings. Empty fields do not filter.
 type Criteria struct {
@@ -196,7 +196,7 @@ func (m *Matcher) evaluate(p *Prepared, now time.Time) (Result, scored) {
 	var sc scored
 	var skillPoints int
 	var skillCode string
-	sc.hits, sc.missing, skillPoints, skillCode = m.skillHitsAndMissing(p.text, p.preferred)
+	sc.hits, sc.missing, skillPoints, skillCode = m.skillFit(p)
 	sc.title, sc.skills, sc.level = m.title(p.title), skillReason(sc.hits, sc.missing, skillPoints, skillCode), m.seniority(p.level)
 	sc.location, sc.language, sc.salary, sc.recency = m.location(j), m.language(p.lang), m.salary(p.salaryTop), recency(j, now)
 
@@ -310,7 +310,6 @@ type SkillFit struct {
 
 // SkillsFor compares c's skills with j.
 func SkillsFor(c Criteria, j Job) SkillFit {
-	p := Prepare(j, nil)
-	have, missing, _, _ := NewMatcher(c, nil).skillHitsAndMissing(p.text, p.preferred)
+	have, missing, _, _ := NewMatcher(c, nil).skillFit(Prepare(j, nil))
 	return SkillFit{Have: have, Missing: missing}
 }

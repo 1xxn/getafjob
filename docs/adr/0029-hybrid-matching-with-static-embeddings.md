@@ -75,6 +75,16 @@ an extra service and 10 to 50 ms per job. Options 4 and 5 need GPUs, LLM calls o
   of quality on real postings. The real run (#285) has to confirm it.
 - Neutral: the model is third-party data (Apache 2.0), named in `deploy/embed/NOTICE`.
 
+### Skill dictionary and weights
+
+The dictionary has about 180 tech skills with English and German spellings, found in one pass over the words of
+a job (an index keyed by the first word of each spelling), and knows which skills a tool brings along (PyTorch:
+machine learning and Python). Scoring a user against a prepared job takes about 5 µs instead of 124 µs.
+Weights from the open jobs (IDF) were measured and left out: on the ranking set they made the order worse
+(NDCG@10 0.913 instead of 0.947 for the platform profile), as rare tools asked for (Grafana, MLOps) weighed too
+much. The larger dictionary itself finds requirements the old one missed; on the ranking set that moves one job
+(MLOps asked, not in the profile), so the model's NDCG@10 is 0.948 with it, the rules' alone 0.920.
+
 ### ESCO
 
 The EU taxonomy ESCO (CC BY 4.0) was checked and left out: getafjob is for IT and tech jobs, and ESCO lacks most
