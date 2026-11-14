@@ -33,3 +33,4 @@ rewritten once accepted: a changed decision gets a new ADR that supersedes the o
 | [0025](0025-boosted-navigation-and-live-dock.md) | Boosted navigation with a preserved live dock | accepted |
 | [0026](0026-ci-pipeline-build-once.md) | CI pipeline: a fast pull request gate, end to end tests after the merge | accepted |
 | [0027](0027-remove-the-ai-module.md) | Remove the AI module | accepted |
+| [0028](0028-nothing-runs-before-the-user-starts-it.md) | Nothing runs before the user starts it | accepted |

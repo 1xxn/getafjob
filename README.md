@@ -51,8 +51,8 @@ Collects job postings, scores them per candidate profile, and fills out applicat
 
 - **Configurable Autonomy & Approvals:**
   - Three distinct autonomy tiers:
-    - `suggest`: Discovers and scores jobs; candidate triggers runs manually.
-    - `approve` *(Default)*: Automatically prepares and fills forms, then halts at `BeginSubmit` for review in the approval queue.
+    - `suggest` *(Default)*: Discovers and scores jobs; candidate triggers runs manually.
+    - `approve`: Automatically prepares and fills forms, then halts at `BeginSubmit` for review in the approval queue.
     - `autonomous`: Submits automatically only when all 11 green rules pass (verified board, score threshold, salary fit, known fields).
   - Web approval queue (`/approvals`) for inspecting form values, attached documents, and confidence metrics before giving the final submit click.
 

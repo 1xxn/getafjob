@@ -413,7 +413,7 @@ func preferencesForm(p profile.Preferences, a application.Settings, mb tracking.
 	}
 	level := string(a.Level)
 	if level == "" {
-		level = string(application.LevelApprove)
+		level = string(application.DefaultSettings.Level)
 	}
 	runnerChoice := string(a.RunnerChoice)
 	if runnerChoice == "" {
@@ -601,11 +601,10 @@ func (s *Server) preferencesSave(w http.ResponseWriter, r *http.Request, u *iden
 		n, err := strconv.Atoi(v)
 		p.MinSalary, salaryErr = n, err != nil
 	}
-	autoLevel := application.LevelApprove
+	autoLevel := application.DefaultSettings.Level
 	var errLevel bool
 	switch strings.TrimSpace(r.PostFormValue("autonomy_level")) {
 	case "":
-		autoLevel = application.LevelApprove
 	case string(application.LevelSuggest):
 		autoLevel = application.LevelSuggest
 	case string(application.LevelApprove):

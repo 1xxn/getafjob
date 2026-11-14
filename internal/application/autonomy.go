@@ -18,9 +18,9 @@ type Level string
 // Levels.
 const (
 	// LevelSuggest only suggests jobs; nothing is queued on the user's behalf, and a run the user queues still
-	// waits for the approval before the submit.
+	// waits for the approval before the submit (default, ADR 0028).
 	LevelSuggest Level = "suggest"
-	// LevelApprove fills in the application and waits for the user's approval before the submit (default).
+	// LevelApprove fills in the application and waits for the user's approval before the submit.
 	LevelApprove Level = "approve"
 	// LevelAutonomous submits when the rule is green; otherwise the application goes to the approval list.
 	LevelAutonomous Level = "autonomous"
@@ -48,7 +48,7 @@ type Settings struct {
 }
 
 // DefaultSettings apply until the user saves their own.
-var DefaultSettings = Settings{Level: LevelApprove, MinScore: 80, DailyLimit: 5, RunnerChoice: RunnerServer}
+var DefaultSettings = Settings{Level: LevelSuggest, MinScore: 80, DailyLimit: 5, RunnerChoice: RunnerServer}
 
 // Limits of the settings.
 const (

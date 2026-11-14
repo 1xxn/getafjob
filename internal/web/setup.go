@@ -146,6 +146,9 @@ func (s *Server) renderSetup(w http.ResponseWriter, r *http.Request, u *identity
 		}
 	case "matches":
 		d.Matches = s.setupMatches(r.Context(), u)
+		if st := s.automation(r.Context(), u); st.AutoQueue() {
+			d.AutoScore = max(st.MinScore, 1)
+		}
 		if s.Identity.PasskeysEnabled() {
 			keys, err := s.Identity.Passkeys(r.Context(), u.ID)
 			if err != nil {
