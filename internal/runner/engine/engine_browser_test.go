@@ -226,6 +226,24 @@ func TestPageContinuesAfterTheAnswer(t *testing.T) {
 	}
 }
 
+// A form that always sends to one more page parks after maxPages pages, without a submit (threat D2).
+func TestFormPageLimit(t *testing.T) {
+	r := start(t, "endless.html")
+	err := r.engine(planner{"Vorname": {Text: "Max", Source: "profile.personal.first_name"}}).Run(t.Context(), r.page)
+	if !errors.Is(err, ErrParked) {
+		t.Fatalf("run: %v, want parked (calls %v)", err, r.coord.calls)
+	}
+	if want := "park:more than 12 form pages"; !slices.Contains(r.coord.calls, want) {
+		t.Fatalf("calls %v, want %q", r.coord.calls, want)
+	}
+	if slices.Contains(r.coord.calls, "begin_submit") || len(r.site.submissions()) != 0 {
+		t.Fatalf("submitted: calls %v", r.coord.calls)
+	}
+	if last := r.coord.pages[len(r.coord.pages)-1]; last != maxPages {
+		t.Fatalf("last page %d, want %d (pages %v)", last, maxPages, r.coord.pages)
+	}
+}
+
 func TestSubmitUsesTheButtonInsideTheForm(t *testing.T) {
 	r := start(t, "greenhouse_header_submit.html")
 	pl := planner{
