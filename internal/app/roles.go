@@ -221,7 +221,10 @@ func worker(ctx context.Context, cfg config.Config, logger *slog.Logger) error {
 		Proxy: cfg.EgressProxy, Timeout: 20 * time.Second})})
 	river.AddWorker(workers, &crawlWorker{svc: discovery.NewService(store).WithImportChecker(recheck), boards: store, states: store, client: client,
 		terms: preferenceTerms(pstore, logger), logger: logger, timeout: 90 * time.Minute, metrics: metrics,
-		notify: pageNotifier(pool, logger)})
+		notify: pageNotifier(pool, logger), crawled: func(ctx context.Context) (bool, error) {
+			run, err := store.LatestCrawlRun(ctx)
+			return run != nil, err
+		}})
 	river.AddWorker(workers, &matchWorker{logger: logger, notify: pageNotifier(pool, logger), svc: matching.NewService(
 		profileCriteria{svc: profile.NewService(pstore, env), store: pstore}, mstore, mstore).WithEmbedder(loadEmbedder(cfg, logger))})
 	river.AddWorker(workers, &boardDiscoveryWorker{

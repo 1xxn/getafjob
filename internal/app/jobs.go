@@ -52,6 +52,8 @@ type crawlWorker struct {
 	timeout time.Duration
 	metrics *crawlMetrics
 	notify  notifier
+	// crawled reports whether a crawl has finished before; until then a scheduled crawl does nothing (#507).
+	crawled func(context.Context) (bool, error)
 }
 
 // notifier tells open pages about progress (crawl, rating); uuid.Nil reaches every user.
@@ -69,7 +71,18 @@ func pageNotifier(pool *pgxpool.Pool, logger *slog.Logger) notifier {
 // Timeout bounds one crawl (a crawl with detail requests takes minutes, not hours).
 func (w *crawlWorker) Timeout(*river.Job[CrawlArgs]) time.Duration { return w.timeout }
 
-func (w *crawlWorker) Work(ctx context.Context, _ *river.Job[CrawlArgs]) error {
+func (w *crawlWorker) Work(ctx context.Context, job *river.Job[CrawlArgs]) error {
+	if !job.Args.Manual && w.crawled != nil {
+		// getafjob never crawls on its own before someone starts the first crawl; that crawl arms the schedule.
+		done, err := w.crawled(ctx)
+		if err != nil {
+			return err
+		}
+		if !done {
+			w.logger.InfoContext(ctx, "scheduled crawl skipped: no crawl was started yet")
+			return nil
+		}
+	}
 	start := time.Now()
 	if w.notify != nil {
 		w.notify(ctx, events.TopicCrawl, "started", uuid.Nil)
@@ -236,8 +249,9 @@ func periodicJobs(cfg config.Config) []*river.PeriodicJob {
 			func() (river.JobArgs, *river.InsertOpts) { return SearchAlertArgs{}, nil }, start),
 	}
 	if cfg.CrawlInterval > 0 {
+		// Not on start: a deploy or restart never starts a crawl, and the first one is always started by hand.
 		jobs = append(jobs, river.NewPeriodicJob(river.PeriodicInterval(cfg.CrawlInterval),
-			func() (river.JobArgs, *river.InsertOpts) { return CrawlArgs{}, nil }, start))
+			func() (river.JobArgs, *river.InsertOpts) { return CrawlArgs{}, nil }, nil))
 	}
 	return jobs
 }
