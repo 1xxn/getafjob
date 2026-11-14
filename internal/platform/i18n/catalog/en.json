@@ -232,6 +232,7 @@
   "match.reason.recency.recent": "Recent ({days} {days|day|days}).",
   "match.reason.salary.below": "The salary of up to {top} EUR is below your minimum of {min} EUR.",
   "match.reason.salary.fit": "Salary up to {top} EUR.",
+  "match.reason.skills.all": "The posting asks for skills you have: {have}.",
   "match.reason.skills.fit": "Your skills in the posting: {have}. Not in your profile: {missing}.",
   "match.reason.skills.none": "The posting names none of your skills. It asks for: {missing}.",
   "match.reason.similarity": "The posting reads like your profile ({pct} %).",

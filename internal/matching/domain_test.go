@@ -76,11 +76,11 @@ func TestSkills(t *testing.T) {
 		min, max   int
 		missing    string
 	}{
-		{"We use Go, Kubernetes and Postgres.", "skills.fit", 20, 25, ""},
+		{"We use Go, Kubernetes and Postgres.", "skills.all", 20, 25, ""},
 		{"Go and Java, Spring, Kafka, Terraform, AWS", "skills.fit", 4, 10, "Java"},
 		{"Java, Spring and Angular", "skills.none", 0, 0, "Java"},
 		{"A friendly team.", "skills.unknown", 10, 10, ""},
-		{"Kochen im Team", "skills.fit", 4, 4, ""},
+		{"Kochen im Team", "skills.all", 4, 4, ""},
 	}
 	for _, tt := range tests {
 		r := skillReason(m.skillHitsAndMissing(normalize(tt.text), ""))

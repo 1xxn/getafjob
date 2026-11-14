@@ -107,9 +107,13 @@ func (m *Matcher) skillHitsAndMissing(text, preferred string) (hits []string, mi
 	if want == 0 {
 		return nil, nil, maxSkills * 2 / 5, "skills.unknown"
 	}
-	code = "skills.fit"
-	if have == 0 {
+	switch {
+	case have == 0:
 		code = "skills.none"
+	case len(missing) == 0:
+		code = "skills.all" // every known skill the job asks for is in the profile
+	default:
+		code = "skills.fit"
 	}
 	points = min(maxSkills*have/min(max(want, 6), 12), maxSkills)
 	return hits, missing, points, code
