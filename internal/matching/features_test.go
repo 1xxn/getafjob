@@ -1,6 +1,7 @@
 package matching
 
 import (
+	"slices"
 	"strings"
 	"testing"
 )
@@ -51,5 +52,25 @@ func TestPrepare(t *testing.T) {
 	// The title's level wins over the years asked.
 	if p := Prepare(Job{Title: "Junior Developer", Description: "2+ years"}, nil); p.level != levelJunior {
 		t.Errorf("level %v", p.level)
+	}
+}
+
+// fixedEmbedder returns a fixed unit vector per text.
+type fixedEmbedder map[string][]float32
+
+func (f fixedEmbedder) Embed(text string) ([]float32, error) { return f[text], nil }
+
+func TestSimilarityInWords(t *testing.T) {
+	c := Criteria{Titles: []string{"Go Developer"}}
+	for _, tt := range []struct {
+		job  []float32
+		code string
+	}{{[]float32{1, 0}, "similarity.high"}, {[]float32{0.5, 0.866}, "similarity.some"}, {[]float32{0, 1}, "similarity.low"}} {
+		j := Job{Title: "Go Developer", Description: "Go"}
+		emb := fixedEmbedder{ProfileText(c): {1, 0}, embedText(j): tt.job}
+		r := NewMatcher(c, emb).Evaluate(j, now)
+		if !slices.ContainsFunc(r.Reasons, func(rs Reason) bool { return rs.Code == tt.code && len(rs.Params) == 0 }) {
+			t.Errorf("%v: %+v, want %s", tt.job, r.Reasons, tt.code)
+		}
 	}
 }

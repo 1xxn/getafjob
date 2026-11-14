@@ -6,13 +6,12 @@ package matching
 import (
 	"math"
 	"slices"
-	"strconv"
 	"strings"
 	"time"
 )
 
 // RulesVersion changes whenever the rules do, so stored results can be recomputed.
-const RulesVersion = 5
+const RulesVersion = 6
 
 // Criteria is what a user wants and brings. Empty fields do not filter.
 type Criteria struct {
@@ -202,7 +201,7 @@ func (m *Matcher) evaluate(p *Prepared, now time.Time) (Result, scored) {
 
 	// Core: weighted factors from 0 to 1; each reason carries its share of the score in points.
 	w := weightsRulesOnly
-	sim, hasSim := m.similarity(p.vec)
+	sim, simFactor, hasSim := m.similarity(p.vec)
 	if hasSim {
 		w = weightsWithModel
 		sc.similarity = sim
@@ -213,8 +212,7 @@ func (m *Matcher) evaluate(p *Prepared, now time.Time) (Result, scored) {
 		rs.Points = int(math.Round(100 * weight * min(max(factor, 0), 1)))
 	}
 	if hasSim {
-		f, _ := strconv.Atoi(sim.Params["pct"])
-		share(&sc.similarity, float64(f)/100, w.similarity)
+		share(&sc.similarity, simFactor, w.similarity)
 	}
 	share(&sc.title, float64(sc.title.Points)/maxTitle, w.title)
 	share(&sc.skills, float64(sc.skills.Points)/maxSkills, w.skills)
@@ -255,17 +253,25 @@ func (m *Matcher) evaluate(p *Prepared, now time.Time) (Result, scored) {
 }
 
 // similarity compares the profile's vector with the job's: cosine 0.25 or less counts as no likeness, 0.70 or
-// more as full (the range the model gives for unrelated and for the same kind of job).
-func (m *Matcher) similarity(job []float32) (Reason, bool) {
+// more as full (the range the model gives for unrelated and for the same kind of job). The reason names it in
+// words; a percentage of a scaled cosine reads like a share and misleads.
+func (m *Matcher) similarity(job []float32) (Reason, float64, bool) {
 	if m.vec == nil || len(job) != len(m.vec) {
-		return Reason{}, false
+		return Reason{}, 0, false
 	}
 	var cos float64
 	for i := range job {
 		cos += float64(job[i]) * float64(m.vec[i])
 	}
 	f := min(max((cos-0.25)/(0.70-0.25), 0), 1)
-	return Reason{Code: "similarity", Params: map[string]string{"pct": strconv.Itoa(int(math.Round(f * 100)))}}, true
+	code := "similarity.low"
+	switch {
+	case f >= 0.6:
+		code = "similarity.high"
+	case f >= 0.3:
+		code = "similarity.some"
+	}
+	return Reason{Code: code}, f, true
 }
 
 func locationFactor(r Reason) float64 {
