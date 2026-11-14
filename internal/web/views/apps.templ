@@ -190,8 +190,21 @@ func appTabs(ctx context.Context, d AppDetailData) []ui.Tab {
 		}
 		return ui.Tab{Label: T(ctx, "apps.tab."+key), Href: href, Active: d.Tab == key, Count: count}
 	}
-	return []ui.Tab{tab("overview", len(d.Questions)), tab("live", 0), tab("fields", len(d.Fields)),
-		tab("timeline", len(d.Timeline)), tab("evidence", 0), tab("notes", 0)}
+	tabs := []ui.Tab{tab("overview", len(d.Questions))}
+	if runMayCome(d.State) || d.Tab == "live" {
+		tabs = append(tabs, tab("live", 0))
+	}
+	return append(tabs, tab("fields", len(d.Fields)), tab("timeline", len(d.Timeline)), tab("evidence", 0), tab("notes", 0))
+}
+
+// runMayCome reports whether a run can still fill the application, so the live tab has something to show.
+func runMayCome(state string) bool {
+	switch state {
+	case "submitted", "confirmed", "submit_unknown", "interview", "offer", "rejected", "withdrawn", "skipped", "failed":
+		return false
+	default:
+		return true
+	}
 }
 
 templ appAction(d AppDetailData, a AppAction) {
