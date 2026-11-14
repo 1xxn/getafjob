@@ -109,6 +109,8 @@ services:
       GETAFJOB_SMTP_URL_FILE: /run/secrets/smtp_url
       GETAFJOB_MASTER_KEY_FILE: /run/secrets/master_key
       GETAFJOB_BLOB_URL: file:///var/lib/getafjob/blobs
+      # Time between scheduled crawls; the schedule starts after the first crawl someone starts by hand. 0: none.
+      GETAFJOB_CRAWL_INTERVAL: ${GETAFJOB_CRAWL_INTERVAL:-6h}
     secrets: [db_app_password, master_key, smtp_url]
     volumes:
       - blobs:/var/lib/getafjob/blobs
