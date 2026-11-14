@@ -661,6 +661,11 @@ func TestProfilePages(t *testing.T) {
 			t.Errorf("profile page lacks experience field %q", want)
 		}
 	}
+	// Existing stations come first, named by title and company; the add form follows them.
+	head, add := strings.Index(body, "<h3>Staff Platform Engineer · Acme Corp</h3>"), strings.Index(body, `action="/profile/experiences" class="stack"`)
+	if head < 0 || add < head {
+		t.Errorf("station heading at %d, add form at %d", head, add)
+	}
 
 	eduForm := url.Values{
 		"degree":         {"M.Sc. Computer Science"},

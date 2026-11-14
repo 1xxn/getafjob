@@ -3,6 +3,7 @@ package views
 import (
 	"context"
 	"strconv"
+	"strings"
 
 	"github.com/1xxn/getafjob/internal/web/views/ui"
 )
@@ -197,6 +198,16 @@ templ sortHandle() {
 	</span>
 }
 
+// stationHead names a station by its two main fields, so the list can be scanned, next to its drag handle.
+templ stationHead(what, where string) {
+	<div class="st-head">
+		if named := nonEmpty(what, where); len(named) > 0 {
+			<h3>{ strings.Join(named, " · ") }</h3>
+		}
+		@sortHandle()
+	</div>
+}
+
 // stationActions are the save state and the move and delete buttons of one station.
 templ stationActions(base, id string) {
 	<div class="actions">
@@ -257,25 +268,13 @@ templ ProfilePage(name string, h CandidateHead, f Form, experiences []ProfileExp
 			}
 		</form>
 		<h2 class="form-section" id="stations">{ T(ctx, "profile.section.experience") }</h2>
-		<form { HX(ctx, "hx-replace-url", "/profile")... } method="post" data-dirty-guard action="/profile/experiences" class="stack" novalidate>
-			<h3>{ T(ctx, "profile.station.add_experience") }</h3>
-			@ui.Input(station(ctx, "title", "new-exp", "", 200))
-			@ui.Input(station(ctx, "company", "new-exp", "", 200))
-			@ui.Input(station(ctx, "location", "new-exp", "", 200))
-			@ui.Select(workplaceSelect(ctx, "new", ""))
-			@ui.Input(station(ctx, "start_date", "new-exp", "", 30))
-			@ui.Input(station(ctx, "end_date", "new-exp", "", 30))
-			@ui.Checkbox(stationCurrent(ctx, "new-exp", "is_current", false))
-			@ui.Textarea(stationBullets(ctx, "new-exp", ""))
-			@ui.Button(ui.ButtonProps{Label: T(ctx, "profile.station.add_experience"), Variant: "primary", Type: "submit"})
-		</form>
 		<div class="st-group" data-sortable>
 			<form method="post" action="/profile/experiences/order" data-sort-form hidden { HX(ctx)... }></form>
 			<ol class="st-list">
 				for _, exp := range experiences {
 					<li class="st-item" data-sort-item data-id={ exp.ID }>
 						<form method="post" action={ templ.SafeURL("/profile/experiences/" + exp.ID) } class="stack form-section" novalidate data-autosave { autosave(ctx, "/profile/experiences/"+exp.ID+"/autosave", exp.ID)... }>
-							@sortHandle()
+							@stationHead(exp.Title, exp.Company)
 							@ui.Input(station(ctx, "title", exp.ID, exp.Title, 200))
 							@ui.Input(station(ctx, "company", exp.ID, exp.Company, 200))
 							@ui.Input(station(ctx, "location", exp.ID, exp.Location, 200))
@@ -290,25 +289,26 @@ templ ProfilePage(name string, h CandidateHead, f Form, experiences []ProfileExp
 				}
 			</ol>
 		</div>
-		<h2 class="form-section">{ T(ctx, "profile.section.education") }</h2>
-		<form { HX(ctx, "hx-replace-url", "/profile")... } method="post" data-dirty-guard action="/profile/educations" class="stack" novalidate>
-			<h3>{ T(ctx, "profile.station.add_education") }</h3>
-			@ui.Input(station(ctx, "degree", "new-edu", "", 200))
-			@ui.Input(station(ctx, "institution", "new-edu", "", 200))
-			@ui.Input(station(ctx, "field_of_study", "new-edu", "", 200))
-			@ui.Input(station(ctx, "start_date", "new-edu", "", 30))
-			@ui.Input(station(ctx, "end_date", "new-edu", "", 30))
-			@ui.Checkbox(stationCurrent(ctx, "new-edu", "is_current_edu", false))
-			@ui.Input(station(ctx, "grade", "new-edu", "", 50))
-			@ui.Button(ui.ButtonProps{Label: T(ctx, "profile.station.add_education"), Variant: "primary", Type: "submit"})
+		<form { HX(ctx, "hx-replace-url", "/profile")... } method="post" data-dirty-guard action="/profile/experiences" class="stack" novalidate>
+			<h3>{ T(ctx, "profile.station.add_experience") }</h3>
+			@ui.Input(station(ctx, "title", "new-exp", "", 200))
+			@ui.Input(station(ctx, "company", "new-exp", "", 200))
+			@ui.Input(station(ctx, "location", "new-exp", "", 200))
+			@ui.Select(workplaceSelect(ctx, "new", ""))
+			@ui.Input(station(ctx, "start_date", "new-exp", "", 30))
+			@ui.Input(station(ctx, "end_date", "new-exp", "", 30))
+			@ui.Checkbox(stationCurrent(ctx, "new-exp", "is_current", false))
+			@ui.Textarea(stationBullets(ctx, "new-exp", ""))
+			@ui.Button(ui.ButtonProps{Label: T(ctx, "profile.station.add_experience"), Variant: "primary", Type: "submit"})
 		</form>
+		<h2 class="form-section">{ T(ctx, "profile.section.education") }</h2>
 		<div class="st-group" data-sortable>
 			<form method="post" action="/profile/educations/order" data-sort-form hidden { HX(ctx)... }></form>
 			<ol class="st-list">
 				for _, edu := range educations {
 					<li class="st-item" data-sort-item data-id={ edu.ID }>
 						<form method="post" action={ templ.SafeURL("/profile/educations/" + edu.ID) } class="stack form-section" novalidate data-autosave { autosave(ctx, "/profile/educations/"+edu.ID+"/autosave", edu.ID)... }>
-							@sortHandle()
+							@stationHead(edu.Degree, edu.Institution)
 							@ui.Input(station(ctx, "degree", edu.ID, edu.Degree, 200))
 							@ui.Input(station(ctx, "institution", edu.ID, edu.Institution, 200))
 							@ui.Input(station(ctx, "field_of_study", edu.ID, edu.FieldOfStudy, 200))
@@ -322,6 +322,17 @@ templ ProfilePage(name string, h CandidateHead, f Form, experiences []ProfileExp
 				}
 			</ol>
 		</div>
+		<form { HX(ctx, "hx-replace-url", "/profile")... } method="post" data-dirty-guard action="/profile/educations" class="stack" novalidate>
+			<h3>{ T(ctx, "profile.station.add_education") }</h3>
+			@ui.Input(station(ctx, "degree", "new-edu", "", 200))
+			@ui.Input(station(ctx, "institution", "new-edu", "", 200))
+			@ui.Input(station(ctx, "field_of_study", "new-edu", "", 200))
+			@ui.Input(station(ctx, "start_date", "new-edu", "", 30))
+			@ui.Input(station(ctx, "end_date", "new-edu", "", 30))
+			@ui.Checkbox(stationCurrent(ctx, "new-edu", "is_current_edu", false))
+			@ui.Input(station(ctx, "grade", "new-edu", "", 50))
+			@ui.Button(ui.ButtonProps{Label: T(ctx, "profile.station.add_education"), Variant: "primary", Type: "submit"})
+		</form>
 	}
 }
 
