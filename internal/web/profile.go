@@ -574,6 +574,8 @@ func (s *Server) preferencesSave(w http.ResponseWriter, r *http.Request, u *iden
 		section = settingsSection(section)
 	}
 	back := "/settings/" + settingsSection(section)
+	// A form with errors renders under the POST path; the address bar keeps the settings tab, so a reload stays there.
+	w.Header().Set("HX-Replace-Url", back)
 	if disconnectPortal := strings.TrimSpace(r.PostFormValue("disconnect_portal")); disconnectPortal != "" {
 		if s.Portals != nil && portals.ValidatePortal(disconnectPortal) == nil {
 			if err := s.Portals.Disconnect(r.Context(), u.ID, disconnectPortal); err != nil {
