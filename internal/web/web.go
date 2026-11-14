@@ -108,11 +108,12 @@ type Server struct {
 	Privacy        PrivacyService
 	Shots          Screenshots
 	Handoffs       HandoffHub
-	Events         *events.Hub    // live application changes; nil turns /events off
-	StyleGuide     bool           // serve /dev/styleguide (development builds only)
-	TimeZone       *time.Location // instance time zone of UI times, summaries and quiet hours
-	System         SystemService  // nil: the system page shows the build only
-	Ops            AdminOps       // nil: no runner, source and queue pages
+	Events         *events.Hub        // live application changes; nil turns /events off
+	StyleGuide     bool               // serve /dev/styleguide (development builds only)
+	TimeZone       *time.Location     // instance time zone of UI times, summaries and quiet hours
+	System         SystemService      // nil: the system page shows the build only
+	Ops            AdminOps           // nil: no runner, source and queue pages
+	Maintenance    MaintenanceService // nil: no maintenance mode
 	PushStore      webpush.Store
 	VAPIDPublicKey string
 	Logger         *slog.Logger
@@ -245,6 +246,7 @@ func (s *Server) Register(mux *http.ServeMux) {
 	mux.Handle("POST /admin/users/{id}/enable", s.adminOnly(s.adminDisable(false)))
 	mux.Handle("POST /admin/users/{id}/delete", s.adminOnly(s.adminDelete))
 	mux.Handle("GET /admin/system", s.adminOnly(s.adminSystem))
+	mux.Handle("POST /admin/maintenance", s.adminOnly(s.adminMaintenance))
 	mux.Handle("GET /admin/runners", s.adminOnly(s.adminRunners))
 	mux.Handle("GET /admin/sources", s.adminOnly(s.adminSources))
 	mux.Handle("POST /admin/sources/crawl", s.limited(s.adminOnly(s.adminCrawl)))
@@ -296,7 +298,13 @@ func (s *Server) page(h func(http.ResponseWriter, *http.Request, *identity.User)
 		ctx := context.WithValue(views.WithZone(views.WithLocale(r.Context(), l), s.TimeZone), tokenKey{}, token)
 		ctx = templ.WithNonce(ctx, httpx.Nonce(ctx))
 		r = r.WithContext(ctx)
-		h(w, r.WithContext(views.WithShell(ctx, s.shell(w, r, u))), u)
+		maint := s.maintenanceState(ctx)
+		if s.blockedForMaintenance(w, r, u, maint) { //nolint:contextcheck // r carries the page context
+			return
+		}
+		sh := s.shell(w, r, u)
+		sh.Maintenance = maint.On && sh.Admin
+		h(w, r.WithContext(views.WithShell(ctx, sh)), u)
 	})
 }
 

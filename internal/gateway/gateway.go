@@ -71,12 +71,14 @@ type Server struct {
 	ATSMetrics     *ats.Tracker
 	Portals        PortalSessionSaver
 	StepDuration   metric.Float64Histogram
-	handoffs       sync.Map // map[uuid.UUID]*HandoffSession
-	runners        sync.Map // map[string]runnerSession
-	runSteps       sync.Map // map[uuid.UUID]runStepState
-	frameAuth      sync.Map // map[string]frameGrant, token -> run for screencast frames
-	seen           sync.Map // map[uuid.UUID]time.Time, run -> last call of its runner
-	sessionOf      sync.Map // map[string]uuid.UUID, run token -> application of its live session
+	// Paused, when set and true, hands out no run (maintenance mode, #518); runs already going are parked elsewhere.
+	Paused    func(ctx context.Context) bool
+	handoffs  sync.Map // map[uuid.UUID]*HandoffSession
+	runners   sync.Map // map[string]runnerSession
+	runSteps  sync.Map // map[uuid.UUID]runStepState
+	frameAuth sync.Map // map[string]frameGrant, token -> run for screencast frames
+	seen      sync.Map // map[uuid.UUID]time.Time, run -> last call of its runner
+	sessionOf sync.Map // map[string]uuid.UUID, run token -> application of its live session
 }
 
 // Lost runs: a runner calls at least every keepalive interval (agent: 20 s); after reapIdle without a call the
@@ -396,6 +398,9 @@ func (s *Server) Lease(ctx context.Context, req *runnerv1.LeaseRequest) (*runner
 	runnerID := req.GetRunnerId()
 	if runnerID == "" || len(runnerID) > 100 {
 		return nil, connect.NewError(connect.CodeInvalidArgument, "runner id")
+	}
+	if s.Paused != nil && s.Paused(ctx) {
+		return &runnerv1.LeaseResponse{}, nil
 	}
 	// Kind and user come from the token: a home runner leases only its own user's runs, whatever runner id it
 	// sends. Only the server secret may use a session registered as a home runner without a user.

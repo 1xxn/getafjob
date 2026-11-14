@@ -220,6 +220,55 @@ func TestReapLostParksSilentRuns(t *testing.T) {
 	}
 }
 
+// Maintenance parks running runs and ends them; a run in submitting keeps its token and finishes the attempt (#518).
+func TestParkForMaintenance(t *testing.T) {
+	pool, st, svc, _ := setup(t)
+	ctx := t.Context()
+	runs := application.NewRuns(svc.WithoutLimits(), st)
+	max := user(t, pool, "max@example.org")
+	running := queued(t, svc, max, jobAt(t, pool, "https://jobs.lever.co/acme/1", "Acme", "acme|1"))
+	submitting := queued(t, svc, max, jobAt(t, pool, "https://jobs.lever.co/muster/2", "Muster", "muster|2"))
+	waiting := queued(t, svc, max, jobAt(t, pool, "https://jobs.lever.co/beispiel/3", "Beispiel", "beispiel|3"))
+	leases := map[uuid.UUID]application.Lease{}
+	for range 3 {
+		l, ok, err := runs.Lease(ctx, "r1", application.RunnerServer, nil)
+		if !ok || err != nil {
+			t.Fatalf("lease: %v %v", ok, err)
+		}
+		leases[l.AppID] = l
+	}
+	ref := func(id uuid.UUID) application.RunRef {
+		return application.RunRef{RunID: leases[id].RunID, AppID: id, UserID: max}
+	}
+	if _, err := svc.Approve(ctx, max, submitting); err != nil {
+		t.Fatal(err)
+	}
+	if err := runs.BeginSubmit(ctx, ref(submitting)); err != nil {
+		t.Fatal(err)
+	}
+	if err := runs.Ask(ctx, ref(waiting), []string{"salary"}); err != nil {
+		t.Fatal(err)
+	}
+	n, err := runs.ParkForMaintenance(ctx)
+	if err != nil || n != 2 {
+		t.Fatalf("parked %d, %v; want 2", n, err)
+	}
+	for _, id := range []uuid.UUID{running, waiting} {
+		if a, _ := svc.Get(ctx, max, id); a.State != application.Parked {
+			t.Errorf("%s: %s, want parked", id, a.State)
+		}
+		if _, err := runs.Authorize(ctx, leases[id].Token); !errors.Is(err, application.ErrNoRun) {
+			t.Errorf("token after maintenance park = %v, want ErrNoRun", err)
+		}
+	}
+	if a, _ := svc.Get(ctx, max, submitting); a.State != application.Submitting {
+		t.Fatalf("submitting run: %s", a.State)
+	}
+	if _, err := runs.Authorize(ctx, leases[submitting].Token); err != nil {
+		t.Fatalf("submitting run lost its token: %v", err)
+	}
+}
+
 // A run whose application the user parked ends with it: its token no longer works, so the old runner cannot touch
 // the application after the user queued it again.
 func TestUserParkEndsTheRun(t *testing.T) {

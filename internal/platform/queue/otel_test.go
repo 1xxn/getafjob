@@ -43,3 +43,19 @@ func TestTelemetryMiddleware(t *testing.T) {
 		t.Errorf("spans = %+v", spans)
 	}
 }
+
+func TestPauseCancelsJobs(t *testing.T) {
+	paused := true
+	mw := &pause{paused: func(context.Context) bool { return paused }}
+	ran := 0
+	inner := func(context.Context) error { ran++; return nil }
+	job := &rivertype.JobRow{Kind: "crawl"}
+	var cancel *rivertype.JobCancelError
+	if err := mw.Work(context.Background(), job, inner); !errors.As(err, &cancel) || !errors.Is(err, ErrPaused) || ran != 0 {
+		t.Fatalf("paused: err = %v, ran = %d", err, ran)
+	}
+	paused = false
+	if err := mw.Work(context.Background(), job, inner); err != nil || ran != 1 {
+		t.Fatalf("running: err = %v, ran = %d", err, ran)
+	}
+}

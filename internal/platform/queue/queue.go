@@ -46,6 +46,9 @@ type Options struct {
 	Workers  *river.Workers
 	Periodic []*river.PeriodicJob
 	Logger   *slog.Logger
+	// Paused, when set and true, cancels every job before it runs (maintenance mode, #518): nothing started
+	// meanwhile runs later on its own; periodic jobs come again at their next time.
+	Paused func(ctx context.Context) bool
 }
 
 // NewWorker returns a client that works the queues; start it with Start and stop it with Stop.
@@ -57,8 +60,12 @@ func NewWorker(pool *pgxpool.Pool, o Options) (*Client, error) {
 	if err := RegisterDepth(pool); err != nil {
 		return nil, err
 	}
+	mw := []rivertype.Middleware{t}
+	if o.Paused != nil {
+		mw = append(mw, &pause{paused: o.Paused})
+	}
 	return river.NewClient(riverpgxv5.New(pool), &river.Config{
-		Middleware: []rivertype.Middleware{t},
+		Middleware: mw,
 		Queues: map[string]river.QueueConfig{
 			river.QueueDefault: {MaxWorkers: 4},
 			Crawl:              {MaxWorkers: 1},

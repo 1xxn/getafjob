@@ -179,6 +179,21 @@ func (s *Service) applyChange(ctx context.Context, userID, id uuid.UUID, c Chang
 	return to, nil
 }
 
+// parkWhileRunning parks the application with reason only while it is running or needs input; in any other state
+// (submitting above all) it returns ErrTransition, and ErrConflict when the state changed while parking.
+func (s *Service) parkWhileRunning(ctx context.Context, userID, id uuid.UUID, reason string) error {
+	app, err := s.store.Get(ctx, userID, id)
+	if err != nil {
+		return err
+	}
+	if app.State != Running && app.State != NeedsInput {
+		return fmt.Errorf("%w: park on %s", ErrTransition, app.State)
+	}
+	c := Change{Event: EvPark, Actor: ActorSystem, Detail: map[string]any{"reason": reason}, From: app.State, To: Parked,
+		At: s.now()}
+	return s.store.Apply(ctx, userID, app, c)
+}
+
 // Start runs the guards and moves a queued application to running. A failing guard parks it with the reason.
 func (s *Service) Start(ctx context.Context, userID, id uuid.UUID, actor Actor) error {
 	app, err := s.store.Get(ctx, userID, id)

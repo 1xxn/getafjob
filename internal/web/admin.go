@@ -14,6 +14,7 @@ import (
 
 	"github.com/1xxn/getafjob/internal/identity"
 	"github.com/1xxn/getafjob/internal/platform/buildinfo"
+	"github.com/1xxn/getafjob/internal/platform/maintenance"
 	"github.com/1xxn/getafjob/internal/web/views"
 	"github.com/1xxn/getafjob/internal/web/views/ui"
 )
@@ -142,6 +143,8 @@ func auditText(ctx context.Context, a identity.AuditEntry, emails map[uuid.UUID]
 		return views.T(ctx, "admin.audit.deleted")
 	case "admin.source_enabled", "admin.source_disabled":
 		return views.T(ctx, "admin.audit."+strings.TrimPrefix(a.Code, "admin."), "source", fmt.Sprint(a.Params["source"]))
+	case "admin.maintenance_on", "admin.maintenance_off":
+		return views.T(ctx, "admin.audit."+strings.TrimPrefix(a.Code, "admin."))
 	case "admin.crawl_started":
 		return views.T(ctx, "admin.audit.crawl_started")
 	case "admin.job_retried":
@@ -325,5 +328,17 @@ func (s *Server) adminSystem(w http.ResponseWriter, r *http.Request, u *identity
 	passkeys, tone := yes(s.Identity.PasskeysEnabled())
 	rows = append(rows, views.AdminSystemRow{Key: "admin.system.passkeys", Value: passkeys, Tone: tone})
 	rows = slices.DeleteFunc(rows, func(r views.AdminSystemRow) bool { return r.Value == "" })
-	s.render(w, r, http.StatusOK, views.AdminSystemPage(views.AdminSystemData{Name: u.DisplayName, Rows: rows}))
+	d := views.AdminSystemData{Name: u.DisplayName, Rows: rows}
+	if s.Maintenance != nil {
+		st, err := s.Maintenance.State(ctx)
+		if err != nil {
+			s.failed(w, r, u, err)
+			return
+		}
+		d.Maintenance = &views.AdminMaintenance{On: st.On, Message: st.Message, Max: maintenance.MaxMessage}
+		if st.On {
+			d.Maintenance.Since = views.When(ctx, st.Since)
+		}
+	}
+	s.render(w, r, http.StatusOK, views.AdminSystemPage(d))
 }

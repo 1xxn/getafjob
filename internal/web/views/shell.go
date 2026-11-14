@@ -26,6 +26,8 @@ type Shell struct {
 	Flash     string            // catalog key of a one-time message, shown as a toast
 	Counts    func() *NavCounts // nil or returning nil: no counters
 	Dock      string            // live dock layout "<side>:<size>", empty for the default
+	// Maintenance shows admins the banner that the instance is in maintenance, with the button to end it.
+	Maintenance bool
 }
 
 // DockSide and DockSize split the dock layout; right and md by default.

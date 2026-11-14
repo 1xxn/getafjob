@@ -54,6 +54,16 @@ type AdminSystemRow struct {
 type AdminSystemData struct {
 	Name string
 	Rows []AdminSystemRow
+	// Maintenance is the maintenance switch; nil hides it (no maintenance service).
+	Maintenance *AdminMaintenance
+}
+
+// AdminMaintenance is the state of the maintenance mode on the system page.
+type AdminMaintenance struct {
+	On      bool
+	Message string
+	Since   string
+	Max     int // longest note in characters
 }
 
 var adminSections = []struct{ Key, Href, Icon string }{
@@ -234,5 +244,36 @@ templ AdminSystemPage(d AdminSystemData) {
 				</div>
 			}
 		</dl>
+		if m := d.Maintenance; m != nil {
+			<section class="adm-maintenance" aria-labelledby="adm-maintenance" data-maintenance={ onOff(m.On) }>
+				<h2 id="adm-maintenance">{ T(ctx, "admin.maintenance") }</h2>
+				if m.On {
+					<p>{ T(ctx, "admin.maintenance.on", "since", m.Since) }</p>
+				} else {
+					<p class="app-hint">{ T(ctx, "admin.maintenance.intro") }</p>
+				}
+				<form method="post" action="/admin/maintenance" class="adm-maintenance-form">
+					<input type="hidden" name="back" value="/admin/system"/>
+					if m.On {
+						<input type="hidden" name="on" value="0"/>
+						@ui.Button(ui.ButtonProps{Label: T(ctx, "maintenance.end"), Type: "submit", Variant: "primary",
+							Attrs: templ.Attributes{"data-maintenance-end": "1"}})
+					} else {
+						<input type="hidden" name="on" value="1"/>
+						@ui.Input(ui.InputProps{FieldProps: ui.FieldProps{Name: "message", Label: T(ctx, "admin.maintenance.message"),
+							Hint: T(ctx, "admin.maintenance.message.hint")}, Value: m.Message, MaxLength: m.Max})
+						@ui.Button(ui.ButtonProps{Label: T(ctx, "admin.maintenance.start"), Type: "submit", Variant: "danger",
+							Attrs: templ.Attributes{"data-maintenance-start": "1"}})
+					}
+				</form>
+			</section>
+		}
 	}
+}
+
+func onOff(on bool) string {
+	if on {
+		return "on"
+	}
+	return "off"
 }

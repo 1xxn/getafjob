@@ -3918,6 +3918,30 @@
     overflow-wrap: anywhere;
   }
 
+  /* maintenance mode (#518): switch on the system page, banner for admins above every page */
+  .adm-maintenance {
+    margin-top: var(--space-5);
+  }
+
+  .adm-maintenance-form {
+    display: grid;
+    gap: var(--space-3);
+    justify-items: start;
+    max-width: 32rem;
+  }
+
+  .adm-maintenance-form > .ui-field {
+    justify-self: stretch;
+  }
+
+  .shell-maintenance {
+    margin-bottom: var(--space-4);
+  }
+
+  .shell-maintenance form {
+    margin-top: var(--space-2);
+  }
+
   /* profile: autosave status and sortable stations (#239) */
   .save-state {
     display: inline-flex;
