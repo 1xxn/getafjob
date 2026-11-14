@@ -614,8 +614,14 @@ func TestProfilePages(t *testing.T) {
 		strings.Count(rec.Body.String(), "This value is not valid.") != 2 || rec.Header().Get("HX-Replace-Url") != "/settings/notifications" {
 		t.Fatalf("invalid notifications %d, address %q: %s", rec.Code, rec.Header().Get("HX-Replace-Url"), rec.Body.String())
 	}
-	if body := a.do(http.MethodGet, "/settings/notifications", nil, session, nil).Body.String(); strings.Contains(body, "25:00") {
+	body = a.do(http.MethodGet, "/settings/notifications", nil, session, nil).Body.String()
+	if strings.Contains(body, "25:00") {
 		t.Error("invalid notification settings were saved")
+	}
+	// Without a VAPID key the web push switch is off and says why.
+	if !strings.Contains(body, "Web push is not set up on this instance") ||
+		!regexp.MustCompile(`<input[^>]*name="notify_webpush_enabled"[^>]*disabled`).MatchString(body) {
+		t.Error("web push switch is offered without a VAPID key")
 	}
 	port := url.Values{"section": {"integrations"}, "mailbox_host": {"imap.example.org"}, "mailbox_username": {"max"}, "mailbox_port": {"99999"}}
 	if rec := a.do(http.MethodPost, "/preferences", port, session, nil); rec.Code != http.StatusUnprocessableEntity || !strings.Contains(rec.Body.String(), `value="99999"`) {

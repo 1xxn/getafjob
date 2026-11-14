@@ -59,6 +59,15 @@ func check(ctx context.Context, f Form, name string) ui.CheckProps {
 	return ui.CheckProps{Name: name, Label: T(ctx, "profile.field."+name), Checked: f.Checks[name]}
 }
 
+// webPush is the web push switch; off with a reason when the instance has no VAPID key.
+func webPush(ctx context.Context, f Form) ui.CheckProps {
+	p := check(ctx, f, "notify_webpush_enabled")
+	if f.Values["webpush_off"] != "" {
+		p.Disabled, p.Hint = true, T(ctx, "profile.notify.webpush_off")
+	}
+	return p
+}
+
 // choice builds a select whose options are labelled with <prefix><value>.
 func choice(ctx context.Context, f Form, name, prefix string, values ...string) ui.SelectProps {
 	opts := make([]ui.Option, 0, len(values))
@@ -392,7 +401,7 @@ templ PreferencesPage(name string, f Form, section string) {
 					<h2>{ T(ctx, "profile.notify.title") }</h2>
 					<p class="muted">{ T(ctx, "profile.notify.hint") }</p>
 					@ui.Checkbox(check(ctx, f, "notify_email_enabled"))
-					@ui.Checkbox(check(ctx, f, "notify_webpush_enabled"))
+					@ui.Checkbox(webPush(ctx, f))
 					@ui.Checkbox(check(ctx, f, "notify_ntfy_enabled"))
 					@ui.Input(input(ctx, f, "notify_ntfy_url", "url", "", 254))
 					@ui.Input(input(ctx, f, "notify_ntfy_topic", "text", "", 254))
