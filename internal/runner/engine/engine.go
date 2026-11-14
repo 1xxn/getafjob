@@ -83,7 +83,13 @@ type StationExpander interface {
 var (
 	ErrAsked  = errors.New("run handed to the user")
 	ErrParked = errors.New("run parked")
+	// ErrNeedsApproval is the coordinator's answer to BeginSubmit when the user approves the submit first.
+	ErrNeedsApproval = errors.New("the submit waits for the user's approval")
 )
+
+// ParkApproval is the park reason of a run that filled everything and waits for the user's approval; the approval
+// queues the application again.
+const ParkApproval = "waiting for your approval"
 
 // maxPages bounds a multi-page flow (hostile pages can loop).
 const maxPages = 12
@@ -264,6 +270,12 @@ func (e *Engine) submit(ctx context.Context, p *rod.Page, page int, st *browser.
 		return err
 	}
 	if err := e.Coord.BeginSubmit(ctx); err != nil {
+		switch {
+		case errors.Is(err, ErrNeedsApproval):
+			return e.park(ctx, p, ParkApproval)
+		case errors.Is(err, ErrParked):
+			return ErrParked
+		}
 		return fmt.Errorf("submit not registered, no click: %w", err)
 	}
 	eff, err := st.Submit(btn.ID, e.wait()) //nolint:contextcheck // the page carries ctx (bound in Run)
