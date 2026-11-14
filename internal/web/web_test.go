@@ -611,8 +611,8 @@ func TestProfilePages(t *testing.T) {
 	// Invalid notification settings come back as field errors; nothing is saved.
 	bad := url.Values{"section": {"notifications"}, "notify_ntfy_enabled": {"on"}, "notify_daily_summary_time": {"25:00"}}
 	if rec := a.do(http.MethodPost, "/preferences", bad, session, nil); rec.Code != http.StatusUnprocessableEntity ||
-		strings.Count(rec.Body.String(), "This value is not valid.") != 2 {
-		t.Fatalf("invalid notifications %d: %s", rec.Code, rec.Body.String())
+		strings.Count(rec.Body.String(), "This value is not valid.") != 2 || rec.Header().Get("HX-Replace-Url") != "/settings/notifications" {
+		t.Fatalf("invalid notifications %d, address %q: %s", rec.Code, rec.Header().Get("HX-Replace-Url"), rec.Body.String())
 	}
 	if body := a.do(http.MethodGet, "/settings/notifications", nil, session, nil).Body.String(); strings.Contains(body, "25:00") {
 		t.Error("invalid notification settings were saved")
