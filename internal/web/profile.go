@@ -545,6 +545,10 @@ func (s *Server) settingsForm(ctx context.Context, u *identity.User, p profile.P
 	}
 	f := preferencesForm(p, a, mb, np, accounts, easyApplyAdmin)
 	f.Values["time_zone"] = s.TimeZone.String()
+	if s.VAPIDPublicKey == "" { // no key: the instance cannot send web push
+		f.Values["webpush_off"] = "1"
+		f.Checks["notify_webpush_enabled"] = false
+	}
 	return f
 }
 

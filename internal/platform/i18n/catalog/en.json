@@ -531,6 +531,7 @@
   "profile.notify.time_zone": "Times below are in {zone}, the time zone of this instance.",
   "profile.notify.test": "Send a test notification",
   "profile.notify.tested": "Test notification sent.",
+  "profile.notify.webpush_off": "Web push is not set up on this instance: it has no VAPID key.",
   "profile.assist.title": "Browser extension (Assist)",
   "profile.assist.hint": "Pair the getafjob Assist browser extension to autofill job applications with your explicit approval and trusted human clicks.",
   "profile.assist.generate_code": "Generate extension pairing code",

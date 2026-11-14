@@ -531,6 +531,7 @@
   "profile.notify.time_zone": "Die Zeiten unten gelten in {zone}, der Zeitzone dieser Instanz.",
   "profile.notify.test": "Test-Benachrichtigung senden",
   "profile.notify.tested": "Test-Benachrichtigung gesendet.",
+  "profile.notify.webpush_off": "Web Push ist auf dieser Instanz nicht eingerichtet: ihr fehlt ein VAPID-Schlüssel.",
   "profile.assist.title": "Browser-Erweiterung (Assist)",
   "profile.assist.hint": "Kopple die Browser-Erweiterung getafjob Assist, um Bewerbungsformulare mit deiner Freigabe und echten Klicks auszufüllen.",
   "profile.assist.generate_code": "Koppelcode für Erweiterung erzeugen",
