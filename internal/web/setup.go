@@ -106,6 +106,11 @@ func (s *Server) renderSetup(w http.ResponseWriter, r *http.Request, u *identity
 	switch step {
 	case "search", "automation":
 		d.Form = preferencesForm(snap.Preferences, s.automation(r.Context(), u), tracking.MailboxAccount{}, notify.Preferences{}, nil, false)
+		// A first search starts from the profile: the current title and the city are the likeliest answers.
+		if step == "search" && len(snap.Preferences.Titles) == 0 && len(snap.Preferences.Locations) == 0 {
+			d.Form.Values["titles"] = snap.Profile.Work.CurrentTitle
+			d.Form.Values["locations"] = snap.Profile.Personal.City
+		}
 	default:
 		d.Form = profileForm(snap)
 	}
