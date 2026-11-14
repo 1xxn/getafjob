@@ -82,7 +82,7 @@ templ Maintenance(message string, signedOut bool) {
 		<div data-maintenance-page>
 			@pubHead("clock", T(ctx, "maintenance.title"), T(ctx, "maintenance.text"))
 			if message != "" {
-				<p class="pub-text" data-maintenance-message>{ message }</p>
+				<p class="pub-note" data-maintenance-message>{ message }</p>
 			}
 			if signedOut {
 				<p class="pub-links"><a href="/login">{ T(ctx, "maintenance.admin_login") }</a></p>
