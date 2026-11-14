@@ -310,6 +310,20 @@ type EvidenceFieldRow struct {
 	Label  string
 	Value  string
 	Source string
+	Kind   string // field kind; a checkbox shows as yes or no
+}
+
+// Shown is the value as the user reads it: a checkbox is yes or no, not the browser's "checked".
+func (f EvidenceFieldRow) Shown(ctx context.Context) string {
+	switch f.Kind {
+	case "checkbox", "aria_checkbox":
+		if f.Value == "checked" {
+			return T(ctx, "evidence.fields.yes")
+		}
+		return T(ctx, "evidence.fields.no")
+	default:
+		return f.Value
+	}
 }
 
 // TimelineRow is one chronological event or checkpoint on the application evidence page.
@@ -408,7 +422,7 @@ func LiveIndicator(runs []ActiveRunItem) templ.Component {
 			var templ_7745c5c3_Var17 string
 			templ_7745c5c3_Var17, templ_7745c5c3_Err = templ.JoinStringErrs(T(ctx, "live.indicator", "count", len(runs)))
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `handoff.templ`, Line: 131, Col: 49}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `handoff.templ`, Line: 145, Col: 49}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var17))
 			if templ_7745c5c3_Err != nil {

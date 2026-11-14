@@ -122,7 +122,7 @@ templ ApprovalReview(d AppDetailData, cv CVVariantData) {
 			<h4 class="job-panel-sub">{ T(ctx, "evidence.fields.title") }</h4>
 			<dl class="jd-fields">
 				for _, f := range d.Fields {
-					@fieldItem(f.Label, f.Value, sourceKey(f.Source))
+					@fieldItem(f.Label, f.Shown(ctx), sourceKey(f.Source))
 				}
 			</dl>
 		}

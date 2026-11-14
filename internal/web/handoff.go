@@ -479,7 +479,8 @@ func (s *Server) applicationDetail(w http.ResponseWriter, r *http.Request, u *id
 			return "/applications/" + appID.String() + "/screenshots/" + strconv.FormatInt(id, 10)
 		}
 		for _, f := range ev.Fields {
-			d.Fields = append(d.Fields, views.EvidenceFieldRow{Page: f.Page, Label: f.Label, Value: f.Value, Source: f.Source})
+			d.Fields = append(d.Fields, views.EvidenceFieldRow{Page: f.Page, Label: f.Label, Value: f.Value, Source: f.Source,
+				Kind: f.Kind})
 		}
 		d.BeforeSubmitURL, d.ConfirmationShotURL = shot(ev.BeforeSubmitCheckpointID), shot(ev.ConfirmationCheckpointID)
 		d.ConfirmationURL = webLink(ev.ConfirmationURL)

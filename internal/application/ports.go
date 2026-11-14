@@ -139,6 +139,7 @@ type EvidenceField struct {
 	Label  string
 	Value  string
 	Source string
+	Kind   string // field kind (checkbox, select, …); empty in older records
 }
 
 // TimelineEntry is a chronological state transition event or run checkpoint of an application.

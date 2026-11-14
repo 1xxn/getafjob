@@ -645,7 +645,7 @@ func ApprovalReview(d AppDetailData, cv CVVariantData) templ.Component {
 				return templ_7745c5c3_Err
 			}
 			for _, f := range d.Fields {
-				templ_7745c5c3_Err = fieldItem(f.Label, f.Value, sourceKey(f.Source)).Render(ctx, templ_7745c5c3_Buffer)
+				templ_7745c5c3_Err = fieldItem(f.Label, f.Shown(ctx), sourceKey(f.Source)).Render(ctx, templ_7745c5c3_Buffer)
 				if templ_7745c5c3_Err != nil {
 					return templ_7745c5c3_Err
 				}

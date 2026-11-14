@@ -377,7 +377,7 @@ templ appFieldsTab(d AppDetailData) {
 							<span class="apps-company">{ T(ctx, "evidence.fields.page", "page", f.Page) }</span>
 						}
 					</td>
-					<td class="app-value">{ f.Value }</td>
+					<td class="app-value">{ f.Shown(ctx) }</td>
 					<td class="ui-narrow app-source">
 						@ui.Badge(T(ctx, sourceKey(f.Source)), ui.Neutral)
 						<code>{ f.Source }</code>

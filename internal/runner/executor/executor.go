@@ -45,6 +45,7 @@ type Filled struct {
 	Label   string `json:"label"`
 	Shown   string `json:"shown"` // what the field shows afterwards
 	Source  string `json:"source"`
+	Kind    string `json:"kind,omitempty"` // field kind, so a checkbox shows as yes or no
 }
 
 // Executor fills plans into the page of one run.
@@ -70,17 +71,17 @@ func (x *Executor) Fill(st *browser.State, p Plan) (*browser.State, []Filled, er
 		if st, err = x.fill(st, p, v); err != nil {
 			return st, done, fmt.Errorf("field %q: %w", v.Label, err)
 		}
-		label, shown := v.Label, v.Text
+		label, shown, kind := v.Label, v.Text, ""
 		if len(v.Files) > 0 {
 			shown = strings.Join(v.Files, ", ")
 		}
 		if f, ok := st.Field(v.FieldID); ok {
-			label = f.Label
+			label, kind = f.Label, f.Kind
 			if f.Value != "" || len(v.Files) == 0 {
 				shown = f.Value
 			}
 		}
-		done = append(done, Filled{FieldID: v.FieldID, Label: label, Shown: shown, Source: v.Source})
+		done = append(done, Filled{FieldID: v.FieldID, Label: label, Shown: shown, Source: v.Source, Kind: kind})
 	}
 	return st, done, nil
 }
