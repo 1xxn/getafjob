@@ -43,23 +43,11 @@ type Reason struct {
 	Hard   bool
 }
 
-// FitBreakdownItem represents one dimension in the score breakdown.
-type FitBreakdownItem struct {
-	Dimension string
-	Label     string
-	Points    int
-	Max       int
-	Detail    string
-}
-
-// FitData holds the data for the Fit Inspector widget.
+// FitData is the skill comparison next to a job: found and missing skills, the missing ones one click from the profile.
 type FitData struct {
 	JobID          int64
-	Score          int
-	Decision       string
 	MatchingSkills []string
 	MissingSkills  []string
-	Breakdown      []FitBreakdownItem
 	AddedSkill     string
 }
 
