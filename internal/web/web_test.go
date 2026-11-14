@@ -64,7 +64,7 @@ type testMatchEvaluator struct {
 }
 
 func (e *testMatchEvaluator) EvaluateAndSave(ctx context.Context, userID uuid.UUID, jobID int64, p discovery.Posting, at time.Time) error {
-	m := matching.NewMatcher(matching.Criteria{Titles: []string{p.Title}})
+	m := matching.NewMatcher(matching.Criteria{Titles: []string{p.Title}}, nil)
 	posted, _ := time.Parse(time.DateOnly, p.Posted)
 	mj := matching.Job{
 		ID:          jobID,

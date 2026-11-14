@@ -1,0 +1,3 @@
+Token subset of sentence-transformers/static-similarity-mrl-multilingual-v1 (revision
+b68f4122911bcffcd6e1f695f2d99cd6788972d8), Apache License 2.0 (deploy/embed/LICENSE).
+Modified: only the tokens of testdata/ranking.json, first 256 columns, float16 (TestWriteRankingModel).

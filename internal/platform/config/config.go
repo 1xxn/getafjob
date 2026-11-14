@@ -97,6 +97,10 @@ type Config struct {
 	// TimeZone is the instance time zone for daily summaries and quiet hours. Default: Europe/Berlin.
 	TimeZone *time.Location
 
+	// EmbedModel is the directory of the static embedding model for matching (ADR 0029); the app image ships it.
+	// Without it matching uses the rules alone.
+	EmbedModel string
+
 	// Unknown lists GETAFJOB_* variables that are set but read by nobody (typos); names only, never values.
 	Unknown []string
 }
@@ -171,6 +175,7 @@ var specs = []spec{
 	{"DEV_STYLEGUIDE", "false", func(c *Config, v string) error { return setBool(&c.DevStyleGuide, v) }},
 	{"LIMITS", "off", setLimits},
 	{"TIMEZONE", "Europe/Berlin", setTimeZone},
+	{"EMBED_MODEL", "/usr/share/getafjob/embed", func(c *Config, v string) error { c.EmbedModel = strings.TrimSpace(v); return nil }},
 }
 
 // Names returns all known variable names (with prefix), e.g. for the docs.

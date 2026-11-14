@@ -37,7 +37,7 @@ func TestNormalizeAndTerms(t *testing.T) {
 }
 
 func TestTitle(t *testing.T) {
-	m := NewMatcher(Criteria{Titles: []string{"Software Engineer", "Go Developer"}})
+	m := NewMatcher(Criteria{Titles: []string{"Software Engineer", "Go Developer"}}, nil)
 	tests := []struct {
 		title, code string
 		hard        bool
@@ -45,7 +45,7 @@ func TestTitle(t *testing.T) {
 		{"Senior Software Engineer (m/w/d)", "title.exact", false},
 		{"Softwareentwickler Backend", "title.synonym", false},
 		{"Go Engineer", "title.partial", false},
-		{"Sales Manager", "title.none", true},
+		{"Sales Manager", "title.none", false}, // hard only without the model (evaluate)
 	}
 	for _, tt := range tests {
 		r := m.title(normalize(tt.title))
@@ -56,13 +56,13 @@ func TestTitle(t *testing.T) {
 	if r := m.title(normalize("Lead Go Developer")); r.Params["term"] != "Go Developer" {
 		t.Errorf("term not as typed: %+v", r)
 	}
-	if r := NewMatcher(Criteria{}).title(normalize("Anything")); r.Code != "title.any" {
+	if r := NewMatcher(Criteria{}, nil).title(normalize("Anything")); r.Code != "title.any" {
 		t.Errorf("no titles: %+v", r)
 	}
 }
 
 func TestExcludedTitle(t *testing.T) {
-	m := NewMatcher(Criteria{Titles: []string{"engineer"}, ExcludeTitles: []string{"sales", "werkstudent"}})
+	m := NewMatcher(Criteria{Titles: []string{"engineer"}, ExcludeTitles: []string{"sales", "werkstudent"}}, nil)
 	r := m.Evaluate(Job{Title: "Sales Engineer"}, now)
 	if r.Decision != Skip || len(r.Reasons) != 1 || r.Reasons[0].Code != "title.excluded" || r.Reasons[0].Params["term"] != "sales" {
 		t.Fatalf("excluded: %+v", r)
@@ -70,7 +70,7 @@ func TestExcludedTitle(t *testing.T) {
 }
 
 func TestSkills(t *testing.T) {
-	m := NewMatcher(Criteria{Skills: []string{"Golang", "Kubernetes (CKA)", "PostgreSQL", "Kochen"}})
+	m := NewMatcher(Criteria{Skills: []string{"Golang", "Kubernetes (CKA)", "PostgreSQL", "Kochen"}}, nil)
 	tests := []struct {
 		text, code string
 		min, max   int
@@ -83,7 +83,7 @@ func TestSkills(t *testing.T) {
 		{"Kochen im Team", "skills.fit", 4, 4, ""},
 	}
 	for _, tt := range tests {
-		r := skillReason(m.skillHitsAndMissing(normalize(tt.text)))
+		r := skillReason(m.skillHitsAndMissing(normalize(tt.text), ""))
 		if r.Code != tt.code || r.Points < tt.min || r.Points > tt.max || !strings.Contains(r.Params["missing"], tt.missing) {
 			t.Errorf("%q: %+v", tt.text, r)
 		}
@@ -104,7 +104,7 @@ func TestSeniority(t *testing.T) {
 		{"viele", "Senior Developer", "level.open"},
 	}
 	for _, tt := range tests {
-		r := NewMatcher(Criteria{YearsTotal: tt.years}).seniority(normalize(tt.title))
+		r := NewMatcher(Criteria{YearsTotal: tt.years}, nil).seniority(levelOf(normalize(tt.title)))
 		if r.Code != tt.code {
 			t.Errorf("%s years, %q: %+v, want %s", tt.years, tt.title, r, tt.code)
 		}
@@ -139,7 +139,7 @@ func TestLocation(t *testing.T) {
 		{Criteria{Locations: []string{"Berlin"}}, "Remote - Germany", "remote", "location.none", true},
 	}
 	for _, tt := range tests {
-		r := NewMatcher(tt.c).location(Job{Location: tt.loc, Workplace: tt.wp})
+		r := NewMatcher(tt.c, nil).location(Job{Location: tt.loc, Workplace: tt.wp})
 		if r.Code != tt.code || r.Hard != tt.hard {
 			t.Errorf("%q/%s: %+v, want %s", tt.loc, tt.wp, r, tt.code)
 		}
@@ -162,9 +162,11 @@ func TestLanguage(t *testing.T) {
 		{nil, german, "language.unknown"},
 		{[]Language{{"Polnisch", "Muttersprache"}}, german, "language.unknown"},
 		{[]Language{{"English", "A2"}}, english, "language.missing"},
+		// A German posting that works in English is open to English speakers.
+		{[]Language{{"English", "native"}, {"German", "B1"}}, german + " Englisch reicht, Deutsch ist ein Plus.", "language.fit"},
 	}
 	for _, tt := range tests {
-		r := NewMatcher(Criteria{Languages: tt.langs}).language(normalize(tt.text))
+		r := NewMatcher(Criteria{Languages: tt.langs}, nil).language(Prepare(Job{Description: tt.text}, nil).lang)
 		if r.Code != tt.code {
 			t.Errorf("%v %q: %+v, want %s", tt.langs, tt.text[:20], r, tt.code)
 		}
@@ -193,14 +195,14 @@ func TestSalary(t *testing.T) {
 			t.Errorf("salaryTop(%q) = %d, want %d", tt.text, got, tt.top)
 		}
 	}
-	m := NewMatcher(Criteria{MinSalary: 70_000})
-	if r := m.salary("50.000 - 60.000 €"); r.Code != "salary.below" || !r.Hard {
+	m := NewMatcher(Criteria{MinSalary: 70_000}, nil)
+	if r := m.salary(salaryTop("50.000 - 60.000 €")); r.Code != "salary.below" || !r.Hard {
 		t.Errorf("below: %+v", r)
 	}
-	if r := m.salary("bis 90.000 €"); r.Code != "salary.fit" {
+	if r := m.salary(salaryTop("bis 90.000 €")); r.Code != "salary.fit" {
 		t.Errorf("fit: %+v", r)
 	}
-	if r := m.salary("Attractive salary"); r.Code != "" {
+	if r := m.salary(salaryTop("Attractive salary")); r.Code != "" {
 		t.Errorf("unknown: %+v", r)
 	}
 }
@@ -228,7 +230,7 @@ func TestRecency(t *testing.T) {
 func TestEvaluateDecision(t *testing.T) {
 	m := NewMatcher(Criteria{Titles: []string{"Backend Engineer"}, Locations: []string{"Berlin"}, Remote: true,
 		RemoteRegions: []string{"Germany"}, Skills: []string{"Go", "PostgreSQL", "Kubernetes"}, YearsTotal: "6",
-		Languages: []Language{{"English", "C1"}, {"Deutsch", "Muttersprache"}}, MinSalary: 60_000})
+		Languages: []Language{{"English", "C1"}, {"Deutsch", "Muttersprache"}}, MinSalary: 60_000}, nil)
 	desc := "We build our platform with Go, PostgreSQL and Kubernetes. Salary 70.000 - 85.000 €."
 	tests := []struct {
 		j    Job
@@ -290,14 +292,14 @@ func TestInspectFit(t *testing.T) {
 	if fit.LocationReason != "location.city" || fit.LocationParams["city"] == "" {
 		t.Errorf("location reason %q without its city: %v", fit.LocationReason, fit.LocationParams)
 	}
-	if fit.SkillPoints <= 0 || fit.MaxSkillPoints != 25 {
+	if fit.SkillPoints <= 0 || fit.MaxSkillPoints != 35 {
 		t.Errorf("SkillPoints = %d / %d", fit.SkillPoints, fit.MaxSkillPoints)
 	}
-	if fit.TitlePoints <= 0 || fit.MaxTitlePoints != 35 {
+	if fit.TitlePoints <= 0 || fit.MaxTitlePoints != 40 {
 		t.Errorf("TitlePoints = %d / %d", fit.TitlePoints, fit.MaxTitlePoints)
 	}
 	// The breakdown adds up to the score of Evaluate.
-	if r := NewMatcher(c).Evaluate(j, now); r.Score != fit.Score || r.Decision != fit.Decision {
+	if r := NewMatcher(c, nil).Evaluate(j, now); r.Score != fit.Score || r.Decision != fit.Decision {
 		t.Errorf("Evaluate = %d %s, InspectFit = %d %s", r.Score, r.Decision, fit.Score, fit.Decision)
 	}
 	// An excluded title scores 0, and so do its parts.
@@ -312,7 +314,7 @@ func TestInspectFit(t *testing.T) {
 func FuzzEvaluate(f *testing.F) {
 	f.Add("Senior Go Developer", "Remote - Germany", "Go, 80.000 €")
 	m := NewMatcher(Criteria{Titles: []string{"go developer"}, Remote: true, RemoteRegions: []string{"eu"},
-		Skills: []string{"Go"}, MinSalary: 50_000})
+		Skills: []string{"Go"}, MinSalary: 50_000}, nil)
 	f.Fuzz(func(t *testing.T, title, loc, desc string) {
 		r := m.Evaluate(Job{Title: title, Location: loc, Description: desc}, now)
 		if r.Score < 0 || r.Score > 100 {

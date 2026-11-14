@@ -50,7 +50,8 @@ Model: `sentence-transformers/static-similarity-mrl-multilingual-v1` (Apache 2.0
 against a SHA-256 sum, stored as float16 (about 54 MB) and read with an own Go reader (`internal/matching/embed`,
 no cgo). Without the model file the similarity part is neutral and the rules still work.
 
-Measured on the ranking set (Windows, 20 threads; one job of 2.6 KB):
+Measured on the ranking set (Windows, 20 threads; one job of 2.6 KB). The tests rank with a token subset of the
+model (`internal/matching/testdata/embed`, identical vectors) and keep floors for both variants:
 
 | Variant | NDCG@10 | Pairs right | Memory | Time per job |
 |---|---|---|---|---|
@@ -58,6 +59,8 @@ Measured on the ranking set (Windows, 20 threads; one job of 2.6 KB):
 | static-mrl, 256 dims, hard filters without title filter | 0.920 | 0.908 | 107 MB (float32) | 0.12 ms once |
 | potion-multilingual-128M, 256 dims, same | 0.906 | 0.904 | 526 MB | 35 ms once |
 | static-mrl, cosine alone (no filters) | 0.927 | 0.912 | 107 MB | 0.12 ms once |
+| **Rules version 3 with the model** (weights 0.40 similarity, 0.20 title, 0.25 skills, 0.15 level; soft factors for place, language, age) | **0.963** | **0.883** | 55 MB (float16) | 0.12 ms once |
+| Rules version 3 without the model (title filter stays hard) | 0.914 | 0.763 | none | |
 
 Option 3 was not measured: option 2 already closes most of the gap, and a transformer needs ONNX Runtime (cgo) or
 an extra service and 10 to 50 ms per job. Options 4 and 5 need GPUs, LLM calls or millions of labelled hires.
@@ -65,7 +68,7 @@ an extra service and 10 to 50 ms per job. Options 4 and 5 need GPUs, LLM calls o
 ### Consequences
 
 - Good, because related and German titles are found, and title-only hits no longer rank high.
-- Good, because a job is analysed once; scoring a user against it is a dot product and a few lookups.
+- Good, because a job is analyzed once; scoring a user against it is a dot product and a few lookups.
 - Good, because it runs in the Go binary on any CPU, without network at run time.
 - Bad, because the image grows by about 54 MB and the worker holds the table in memory.
 - Bad, because the ranking set is small and written by the project; it guards against regressions but is no proof

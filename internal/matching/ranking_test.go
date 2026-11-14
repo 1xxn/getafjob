@@ -7,6 +7,8 @@ import (
 	"slices"
 	"testing"
 	"time"
+
+	"github.com/1xxn/getafjob/internal/matching/embed"
 )
 
 // rankingSet is a fixed set of fictional postings with graded relevance (0 to 3) per profile. It measures how well
@@ -28,13 +30,18 @@ type rankingSet struct {
 	} `json:"jobs"`
 }
 
-// Floors of the current rules; raise them when the ranking gets better, never lower them.
+// Floors of the ranking with the model (the token subset in testdata/embed) and of the rules alone; raise them
+// when the ranking gets better, never lower them.
 const (
-	minNDCG     = 0.86
-	minPairwise = 0.72
+	minNDCGModel     = 0.96
+	minPairsModel    = 0.88
+	minNDCGRules     = 0.91
+	minPairsRules    = 0.76
+	rankingModelDims = 256
 )
 
-func TestRankingQuality(t *testing.T) {
+func loadRankingSet(t *testing.T) rankingSet {
+	t.Helper()
 	b, err := os.ReadFile("testdata/ranking.json")
 	if err != nil {
 		t.Fatal(err)
@@ -43,21 +50,55 @@ func TestRankingQuality(t *testing.T) {
 	if err := json.Unmarshal(b, &set); err != nil {
 		t.Fatal(err)
 	}
+	return set
+}
+
+func (set rankingSet) jobs() map[string]Job {
 	jobs := map[string]Job{}
 	for i, j := range set.Jobs {
 		jobs[j.ID] = Job{ID: int64(i + 1), Company: j.Company, Title: j.Title, Location: j.Location, Workplace: j.Workplace,
 			Description: j.Description, FirstSeen: now.Add(-time.Duration(j.Days) * 24 * time.Hour)}
 	}
-	var sumNDCG, sumPairs float64
+	return jobs
+}
+
+func TestRankingQuality(t *testing.T) {
+	set := loadRankingSet(t)
+	model, err := embed.Load("testdata/embed", 0)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, v := range []struct {
+		name            string
+		emb             Embedder
+		minNDCG, minPrs float64
+	}{{"model", model, minNDCGModel, minPairsModel}, {"rules", nil, minNDCGRules, minPairsRules}} {
+		t.Run(v.name, func(t *testing.T) {
+			ndcg, pairs := rank(t, set, v.emb)
+			if ndcg < v.minNDCG || pairs < v.minPrs {
+				t.Errorf("ranking got worse: NDCG@10 %.3f (floor %.3f), pairs %.3f (floor %.3f)", ndcg, v.minNDCG, pairs, v.minPrs)
+			}
+		})
+	}
+}
+
+// rank scores the ranking set with emb (nil: rules alone) and returns the mean NDCG@10 and pairwise accuracy.
+func rank(t *testing.T, set rankingSet, emb Embedder) (ndcgMean, pairsMean float64) {
+	t.Helper()
+	jobs := set.jobs()
+	prepared := map[string]*Prepared{}
+	for id, j := range jobs {
+		prepared[id] = Prepare(j, emb)
+	}
 	for _, p := range set.Profiles {
-		m := NewMatcher(p.Criteria)
+		m := NewMatcher(p.Criteria, emb)
 		var ranked []graded
 		for id, g := range p.Grades {
-			j, ok := jobs[id]
+			pj, ok := prepared[id]
 			if !ok {
 				t.Fatalf("%s: unknown job %s", p.Name, id)
 			}
-			r := m.Evaluate(j, now)
+			r := m.EvaluatePrepared(pj, now)
 			key := r.Score
 			if r.Decision == Skip {
 				key = -1 // filtered out: below everything shown
@@ -66,13 +107,32 @@ func TestRankingQuality(t *testing.T) {
 		}
 		ndcg, pairs := ndcgAt(ranked, 10), pairwise(ranked)
 		t.Logf("%-8s NDCG@10 %.3f  pairs %.3f", p.Name, ndcg, pairs)
-		sumNDCG += ndcg
-		sumPairs += pairs
+		ndcgMean += ndcg
+		pairsMean += pairs
 	}
 	n := float64(len(set.Profiles))
-	t.Logf("mean     NDCG@10 %.3f  pairs %.3f", sumNDCG/n, sumPairs/n)
-	if sumNDCG/n < minNDCG || sumPairs/n < minPairwise {
-		t.Errorf("ranking got worse: NDCG@10 %.3f (floor %.3f), pairs %.3f (floor %.3f)", sumNDCG/n, minNDCG, sumPairs/n, minPairwise)
+	t.Logf("mean     NDCG@10 %.3f  pairs %.3f", ndcgMean/n, pairsMean/n)
+	return ndcgMean / n, pairsMean / n
+}
+
+// TestWriteRankingModel rebuilds testdata/embed from the full model: only the tokens of the ranking set, so the
+// tests rank with the real vectors. Run it after changing the ranking set or the texts that are embedded:
+// GETAFJOB_EMBED_FULL=<dir with tokenizer.json and model.safetensors> go test -run TestWriteRankingModel.
+func TestWriteRankingModel(t *testing.T) {
+	full := os.Getenv("GETAFJOB_EMBED_FULL")
+	if full == "" {
+		t.Skip("GETAFJOB_EMBED_FULL not set")
+	}
+	set := loadRankingSet(t)
+	var texts []string
+	for _, j := range set.Jobs {
+		texts = append(texts, embedText(Job{Title: j.Title, Description: j.Description}))
+	}
+	for _, p := range set.Profiles {
+		texts = append(texts, ProfileText(p.Criteria))
+	}
+	if err := embed.Subset(full, "testdata/embed", texts, rankingModelDims); err != nil {
+		t.Fatal(err)
 	}
 }
 

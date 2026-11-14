@@ -244,6 +244,7 @@
   "match.reason.salary.fit": "Salary up to {top} EUR.",
   "match.reason.skills.fit": "Your skills in the posting: {have}. Not in your profile: {missing}.",
   "match.reason.skills.none": "The posting names none of your skills. It asks for: {missing}.",
+  "match.reason.similarity": "The posting reads like your profile ({pct} %).",
   "match.reason.skills.unknown": "The posting names no known skills.",
   "match.reason.title.any": "You have not named wanted titles.",
   "match.reason.title.exact": "The title matches \"{term}\".",
