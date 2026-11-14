@@ -938,7 +938,7 @@ func jobsFilters(d JobsData) templ.Component {
 				return templ_7745c5c3_Err
 			}
 			templ_7745c5c3_Err = templruntime.RenderAttributes(ctx, templ_7745c5c3_Buffer, templ_7745c5c3_ElementWriter, "form", HX(ctx, "hx-get", "/jobs", "hx-target", "#results", "hx-swap", "outerHTML transition:false", "hx-push-url", "true",
-				"hx-trigger", "submit, change from:select, input changed delay:400ms from:input"))
+				"hx-trigger", "submit, change from:.jobs-filters select, input changed delay:400ms from:.jobs-filters input"))
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
