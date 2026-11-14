@@ -178,7 +178,7 @@ templ jobsToolbar(d JobsData) {
 	</div>
 	@ui.Dialog(ui.DialogProps{ID: "dlg-save-search", Title: T(ctx, "searches.save"), CloseLabel: T(ctx, "shell.close")}) {
 		<form method="post" action="/searches" class="stack" data-save-search-form>
-			<input type="hidden" name="query" value={ d.SaveQuery }/>
+			<input type="hidden" id="save-search-query" name="query" value={ d.SaveQuery }/>
 			<p class="muted">{ T(ctx, "searches.save_hint") }</p>
 			@ui.Input(ui.InputProps{FieldProps: ui.FieldProps{ID: "search-name", Name: "name", Label: T(ctx, "searches.name"), Required: true}, MaxLength: 100})
 			@ui.Checkbox(ui.CheckProps{ID: "search-alert", Name: "alert", Label: T(ctx, "searches.alert"), Hint: T(ctx, "searches.alert_hint")})
@@ -287,6 +287,12 @@ templ JobsPage(d JobsData) {
 }
 
 // JobResults is the part htmx swaps on filter changes: chips, bulk bar, rows, pager and the open job.
+// JobResultsSwap answers a filter change: the results and, out of band, the filters the save search dialog keeps.
+templ JobResultsSwap(d JobsData) {
+	@JobResults(d)
+	<input type="hidden" id="save-search-query" name="query" value={ d.SaveQuery } { HX(ctx, "hx-swap-oob", "true")... }/>
+}
+
 templ JobResults(d JobsData) {
 	<div id="results" class={ "jobs-layout", templ.KV("jobs-layout-open", d.Panel != nil) }>
 		<div class="jobs-main">
