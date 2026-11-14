@@ -51,6 +51,10 @@ func TestAdmin(t *testing.T) {
 	if link := tab.Eval("return document.querySelector('[data-invite-link] input').value"); !strings.Contains(link, "/invite/") {
 		t.Fatalf("invitation link %s", link)
 	}
+	// Copy: the button confirms, or (no clipboard permission) selects the link for Ctrl+C.
+	tab.Click(`[data-copy="invite-link"]`)
+	tab.WaitWithin(5*time.Second, `(() => { const b = document.querySelector('[data-copy="invite-link"]');
+		return b.querySelector('span').textContent === b.dataset.copied || document.activeElement.id === 'invite-link' })()`)
 	tab.Axe("/admin/users")
 	tab.Shot("invited")
 	tab.Click(`[data-invite-row="` + email + `"] button[type="submit"]`)

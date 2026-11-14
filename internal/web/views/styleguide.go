@@ -12,7 +12,7 @@ var sgColors = []string{
 var sgIcons = []string{
 	"home", "search", "briefcase", "bookmark", "live", "inbox", "check-circle", "check", "x", "chevron-down",
 	"chevron-up", "chevron-left", "chevron-right", "arrow-up", "arrow-down", "arrow-up-down", "list", "file-text",
-	"file", "columns", "user", "users", "message", "type", "settings", "shield", "bell", "sun", "moon", "monitor",
+	"file", "copy", "columns", "user", "users", "message", "type", "settings", "shield", "bell", "sun", "moon", "monitor",
 	"menu", "plus", "external", "more", "logout", "globe", "eye", "upload", "download", "trash", "edit", "filter",
 	"refresh", "play", "pause", "clock", "send", "pointer", "alert", "info", "command", "calendar", "building",
 	"map-pin", "server", "database", "star", "lock", "ban",

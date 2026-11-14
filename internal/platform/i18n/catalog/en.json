@@ -1118,6 +1118,8 @@
   "admin.invite.create": "Create invitation link",
   "admin.invite.created": "Invitation created",
   "admin.invite.created_text": "Copy the link now and send it to the person. It is shown only once and valid until {expires}.",
+  "admin.invite.copied": "Link copied.",
+  "admin.invite.copy": "Copy link",
   "admin.invite.link": "Invitation link",
   "admin.invite.taken": "An account with this address exists already.",
   "admin.invite.failed": "No invitation was created. Check the address.",
