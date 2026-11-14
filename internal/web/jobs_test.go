@@ -451,19 +451,19 @@ func TestFitInspectorAndCVVariantSwitcher(t *testing.T) {
 	if !strings.Contains(body, `id="fit-inspector"`) {
 		t.Fatal("fit inspector missing")
 	}
-	if !strings.Contains(body, "Matching Skills") || !strings.Contains(body, "Go") {
+	if !strings.Contains(body, "Matching skills") || !strings.Contains(body, "Go") {
 		t.Fatalf("matching skills missing in body:\n%s", body)
 	}
-	if !strings.Contains(body, "Missing Keywords &amp; Skills") {
+	if !strings.Contains(body, "Missing keywords &amp; skills") {
 		t.Fatalf("missing skills title not found")
 	}
 	if !strings.Contains(body, "PostgreSQL") || !strings.Contains(body, "Docker") {
 		t.Fatalf("missing skills PostgreSQL / Docker not found")
 	}
-	if !strings.Contains(body, "Score Breakdown") {
+	if !strings.Contains(body, "Score breakdown") {
 		t.Fatal("score breakdown title not found")
 	}
-	if !strings.Contains(body, "Skills Overlap") || !strings.Contains(body, "Seniority Level") {
+	if !strings.Contains(body, "Skills overlap") || !strings.Contains(body, "Seniority level") {
 		t.Fatal("breakdown dimensions missing")
 	}
 
@@ -683,7 +683,7 @@ func TestJobApply_PreviewAndSubmit(t *testing.T) {
 	checkNonces(t, previewRec)
 	previewHTML := previewRec.Body.String()
 	for _, expected := range []string{
-		"Instant Apply Preview",
+		"Instant apply preview",
 		"Senior Distributed Systems Engineer",
 		"Cloud Systems AG",
 		"Max Mustermann",
@@ -701,7 +701,7 @@ func TestJobApply_PreviewAndSubmit(t *testing.T) {
 		"Computer Science",
 		"Earliest start date?",
 		"Within 2 weeks notice",
-		"Confirm &amp; Start Application",
+		"Confirm &amp; start application",
 	} {
 		if !strings.Contains(previewHTML, expected) {
 			t.Errorf("preview HTML missing expected substring: %q", expected)
@@ -766,7 +766,7 @@ func TestJobApply_PreviewAndSubmit(t *testing.T) {
 	if !strings.Contains(dupBody, "You already have an active or submitted application for this job.") {
 		t.Errorf("duplicate preview missing duplicate error message, body:\n%s", dupBody)
 	}
-	if !strings.Contains(dupBody, "Application Blocked by Safety Guard") {
+	if !strings.Contains(dupBody, "Application blocked by safety guard") {
 		t.Error("duplicate preview missing blocked guard button label")
 	}
 
@@ -787,13 +787,13 @@ func TestJobApply_PreviewAndSubmit(t *testing.T) {
 		t.Fatalf("applications count = %d, want 1", appCount)
 	}
 
-	// 9. Verify Job Detail page now displays "View Application" linking to the active application
+	// 9. Verify Job Detail page now displays "View application" linking to the active application
 	jobDetailRec := a.do(http.MethodGet, "/jobs/"+strconv.FormatInt(jobID, 10), nil, session, nil)
 	if jobDetailRec.Code != http.StatusOK {
 		t.Fatalf("job detail code: %d", jobDetailRec.Code)
 	}
 	jobDetailHTML := jobDetailRec.Body.String()
-	if !strings.Contains(jobDetailHTML, "View Application") || !strings.Contains(jobDetailHTML, "/applications/"+appIDStr) {
+	if !strings.Contains(jobDetailHTML, "View application") || !strings.Contains(jobDetailHTML, "/applications/"+appIDStr) {
 		t.Errorf("job detail missing 'View Application' button linking to %s", appIDStr)
 	}
 }

@@ -100,3 +100,30 @@ func TestGermanSaysDu(t *testing.T) {
 		}
 	}
 }
+
+// English labels use sentence case: after the first word only names and acronyms start with a capital letter.
+func TestEnglishLabelsUseSentenceCase(t *testing.T) {
+	names := map[string]bool{"CV": true, "EU": true, "LinkedIn": true, "Indeed": true, "GitHub": true, "GDPR": true,
+		"Greenhouse": true, "Lever": true, "Ashby": true, "Workday": true, "Personio": true, "SmartRecruiters": true,
+		"Recruitee": true, "Workable": true, "Teamtailor": true, "I": true, "Europe": true, "Germany": true,
+		"German": true, "English": true, "Chromium": true, "Web": true, "Push": true, "Easy": true, "Apply": true,
+		"Assist": true, "Enter": true, "Max": true, "Mustermann": true, "Berlin": true, "Acme": true, "GmbH": true,
+		"Backend": true, "Engineer": true}
+	for k, msg := range catalogs[EN] {
+		// Sentences and texts with parameters are prose; this test looks at short labels.
+		if strings.ContainsAny(msg, "{.?!") || len(msg) > 60 {
+			continue
+		}
+		words := strings.Fields(msg)
+		for _, w := range words[min(1, len(words)):] {
+			core := strings.Trim(w, `()&/,:;*"'`)
+			if core == "" || core == strings.ToUpper(core) || names[core] {
+				continue
+			}
+			if r := []rune(core)[0]; r >= 'A' && r <= 'Z' {
+				t.Errorf("en: %q is not in sentence case: %q (%s)", k, msg, core)
+				break
+			}
+		}
+	}
+}
