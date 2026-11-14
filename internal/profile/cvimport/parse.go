@@ -357,8 +357,8 @@ func extractWorkExperiences(lines []string) []profile.WorkExperience {
 			continue
 		}
 		we := profile.WorkExperience{
-			StartDate: strings.TrimSpace(l[m[2]:m[3]]),
-			EndDate:   strings.TrimSpace(l[m[4]:m[5]]),
+			StartDate: profile.MonthDate(l[m[2]:m[3]]),
+			EndDate:   profile.MonthDate(l[m[4]:m[5]]),
 			SortOrder: len(out),
 		}
 		if isOngoing(we.EndDate) {
@@ -390,8 +390,8 @@ func extractEducations(lines []string) []profile.EducationStation {
 			continue
 		}
 		ed := profile.EducationStation{
-			StartDate: strings.TrimSpace(l[m[2]:m[3]]),
-			EndDate:   strings.TrimSpace(l[m[4]:m[5]]),
+			StartDate: profile.MonthDate(l[m[2]:m[3]]),
+			EndDate:   profile.MonthDate(l[m[4]:m[5]]),
 			SortOrder: len(out),
 		}
 		if isOngoing(ed.EndDate) {

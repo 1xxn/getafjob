@@ -268,3 +268,15 @@ func TestStationsCRUDAndOrdering(t *testing.T) {
 		t.Fatalf("expected ErrStationNotFound, got %v", err)
 	}
 }
+
+// Month notations from CVs become YYYY-MM, the form the planner fills from; other dates stay as written.
+func TestMonthDate(t *testing.T) {
+	for in, want := range map[string]string{
+		"01/2021": "2021-01", "4.2019": "2019-04", " 12-2018 ": "2018-12", "2021/04": "2021-04",
+		"2021-04": "2021-04", "2021": "2021", "13/2021": "13/2021", "Jan 2021": "Jan 2021", "": "",
+	} {
+		if got := MonthDate(in); got != want {
+			t.Errorf("MonthDate(%q) = %q, want %q", in, got, want)
+		}
+	}
+}

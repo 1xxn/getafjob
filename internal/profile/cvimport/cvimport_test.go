@@ -150,7 +150,7 @@ func TestExtractStationsEnglish(t *testing.T) {
 		t.Fatalf("expected 2 work experiences, got %d", len(exps))
 	}
 	e0 := exps[0]
-	if e0.Title != "Senior Platform Engineer" || e0.Company != "Muster GmbH" || e0.StartDate != "01/2021" || !e0.IsCurrent || e0.EndDate != "" {
+	if e0.Title != "Senior Platform Engineer" || e0.Company != "Muster GmbH" || e0.StartDate != "2021-01" || !e0.IsCurrent || e0.EndDate != "" {
 		t.Errorf("e0 mismatch: %+v", e0)
 	}
 	if len(e0.DescriptionBullets) != 2 || e0.DescriptionBullets[0] != "Built the internal developer platform" {
@@ -179,7 +179,7 @@ func TestExtractStationsGerman(t *testing.T) {
 		t.Fatalf("expected 1 work experience, got %d", len(exps))
 	}
 	e0 := exps[0]
-	if e0.Title != "Softwareentwicklerin" || e0.Company != "Beispiel GmbH" || e0.StartDate != "03/2019" || !e0.IsCurrent {
+	if e0.Title != "Softwareentwicklerin" || e0.Company != "Beispiel GmbH" || e0.StartDate != "2019-03" || !e0.IsCurrent {
 		t.Errorf("e0 mismatch: %+v", e0)
 	}
 	if len(e0.DescriptionBullets) != 1 || e0.DescriptionBullets[0] != "Microservices in Go" {
