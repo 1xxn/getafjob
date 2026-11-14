@@ -188,7 +188,7 @@ Add the following secrets to each environment (or as repository secrets if shari
 
 ### Automated Workflows
 
-- **Staging Deployment:** When a pull request merges to `main`, `.github/workflows/main.yml` runs the stack checks (e2e included), builds and signs container images (`ghcr.io/1xxn/getafjob:main-<sha>`), and when the commit is still the head of `main` dispatches to `deploy.yml` with `environment: staging`.
+- **Staging Deployment:** When a pull request merges to `main`, `.github/workflows/main.yml` runs the stack checks (e2e included), builds and signs container images (`ghcr.io/1xxn/getafjob:sha-<commit>`, plus `main` for the head), and when the commit is still the head of `main` dispatches to `deploy.yml` with `environment: staging`.
 - **Production Deployment:** When the maintainer pushes a tag (`v0.1.0`), `.github/workflows/release.yml` creates binaries, publishes signed container images, and requests approval for the `production` environment. Upon approval, `deploy.yml` deploys the release.
 
 ### Manual Deployment via GitHub Actions UI
@@ -198,7 +198,7 @@ Add the following secrets to each environment (or as repository secrets if shari
 3. Click **Run workflow**:
    - **Target environment:** `staging` or `production`.
    - **Action:** `deploy`.
-   - **Version tag:** e.g. `v0.1.0` or `main-22e0c86`.
+   - **Version tag:** e.g. `v0.1.0` or `sha-<full commit hash>`.
 4. Click **Run workflow**.
 
 ### Manual Deployment via CLI
@@ -212,7 +212,7 @@ cd /opt/getafjob
 GETAFJOB_ENV=production deploy/deploy.sh v0.1.0
 
 # Deploy specific version to staging
-GETAFJOB_ENV=staging deploy/deploy.sh main-22e0c86
+GETAFJOB_ENV=staging deploy/deploy.sh sha-<full commit hash>
 
 # Using task
 go tool task deploy -- --env production v0.1.0
