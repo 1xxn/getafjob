@@ -1,0 +1,131 @@
+{
+  "profiles": [
+    {
+      "name": "platform",
+      "criteria": {
+        "Titles": ["Platform Engineer", "DevOps Engineer"],
+        "Locations": ["Berlin"],
+        "Remote": true,
+        "RemoteRegions": ["Germany"],
+        "Skills": ["Go", "Kubernetes", "Terraform", "AWS", "PostgreSQL", "Prometheus", "Linux"],
+        "Languages": [{"Name": "Deutsch", "Level": "Muttersprache"}, {"Name": "English", "Level": "C1"}],
+        "YearsTotal": "7"
+      },
+      "grades": {
+        "p1": 3, "p2": 3, "p3": 3, "p4": 2, "p5": 2, "p6": 1, "p7": 2, "p8": 1, "p9": 0, "p10": 2,
+        "p11": 1, "p12": 0, "p13": 2, "p14": 1,
+        "f1": 0, "f2": 0, "f3": 0, "d1": 0, "d2": 0, "d3": 1, "x1": 0, "x2": 0, "x3": 1, "x4": 0
+      }
+    },
+    {
+      "name": "frontend",
+      "criteria": {
+        "Titles": ["Frontend Developer", "Webentwickler"],
+        "Locations": ["Hamburg"],
+        "Remote": true,
+        "RemoteRegions": ["Germany"],
+        "Skills": ["JavaScript", "TypeScript", "React", "CSS", "HTML"],
+        "Languages": [{"Name": "Deutsch", "Level": "Muttersprache"}, {"Name": "Englisch", "Level": "B2"}],
+        "YearsTotal": "1"
+      },
+      "grades": {
+        "f1": 3, "f2": 3, "f3": 2, "f4": 3, "f5": 1, "f6": 2, "f7": 0, "f8": 2, "f9": 1, "f10": 0,
+        "p1": 0, "p2": 0, "p4": 0, "d1": 0, "x1": 0, "x2": 1, "x3": 0, "x4": 0
+      }
+    },
+    {
+      "name": "data",
+      "criteria": {
+        "Titles": ["Data Scientist", "Machine Learning Engineer"],
+        "Locations": ["München"],
+        "Remote": true,
+        "RemoteRegions": ["Germany", "EU"],
+        "Skills": ["Python", "SQL", "PyTorch", "scikit-learn", "Pandas", "Statistics"],
+        "Languages": [{"Name": "English", "Level": "native"}, {"Name": "German", "Level": "B1"}],
+        "YearsTotal": "4"
+      },
+      "grades": {
+        "d1": 3, "d2": 3, "d3": 2, "d4": 2, "d5": 1, "d6": 0, "d7": 3, "d8": 1, "d9": 0, "d10": 2,
+        "p1": 0, "p3": 0, "f1": 0, "x1": 0, "x2": 0, "x3": 0, "x4": 0
+      }
+    }
+  ],
+  "jobs": [
+    {"id": "p1", "title": "Senior Platform Engineer (m/w/d)", "company": "Muster Cloud GmbH", "location": "Berlin, Germany", "workplace": "hybrid", "days": 2,
+     "description": "Wir bauen unsere interne Plattform auf Kubernetes und AWS. Deine Aufgaben: Betrieb und Ausbau von Clustern, Infrastruktur mit Terraform, Monitoring mit Prometheus. Du bringst mit: mehrjährige Erfahrung mit Go oder Python, Kubernetes, Terraform und Linux. Von Vorteil: PostgreSQL-Betrieb."},
+    {"id": "p2", "title": "Site Reliability Engineer", "company": "Muster Payments AG", "location": "Remote, Germany", "workplace": "remote", "days": 5,
+     "description": "You keep our payment platform reliable. Requirements: 5+ years of experience running Kubernetes in production, strong Go skills, Terraform, AWS, Prometheus and Grafana, on-call experience. Nice to have: PostgreSQL tuning."},
+    {"id": "p3", "title": "DevOps Engineer (all genders)", "company": "Muster Logistik SE", "location": "Berlin", "workplace": "onsite", "days": 1,
+     "description": "Your tasks: CI/CD pipelines with GitLab, Kubernetes on AWS, Terraform modules, Linux administration. What you bring: several years as DevOps or platform engineer, Go or Python, PostgreSQL. We offer 75.000 - 90.000 EUR."},
+    {"id": "p4", "title": "Cloud Engineer Azure", "company": "Muster Consulting GmbH", "location": "Berlin, Germany", "workplace": "hybrid", "days": 10,
+     "description": "Du betreust Kundenumgebungen in Microsoft Azure. Anforderungen: Azure, Bicep oder Terraform, PowerShell, Windows Server, Active Directory. Kubernetes (AKS) ist ein Plus."},
+    {"id": "p5", "title": "Infrastructure Engineer", "company": "Muster Games GmbH", "location": "Remote - Germany", "workplace": "remote", "days": 20,
+     "description": "We look for an engineer for our game servers. You bring experience with Linux, Ansible, Terraform and AWS, and some scripting in Python or Go. Kubernetes experience is welcome."},
+    {"id": "p6", "title": "Junior DevOps Engineer", "company": "Muster Start GmbH", "location": "Berlin", "workplace": "onsite", "days": 3,
+     "description": "Einstieg in DevOps: Du unterstützt unser Team bei Docker, Kubernetes und CI/CD. Erste Erfahrung mit Linux und einer Skriptsprache genügt."},
+    {"id": "p7", "title": "Backend Engineer Go", "company": "Muster Finance GmbH", "location": "Berlin, Germany", "workplace": "hybrid", "days": 4,
+     "description": "Build APIs in Go on PostgreSQL. You bring 5+ years of backend development with Go, PostgreSQL, Kubernetes and AWS. You care about observability with Prometheus."},
+    {"id": "p8", "title": "Head of Platform Engineering", "company": "Muster Scale AG", "location": "Berlin", "workplace": "hybrid", "days": 6,
+     "description": "Lead three platform teams (20 engineers). You bring 12+ years of experience, of which 5 in leadership, budget responsibility, Kubernetes and cloud strategy."},
+    {"id": "p9", "title": "Platform Engineer", "company": "Muster Bank AG", "location": "Zürich, Switzerland", "workplace": "onsite", "days": 2,
+     "description": "Kubernetes, Terraform and Go for our banking platform in Zurich. On-site five days a week."},
+    {"id": "p10", "title": "Plattform-Ingenieur (m/w/d)", "company": "Muster Stadtwerke", "location": "Berlin", "workplace": "hybrid", "days": 8,
+     "description": "Wir suchen Verstärkung für unsere Container-Plattform. Du kennst dich mit Kubernetes, Terraform und Linux aus und hast mindestens 5 Jahre Berufserfahrung im Betrieb. Kenntnisse in Go sind wünschenswert."},
+    {"id": "p11", "title": "DevOps Engineer", "company": "Muster Retail GmbH", "location": "Berlin", "workplace": "hybrid", "days": 40,
+     "description": "Jenkins, Docker, Kubernetes, AWS. Erfahrung mit Java-Builds."},
+    {"id": "p12", "title": "Platform Engineer (Salesforce)", "company": "Muster CRM GmbH", "location": "Berlin", "workplace": "hybrid", "days": 3,
+     "description": "Customize our Salesforce platform with Apex and Lightning Web Components. Salesforce certification required."},
+    {"id": "p13", "title": "Systems Engineer Linux", "company": "Muster Hosting GmbH", "location": "Remote, Deutschland", "workplace": "remote", "days": 7,
+     "description": "Betrieb von Linux-Servern und Kubernetes-Clustern im eigenen Rechenzentrum. Automatisierung mit Ansible und Terraform, Monitoring mit Prometheus. Go oder Python für Tools."},
+    {"id": "p14", "title": "DevOps Engineer", "company": "Muster Agentur", "location": "Berlin", "workplace": "onsite", "days": 2,
+     "description": "DevOps."},
+    {"id": "f1", "title": "Frontend Developer (m/w/d)", "company": "Muster Shop GmbH", "location": "Hamburg", "workplace": "hybrid", "days": 3,
+     "description": "Du entwickelst unseren Onlineshop mit React und TypeScript. Du bringst erste Erfahrung mit JavaScript, HTML und CSS mit. Berufseinsteiger willkommen."},
+    {"id": "f2", "title": "Junior Webentwickler (m/w/d)", "company": "Muster Medien GmbH", "location": "Hamburg", "workplace": "onsite", "days": 1,
+     "description": "Für unsere Kundenprojekte suchst du nach Webentwicklung mit HTML, CSS und JavaScript. React-Kenntnisse sind von Vorteil."},
+    {"id": "f3", "title": "Frontend Engineer Vue.js", "company": "Muster Travel GmbH", "location": "Remote, Germany", "workplace": "remote", "days": 6,
+     "description": "Build our booking frontend with Vue.js and TypeScript. You know JavaScript, HTML and CSS well. 2+ years of experience."},
+    {"id": "f4", "title": "Junior Frontend Developer", "company": "Muster Health GmbH", "location": "Hamburg, Germany", "workplace": "hybrid", "days": 2,
+     "description": "Join our team building a patient app in React and TypeScript. Requirements: JavaScript, TypeScript, React, CSS. Nice to have: testing with Jest."},
+    {"id": "f5", "title": "Senior Frontend Architect", "company": "Muster Commerce AG", "location": "Hamburg", "workplace": "hybrid", "days": 4,
+     "description": "Define the frontend architecture for 8 teams. 10+ years of experience with JavaScript frameworks, micro frontends and design systems."},
+    {"id": "f6", "title": "Fullstack Entwickler (m/w/d)", "company": "Muster Software GmbH", "location": "Hamburg", "workplace": "hybrid", "days": 5,
+     "description": "React und TypeScript im Frontend, Node.js und PostgreSQL im Backend. Erste Berufserfahrung mit JavaScript ist ausreichend."},
+    {"id": "f7", "title": "Frontend Developer", "company": "Muster Labs Inc.", "location": "New York, USA", "workplace": "onsite", "days": 2,
+     "description": "React, TypeScript, on-site in Manhattan."},
+    {"id": "f8", "title": "UI Engineer", "company": "Muster Design GmbH", "location": "Remote, Germany", "workplace": "remote", "days": 9,
+     "description": "You turn designs into accessible components: HTML, CSS, TypeScript and React. Junior profiles with a strong portfolio are welcome."},
+    {"id": "f9", "title": "Webdesigner (m/w/d)", "company": "Muster Werbung", "location": "Hamburg", "workplace": "onsite", "days": 12,
+     "description": "Gestaltung von Webseiten mit Figma und WordPress, etwas HTML und CSS."},
+    {"id": "f10", "title": "Frontend Developer Angular", "company": "Muster Versicherung AG", "location": "Hamburg", "workplace": "hybrid", "days": 3,
+     "description": "Angular, RxJS, TypeScript. Mindestens 6 Jahre Erfahrung in der Frontend-Entwicklung, davon 3 mit Angular. Verhandlungssicheres Französisch."},
+    {"id": "d1", "title": "Data Scientist (m/w/d)", "company": "Muster Energie AG", "location": "München", "workplace": "hybrid", "days": 3,
+     "description": "You build forecasting models with Python, Pandas and scikit-learn. Requirements: 3+ years as data scientist, strong statistics, SQL. Nice to have: PyTorch."},
+    {"id": "d2", "title": "Machine Learning Engineer", "company": "Muster Vision GmbH", "location": "Remote, EU", "workplace": "remote", "days": 4,
+     "description": "Train and deploy deep learning models with PyTorch. You bring Python, PyTorch, MLOps experience and SQL. 3-5 years of experience."},
+    {"id": "d3", "title": "Data Engineer", "company": "Muster Mobility GmbH", "location": "München", "workplace": "hybrid", "days": 5,
+     "description": "Build data pipelines with Python, SQL, Airflow and Spark on AWS. Some Kubernetes."},
+    {"id": "d4", "title": "Senior Data Scientist", "company": "Muster Insurance AG", "location": "Remote, Germany", "workplace": "remote", "days": 6,
+     "description": "Pricing models with Python and statistics. 5+ years of experience, SQL, scikit-learn."},
+    {"id": "d5", "title": "Data Analyst", "company": "Muster Retail GmbH", "location": "München", "workplace": "onsite", "days": 2,
+     "description": "Dashboards in Power BI, SQL queries, Excel. Some Python is a plus."},
+    {"id": "d6", "title": "Data Scientist", "company": "Muster Bio AG", "location": "Basel, Switzerland", "workplace": "onsite", "days": 3,
+     "description": "Python and R for clinical studies, on-site in Basel."},
+    {"id": "d7", "title": "KI-Entwickler / Machine Learning (m/w/d)", "company": "Muster Industrie GmbH", "location": "München", "workplace": "hybrid", "days": 4,
+     "description": "Du entwickelst Modelle zur Qualitätskontrolle mit Python, PyTorch und scikit-learn. Gute Kenntnisse in Statistik und SQL. Englisch reicht, Deutsch ist ein Plus."},
+    {"id": "d8", "title": "Head of Data Science", "company": "Muster Group SE", "location": "München", "workplace": "hybrid", "days": 5,
+     "description": "Lead a team of 12 data scientists. 10+ years of experience, 4 in leadership."},
+    {"id": "d9", "title": "Werkstudent Data Science", "company": "Muster Uni Spin-off", "location": "München", "workplace": "hybrid", "days": 2,
+     "description": "Als Werkstudent unterstützt du uns 20 Stunden pro Woche mit Python und Pandas. Du bist eingeschrieben."},
+    {"id": "d10", "title": "Applied Scientist", "company": "Muster Search GmbH", "location": "Remote, Germany", "workplace": "remote", "days": 8,
+     "description": "Ranking and recommendation models. Python, PyTorch, statistics, A/B testing, SQL. 3+ years of experience."},
+    {"id": "x1", "title": "Vertriebsmitarbeiter Außendienst (m/w/d)", "company": "Muster Handel GmbH", "location": "Berlin", "workplace": "onsite", "days": 1,
+     "description": "Du betreust Kunden im Außendienst. Führerschein Klasse B erforderlich."},
+    {"id": "x2", "title": "Software Engineer", "company": "Muster Tech GmbH", "location": "Hamburg", "workplace": "hybrid", "days": 3,
+     "description": "Generalist role: TypeScript and React in the frontend, Go and PostgreSQL in the backend, deployed on Kubernetes."},
+    {"id": "x3", "title": "IT Administrator", "company": "Muster Praxis", "location": "Berlin", "workplace": "onsite", "days": 4,
+     "description": "Betreuung von Windows-Clients, Linux-Servern und Netzwerk. Erste Erfahrung mit Docker ist ein Plus."},
+    {"id": "x4", "title": "Pflegefachkraft (m/w/d)", "company": "Muster Klinik", "location": "München", "workplace": "onsite", "days": 2,
+     "description": "Pflege von Patientinnen und Patienten im Schichtdienst."}
+  ]
+}
