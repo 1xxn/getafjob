@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"slices"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -465,5 +466,26 @@ func TestDoneAfterParkClosesTheLiveSession(t *testing.T) {
 	}
 	if active := srv.ActiveRuns(u); len(active) != 0 {
 		t.Fatalf("live sessions after the run ended: %v", active)
+	}
+}
+
+// In maintenance no runner gets a run; the queued application waits and is leased once it ends (#518).
+func TestNoLeaseInMaintenance(t *testing.T) {
+	pool, apps, c, _, srv := setupWithServer(t)
+	ctx := t.Context()
+	var paused atomic.Bool
+	paused.Store(true)
+	srv.Paused = func(context.Context) bool { return paused.Load() }
+	reg, err := c.Register(with(ctx, secret), &runnerv1.RegisterRequest{Version: "test"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	queue(t, pool, apps)
+	if l, err := c.Lease(with(ctx, secret), &runnerv1.LeaseRequest{RunnerId: reg.GetRunnerId()}); err != nil || l.GetRun() != nil {
+		t.Fatalf("lease in maintenance: %v, %v", l.GetRun(), err)
+	}
+	paused.Store(false)
+	if l, err := c.Lease(with(ctx, secret), &runnerv1.LeaseRequest{RunnerId: reg.GetRunnerId()}); err != nil || l.GetRun() == nil {
+		t.Fatalf("lease after maintenance: %v", err)
 	}
 }

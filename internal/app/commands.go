@@ -33,6 +33,7 @@ Commands:
   gen-vapid-key  print a fresh VAPID P-256 key pair for web push notifications
   invite         create a one-time invitation link (admin invite -email … [-role admin] [-send])
   inbox          queue inbox check now (the worker runs it)
+  maintenance    maintenance mode: only admins get in, background work stops (admin maintenance on [-message …] | off | status)
   load-test      run concurrent load test against a server (admin load-test [-url ...] [-users 5] [-duration 10s])
   notify         queue daily summary notification (admin notify summary)
   plan           queue planning now (the worker runs it)
@@ -84,6 +85,8 @@ func admin(ctx context.Context, args []string, env Env) int {
 		return adminPlan(ctx, args[1:], env)
 	case "inbox":
 		return adminInbox(ctx, args[1:], env)
+	case "maintenance":
+		return adminMaintenance(ctx, args[1:], env)
 	case "load-test":
 		return adminLoadTest(ctx, args[1:], env)
 	case "notify":

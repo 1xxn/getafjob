@@ -216,6 +216,12 @@ type MagicLink struct {
 	UsedAt    *time.Time
 }
 
+type Maintenance struct {
+	ID      bool
+	Message string
+	Since   time.Time
+}
+
 type Match struct {
 	UserID     uuid.UUID
 	JobID      int64

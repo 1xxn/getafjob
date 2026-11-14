@@ -75,6 +75,22 @@ templ Invite(action, email, signedIn, name, nameError string) {
 }
 
 // Problem is the page for errors and invalid links; text is already translated.
+// Maintenance is what everyone but admins sees while the instance is in maintenance; message is the admin's note.
+// Signed-out visitors get the way to the sign-in, which stays open for admins.
+templ Maintenance(message string, signedOut bool) {
+	@Layout(Page{Title: T(ctx, "maintenance.title")}) {
+		<div data-maintenance-page>
+			@pubHead("clock", T(ctx, "maintenance.title"), T(ctx, "maintenance.text"))
+			if message != "" {
+				<p class="pub-text" data-maintenance-message>{ message }</p>
+			}
+			if signedOut {
+				<p class="pub-links"><a href="/login">{ T(ctx, "maintenance.admin_login") }</a></p>
+			}
+		</div>
+	}
+}
+
 templ Problem(title, text, userName string) {
 	@Layout(Page{Title: title, UserName: userName}) {
 		if userName != "" {

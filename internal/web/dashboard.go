@@ -160,6 +160,8 @@ func parkReasonKey(reason string) string {
 		return "dash.park.unreachable"
 	case strings.Contains(r, "submit not registered"), strings.Contains(r, "no click"), strings.Contains(r, "no effect"):
 		return "dash.park.no_confirm"
+	case strings.HasPrefix(r, "maintenance"): // application.ParkedForMaintenance
+		return "dash.park.maintenance"
 	case strings.HasPrefix(r, "runner lost"):
 		return "dash.park.runner_lost"
 	case strings.Contains(r, "form rejected"):

@@ -166,6 +166,37 @@ func (r *Runs) ReapLost(ctx context.Context, lastSeen func(runID uuid.UUID) (tim
 	return n, errors.Join(errs...)
 }
 
+// ParkedForMaintenance is the park reason of runs stopped because the instance went into maintenance.
+const ParkedForMaintenance = "maintenance: the instance went into maintenance"
+
+// ParkForMaintenance parks every application whose run is still going (running or needs_input) and ends the run,
+// so its runner stops at the next call. An application that moved on in the meantime (submitting) keeps its run
+// and finishes the attempt. Parked applications wait for the user; nothing re-queues them.
+func (r *Runs) ParkForMaintenance(ctx context.Context) (int, error) {
+	runs, err := r.store.UnfinishedRuns(ctx)
+	if err != nil {
+		return 0, err
+	}
+	n := 0
+	var errs []error
+	for _, u := range runs {
+		err := r.apps.parkWhileRunning(ctx, u.UserID, u.AppID, ParkedForMaintenance)
+		switch {
+		case errors.Is(err, ErrTransition), errors.Is(err, ErrConflict):
+			continue
+		case err != nil:
+			errs = append(errs, err)
+			continue
+		}
+		if err := r.store.FinishRun(ctx, u.RunRef, "parked", r.apps.now()); err != nil {
+			errs = append(errs, err)
+			continue
+		}
+		n++
+	}
+	return n, errors.Join(errs...)
+}
+
 // Checkpoint stores a step.
 func (r *Runs) Checkpoint(ctx context.Context, ref RunRef, c Checkpoint) error {
 	c.At = r.apps.now()

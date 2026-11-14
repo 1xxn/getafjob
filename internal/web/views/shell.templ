@@ -182,6 +182,20 @@ templ confirmDialog() {
 	</dialog>
 }
 
+// maintenanceBanner tells an admin that only admins can use the instance and ends the maintenance.
+templ maintenanceBanner() {
+	<div class="shell-maintenance" data-maintenance-banner>
+		@ui.Alert(ui.AlertProps{Tone: ui.Warning, Title: T(ctx, "maintenance.banner.title"), Text: T(ctx, "maintenance.banner.text")}) {
+			<form method="post" action="/admin/maintenance">
+				<input type="hidden" name="on" value="0"/>
+				<input type="hidden" name="back" value={ ShellFrom(ctx).Back }/>
+				@ui.Button(ui.ButtonProps{Label: T(ctx, "maintenance.end"), Type: "submit", Size: "sm",
+					Attrs: templ.Attributes{"data-maintenance-end": "1"}})
+			</form>
+		}
+	</div>
+}
+
 // AppShell wraps the page content of a signed-in user.
 templ AppShell(s Shell, wide bool) {
 	{{ counts := (*NavCounts)(nil) }}
@@ -196,6 +210,9 @@ templ AppShell(s Shell, wide bool) {
 	</aside>
 	<div class="shell-content">
 		<main id="main" tabindex="-1" class={ templ.KV("wide", wide) }>
+			if s.Maintenance {
+				@maintenanceBanner()
+			}
 			{ children... }
 		</main>
 		<footer class="footer">

@@ -34,6 +34,7 @@ import (
 	"github.com/1xxn/getafjob/internal/platform/db"
 	"github.com/1xxn/getafjob/internal/platform/events"
 	"github.com/1xxn/getafjob/internal/platform/httpx"
+	"github.com/1xxn/getafjob/internal/platform/maintenance"
 	"github.com/1xxn/getafjob/internal/platform/netguard"
 	"github.com/1xxn/getafjob/internal/platform/queue"
 	"github.com/1xxn/getafjob/internal/platform/webpush"
@@ -115,6 +116,7 @@ func serve(ctx context.Context, cfg config.Config, logger *slog.Logger) error {
 	portalsStore := portalsstore.New(pool)
 	portalsCipher := portalscrypto.NewCipher(env)
 	portalsSvc := portals.NewService(portalsStore, portalsCipher, newAutonomyAdapter(apps), cfg.EasyApplyEnabled)
+	maint := maintenance.New(pool)
 	liveEvents := events.NewHub()
 	go events.Listen(ctx, pool, liveEvents, logger)
 	var gw *gateway.Server
@@ -125,7 +127,7 @@ func serve(ctx context.Context, cfg config.Config, logger *slog.Logger) error {
 		}
 		gw = &gateway.Server{Runs: application.NewRuns(apps, astore), Apps: apps, Shots: sealedFiles,
 			Secret: cfg.RunnerSecret.Reveal(), Logger: logger, Notify: appNotifier.YourTurn, NotifyApproval: appNotifier.ApprovalAsked, ATSMetrics: atsMetrics,
-			Portals: portalsSvc,
+			Portals: portalsSvc, Paused: paused(maint),
 			Data: runData{profiles: profiles, items: profile.NewItems(pstore, env), docs: docs, stations: profile.NewStations(pstore, env), jobs: astore, apps: astore, portals: portalsSvc, now: time.Now,
 				fixture: devFixtureHost(cfg, logger)}}
 		go gw.ReapLost(ctx)
@@ -158,9 +160,10 @@ func serve(ctx context.Context, cfg config.Config, logger *slog.Logger) error {
 	(&web.Server{Identity: ids, Logger: logger, Profile: profiles, Documents: docs, Items: items, Stations: stations,
 		Importer: cvimport.NewImporter(docs, profiles, stations, extractor), Jobs: listings, Searches: matching.NewSavedSearches(mstore, listings), Discovery: discoverySvc,
 		PushStore: webpush.NewStore(pool), VAPIDPublicKey: vapidPub, Apps: apps, Tracking: trackingSvc, Notify: notifySvc, Assist: assistSvc, Portals: portalsSvc, Privacy: privacySvc, Shots: sealedFiles, Handoffs: gw, Events: liveEvents, StyleGuide: cfg.DevStyleGuide, TimeZone: cfg.TimeZone,
-		System: systemFacts{pool: pool, cfg: cfg}, Ops: adminOps{pool: pool, queue: inserter}}).Register(mux)
+		System: systemFacts{pool: pool, cfg: cfg}, Ops: adminOps{pool: pool, queue: inserter},
+		Maintenance: newMaintenanceControl(pool, maint, cfg)}).Register(mux)
 
-	h := httpx.Instrument(httpx.Protect(httpx.Routes(mux), maxBody, cfg.PublicURL.Scheme == "https",
+	h := httpx.Instrument(httpx.Protect(maintenanceAPI(maint, httpx.Routes(mux)), maxBody, cfg.PublicURL.Scheme == "https",
 		httpx.Upload{Path: "/documents", Max: web.MaxUpload}, httpx.Upload{Path: "/setup/cv", Max: web.MaxUpload}))
 
 	// UI and gateway stop together: when one fails, the other is shut down.
@@ -241,7 +244,8 @@ func worker(ctx context.Context, cfg config.Config, logger *slog.Logger) error {
 	tcipher := trackingcrypto.NewCipher(env)
 	trackingSvc := tracking.NewService(tstore, trackingimap.NewClient(cfg.EgressProxy), tcipher, newAppTransitionAdapter(apps))
 	river.AddWorker(workers, &inboxWorker{svc: trackingSvc, logger: logger})
-	jobs, err := queue.NewWorker(pool, queue.Options{Workers: workers, Periodic: periodicJobs(cfg), Logger: logger})
+	jobs, err := queue.NewWorker(pool, queue.Options{Workers: workers, Periodic: periodicJobs(cfg), Logger: logger,
+		Paused: paused(maintenance.New(pool))})
 	if err != nil {
 		return err
 	}
