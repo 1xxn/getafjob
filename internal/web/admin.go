@@ -108,6 +108,11 @@ func (s *Server) renderAdminUsers(w http.ResponseWriter, r *http.Request, u *ide
 			d.Audit = append(d.Audit, views.AdminAuditRow{At: views.When(ctx, a.At), Text: text})
 		}
 	}
+	// Inviting, revoking or changing a user answers a POST under its own path; the address bar shows the users page,
+	// so a reload neither lands on a 404 nor shows a one-time invitation link again.
+	if r.Method == http.MethodPost {
+		w.Header().Set("HX-Replace-Url", "/admin/users")
+	}
 	s.render(w, r, status, views.AdminUsersPage(d))
 }
 
