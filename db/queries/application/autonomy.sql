@@ -57,9 +57,9 @@ UPDATE runs SET adapter = $3 WHERE id = $1 AND user_id = $2;
 
 -- name: AdapterRuns :one
 -- System role: finished runs of an adapter since a time (all users), and how many of them were submitted. Runs that
--- a guard stopped before the form say nothing about the adapter.
+-- a guard stopped before the form or that paused to wait for user answers/approval say nothing about the adapter.
 SELECT count(*) AS runs, count(*) FILTER (WHERE outcome = 'submitted') AS submitted
-FROM runs WHERE adapter = $1 AND finished_at IS NOT NULL AND finished_at >= $2 AND outcome <> 'guard';
+FROM runs WHERE adapter = $1 AND finished_at IS NOT NULL AND finished_at >= $2 AND outcome NOT IN ('guard', 'asked');
 
 -- name: NavCounts :one
 -- needs_input also counts runs parked to wait for answers (the runner freed the browser); the page lists both.

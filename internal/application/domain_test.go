@@ -90,3 +90,21 @@ func TestGuard(t *testing.T) {
 		}
 	}
 }
+
+func TestIsWaitingForUserPark(t *testing.T) {
+	for _, tc := range []struct {
+		reason string
+		want   bool
+	}{
+		{"waiting for your approval", true},
+		{"waiting for your answers; the browser was closed to free the runner", true},
+		{"waiting for your answers", true},
+		{"captcha", false},
+		{"runner lost: the browser of this run stopped (restart or crash)", false},
+		{"", false},
+	} {
+		if got := IsWaitingForUserPark(tc.reason); got != tc.want {
+			t.Errorf("IsWaitingForUserPark(%q) = %v, want %v", tc.reason, got, tc.want)
+		}
+	}
+}

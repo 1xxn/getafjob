@@ -7,6 +7,7 @@ import (
 	"encoding/base64"
 	"errors"
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/google/uuid"
@@ -276,11 +277,20 @@ func (r *Runs) Submitted(ctx context.Context, ref RunRef, confirmed bool, effect
 	return r.store.FinishRun(ctx, ref, "submitted", r.apps.now())
 }
 
+// IsWaitingForUserPark reports whether a park reason merely frees the browser while waiting for user approval or answers.
+func IsWaitingForUserPark(reason string) bool {
+	return reason == "waiting for your approval" || strings.HasPrefix(reason, "waiting for your answers")
+}
+
 // Park stops the run for a human look.
 func (r *Runs) Park(ctx context.Context, ref RunRef, reason, screenshot string) error {
 	if _, err := r.apps.Fire(ctx, ref.UserID, ref.AppID, EvPark, ActorRunner,
 		map[string]any{"reason": reason, "screenshot": screenshot}); err != nil && !errors.Is(err, ErrTransition) {
 		return err
 	}
-	return r.store.FinishRun(ctx, ref, "parked", r.apps.now())
+	outcome := "parked"
+	if IsWaitingForUserPark(reason) {
+		outcome = "asked"
+	}
+	return r.store.FinishRun(ctx, ref, outcome, r.apps.now())
 }

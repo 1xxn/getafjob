@@ -13,6 +13,7 @@ import (
 	"github.com/1xxn/getafjob/internal/application"
 	"github.com/1xxn/getafjob/internal/platform/config"
 	"github.com/1xxn/getafjob/internal/platform/netguard"
+	"github.com/1xxn/getafjob/internal/platform/queue"
 	"github.com/1xxn/getafjob/internal/platform/webpush"
 )
 
@@ -21,6 +22,11 @@ type RecoverArgs struct{}
 
 // Kind implements river.JobArgs.
 func (RecoverArgs) Kind() string { return "application_recover" }
+
+// InsertOpts places recovery on the apply queue.
+func (RecoverArgs) InsertOpts() river.InsertOpts {
+	return river.InsertOpts{Queue: queue.Apply, MaxAttempts: 3}
+}
 
 type recoverWorker struct {
 	river.WorkerDefaults[RecoverArgs]
@@ -41,6 +47,11 @@ type HandoffArgs struct{}
 
 // Kind implements river.JobArgs.
 func (HandoffArgs) Kind() string { return "application_handoffs" }
+
+// InsertOpts places handoff watching on the apply queue.
+func (HandoffArgs) InsertOpts() river.InsertOpts {
+	return river.InsertOpts{Queue: queue.Apply, MaxAttempts: 3}
+}
 
 type handoffWorker struct {
 	river.WorkerDefaults[HandoffArgs]

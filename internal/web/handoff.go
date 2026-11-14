@@ -69,6 +69,9 @@ type screenStatus struct {
 
 // openFieldQuestions reports whether the waiting run asks the user for field answers.
 func (s *Server) openFieldQuestions(ctx context.Context, userID, appID uuid.UUID) bool {
+	if s.Apps == nil {
+		return false
+	}
 	qs, err := s.Apps.Questions(ctx, userID, appID)
 	if err != nil {
 		return false
@@ -208,7 +211,12 @@ func (s *Server) screenWebSocket(w http.ResponseWriter, r *http.Request, u *iden
 func (s *Server) screenEvent(ctx context.Context, u *identity.User, appID uuid.UUID, in screenInputMsg) *runnerv1.HandoffEvent {
 	switch in.Type {
 	case "resume":
-		_, _ = s.Apps.Fire(ctx, u.ID, appID, application.EvAnswer, application.ActorUser, nil)
+		if s.openFieldQuestions(ctx, u.ID, appID) {
+			return nil
+		}
+		if s.Apps != nil {
+			_, _ = s.Apps.Fire(ctx, u.ID, appID, application.EvAnswer, application.ActorUser, nil)
+		}
 		return &runnerv1.HandoffEvent{Msg: &runnerv1.HandoffEvent_Resume{Resume: true}}
 	case "park":
 		_, _ = s.Apps.Fire(ctx, u.ID, appID, application.EvPark, application.ActorUser, map[string]any{"reason": "parked by user"})
@@ -339,10 +347,26 @@ func (s *Server) applicationAnswer(w http.ResponseWriter, r *http.Request, u *id
 		saved = append(saved, &runnerv1.Answer{Id: id, Question: q, Answer: a})
 	}
 
-	if s.Apps != nil {
-		if sess != nil {
-			_, _ = s.Apps.Fire(r.Context(), u.ID, appID, application.EvAnswer, application.ActorUser, nil)
-		} else {
+	if s.Apps != nil && sess != nil {
+		if _, err := s.Apps.Fire(r.Context(), u.ID, appID, application.EvAnswer, application.ActorUser, nil); err != nil {
+			sess = nil
+		}
+	}
+	if sess == nil {
+		if s.Items != nil {
+			for _, ans := range saved {
+				if ans.Id != "" {
+					continue
+				}
+				savedID, err := s.Items.SaveAnswer(r.Context(), u.ID, profile.Answer{Question: ans.Question, Answer: ans.Answer})
+				if err != nil {
+					s.failed(w, r, u, err)
+					return
+				}
+				ans.Id = savedID.String()
+			}
+		}
+		if s.Apps != nil {
 			// No live browser session (e.g. after a restart or hold timeout): park if still waiting and requeue.
 			_, _ = s.Apps.Fire(r.Context(), u.ID, appID, application.EvPark, application.ActorUser, map[string]any{"reason": "answered without active session"})
 			_, _ = s.Apps.Fire(r.Context(), u.ID, appID, application.EvRequeue, application.ActorUser, nil)

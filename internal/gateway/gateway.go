@@ -114,6 +114,19 @@ func (s *Server) ReapLost(ctx context.Context) {
 		if err != nil && s.Logger != nil {
 			s.Logger.WarnContext(ctx, "reap lost runs", "err", err)
 		}
+		now := time.Now()
+		s.seen.Range(func(k, v any) bool {
+			if now.Sub(v.(time.Time)) >= reapIdle {
+				s.seen.Delete(k)
+			}
+			return true
+		})
+		s.runSteps.Range(func(k, v any) bool {
+			if now.Sub(v.(runStepState).at) >= reapIdle {
+				s.runSteps.Delete(k)
+			}
+			return true
+		})
 	}
 }
 
@@ -128,6 +141,7 @@ type frameGrant struct {
 type runStepState struct {
 	at      time.Time
 	adapter string
+	portal  string
 }
 
 type runnerIdentity struct {
@@ -431,7 +445,7 @@ func (s *Server) Lease(ctx context.Context, req *runnerv1.LeaseRequest) (*runner
 	urls := append([]string{run.GetStartUrl()}, run.GetOrigins()...)
 	adapter := ats.Detect("", urls...)
 	_ = s.Runs.SetAdapter(ctx, ref, adapter)
-	s.runSteps.Store(ref.RunID, runStepState{at: time.Now(), adapter: adapter})
+	s.runSteps.Store(ref.RunID, runStepState{at: time.Now(), adapter: adapter, portal: run.GetPortal()})
 	s.Logger.InfoContext(ctx, "run leased", "run", l.RunID, "runner", runnerID, "host", l.Host)
 	return &runnerv1.LeaseResponse{Run: run}, nil
 }
@@ -491,11 +505,19 @@ func (s *Server) Checkpoint(ctx context.Context, req *runnerv1.CheckpointRequest
 	if err != nil {
 		return nil, err
 	}
-	if cookies := m.GetUpdatedSessionCookiesJson(); len(cookies) > 0 && s.Portals != nil && s.Apps != nil && s.Data != nil {
-		if app, err := s.Apps.Get(ctx, ref.UserID, ref.AppID); err == nil {
-			if run, err := s.Data.RunData(ctx, ref.UserID, app.JobID); err == nil && run.GetPortal() != "" {
-				_ = s.Portals.RefreshCookies(ctx, ref.UserID, run.GetPortal(), cookies)
+	if cookies := m.GetUpdatedSessionCookiesJson(); len(cookies) > 0 && s.Portals != nil {
+		portal := ""
+		if val, ok := s.runSteps.Load(ref.RunID); ok {
+			portal = val.(runStepState).portal
+		} else if s.Apps != nil && s.Data != nil {
+			if app, err := s.Apps.Get(ctx, ref.UserID, ref.AppID); err == nil {
+				if run, err := s.Data.RunData(ctx, ref.UserID, app.JobID); err == nil {
+					portal = run.GetPortal()
+				}
 			}
+		}
+		if portal != "" {
+			_ = s.Portals.RefreshCookies(ctx, ref.UserID, portal, cookies)
 		}
 	}
 	s.recordStepDuration(ctx, ref, m.GetStep())
@@ -510,7 +532,7 @@ func (s *Server) Ask(ctx context.Context, req *runnerv1.AskRequest) (*runnerv1.A
 	if err != nil {
 		return nil, err
 	}
-	s.runSteps.Delete(ref.RunID)
+	defer s.runSteps.Delete(ref.RunID)
 	qs := req.GetQuestions()
 	if len(qs) == 0 || len(qs) > 50 {
 		return nil, connect.NewError(connect.CodeInvalidArgument, "between 1 and 50 questions")
@@ -563,8 +585,8 @@ func (s *Server) Submitted(ctx context.Context, req *runnerv1.SubmittedRequest) 
 	if err := s.Runs.Submitted(ctx, ref, req.GetConfirmed(), effect); err != nil {
 		return nil, code(err)
 	}
-	s.finishStepDuration(ctx, ref, "submit")
 	s.recordATSOutcome(ctx, ref, ats.OutcomeSubmitted)
+	s.finishStepDuration(ctx, ref, "submit")
 	return &runnerv1.SubmittedResponse{}, nil
 }
 
@@ -574,21 +596,30 @@ func (s *Server) Park(ctx context.Context, req *runnerv1.ParkRequest) (*runnerv1
 	if err != nil {
 		return nil, err
 	}
-	s.runSteps.Delete(ref.RunID)
+	defer s.runSteps.Delete(ref.RunID)
 	key, err := s.screenshot(ctx, ref, req.GetScreenshot())
 	if err != nil {
 		return nil, err
 	}
-	if err := s.Runs.Park(ctx, ref, clip(req.GetReason(), 1000), key); err != nil {
+	reason := clip(req.GetReason(), 1000)
+	if err := s.Runs.Park(ctx, ref, reason, key); err != nil {
 		return nil, code(err)
 	}
-	s.recordATSOutcome(ctx, ref, ats.OutcomeParked)
+	if !application.IsWaitingForUserPark(reason) {
+		s.recordATSOutcome(ctx, ref, ats.OutcomeParked)
+	}
 	return &runnerv1.ParkResponse{}, nil
 }
 
 func (s *Server) recordATSOutcome(ctx context.Context, ref application.RunRef, outcome ats.Outcome) {
 	if s.ATSMetrics == nil {
 		return
+	}
+	if val, ok := s.runSteps.Load(ref.RunID); ok {
+		if adapter := val.(runStepState).adapter; adapter != "" {
+			s.ATSMetrics.Record(ctx, adapter, outcome)
+			return
+		}
 	}
 	var urls []string
 	if s.Apps != nil && s.Data != nil {
@@ -712,7 +743,7 @@ func (s *Server) recordStepDuration(ctx context.Context, ref application.RunRef,
 	}
 	st := val.(runStepState)
 	took := time.Since(st.at)
-	s.runSteps.Store(ref.RunID, runStepState{at: time.Now(), adapter: st.adapter})
+	s.runSteps.Store(ref.RunID, runStepState{at: time.Now(), adapter: st.adapter, portal: st.portal})
 	if h := s.histogram(); h != nil {
 		h.Record(ctx, took.Seconds(), metric.WithAttributes(
 			attribute.String("step", step),

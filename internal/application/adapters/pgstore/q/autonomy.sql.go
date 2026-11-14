@@ -14,7 +14,7 @@ import (
 
 const adapterRuns = `-- name: AdapterRuns :one
 SELECT count(*) AS runs, count(*) FILTER (WHERE outcome = 'submitted') AS submitted
-FROM runs WHERE adapter = $1 AND finished_at IS NOT NULL AND finished_at >= $2 AND outcome <> 'guard'
+FROM runs WHERE adapter = $1 AND finished_at IS NOT NULL AND finished_at >= $2 AND outcome NOT IN ('guard', 'asked')
 `
 
 type AdapterRunsParams struct {
@@ -28,7 +28,7 @@ type AdapterRunsRow struct {
 }
 
 // System role: finished runs of an adapter since a time (all users), and how many of them were submitted. Runs that
-// a guard stopped before the form say nothing about the adapter.
+// a guard stopped before the form or that paused to wait for user answers/approval say nothing about the adapter.
 func (q *Queries) AdapterRuns(ctx context.Context, arg AdapterRunsParams) (AdapterRunsRow, error) {
 	row := q.db.QueryRow(ctx, adapterRuns, arg.Adapter, arg.FinishedAt)
 	var i AdapterRunsRow

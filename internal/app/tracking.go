@@ -70,6 +70,7 @@ func (InboxArgs) Kind() string { return "inbox" }
 // InsertOpts: at most one inbox check runs or waits.
 func (a InboxArgs) InsertOpts() river.InsertOpts {
 	return river.InsertOpts{
+		Queue:       queue.Mail,
 		MaxAttempts: 3,
 		UniqueOpts: river.UniqueOpts{
 			ByArgs: true,
