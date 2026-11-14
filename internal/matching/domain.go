@@ -1,15 +1,18 @@
 // Package matching ranks open jobs per user: hard filters, a score from 0 to 100 with a reason for every part,
-// and a decision. Rules only, no AI; the same inputs always give the same result.
+// and a decision. Rules plus a static embedding model (ADR 0029), no LLM; the same inputs always give the same
+// result.
 package matching
 
 import (
+	"math"
 	"slices"
+	"strconv"
 	"strings"
 	"time"
 )
 
 // RulesVersion changes whenever the rules do, so stored results can be recomputed.
-const RulesVersion = 2
+const RulesVersion = 3
 
 // Criteria is what a user wants and brings. Empty fields do not filter.
 type Criteria struct {
@@ -57,7 +60,8 @@ const (
 	maybeFrom = 35
 )
 
-// Reason explains one part of a result: Code is an i18n key below match.reason., Params fill it in.
+// Reason explains one part of a result: Code is an i18n key below match.reason., Params fill it in. The points of
+// all reasons add up to the score.
 type Reason struct {
 	Code   string            `json:"code"`
 	Points int               `json:"points"`
@@ -73,7 +77,7 @@ type Result struct {
 	Reasons  []Reason
 }
 
-// Maximum points of each part; they add up to 100.
+// Raw points of the parts; the score weighs them (weights below).
 const (
 	maxTitle    = 35
 	maxSkills   = 25
@@ -84,7 +88,16 @@ const (
 	maxRecency  = 5
 )
 
-// Matcher evaluates jobs for one user; build it once per user, it prepares the terms.
+// Weights of the core parts in the score, with and without the embedding model. Text similarity carries most:
+// on the ranking set it orders jobs best (ADR 0029).
+var (
+	weightsWithModel = weights{similarity: 0.40, title: 0.20, skills: 0.25, level: 0.15}
+	weightsRulesOnly = weights{title: 0.40, skills: 0.35, level: 0.25}
+)
+
+type weights struct{ similarity, title, skills, level float64 }
+
+// Matcher evaluates jobs for one user; build it once per user, it prepares the terms and the profile's vector.
 type Matcher struct {
 	titles   []term
 	synonyms []term
@@ -98,13 +111,15 @@ type Matcher struct {
 	langs    map[string]bool
 	minPay   int
 	names    map[term]string // user terms as typed, for reasons
+	emb      Embedder
+	vec      []float32 // the profile's vector; nil without a model or profile text
 }
 
-// NewMatcher prepares c.
-func NewMatcher(c Criteria) *Matcher {
+// NewMatcher prepares c. emb may be nil: the score then comes from the rules alone.
+func NewMatcher(c Criteria, emb Embedder) *Matcher {
 	m := &Matcher{titles: terms(c.Titles), exclude: terms(c.ExcludeTitles), cities: terms(c.Locations),
 		remote: c.Remote, level: levelForYears(c.YearsTotal), langs: spoken(c.Languages), minPay: c.MinSalary,
-		skills: userSkills(c.Skills)}
+		skills: userSkills(c.Skills), emb: emb}
 	m.names = map[term]string{}
 	for _, l := range [][]string{c.Titles, c.ExcludeTitles, c.Locations} {
 		for _, s := range l {
@@ -125,7 +140,22 @@ func NewMatcher(c Criteria) *Matcher {
 		m.regions = append(m.regions, t)
 		m.regions = append(m.regions, terms(regionAliases[string(t)])...)
 	}
+	if text := ProfileText(c); emb != nil && text != "" {
+		m.vec, _ = emb.Embed(text)
+	}
 	return m
+}
+
+// ProfileText is what the profile's vector is made of: the wanted titles and the skills.
+func ProfileText(c Criteria) string {
+	var parts []string
+	if len(c.Titles) > 0 {
+		parts = append(parts, strings.Join(c.Titles, ", "))
+	}
+	if len(c.Skills) > 0 {
+		parts = append(parts, strings.Join(c.Skills, ", "))
+	}
+	return strings.Join(parts, ". ")
 }
 
 // name returns a user term as typed; dictionary terms come back normalized.
@@ -136,43 +166,84 @@ func (m *Matcher) name(t term) string {
 	return string(t)
 }
 
-// Evaluate scores one job.
+// Evaluate scores one job. To score many users against the same jobs, Prepare each job once and use
+// EvaluatePrepared.
 func (m *Matcher) Evaluate(j Job, now time.Time) Result {
-	r, _ := m.evaluate(j, now)
+	r, _ := m.evaluate(Prepare(j, m.emb), now)
+	return r
+}
+
+// EvaluatePrepared scores a prepared job; p must come from the same embedding model as the matcher.
+func (m *Matcher) EvaluatePrepared(p *Prepared, now time.Time) Result {
+	r, _ := m.evaluate(p, now)
 	return r
 }
 
 // scored keeps the parts of one evaluation for InspectFit; all zero when the title is excluded.
 type scored struct {
-	title, skills, level, location, language, salary, recency Reason
-	hits, missing                                             []string
+	title, skills, level, location, language, salary, recency, similarity Reason
+	hits, missing                                                         []string
 }
 
 // evaluate scores one job once and returns the parts it added up.
-func (m *Matcher) evaluate(j Job, now time.Time) (Result, scored) {
+func (m *Matcher) evaluate(p *Prepared, now time.Time) (Result, scored) {
+	j := p.Job
 	r := Result{JobID: j.ID, Decision: Skip}
-	title := normalize(j.Title)
-	if ex, ok := anyIn(m.exclude, title); ok {
+	if ex, ok := anyIn(m.exclude, p.title); ok {
 		r.Reasons = []Reason{{Code: "title.excluded", Hard: true, Params: map[string]string{"term": m.name(ex)}}}
 		return r, scored{}
 	}
-	text := title + normalize(j.Description)
 	var sc scored
 	var skillPoints int
 	var skillCode string
-	sc.hits, sc.missing, skillPoints, skillCode = m.skillHitsAndMissing(text)
-	sc.title, sc.skills, sc.level = m.title(title), skillReason(sc.hits, sc.missing, skillPoints, skillCode), m.seniority(title)
-	sc.location, sc.language, sc.salary, sc.recency = m.location(j), m.language(text), m.salary(j.Description), recency(j, now)
+	sc.hits, sc.missing, skillPoints, skillCode = m.skillHitsAndMissing(p.text, p.preferred)
+	sc.title, sc.skills, sc.level = m.title(p.title), skillReason(sc.hits, sc.missing, skillPoints, skillCode), m.seniority(p.level)
+	sc.location, sc.language, sc.salary, sc.recency = m.location(j), m.language(p.lang), m.salary(p.salaryTop), recency(j, now)
+
+	// Core: weighted factors from 0 to 1; each reason carries its share of the score in points.
+	w := weightsRulesOnly
+	sim, hasSim := m.similarity(p.vec)
+	if hasSim {
+		w = weightsWithModel
+		sc.similarity = sim
+	} else if sc.title.Code == "title.none" {
+		sc.title.Hard = true // without the model nothing else tells a related title from an unrelated one
+	}
+	share := func(rs *Reason, factor, weight float64) {
+		rs.Points = int(math.Round(100 * weight * min(max(factor, 0), 1)))
+	}
+	if hasSim {
+		f, _ := strconv.Atoi(sim.Params["pct"])
+		share(&sc.similarity, float64(f)/100, w.similarity)
+	}
+	share(&sc.title, float64(sc.title.Points)/maxTitle, w.title)
+	share(&sc.skills, float64(sc.skills.Points)/maxSkills, w.skills)
+	share(&sc.level, float64(sc.level.Points+maxLevel)/(2*maxLevel), w.level)
+	parts := []*Reason{&sc.similarity, &sc.title, &sc.skills, &sc.level}
+	score := 0
+	for _, rs := range parts {
+		score += rs.Points
+	}
+	// Soft parts lower the score by a share: place, language and age of the posting; salary only filters.
+	for _, s := range []struct {
+		rs     *Reason
+		factor float64
+	}{{&sc.location, locationFactor(sc.location)}, {&sc.language, languageFactor(sc.language)},
+		{&sc.salary, 1}, {&sc.recency, recencyFactor(sc.recency)}} {
+		delta := int(math.Round(float64(score) * (s.factor - 1)))
+		s.rs.Points = delta
+		score += delta
+		parts = append(parts, s.rs)
+	}
 	hard := false
-	for _, p := range []Reason{sc.title, sc.skills, sc.level, sc.location, sc.language, sc.salary, sc.recency} {
-		if p.Code == "" {
+	for _, rs := range parts {
+		if rs.Code == "" {
 			continue
 		}
-		r.Score += p.Points
-		hard = hard || p.Hard
-		r.Reasons = append(r.Reasons, p)
+		hard = hard || rs.Hard
+		r.Reasons = append(r.Reasons, *rs)
 	}
-	r.Score = min(max(r.Score, 0), 100)
+	r.Score = min(max(score, 0), 100)
 	switch {
 	case hard:
 	case r.Score >= matchFrom:
@@ -181,6 +252,52 @@ func (m *Matcher) evaluate(j Job, now time.Time) (Result, scored) {
 		r.Decision = Maybe
 	}
 	return r, sc
+}
+
+// similarity compares the profile's vector with the job's: cosine 0.25 or less counts as no likeness, 0.70 or
+// more as full (the range the model gives for unrelated and for the same kind of job).
+func (m *Matcher) similarity(job []float32) (Reason, bool) {
+	if m.vec == nil || len(job) != len(m.vec) {
+		return Reason{}, false
+	}
+	var cos float64
+	for i := range job {
+		cos += float64(job[i]) * float64(m.vec[i])
+	}
+	f := min(max((cos-0.25)/(0.70-0.25), 0), 1)
+	return Reason{Code: "similarity", Params: map[string]string{"pct": strconv.Itoa(int(math.Round(f * 100)))}}, true
+}
+
+func locationFactor(r Reason) float64 {
+	switch r.Code {
+	case "location.city", "location.remote":
+		return 1
+	case "location.none":
+		return 0.8
+	}
+	return 0.9 // unknown or no wish
+}
+
+func languageFactor(r Reason) float64 {
+	switch r.Code {
+	case "language.unknown":
+		return 0.95
+	case "language.missing":
+		return 0.8
+	}
+	return 1
+}
+
+func recencyFactor(r Reason) float64 {
+	switch r.Code {
+	case "recency.recent":
+		return 0.97
+	case "recency.month":
+		return 0.94
+	case "recency.old":
+		return 0.9
+	}
+	return 1
 }
 
 // FitInspection is a granular breakdown of how a candidate matches a job.
@@ -211,22 +328,27 @@ type FitInspection struct {
 // InspectFit breaks a job's result down into its parts, the same evaluation as Evaluate; an excluded title shows
 // no points, as its score is 0.
 func (m *Matcher) InspectFit(j Job, now time.Time) FitInspection {
-	res, sc := m.evaluate(j, now)
+	p := Prepare(j, m.emb)
+	res, sc := m.evaluate(p, now)
+	w := weightsRulesOnly
+	if sc.similarity.Code != "" {
+		w = weightsWithModel
+	}
 	return FitInspection{
 		Score:              res.Score,
 		Decision:           res.Decision,
 		MatchingSkills:     sc.hits,
 		MissingSkills:      sc.missing,
 		SkillPoints:        sc.skills.Points,
-		MaxSkillPoints:     maxSkills,
+		MaxSkillPoints:     int(math.Round(100 * w.skills)),
 		TitlePoints:        sc.title.Points,
-		MaxTitlePoints:     maxTitle,
+		MaxTitlePoints:     int(math.Round(100 * w.title)),
 		SeniorityPoints:    sc.level.Points,
-		MaxSeniorityPoints: maxLevel,
+		MaxSeniorityPoints: int(math.Round(100 * w.level)),
 		CandidateLevel:     levelNames[m.level],
-		JobLevel:           levelNames[levelOf(normalize(j.Title))],
+		JobLevel:           levelNames[p.level],
 		LocationPoints:     sc.location.Points,
-		MaxLocationPoints:  maxLocation,
+		MaxLocationPoints:  0,
 		LocationReason:     sc.location.Code,
 		LocationParams:     sc.location.Params,
 		Workplace:          j.Workplace,
@@ -239,6 +361,5 @@ func (m *Matcher) InspectFit(j Job, now time.Time) FitInspection {
 
 // InspectFit evaluates criteria against a job with granular breakdown.
 func InspectFit(c Criteria, j Job, now time.Time) FitInspection {
-	m := NewMatcher(c)
-	return m.InspectFit(j, now)
+	return NewMatcher(c, nil).InspectFit(j, now)
 }

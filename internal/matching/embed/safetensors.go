@@ -217,3 +217,61 @@ func floatToHalf(f float32) uint16 {
 	}
 	return sign | uint16(min(h, 0x7c00)&0x7fff)
 }
+
+// Subset writes a model to to that knows only the tokens of texts, with the first dims columns as float16: a few
+// hundred KB that tokenize and embed those texts exactly like the full model (tests). Only WordPiece models: the
+// greedy longest match picks the same pieces when the vocabulary holds every piece it picked before.
+func Subset(from, to string, texts []string, dims int) error {
+	m, err := Load(from, dims)
+	if err != nil {
+		return err
+	}
+	if m.tok.kind != "WordPiece" {
+		return errors.New("embed: subset needs a WordPiece model")
+	}
+	pieces := make(map[int]string, len(m.tok.ids))
+	for p, id := range m.tok.ids {
+		pieces[id] = p
+	}
+	used := map[int]int{} // old id -> new id
+	var order []int
+	for _, s := range texts {
+		for _, id := range m.tok.Encode(s) {
+			if _, ok := used[id]; !ok {
+				used[id] = len(order)
+				order = append(order, id)
+			}
+		}
+	}
+	vocab := make(map[string]int, len(order))
+	t := table{rows: len(order), cols: m.dim, data: make([]uint16, len(order)*m.dim)}
+	for n, id := range order {
+		vocab[pieces[id]] = n
+		copy(t.data[n*m.dim:(n+1)*m.dim], m.table[id*m.dim:(id+1)*m.dim])
+	}
+	tok, err := json.MarshalIndent(map[string]any{"model": map[string]any{"type": "WordPiece",
+		"continuing_subword_prefix": m.tok.prefix, "max_input_chars_per_word": m.tok.maxWord, "vocab": vocab}}, "", " ")
+	if err != nil {
+		return err
+	}
+	if err := os.MkdirAll(to, 0o755); err != nil { //nolint:gosec // test data in the repository
+		return err
+	}
+	dst, err := os.OpenRoot(filepath.Clean(to))
+	if err != nil {
+		return err
+	}
+	defer func() { _ = dst.Close() }()
+	if err := dst.WriteFile("tokenizer.json", append(tok, '\n'), 0o644); err != nil {
+		return err
+	}
+	out, err := dst.Create("model.safetensors")
+	if err != nil {
+		return err
+	}
+	if err := writeTable(out, t); err != nil {
+		_ = out.Close()
+		return err
+	}
+	return out.Close()
+}

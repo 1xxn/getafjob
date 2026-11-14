@@ -6,6 +6,7 @@ import (
 	"flag"
 	"fmt"
 	"io"
+	"log/slog"
 	"net/url"
 	"strconv"
 	"strings"
@@ -90,7 +91,8 @@ func adminDemo(ctx context.Context, args []string, env Env) int {
 		}
 		docs = profile.NewDocuments(profilestore.New(pool), blob.NewSealed(files, envelope), envelope)
 	}
-	st, err := seedDemo(ctx, pool, envelope, cfg.PublicURL, *jobs, *seed, time.Now(), site, *fresh, docs, level, env.Stdout)
+	st, err := seedDemo(ctx, pool, envelope, cfg.PublicURL, *jobs, *seed, time.Now(), site, *fresh, docs, level,
+		loadEmbedder(cfg, slog.New(slog.NewTextHandler(env.Stderr, nil))), env.Stdout)
 	if err != nil {
 		_, _ = fmt.Fprintln(env.Stderr, "demo failed:", err)
 		return ExitError
@@ -121,7 +123,8 @@ func localURL(u *url.URL) bool {
 
 // seedDemo creates the demo users (or reuses them), saves their profiles, upserts the postings and matches them.
 func seedDemo(ctx context.Context, pool *pgxpool.Pool, sealer profile.Sealer, public *url.URL, jobs int, seed uint64,
-	now time.Time, fixtures *url.URL, fresh int, docs *profile.Documents, level application.Level, out io.Writer,
+	now time.Time, fixtures *url.URL, fresh int, docs *profile.Documents, level application.Level, emb matching.Embedder,
+	out io.Writer,
 ) (matching.Stats, error) {
 	apps := application.NewService(applicationstore.New(pool))
 	ids := identity.NewService(pgstore.New(pool), nil, public)
@@ -195,7 +198,7 @@ func seedDemo(ctx context.Context, pool *pgxpool.Pool, sealer profile.Sealer, pu
 	}
 
 	ms := matchingstore.New(pool)
-	return matching.NewService(profileCriteria{svc: profiles, store: pstore}, ms, ms).Run(ctx, users)
+	return matching.NewService(profileCriteria{svc: profiles, store: pstore}, ms, ms).WithEmbedder(emb).Run(ctx, users)
 }
 
 // demoCV uploads the invented CV of p unless the user has a CV already; without a blob store it does nothing.

@@ -67,7 +67,8 @@ func (a *AppMatchEvaluator) EvaluateAndSave(ctx context.Context, userID uuid.UUI
 			criteria = c
 		}
 	}
-	m := matching.NewMatcher(criteria)
+	// Rules only here (serve role, no model in memory); the worker's next match run adds the similarity.
+	m := matching.NewMatcher(criteria, nil)
 	posted, _ := time.Parse(time.DateOnly, p.Posted)
 	mj := matching.Job{
 		ID:          jobID,

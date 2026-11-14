@@ -244,6 +244,7 @@
   "match.reason.salary.fit": "Gehalt bis {top} EUR.",
   "match.reason.skills.fit": "Deine Kenntnisse in der Anzeige: {have}. Nicht in deinem Profil: {missing}.",
   "match.reason.skills.none": "Die Anzeige nennt keine deiner Kenntnisse. Gefragt sind: {missing}.",
+  "match.reason.similarity": "Die Anzeige ähnelt deinem Profil ({pct} %).",
   "match.reason.skills.unknown": "Die Anzeige nennt keine bekannten Kenntnisse.",
   "match.reason.title.any": "Du hast keine Wunschtitel angegeben.",
   "match.reason.title.exact": "Der Titel passt zu „{term}“.",

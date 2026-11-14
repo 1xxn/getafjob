@@ -22,7 +22,7 @@ func (m *Matcher) title(title string) Reason {
 			return Reason{Code: "title.partial", Points: maxTitle / 3, Params: map[string]string{"term": w}}
 		}
 	}
-	return Reason{Code: "title.none", Hard: true}
+	return Reason{Code: "title.none"} // a filter only without the model: the similarity can carry a related title
 }
 
 // synonymsOf returns the titles of every role group a wanted title belongs to.
@@ -84,7 +84,9 @@ func userSkills(list []string) []userSkill {
 	return out
 }
 
-func (m *Matcher) skillHitsAndMissing(text string) (hits []string, missing []string, points int, code string) {
+// skillHitsAndMissing compares the user's skills with the known skills a job names. Skills named only in its
+// nice-to-have sentences (preferred) count when the user has them and are not missing when not.
+func (m *Matcher) skillHitsAndMissing(text, preferred string) (hits []string, missing []string, points int, code string) {
 	var have, want int
 	for _, s := range m.skills {
 		if _, ok := anyIn(s.terms, text); ok {
@@ -97,7 +99,7 @@ func (m *Matcher) skillHitsAndMissing(text string) (hits []string, missing []str
 		if slices.Contains(hits, k.name) {
 			continue
 		}
-		if _, ok := anyIn(skillTerms[i], text); ok {
+		if _, ok := anyIn(skillTerms[i], text); ok && !onlyPreferred(skillTerms[i], text, preferred) {
 			want += k.weight
 			missing = append(missing, k.name)
 		}
@@ -111,6 +113,22 @@ func (m *Matcher) skillHitsAndMissing(text string) (hits []string, missing []str
 	}
 	points = min(maxSkills*have/min(max(want, 6), 12), maxSkills)
 	return hits, missing, points, code
+}
+
+// onlyPreferred reports whether every mention of a skill sits in the job's nice-to-have sentences.
+func onlyPreferred(ts []term, text, preferred string) bool {
+	if preferred == "" {
+		return false
+	}
+	if _, ok := anyIn(ts, preferred); !ok {
+		return false
+	}
+	for _, t := range ts {
+		if strings.Count(text, " "+string(t)) > strings.Count(preferred, " "+string(t)) {
+			return false
+		}
+	}
+	return true
 }
 
 // skillReason puts the skill comparison of skillHitsAndMissing into a reason. Known skills the user lacks lower the
@@ -193,8 +211,8 @@ func levelForYears(s string) level {
 	}
 }
 
-func (m *Matcher) seniority(title string) Reason {
-	job := levelOf(title)
+// seniority compares the level a job asks for (title, else years asked) with the user's.
+func (m *Matcher) seniority(job level) Reason {
 	if job == levelUnknown || m.level == levelUnknown {
 		return Reason{Code: "level.open", Points: maxLevel / 2}
 	}
@@ -300,8 +318,7 @@ func spoken(list []Language) map[string]bool {
 
 var lowLevels = terms([]string{"a1", "a2", "b1", "basic", "basics", "beginner", "grundkenntnisse", "anfaenger"})
 
-func (m *Matcher) language(text string) Reason {
-	lang := detect(text)
+func (m *Matcher) language(lang string) Reason {
 	p := map[string]string{"lang": lang}
 	switch {
 	case m.langs == nil:
@@ -349,8 +366,7 @@ func detect(normalized string) string {
 	return "en"
 }
 
-func (m *Matcher) salary(description string) Reason {
-	top := salaryTop(description)
+func (m *Matcher) salary(top int) Reason {
 	switch {
 	case top == 0 || m.minPay == 0:
 		return Reason{}

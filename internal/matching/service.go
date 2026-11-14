@@ -15,6 +15,7 @@ type Service struct {
 	profiles Profiles
 	jobs     Jobs
 	store    Store
+	emb      Embedder // nil: rules only
 	now      func() time.Time
 }
 
@@ -22,6 +23,12 @@ type Service struct {
 func NewService(p Profiles, j Jobs, s Store) *Service {
 	return &Service{profiles: p, jobs: j, store: s, now: time.Now}
 }
+
+// WithEmbedder adds the embedding model (ADR 0029); without it the score comes from the rules alone.
+func (s *Service) WithEmbedder(e Embedder) *Service { s.emb = e; return s }
+
+// Embedder returns the model the service matches with, nil if none.
+func (s *Service) Embedder() Embedder { return s.emb }
 
 // WithClock sets the clock (tests).
 func (s *Service) WithClock(now func() time.Time) *Service { s.now = now; return s }
@@ -49,7 +56,7 @@ func (s *Service) Run(ctx context.Context, users []uuid.UUID) (Stats, error) {
 		if err != nil {
 			return st, err
 		}
-		matchers[i] = NewMatcher(c)
+		matchers[i] = NewMatcher(c, s.emb)
 	}
 	st.Users = len(users)
 	if len(users) == 0 {
@@ -66,10 +73,15 @@ func (s *Service) Run(ctx context.Context, users []uuid.UUID) (Stats, error) {
 		}
 		st.Jobs += len(jobs)
 		after = jobs[len(jobs)-1].ID
+		// Each job is analyzed once (text, language, vector) and then scored for every user.
+		prepared := make([]*Prepared, len(jobs))
+		for k, j := range jobs {
+			prepared[k] = Prepare(j, s.emb)
+		}
 		rs := make([]Result, len(jobs))
 		for i, u := range users {
-			for k, j := range jobs {
-				rs[k] = matchers[i].Evaluate(j, now)
+			for k := range prepared {
+				rs[k] = matchers[i].EvaluatePrepared(prepared[k], now)
 				st.Decisions[rs[k].Decision]++
 			}
 			if err := s.store.SaveMatches(ctx, u, rs, now); err != nil {

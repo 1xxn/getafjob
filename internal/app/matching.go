@@ -13,6 +13,8 @@ import (
 	"github.com/riverqueue/river/rivertype"
 
 	"github.com/1xxn/getafjob/internal/matching"
+	"github.com/1xxn/getafjob/internal/matching/embed"
+	"github.com/1xxn/getafjob/internal/platform/config"
 	"github.com/1xxn/getafjob/internal/platform/events"
 	"github.com/1xxn/getafjob/internal/profile"
 	profilestore "github.com/1xxn/getafjob/internal/profile/adapters/pgstore"
@@ -144,4 +146,20 @@ func union(lists [][]string, limit int) []string {
 		}
 	}
 	return out
+}
+
+// loadEmbedder loads the static embedding model for matching (ADR 0029). Without it, matching uses the rules alone,
+// so a missing or broken model is logged, not fatal.
+func loadEmbedder(cfg config.Config, logger *slog.Logger) matching.Embedder {
+	if cfg.EmbedModel == "" {
+		return nil
+	}
+	start := time.Now()
+	m, err := embed.Load(cfg.EmbedModel, 0)
+	if err != nil {
+		logger.Warn("embedding model not loaded; matching uses the rules alone", "dir", cfg.EmbedModel, "err", err)
+		return nil
+	}
+	logger.Info("embedding model loaded", "dims", m.Dim(), "took", time.Since(start).Round(time.Millisecond))
+	return m
 }
