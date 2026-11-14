@@ -188,7 +188,7 @@ func (s *Server) jobsPage(w http.ResponseWriter, r *http.Request, u *identity.Us
 		}
 	}
 	if partial(r) {
-		s.render(w, r, http.StatusOK, views.JobResults(d))
+		s.render(w, r, http.StatusOK, views.JobResultsSwap(d))
 		return
 	}
 	s.render(w, r, http.StatusOK, views.JobsPage(d))

@@ -109,6 +109,12 @@ func TestJobPages(t *testing.T) {
 		!strings.Contains(part.Header().Get("Vary"), "HX-Request") {
 		t.Fatalf("partial: %s", body)
 	}
+	// A filter change also hands the save search dialog the new filters (it lives outside #results).
+	filtered := a.do(http.MethodGet, "/jobs?q=Go&workplace=remote", nil, session, map[string]string{"HX-Request": "true", "HX-Request-Type": "partial"}).Body.String()
+	if !strings.Contains(filtered, `id="save-search-query"`) || !strings.Contains(filtered, `hx-swap-oob="true"`) ||
+		!strings.Contains(filtered, "q=Go") || !strings.Contains(filtered, "workplace=remote") {
+		t.Fatalf("filters for the save search dialog missing: %s", filtered)
+	}
 	restore := a.do(http.MethodGet, "/jobs", nil, session, map[string]string{"HX-Request": "true", "HX-History-Restore-Request": "true"})
 	if !strings.Contains(restore.Body.String(), "<html") {
 		t.Fatal("history restore got a fragment")
