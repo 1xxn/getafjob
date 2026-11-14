@@ -160,6 +160,6 @@ func loadEmbedder(cfg config.Config, logger *slog.Logger) matching.Embedder {
 		logger.Warn("embedding model not loaded; matching uses the rules alone", "dir", cfg.EmbedModel, "err", err)
 		return nil
 	}
-	logger.Info("embedding model loaded", "dims", m.Dim(), "took", time.Since(start).Round(time.Millisecond))
+	logger.Info("embedding model loaded", "dims", m.Dim(), "took", time.Since(start).Round(time.Millisecond).String())
 	return m
 }

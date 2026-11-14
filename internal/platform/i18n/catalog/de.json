@@ -232,6 +232,7 @@
   "match.reason.recency.recent": "Aktuell ({days} {days|Tag|Tage}).",
   "match.reason.salary.below": "Das Gehalt von bis zu {top} EUR liegt unter deinem Minimum von {min} EUR.",
   "match.reason.salary.fit": "Gehalt bis {top} EUR.",
+  "match.reason.skills.all": "Die Anzeige verlangt Kenntnisse, die du hast: {have}.",
   "match.reason.skills.fit": "Deine Kenntnisse in der Anzeige: {have}. Nicht in deinem Profil: {missing}.",
   "match.reason.skills.none": "Die Anzeige nennt keine deiner Kenntnisse. Gefragt sind: {missing}.",
   "match.reason.similarity": "Die Anzeige ähnelt deinem Profil ({pct} %).",

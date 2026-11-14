@@ -12,7 +12,7 @@ import (
 )
 
 // RulesVersion changes whenever the rules do, so stored results can be recomputed.
-const RulesVersion = 3
+const RulesVersion = 4
 
 // Criteria is what a user wants and brings. Empty fields do not filter.
 type Criteria struct {
