@@ -317,6 +317,7 @@ func (s *Store) Evidence(ctx context.Context, userID, id uuid.UUID) (ev applicat
 					Label  string `json:"label"`
 					Shown  string `json:"shown"`
 					Source string `json:"source"`
+					Kind   string `json:"kind"`
 				} `json:"filled"`
 			}
 			_ = json.Unmarshal(c.Data, &d)
@@ -327,6 +328,7 @@ func (s *Store) Evidence(ctx context.Context, userID, id uuid.UUID) (ev applicat
 					Label:  cmp.Or(f.Label, f.ID),
 					Value:  f.Shown,
 					Source: f.Source,
+					Kind:   f.Kind,
 				}
 				idx := slices.IndexFunc(ev.Fields, func(existing application.EvidenceField) bool {
 					return existing.Page == ef.Page && ef.ID != "" && existing.ID == ef.ID

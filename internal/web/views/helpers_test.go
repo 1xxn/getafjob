@@ -111,3 +111,18 @@ func TestFormactionButtonsHaveNonce(t *testing.T) {
 		}
 	}
 }
+
+// A filled checkbox reads as yes or no, not as the browser's "checked".
+func TestEvidenceCheckboxShowsYesOrNo(t *testing.T) {
+	de := WithLocale(t.Context(), i18n.Locale("de"))
+	for row, want := range map[EvidenceFieldRow]string{
+		{Kind: "checkbox", Value: "checked"}: "Ja",
+		{Kind: "checkbox", Value: ""}:        "Nein",
+		{Kind: "text", Value: "checked"}:     "checked",
+		{Value: "Max"}:                       "Max",
+	} {
+		if got := row.Shown(de); got != want {
+			t.Errorf("%+v: %q, want %q", row, got, want)
+		}
+	}
+}

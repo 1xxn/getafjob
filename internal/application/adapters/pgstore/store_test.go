@@ -299,7 +299,7 @@ func TestEvidenceAndScreenshotRetention(t *testing.T) {
 		Step:       "execute",
 		Page:       1,
 		URL:        "https://jobs.example.org/apply",
-		Data:       []byte(`{"filled":[{"field_id":"f-1","label":"First name","shown":"Mx","source":"profile:personal.first_name"},{"field_id":"f-2","label":"Email","shown":"max@example.org","source":"profile:personal.email"}]}`),
+		Data:       []byte(`{"filled":[{"field_id":"f-1","label":"First name","shown":"Mx","source":"profile:personal.first_name"},{"field_id":"f-2","label":"Email","shown":"max@example.org","source":"profile:personal.email","kind":"email"}]}`),
 		Screenshot: "runs/1/execute.png",
 	}); err != nil {
 		t.Fatal(err)
@@ -350,7 +350,7 @@ func TestEvidenceAndScreenshotRetention(t *testing.T) {
 		t.Fatalf("evidence: %v", err)
 	}
 	if len(ev.Fields) != 2 || ev.Fields[0].Label != "First name" || ev.Fields[0].Value != "Max" ||
-		ev.Fields[0].Source != "profile:personal.first_name" {
+		ev.Fields[0].Source != "profile:personal.first_name" || ev.Fields[1].Kind != "email" {
 		t.Fatalf("fields = %+v", ev.Fields)
 	}
 	if ev.BeforeSubmitCheckpointID <= 0 || ev.ConfirmationCheckpointID <= 0 {

@@ -471,6 +471,8 @@
   "handoff.save_continue": "Save and continue",
   "evidence.job_link": "Job posting",
   "evidence.fields.title": "Filled fields",
+  "evidence.fields.yes": "Yes",
+  "evidence.fields.no": "No",
   "evidence.fields.empty": "No fields have been filled yet.",
   "evidence.fields.field": "Field",
   "evidence.fields.value": "Value",
