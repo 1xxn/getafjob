@@ -193,6 +193,10 @@ docker compose -f deploy/compose.yaml exec serve \
   getafjob admin demo -jobs 2000
 ```
 This populates the database with 2,000 synthetic job listings and matches them against demo candidate profiles.
+
+### Production server
+To run getafjob on your own server (DNS, mail, hardening, signed images, backups), follow
+[`docs/runbooks/install.md`](docs/runbooks/install.md).
 Add `-fixtures http://fixtures:8080` to point the postings at the local fixture site: in the development stack the
 runner has its own egress proxy that reaches only that site, so runs can be watched end to end without touching a
 real job site.
