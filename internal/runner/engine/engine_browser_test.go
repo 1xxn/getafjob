@@ -245,6 +245,28 @@ func TestSubmitUsesTheButtonInsideTheForm(t *testing.T) {
 	}
 }
 
+// A submit that waits for the user's approval parks with its own reason, without a click and without an error.
+func TestApprovalParksWithoutAClick(t *testing.T) {
+	r := start(t, "greenhouse_header_submit.html")
+	r.coord.refuse = errors.Join(ErrNeedsApproval, errors.New("aborted"))
+	pl := planner{
+		"First Name": {Text: "Max", Source: "profile.personal.first_name"},
+		"Last Name":  {Text: "Mustermann", Source: "profile.personal.last_name"},
+		"Email":      {Text: "max.mustermann@example.org", Source: "profile.personal.email"},
+		"Resume/CV":  cv,
+	}
+	if err := r.engine(pl).Run(t.Context(), r.page); !errors.Is(err, ErrParked) {
+		t.Fatalf("run: %v, want parked", err)
+	}
+	if !slices.Contains(r.coord.calls, "park:"+ParkApproval) {
+		t.Fatalf("calls = %v", r.coord.calls)
+	}
+	time.Sleep(time.Second)
+	if subs := r.site.submissions(); len(subs) != 0 {
+		t.Fatalf("submitted anyway: %v", subs)
+	}
+}
+
 func TestNoClickWithoutRegisteredSubmit(t *testing.T) {
 	r := start(t, "greenhouse_header_submit.html")
 	r.coord.refuse = errors.New("already submitted")

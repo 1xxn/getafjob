@@ -345,6 +345,11 @@ func code(err error) error {
 		return connect.NewError(connect.CodeFailedPrecondition, err.Error())
 	case errors.Is(err, application.ErrNoRun):
 		return connect.NewError(connect.CodeUnauthenticated, err.Error())
+	case errors.Is(err, application.ErrNeedsApproval):
+		return connect.NewError(connect.CodeAborted, err.Error())
+	case errors.Is(err, application.ErrExcluded), errors.Is(err, application.ErrDuplicate),
+		errors.Is(err, application.ErrCompanyWindow):
+		return connect.NewError(connect.CodePermissionDenied, err.Error())
 	default:
 		return err
 	}
