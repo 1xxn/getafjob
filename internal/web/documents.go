@@ -193,36 +193,6 @@ func (s *Server) documentDelete(w http.ResponseWriter, r *http.Request, u *ident
 	}
 }
 
-// documentImport fills empty profile fields from a CV and shows the profile for checking.
-func (s *Server) documentImport(w http.ResponseWriter, r *http.Request, u *identity.User) {
-	if u == nil {
-		http.Redirect(w, r, "/login", http.StatusSeeOther)
-		return
-	}
-	id, ok := docID(r)
-	if !ok || s.Importer == nil {
-		s.notFound(w, r, u)
-		return
-	}
-	filled, err := s.Importer.Import(r.Context(), u.ID, id)
-	switch {
-	case err == nil && filled:
-		http.Redirect(w, r, "/profile?imported=1", http.StatusSeeOther)
-	case err == nil:
-		s.renderDocuments(w, r, u, http.StatusOK, views.T(r.Context(), "documents.import_nothing"), false)
-	case errors.Is(err, profile.ErrNotFound):
-		s.notFound(w, r, u)
-	case errors.Is(err, cvimport.ErrNoText):
-		s.renderDocuments(w, r, u, http.StatusUnprocessableEntity, views.T(r.Context(), "documents.import_no_text"), true)
-	case errors.Is(err, profile.ErrFileType), errors.Is(err, profile.ErrFileTooLarge):
-		s.renderDocuments(w, r, u, http.StatusUnprocessableEntity, views.T(r.Context(), "documents.import_unreadable"), true)
-	case errors.Is(err, profile.ErrConflict):
-		s.renderDocuments(w, r, u, http.StatusConflict, views.T(r.Context(), "profile.conflict"), true)
-	default:
-		s.failed(w, r, u, err)
-	}
-}
-
 // documentReview renders the interactive review page for extracted career stations and profile fields.
 func (s *Server) documentReview(w http.ResponseWriter, r *http.Request, u *identity.User) {
 	if u == nil {
