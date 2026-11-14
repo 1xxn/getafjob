@@ -1,4 +1,4 @@
-# 0029. Hybrid matching with a skill taxonomy and static embeddings
+# 0029. Hybrid matching with a tech skill dictionary and static embeddings
 
 - Status: accepted
 - Date: 2026-11-14
@@ -25,7 +25,7 @@ and job, because every job is normalized again for every user.
 
 ## Considered options
 
-1. Rules only, refined (taxonomy, IDF weights, continuous factors).
+1. Rules only, refined (larger skill dictionary or the ESCO taxonomy, IDF weights, continuous factors).
 2. Rules plus a static embedding model (a token table, averaged; no network layers).
 3. Rules plus a transformer embedding model (multilingual-e5-small, about 118 M parameters).
 4. Cross-encoder or LLM re-ranking.
@@ -37,8 +37,9 @@ Chosen option: 2, with the refinements of 1, and learning to rank once there is 
 
 - Hard filters stay for excluded titles, place, language and salary. "No title match" is no longer a hard filter:
   the similarity decides.
-- Per job, once (cached by content hash and rules version): skills and occupations from the ESCO taxonomy (found in
-  one pass), required vs preferred skills, years asked, and a static embedding of title and text.
+- Per job, once (cached by content hash and rules version): skills from an own tech skill dictionary with German
+  and English spellings (found in one pass), required vs preferred skills, years asked, and a static embedding of
+  title and text.
 - Score: weighted combination of text similarity (cosine of profile and job), title, IDF-weighted skill coverage,
   seniority, place, language and recency; each part is shown as a reason. Weights are fixed at first and later
   learned per user from likes, skips and applications (logistic regression).
@@ -69,5 +70,11 @@ an extra service and 10 to 50 ms per job. Options 4 and 5 need GPUs, LLM calls o
 - Bad, because the image grows by about 54 MB and the worker holds the table in memory.
 - Bad, because the ranking set is small and written by the project; it guards against regressions but is no proof
   of quality on real postings. The real run (#285) has to confirm it.
-- Neutral: the ESCO taxonomy and the model are third-party data with their own licences (Apache 2.0 for the
-  model); both are named in the notices.
+- Neutral: the model is third-party data (Apache 2.0), named in `deploy/embed/NOTICE`.
+
+### ESCO
+
+The EU taxonomy ESCO (CC BY 4.0) was checked and left out: getafjob is for IT and tech jobs, and ESCO lacks most
+of their tools (no Kubernetes, Docker, Terraform, Kafka, PyTorch, React, AWS, scikit-learn or Angular; TypeScript,
+PostgreSQL and DevOps are there). Importing it would add a pipeline, upkeep and generic skills ("communicate")
+that add noise, for little gain on tech postings. Related job titles are covered by the embeddings.
