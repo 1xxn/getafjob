@@ -360,7 +360,13 @@ func (s *Server) applicationAnswer(w http.ResponseWriter, r *http.Request, u *id
 	}
 
 	if partial(r) {
-		s.render(w, r, http.StatusOK, views.AnswerSent(appID.String(), sess != nil))
+		more := false
+		if s.Apps != nil {
+			if c, err := s.Apps.NavCounts(r.Context(), u.ID); err == nil {
+				more = c.NeedsInput > 0 // this run no longer waits: any count is another run
+			}
+		}
+		s.render(w, r, http.StatusOK, views.AnswerSent(appID.String(), sess != nil, more))
 		return
 	}
 	if back := r.PostFormValue("back"); strings.HasPrefix(back, "/needs-input") {

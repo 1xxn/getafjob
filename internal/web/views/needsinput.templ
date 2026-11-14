@@ -161,8 +161,8 @@ templ niPanel(o NIOpen) {
 	</section>
 }
 
-// AnswerSent replaces the questions once the answers are on their way.
-templ AnswerSent(appID string, resumed bool) {
+// AnswerSent replaces the questions once the answers are on their way; more offers the next waiting run.
+templ AnswerSent(appID string, resumed, more bool) {
 	<div id="ni-form" class="ni-form" data-answered>
 		if resumed {
 			@ui.Alert(ui.AlertProps{Tone: ui.Success, Title: T(ctx, "ni.sent"), Text: T(ctx, "ni.sent_live")})
@@ -170,8 +170,12 @@ templ AnswerSent(appID string, resumed bool) {
 			@ui.Alert(ui.AlertProps{Tone: ui.Success, Title: T(ctx, "ni.sent"), Text: T(ctx, "ni.sent_queued")})
 		}
 		<div class="app-actions">
-			@ui.Button(ui.ButtonProps{Label: T(ctx, "ni.next"), Href: "/needs-input", Variant: "primary", Icon: "inbox"})
-			@ui.Button(ui.ButtonProps{Label: T(ctx, "ni.details"), Href: "/applications/" + appID, Variant: "ghost"})
+			if more {
+				@ui.Button(ui.ButtonProps{Label: T(ctx, "ni.next"), Href: "/needs-input", Variant: "primary", Icon: "inbox"})
+				@ui.Button(ui.ButtonProps{Label: T(ctx, "ni.details"), Href: "/applications/" + appID, Variant: "ghost"})
+			} else {
+				@ui.Button(ui.ButtonProps{Label: T(ctx, "ni.details"), Href: "/applications/" + appID, Variant: "primary"})
+			}
 		</div>
 	</div>
 }
