@@ -1,0 +1,30 @@
+package views
+
+import "github.com/1xxn/getafjob/internal/platform/i18n"
+
+// StaticMaintenance is the maintenance page Caddy serves while serve does not answer (deploy, restart, crash): one
+// file without scripts and app assets, in English and German, light and dark. css holds the colors from the tokens.
+templ StaticMaintenance(css string) {
+	<!DOCTYPE html>
+	<html lang="en">
+		<head>
+			<meta charset="utf-8"/>
+			<meta name="viewport" content="width=device-width, initial-scale=1"/>
+			<meta name="color-scheme" content="light dark"/>
+			<meta name="robots" content="noindex"/>
+			<title>{ T(WithLocale(ctx, i18n.EN), "maintenance.title") } · getafjob</title>
+			@templ.Raw("<style>" + css + "</style>")
+		</head>
+		<body>
+			<main>
+				<p class="brand">getafjob</p>
+				for _, l := range []i18n.Locale{i18n.EN, i18n.DE} {
+					<section lang={ string(l) }>
+						<h1>{ T(WithLocale(ctx, l), "maintenance.title") }</h1>
+						<p>{ T(WithLocale(ctx, l), "maintenance.text") }</p>
+					</section>
+				}
+			</main>
+		</body>
+	</html>
+}

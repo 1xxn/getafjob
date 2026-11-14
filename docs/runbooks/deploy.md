@@ -186,6 +186,9 @@ Add the following secrets to each environment (or as repository secrets if shari
 
 ## 6. Deployment Operations
 
+During a deploy visitors see the static maintenance page while `serve` restarts; for longer work turn on the
+maintenance mode first ([maintenance.md](maintenance.md)).
+
 ### Automated Workflows
 
 - **Staging Deployment:** When a pull request merges to `main`, `.github/workflows/main.yml` runs the stack checks (e2e included), builds and signs container images (`ghcr.io/1xxn/getafjob:sha-<commit>`, plus `main` for the head), and when the commit is still the head of `main` dispatches to `deploy.yml` with `environment: staging`.
