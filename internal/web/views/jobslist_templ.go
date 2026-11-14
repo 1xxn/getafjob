@@ -938,7 +938,7 @@ func jobsFilters(d JobsData) templ.Component {
 				return templ_7745c5c3_Err
 			}
 			templ_7745c5c3_Err = templruntime.RenderAttributes(ctx, templ_7745c5c3_Buffer, templ_7745c5c3_ElementWriter, "form", HX(ctx, "hx-get", "/jobs", "hx-target", "#results", "hx-swap", "outerHTML transition:false", "hx-push-url", "true",
-				"hx-trigger", "submit, change from:.jobs-filters select, input changed delay:400ms from:.jobs-filters input"))
+				"hx-trigger", "submit, change target:select, input changed delay:400ms target:input"))
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
@@ -1108,7 +1108,6 @@ func JobsPage(d JobsData) templ.Component {
 	})
 }
 
-// JobResults is the part htmx swaps on filter changes: chips, bulk bar, rows, pager and the open job.
 // JobResultsSwap answers a filter change: the results and, out of band, the filters the save search dialog keeps.
 func JobResultsSwap(d JobsData) templ.Component {
 	return templruntime.GeneratedTemplate(func(templ_7745c5c3_Input templruntime.GeneratedComponentInput) (templ_7745c5c3_Err error) {
@@ -1142,7 +1141,7 @@ func JobResultsSwap(d JobsData) templ.Component {
 			var templ_7745c5c3_Var34 string
 			templ_7745c5c3_Var34, templ_7745c5c3_Err = templruntime.NewAttributeExpression(d.SaveQuery).Resolve(ctx)
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `jobslist.templ`, Line: 293, Col: 77}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `jobslist.templ`, Line: 292, Col: 77}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var34)
 			if templ_7745c5c3_Err != nil {
@@ -1174,6 +1173,7 @@ func JobResultsSwap(d JobsData) templ.Component {
 	})
 }
 
+// JobResults is the part htmx swaps on filter changes: chips, bulk bar, rows, pager and the open job.
 func JobResults(d JobsData) templ.Component {
 	return templruntime.GeneratedTemplate(func(templ_7745c5c3_Input templruntime.GeneratedComponentInput) (templ_7745c5c3_Err error) {
 		templ_7745c5c3_W, ctx := templ_7745c5c3_Input.Writer, templ_7745c5c3_Input.Context

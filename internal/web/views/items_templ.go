@@ -110,7 +110,7 @@ func AnswersPage(name string, h CandidateHead, f Form, d AnswersData) templ.Comp
 					return templ_7745c5c3_Err
 				}
 				templ_7745c5c3_Err = templruntime.RenderAttributes(ctx, templ_7745c5c3_Buffer, templ_7745c5c3_ElementWriter, "form", HX(ctx, "hx-get", "/answers", "hx-target", "#answer-list", "hx-select", "#answer-list", "hx-swap", "outerHTML transition:false", "hx-push-url", "true",
-					"hx-sync", "this:replace", "hx-trigger", "submit, input changed delay:300ms from:.apps-search input"))
+					"hx-sync", "this:replace", "hx-trigger", "submit, input changed delay:300ms target:input"))
 				if templ_7745c5c3_Err != nil {
 					return templ_7745c5c3_Err
 				}
