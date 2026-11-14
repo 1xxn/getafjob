@@ -1154,7 +1154,7 @@ func TestPrivacyExportAndDelete(t *testing.T) {
 
 	// 1. GET /privacy is public and rendered in German and English
 	enPage := a.do(http.MethodGet, "/privacy", nil, "", map[string]string{"Accept-Language": "en"}).Body.String()
-	if !strings.Contains(enPage, "Privacy Notice") || !strings.Contains(enPage, "Envelope Encryption") {
+	if !strings.Contains(enPage, "Privacy notice") || !strings.Contains(enPage, "envelope encryption") {
 		t.Errorf("privacy page EN missing expected headings: %s", enPage)
 	}
 	dePage := a.do(http.MethodGet, "/privacy", nil, "", map[string]string{"Accept-Language": "de"}).Body.String()
