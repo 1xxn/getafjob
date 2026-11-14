@@ -178,6 +178,23 @@ document.addEventListener(
   },
   true
 );
+document.addEventListener("click", (e) => {
+  const btn = e.target.closest?.("[data-copy]");
+  const field = btn && document.getElementById(btn.dataset.copy || "");
+  if (!(field instanceof HTMLInputElement)) return;
+  const done = () => {
+    const announcer = document.getElementById("route-announcer");
+    const label = btn.querySelector("span");
+    if (announcer && btn.dataset.copied) announcer.textContent = btn.dataset.copied;
+    if (label && btn.dataset.copied) label.textContent = btn.dataset.copied;
+  };
+  const select2 = () => {
+    field.focus();
+    field.select();
+  };
+  if (!navigator.clipboard) return select2();
+  navigator.clipboard.writeText(field.value).then(done, select2);
+});
 var confirmed = null;
 document.addEventListener(
   "submit",

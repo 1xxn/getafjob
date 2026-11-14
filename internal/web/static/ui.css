@@ -3786,6 +3786,16 @@
     gap: var(--space-2);
   }
 
+  .adm-link-row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--space-2);
+  }
+
+  .adm-link-row .ui-input {
+    flex: 1 1 16rem;
+  }
+
   .adm-list {
     display: grid;
     margin: var(--space-2) 0 0;

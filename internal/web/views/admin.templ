@@ -106,7 +106,11 @@ templ AdminUsersPage(d AdminUsersData) {
 			<div class="adm-link" data-invite-link>
 				@ui.Alert(ui.AlertProps{Tone: ui.Info, Title: T(ctx, "admin.invite.created"), Text: T(ctx, "admin.invite.created_text", "expires", d.LinkExpires)})
 				<label class="ui-label" for="invite-link">{ T(ctx, "admin.invite.link") }</label>
-				<input id="invite-link" class="ui-input" type="text" readonly value={ d.Link }/>
+				<div class="adm-link-row">
+					<input id="invite-link" class="ui-input" type="text" readonly value={ d.Link }/>
+					@ui.Button(ui.ButtonProps{Label: T(ctx, "admin.invite.copy"), Icon: "copy",
+						Attrs: templ.Attributes{"data-copy": "invite-link", "data-copied": T(ctx, "admin.invite.copied")}})
+				</div>
 			</div>
 		}
 		<form method="post" action="/admin/invites" class="set-form stack adm-invite" novalidate>

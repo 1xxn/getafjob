@@ -224,6 +224,28 @@ document.addEventListener(
   true,
 );
 
+// --- copy buttons ---
+// A button with data-copy="<field id>" copies that field's value; the screen reader hears data-copied. Without the
+// clipboard (an insecure context) the field is selected, so Ctrl+C copies it.
+
+document.addEventListener('click', (e) => {
+  const btn = (e.target as Element).closest?.<HTMLElement>('[data-copy]');
+  const field = btn && document.getElementById(btn.dataset.copy || '');
+  if (!(field instanceof HTMLInputElement)) return;
+  const done = () => {
+    const announcer = document.getElementById('route-announcer');
+    const label = btn.querySelector('span');
+    if (announcer && btn.dataset.copied) announcer.textContent = btn.dataset.copied;
+    if (label && btn.dataset.copied) label.textContent = btn.dataset.copied;
+  };
+  const select = () => {
+    field.focus();
+    field.select();
+  };
+  if (!navigator.clipboard) return select();
+  navigator.clipboard.writeText(field.value).then(done, select);
+});
+
 // --- confirm dialogs ---
 
 let confirmed: HTMLFormElement | null = null;
