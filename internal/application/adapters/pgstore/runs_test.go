@@ -294,3 +294,55 @@ func TestUserParkEndsTheRun(t *testing.T) {
 		t.Fatalf("state = %s, want queued", a.State)
 	}
 }
+
+// Portal runs share the user's session cookies: one at a time per user and portal and a fixed gap, even without
+// limits; other users and other hosts are not held up (#514).
+func TestPortalRunsOneAtATime(t *testing.T) {
+	pool, st, svc, now := setup(t)
+	ctx := t.Context()
+	runs := application.NewRuns(svc.WithoutLimits(), st)
+	max := user(t, pool, "max@example.org")
+	erika := user(t, pool, "erika@example.org")
+	first := queued(t, svc, max, jobAt(t, pool, "https://www.linkedin.com/jobs/view/1", "Acme", "acme|1"))
+	second := queued(t, svc, max, jobAt(t, pool, "https://www.linkedin.com/jobs/view/2", "Muster", "muster|2"))
+	other := queued(t, svc, max, jobAt(t, pool, "https://jobs.lever.co/beispiel/3", "Beispiel", "beispiel|3"))
+	erikas := queued(t, svc, erika, jobAt(t, pool, "https://de.linkedin.com/jobs/view/4", "Probe", "probe|4"))
+
+	lease := func() application.Lease {
+		t.Helper()
+		l, ok, err := runs.Lease(ctx, "r1", application.RunnerServer, nil)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if !ok {
+			return application.Lease{}
+		}
+		return l
+	}
+	got := map[uuid.UUID]application.Lease{}
+	for range 4 {
+		if l := lease(); l.AppID != uuid.Nil {
+			got[l.AppID] = l
+		}
+	}
+	if _, ok := got[second]; ok || len(got) != 3 {
+		t.Fatalf("leased %v; want first, other and erika's, not the second LinkedIn run of max", got)
+	}
+	for _, id := range []uuid.UUID{first, other, erikas} {
+		if _, ok := got[id]; !ok {
+			t.Errorf("%s not leased", id)
+		}
+	}
+	// The first run ends: the gap still holds the next one back, then it runs.
+	ref := application.RunRef{RunID: got[first].RunID, AppID: first, UserID: max}
+	if err := runs.Park(ctx, ref, "parked by user", ""); err != nil {
+		t.Fatal(err)
+	}
+	if l := lease(); l.AppID != uuid.Nil {
+		t.Fatalf("leased %s within the portal gap", l.AppID)
+	}
+	*now = now.Add(application.PortalGap + time.Second)
+	if l := lease(); l.AppID != second {
+		t.Fatalf("after the gap leased %s, want the second LinkedIn run", l.AppID)
+	}
+}

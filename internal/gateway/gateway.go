@@ -52,9 +52,9 @@ type Screenshots interface {
 	Put(ctx context.Context, userID uuid.UUID, key string, data []byte) error
 }
 
-// PortalSessionSaver stores updated portal session cookies captured during a run.
+// PortalSessionSaver stores the session cookies of a new sign-in in the remote browser, keeping the daily limit.
 type PortalSessionSaver interface {
-	SaveCookies(ctx context.Context, userID uuid.UUID, portal string, cookiesJSON []byte, dailyLimit int) error
+	RefreshCookies(ctx context.Context, userID uuid.UUID, portal string, cookiesJSON []byte) error
 }
 
 // Server implements the runner service.
@@ -494,7 +494,7 @@ func (s *Server) Checkpoint(ctx context.Context, req *runnerv1.CheckpointRequest
 	if cookies := m.GetUpdatedSessionCookiesJson(); len(cookies) > 0 && s.Portals != nil && s.Apps != nil && s.Data != nil {
 		if app, err := s.Apps.Get(ctx, ref.UserID, ref.AppID); err == nil {
 			if run, err := s.Data.RunData(ctx, ref.UserID, app.JobID); err == nil && run.GetPortal() != "" {
-				_ = s.Portals.SaveCookies(ctx, ref.UserID, run.GetPortal(), cookies, 0)
+				_ = s.Portals.RefreshCookies(ctx, ref.UserID, run.GetPortal(), cookies)
 			}
 		}
 	}

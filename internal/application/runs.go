@@ -13,10 +13,12 @@ import (
 )
 
 // Run limits: a lease is valid for RunTTL; one host gets no second run while one is active and at most one lease
-// per HostGap.
+// per HostGap. A user's portal (LinkedIn, Indeed) gets one run at a time and at most one lease per PortalGap, also
+// without limits: every run there uses the same session cookies (#514). The gap is fixed, no random jitter.
 const (
-	RunTTL  = 60 * time.Minute
-	HostGap = 5 * time.Minute
+	RunTTL    = 60 * time.Minute
+	HostGap   = 5 * time.Minute
+	PortalGap = 10 * time.Minute
 )
 
 // ErrNoRun reports a token that names no active run.
@@ -51,7 +53,7 @@ type RunStore interface {
 	// UnfinishedRuns lists runs without a finish whose application still waits on its runner.
 	UnfinishedRuns(ctx context.Context) ([]UnfinishedRun, error)
 	// LeaseNext leases the oldest queued application that passes the per-host limits.
-	LeaseNext(ctx context.Context, runnerID string, tokenHash []byte, runnerChoice string, userID *uuid.UUID, now, expires, gapStart time.Time, unlimited bool) (Lease, bool, error)
+	LeaseNext(ctx context.Context, runnerID string, tokenHash []byte, runnerChoice string, userID *uuid.UUID, now, expires, gapStart, portalGapStart time.Time, unlimited bool) (Lease, bool, error)
 	RunByToken(ctx context.Context, tokenHash []byte) (RunRef, time.Time, *time.Time, error)
 	FinishRun(ctx context.Context, r RunRef, outcome string, at time.Time) error
 	AddCheckpoint(ctx context.Context, r RunRef, c Checkpoint) error
@@ -86,7 +88,7 @@ func (r *Runs) Lease(ctx context.Context, runnerID string, choice RunnerChoice, 
 		_, _ = rand.Read(b)
 		token := base64.RawURLEncoding.EncodeToString(b)
 		now := r.apps.now()
-		l, ok, err := r.store.LeaseNext(ctx, runnerID, tokenHash(token), runnerChoice, userID, now, now.Add(RunTTL), now.Add(-HostGap), r.apps.unlimited)
+		l, ok, err := r.store.LeaseNext(ctx, runnerID, tokenHash(token), runnerChoice, userID, now, now.Add(RunTTL), now.Add(-HostGap), now.Add(-PortalGap), r.apps.unlimited)
 		if err != nil || !ok {
 			return Lease{}, false, err
 		}

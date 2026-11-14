@@ -636,8 +636,8 @@ func (q *Queries) InsertEvent(ctx context.Context, arg InsertEventParams) error 
 }
 
 const insertRun = `-- name: InsertRun :one
-INSERT INTO runs (application_id, user_id, runner_id, host, token_hash, leased_at, expires_at)
-VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING id
+INSERT INTO runs (application_id, user_id, runner_id, host, token_hash, leased_at, expires_at, portal)
+VALUES ($1, $2, $3, $4, $5, $6, $7, $8) RETURNING id
 `
 
 type InsertRunParams struct {
@@ -648,6 +648,7 @@ type InsertRunParams struct {
 	TokenHash     []byte
 	LeasedAt      time.Time
 	ExpiresAt     time.Time
+	Portal        string
 }
 
 func (q *Queries) InsertRun(ctx context.Context, arg InsertRunParams) (uuid.UUID, error) {
@@ -659,6 +660,7 @@ func (q *Queries) InsertRun(ctx context.Context, arg InsertRunParams) (uuid.UUID
 		arg.TokenHash,
 		arg.LeasedAt,
 		arg.ExpiresAt,
+		arg.Portal,
 	)
 	var id uuid.UUID
 	err := row.Scan(&id)
@@ -681,25 +683,31 @@ func (q *Queries) InsertSubmitAttempt(ctx context.Context, arg InsertSubmitAttem
 }
 
 const leaseCandidate = `-- name: LeaseCandidate :one
-SELECT a.id, a.user_id, a.job_id,
-  lower(coalesce(substring(coalesce(nullif(j.apply_url, ''), j.url) from '^[a-zA-Z]+://([^/:?#]+)'), ''))::text AS host
+SELECT a.id, a.user_id, a.job_id, h.host::text AS host, p.portal::text AS portal
 FROM applications a
 JOIN jobs j ON j.id = a.job_id
+CROSS JOIN LATERAL (SELECT lower(coalesce(substring(coalesce(nullif(j.apply_url, ''), j.url) from '^[a-zA-Z]+://([^/:?#]+)'), '')) AS host) h
+CROSS JOIN LATERAL (SELECT CASE
+    WHEN lower(j.source) = 'linkedin' OR lower(j.source) LIKE 'linkedin:%' OR h.host ~ '(^|\.)linkedin\.com$' THEN 'linkedin'
+    WHEN lower(j.source) = 'indeed' OR lower(j.source) LIKE 'indeed:%' OR h.host ~ '(^|\.)indeed\.com$' THEN 'indeed'
+    ELSE '' END AS portal) p
 LEFT JOIN autonomy_settings s ON s.user_id = a.user_id
 WHERE a.state = 'queued'
   AND NOT EXISTS (SELECT 1 FROM runs r WHERE r.application_id = a.id AND r.finished_at IS NULL AND r.expires_at > $1::timestamptz)
+  AND (p.portal = '' OR NOT EXISTS (SELECT 1 FROM runs r WHERE r.user_id = a.user_id AND r.portal = p.portal
+      AND ((r.finished_at IS NULL AND r.expires_at > $1::timestamptz) OR r.leased_at > $2::timestamptz)))
   -- Without limits (self-host) neither the per-host gap nor the daily quota applies.
-  AND ($2::bool OR (
-    NOT EXISTS (SELECT 1 FROM runs r WHERE r.host = lower(coalesce(substring(coalesce(nullif(j.apply_url, ''), j.url) from '^[a-zA-Z]+://([^/:?#]+)'), ''))
-      AND ((r.finished_at IS NULL AND r.expires_at > $1::timestamptz) OR r.leased_at > $3::timestamptz))
+  AND ($3::bool OR (
+    NOT EXISTS (SELECT 1 FROM runs r WHERE r.host = h.host
+      AND ((r.finished_at IS NULL AND r.expires_at > $1::timestamptz) OR r.leased_at > $4::timestamptz))
     AND coalesce(s.daily_limit, 5) > 0
     AND (
       SELECT count(*) FROM submit_attempts sa
       WHERE sa.user_id = a.user_id
         AND sa.started_at >= $1::timestamptz - interval '24 hours'
     ) < coalesce(s.daily_limit, 5)))
-  AND coalesce(s.runner_choice, 'server') = $4::text
-  AND ($5::uuid IS NULL OR a.user_id = $5::uuid)
+  AND coalesce(s.runner_choice, 'server') = $5::text
+  AND ($6::uuid IS NULL OR a.user_id = $6::uuid)
   AND NOT a.queue_paused
 ORDER BY a.queue_pos NULLS LAST, a.id
 LIMIT 1
@@ -707,11 +715,12 @@ FOR UPDATE OF a SKIP LOCKED
 `
 
 type LeaseCandidateParams struct {
-	Now          time.Time
-	Unlimited    bool
-	GapStart     time.Time
-	RunnerChoice string
-	UserID       *uuid.UUID
+	Now            time.Time
+	PortalGapStart time.Time
+	Unlimited      bool
+	GapStart       time.Time
+	RunnerChoice   string
+	UserID         *uuid.UUID
 }
 
 type LeaseCandidateRow struct {
@@ -719,14 +728,17 @@ type LeaseCandidateRow struct {
 	UserID uuid.UUID
 	JobID  int64
 	Host   string
+	Portal string
 }
 
 // System role: the first queued application (queue order, not paused) whose host has no active run and no lease within the gap,
 // whose user has free daily quota (both skipped when unlimited), that has no unfinished run itself, and that
-// matches the runner's choice.
+// matches the runner's choice. A portal run (LinkedIn, Indeed: the user's session cookies) also waits while the same
+// user has an active run on that portal or leased one within the portal gap, limits or not.
 func (q *Queries) LeaseCandidate(ctx context.Context, arg LeaseCandidateParams) (LeaseCandidateRow, error) {
 	row := q.db.QueryRow(ctx, leaseCandidate,
 		arg.Now,
+		arg.PortalGapStart,
 		arg.Unlimited,
 		arg.GapStart,
 		arg.RunnerChoice,
@@ -738,6 +750,7 @@ func (q *Queries) LeaseCandidate(ctx context.Context, arg LeaseCandidateParams) 
 		&i.UserID,
 		&i.JobID,
 		&i.Host,
+		&i.Portal,
 	)
 	return i, err
 }

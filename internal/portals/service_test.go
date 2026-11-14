@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"slices"
+	"strings"
 	"testing"
 	"time"
 
@@ -262,5 +263,26 @@ func TestServiceSetDailyLimit(t *testing.T) {
 
 	if err := svc.SetDailyLimit(context.Background(), userID, PortalLinkedIn, 50); !errors.Is(err, ErrInvalidDailyLimit) {
 		t.Fatalf("expected ErrInvalidDailyLimit for limit 50, got %v", err)
+	}
+}
+
+// Cookies from a new sign-in in the remote browser replace the old ones and keep the user's daily limit (#514).
+func TestRefreshCookiesKeepsTheDailyLimit(t *testing.T) {
+	store := newFakeStore()
+	svc := NewService(store, &fakeCipher{}, &fakeAutonomy{enabled: true, terms: true}, true)
+	userID := uuid.New()
+	ctx := context.Background()
+	if err := svc.SaveCookies(ctx, userID, PortalLinkedIn, []byte(`[{"name":"li_at","value":"old"}]`), 3); err != nil {
+		t.Fatal(err)
+	}
+	if err := svc.RefreshCookies(ctx, userID, PortalLinkedIn, []byte(`[{"name":"li_at","value":"new"}]`)); err != nil {
+		t.Fatal(err)
+	}
+	sess, err := store.GetSession(ctx, userID, PortalLinkedIn)
+	if err != nil || sess.DailyLimit != 3 {
+		t.Fatalf("session after refresh: limit %d, %v", sess.DailyLimit, err)
+	}
+	if got, _ := svc.GetDecryptedCookies(ctx, userID, PortalLinkedIn); !strings.Contains(string(got), "new") {
+		t.Errorf("cookies after refresh: %s", got)
 	}
 }

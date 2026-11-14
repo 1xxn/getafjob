@@ -320,6 +320,7 @@ type Run struct {
 	FinishedAt    *time.Time
 	Outcome       *string
 	Adapter       string
+	Portal        string
 }
 
 type RunCheckpoint struct {
