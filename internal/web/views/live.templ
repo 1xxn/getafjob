@@ -98,6 +98,8 @@ templ runState(r ActiveRunItem) {
 // LivePage is the live center (/live): every active run as a small live picture, or one run in focus.
 templ LivePage(d LiveData) {
 	@Layout(Page{Title: T(ctx, "live.title"), UserName: d.Name, Handoff: true}) {
+		// The live center shows the runs itself: the floating dock stays hidden here (it keeps its connection).
+		<span hidden data-live-center></span>
 		if d.Focus != nil {
 			@liveFocus(d)
 		} else {
