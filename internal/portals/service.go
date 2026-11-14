@@ -90,6 +90,15 @@ func (s *Service) SaveCookies(ctx context.Context, userID uuid.UUID, portal stri
 	return s.store.SaveSession(ctx, sess)
 }
 
+// RefreshCookies stores the cookies of a new sign-in in the remote browser and keeps the session's daily limit.
+func (s *Service) RefreshCookies(ctx context.Context, userID uuid.UUID, portal string, cookiesJSON []byte) error {
+	limit := 0 // no session yet: the default
+	if sess, err := s.store.GetSession(ctx, userID, strings.ToLower(strings.TrimSpace(portal))); err == nil {
+		limit = sess.DailyLimit
+	}
+	return s.SaveCookies(ctx, userID, portal, cookiesJSON, limit)
+}
+
 // GetDecryptedCookies retrieves and decrypts the session cookies for a portal.
 func (s *Service) GetDecryptedCookies(ctx context.Context, userID uuid.UUID, portal string) ([]byte, error) {
 	if !s.adminEnabled {

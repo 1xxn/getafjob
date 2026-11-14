@@ -439,7 +439,7 @@ var _ application.RunStore = (*Store)(nil)
 
 // LeaseNext leases the next application in the system role: one lease at a time (advisory lock), so the
 // per-host check holds across runners.
-func (s *Store) LeaseNext(ctx context.Context, runnerID string, tokenHash []byte, runnerChoice string, userID *uuid.UUID, now, expires, gapStart time.Time, unlimited bool) (
+func (s *Store) LeaseNext(ctx context.Context, runnerID string, tokenHash []byte, runnerChoice string, userID *uuid.UUID, now, expires, gapStart, portalGapStart time.Time, unlimited bool) (
 	l application.Lease, ok bool, err error,
 ) {
 	err = db.InSystemTx(ctx, s.pool, func(tx pgx.Tx) error {
@@ -447,7 +447,7 @@ func (s *Store) LeaseNext(ctx context.Context, runnerID string, tokenHash []byte
 		if err := qs.LockLeases(ctx); err != nil {
 			return err
 		}
-		c, err := qs.LeaseCandidate(ctx, q.LeaseCandidateParams{Now: now, GapStart: gapStart, RunnerChoice: runnerChoice, UserID: userID, Unlimited: unlimited})
+		c, err := qs.LeaseCandidate(ctx, q.LeaseCandidateParams{Now: now, GapStart: gapStart, PortalGapStart: portalGapStart, RunnerChoice: runnerChoice, UserID: userID, Unlimited: unlimited})
 		if errors.Is(err, pgx.ErrNoRows) {
 			return nil
 		}
@@ -455,7 +455,7 @@ func (s *Store) LeaseNext(ctx context.Context, runnerID string, tokenHash []byte
 			return err
 		}
 		id, err := qs.InsertRun(ctx, q.InsertRunParams{ApplicationID: c.ID, UserID: c.UserID, RunnerID: runnerID,
-			Host: c.Host, TokenHash: tokenHash, LeasedAt: now, ExpiresAt: expires})
+			Host: c.Host, TokenHash: tokenHash, LeasedAt: now, ExpiresAt: expires, Portal: c.Portal})
 		if err != nil {
 			return err
 		}

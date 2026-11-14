@@ -72,17 +72,24 @@ UPDATE applications SET handoff_warned = true WHERE id = $1 AND user_id = $2 AND
 -- name: LeaseCandidate :one
 -- System role: the first queued application (queue order, not paused) whose host has no active run and no lease within the gap,
 -- whose user has free daily quota (both skipped when unlimited), that has no unfinished run itself, and that
--- matches the runner's choice.
-SELECT a.id, a.user_id, a.job_id,
-  lower(coalesce(substring(coalesce(nullif(j.apply_url, ''), j.url) from '^[a-zA-Z]+://([^/:?#]+)'), ''))::text AS host
+-- matches the runner's choice. A portal run (LinkedIn, Indeed: the user's session cookies) also waits while the same
+-- user has an active run on that portal or leased one within the portal gap, limits or not.
+SELECT a.id, a.user_id, a.job_id, h.host::text AS host, p.portal::text AS portal
 FROM applications a
 JOIN jobs j ON j.id = a.job_id
+CROSS JOIN LATERAL (SELECT lower(coalesce(substring(coalesce(nullif(j.apply_url, ''), j.url) from '^[a-zA-Z]+://([^/:?#]+)'), '')) AS host) h
+CROSS JOIN LATERAL (SELECT CASE
+    WHEN lower(j.source) = 'linkedin' OR lower(j.source) LIKE 'linkedin:%' OR h.host ~ '(^|\.)linkedin\.com$' THEN 'linkedin'
+    WHEN lower(j.source) = 'indeed' OR lower(j.source) LIKE 'indeed:%' OR h.host ~ '(^|\.)indeed\.com$' THEN 'indeed'
+    ELSE '' END AS portal) p
 LEFT JOIN autonomy_settings s ON s.user_id = a.user_id
 WHERE a.state = 'queued'
   AND NOT EXISTS (SELECT 1 FROM runs r WHERE r.application_id = a.id AND r.finished_at IS NULL AND r.expires_at > sqlc.arg(now)::timestamptz)
+  AND (p.portal = '' OR NOT EXISTS (SELECT 1 FROM runs r WHERE r.user_id = a.user_id AND r.portal = p.portal
+      AND ((r.finished_at IS NULL AND r.expires_at > sqlc.arg(now)::timestamptz) OR r.leased_at > sqlc.arg(portal_gap_start)::timestamptz)))
   -- Without limits (self-host) neither the per-host gap nor the daily quota applies.
   AND (sqlc.arg(unlimited)::bool OR (
-    NOT EXISTS (SELECT 1 FROM runs r WHERE r.host = lower(coalesce(substring(coalesce(nullif(j.apply_url, ''), j.url) from '^[a-zA-Z]+://([^/:?#]+)'), ''))
+    NOT EXISTS (SELECT 1 FROM runs r WHERE r.host = h.host
       AND ((r.finished_at IS NULL AND r.expires_at > sqlc.arg(now)::timestamptz) OR r.leased_at > sqlc.arg(gap_start)::timestamptz))
     AND coalesce(s.daily_limit, 5) > 0
     AND (
@@ -98,8 +105,8 @@ LIMIT 1
 FOR UPDATE OF a SKIP LOCKED;
 
 -- name: InsertRun :one
-INSERT INTO runs (application_id, user_id, runner_id, host, token_hash, leased_at, expires_at)
-VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING id;
+INSERT INTO runs (application_id, user_id, runner_id, host, token_hash, leased_at, expires_at, portal)
+VALUES ($1, $2, $3, $4, $5, $6, $7, $8) RETURNING id;
 
 -- name: RunByToken :one
 -- System role: the run a token belongs to.
