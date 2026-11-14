@@ -241,7 +241,7 @@ templ jobsFilters(d JobsData) {
 		role="search"
 		aria-label={ T(ctx, "jobs.filters") }
 		{ HX(ctx, "hx-get", "/jobs", "hx-target", "#results", "hx-swap", "outerHTML transition:false", "hx-push-url", "true",
-			"hx-trigger", "submit, change from:select, input changed delay:400ms from:input")... }
+			"hx-trigger", "submit, change target:select, input changed delay:400ms target:input")... }
 	>
 		<div class="jobs-filter-search">
 			@ui.Input(ui.InputProps{FieldProps: ui.FieldProps{Name: "q", Label: T(ctx, "jobs.search_label"), HideLabel: true},
@@ -286,13 +286,13 @@ templ JobsPage(d JobsData) {
 	}
 }
 
-// JobResults is the part htmx swaps on filter changes: chips, bulk bar, rows, pager and the open job.
 // JobResultsSwap answers a filter change: the results and, out of band, the filters the save search dialog keeps.
 templ JobResultsSwap(d JobsData) {
 	@JobResults(d)
 	<input type="hidden" id="save-search-query" name="query" value={ d.SaveQuery } { HX(ctx, "hx-swap-oob", "true")... }/>
 }
 
+// JobResults is the part htmx swaps on filter changes: chips, bulk bar, rows, pager and the open job.
 templ JobResults(d JobsData) {
 	<div id="results" class={ "jobs-layout", templ.KV("jobs-layout-open", d.Panel != nil) }>
 		<div class="jobs-main">

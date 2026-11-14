@@ -94,7 +94,7 @@ templ ApplicationsPage(d AppsData) {
 				role="search"
 				aria-label={ T(ctx, "apps.search_label") }
 				{ HX(ctx, "hx-get", "/applications", "hx-target", "#apps-results", "hx-swap", "outerHTML transition:false", "hx-push-url", "true",
-					"hx-sync", "this:replace", "hx-trigger", "submit, input changed delay:400ms from:input")... }
+					"hx-sync", "this:replace", "hx-trigger", "submit, input changed delay:400ms target:input")... }
 			>
 				<input type="hidden" name="group" value={ d.Group }/>
 				@ui.Input(ui.InputProps{FieldProps: ui.FieldProps{Name: "q", Label: T(ctx, "apps.search_label"), HideLabel: true},
