@@ -1,25 +1,30 @@
 package embed
 
 import (
+	"bufio"
 	"encoding/binary"
 	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
 	"math"
+	"os"
+	"path/filepath"
 )
 
-// table is the one 2-D tensor of a static model file.
+// table is the one 2-D tensor of a static model file, as float16.
 type table struct {
 	rows, cols int
-	data       []float32
+	data       []uint16
 }
 
 // maxHeader bounds the JSON header of a safetensors file.
 const maxHeader = 1 << 20
 
-// readTable reads the single 2-D tensor of a safetensors file (F32 or F16) as float32.
-func readTable(r io.Reader) (table, error) {
+// readTable reads the single 2-D tensor of a safetensors file (F32 or F16) as float16, keeping the first dims
+// columns when dims is between 0 and the width.
+func readTable(r io.Reader, dims int) (table, error) {
+	r = bufio.NewReaderSize(r, 1<<20)
 	var n uint64
 	if err := binary.Read(r, binary.LittleEndian, &n); err != nil {
 		return table{}, err
@@ -61,20 +66,100 @@ func readTable(r io.Reader) (table, error) {
 	if rows <= 0 || cols <= 0 || int64(rows)*int64(cols)*int64(size) != info.Offsets[1] {
 		return table{}, errors.New("safetensors: shape and size disagree")
 	}
-	raw := make([]byte, info.Offsets[1])
-	if _, err := io.ReadFull(r, raw); err != nil {
-		return table{}, err
+	keep := cols
+	if dims > 0 && dims < cols {
+		keep = dims
 	}
-	data := make([]float32, rows*cols)
-	for i := range data {
-		if size == 4 {
-			data[i] = math.Float32frombits(binary.LittleEndian.Uint32(raw[i*4:]))
-		} else {
-			data[i] = half(binary.LittleEndian.Uint16(raw[i*2:]))
+	data := make([]uint16, rows*keep)
+	row := make([]byte, cols*size)
+	for i := range rows {
+		if _, err := io.ReadFull(r, row); err != nil {
+			return table{}, err
+		}
+		for j := range keep {
+			if size == 4 {
+				data[i*keep+j] = floatToHalf(math.Float32frombits(binary.LittleEndian.Uint32(row[j*4:])))
+			} else {
+				data[i*keep+j] = binary.LittleEndian.Uint16(row[j*2:])
+			}
 		}
 	}
-	return table{rows: rows, cols: cols, data: data}, nil
+	return table{rows: rows, cols: keep, data: data}, nil
 }
+
+// writeTable writes t as the single F16 tensor "embedding.weight" of a safetensors file.
+func writeTable(w io.Writer, t table) error {
+	head, err := json.Marshal(map[string]any{"embedding.weight": map[string]any{
+		"dtype": "F16", "shape": []int{t.rows, t.cols}, "data_offsets": []int{0, len(t.data) * 2}}})
+	if err != nil {
+		return err
+	}
+	for len(head)%8 != 0 { // the data starts 8-byte aligned
+		head = append(head, ' ')
+	}
+	bw := bufio.NewWriterSize(w, 1<<20)
+	if err := binary.Write(bw, binary.LittleEndian, uint64(len(head))); err != nil {
+		return err
+	}
+	if _, err := bw.Write(head); err != nil {
+		return err
+	}
+	if err := binary.Write(bw, binary.LittleEndian, t.data); err != nil {
+		return err
+	}
+	return bw.Flush()
+}
+
+// Pack writes the model in from (tokenizer.json, model.safetensors) to to, cut to dims columns and stored as
+// float16: the form the image ships.
+func Pack(from, to string, dims int) error {
+	src, err := os.OpenRoot(from)
+	if err != nil {
+		return err
+	}
+	defer func() { _ = src.Close() }()
+	tok, err := src.ReadFile("tokenizer.json")
+	if err != nil {
+		return err
+	}
+	f, err := src.Open("model.safetensors")
+	if err != nil {
+		return err
+	}
+	defer func() { _ = f.Close() }()
+	t, err := readTable(f, dims)
+	if err != nil {
+		return fmt.Errorf("embed: %w", err)
+	}
+	if err := os.MkdirAll(to, 0o755); err != nil { //nolint:gosec // build tool output, read by everyone in the image
+		return err
+	}
+	dst, err := os.OpenRoot(filepath.Clean(to))
+	if err != nil {
+		return err
+	}
+	defer func() { _ = dst.Close() }()
+	if err := dst.WriteFile("tokenizer.json", tok, 0o644); err != nil {
+		return err
+	}
+	out, err := dst.Create("model.safetensors")
+	if err != nil {
+		return err
+	}
+	if err := writeTable(out, t); err != nil {
+		_ = out.Close()
+		return err
+	}
+	return out.Close()
+}
+
+// halfToFloat maps every float16 bit pattern to its float32 value (256 KB, built once).
+var halfToFloat = func() (t [1 << 16]float32) {
+	for h := range t {
+		t[h] = half(uint16(h))
+	}
+	return t
+}()
 
 // half converts an IEEE 754 half-precision number.
 func half(h uint16) float32 {
@@ -83,10 +168,7 @@ func half(h uint16) float32 {
 	frac := uint32(h) & 0x3ff
 	switch exp {
 	case 0:
-		if frac == 0 {
-			return math.Float32frombits(sign)
-		}
-		f := float32(frac) / 1024 * float32(math.Pow(2, -14))
+		f := float32(frac) * (1.0 / (1 << 24)) // subnormal: frac * 2^-24
 		if sign != 0 {
 			f = -f
 		}
@@ -95,4 +177,43 @@ func half(h uint16) float32 {
 		return math.Float32frombits(sign | 0x7f800000 | frac<<13)
 	}
 	return math.Float32frombits(sign | (exp+112)<<23 | frac<<13)
+}
+
+// floatToHalf rounds f to the nearest float16 (ties to even); out of range becomes infinity, tiny values zero or
+// subnormal.
+func floatToHalf(f float32) uint16 {
+	b := math.Float32bits(f)
+	sign := uint16(b>>16) & 0x8000
+	exp := int32(b>>23&0xff) - 127 + 15
+	mant := b & 0x7fffff
+	switch {
+	case b&0x7fffffff == 0:
+		return sign
+	case int32(b>>23&0xff) == 0xff: // inf or NaN
+		if mant != 0 {
+			return sign | 0x7e00
+		}
+		return sign | 0x7c00
+	case exp >= 0x1f:
+		return sign | 0x7c00
+	case exp <= 0: // subnormal or zero
+		if exp < -10 {
+			return sign
+		}
+		mant |= 0x800000
+		shift := uint32(14 - exp)
+		h := mant >> shift
+		rem := mant & (1<<shift - 1)
+		half := uint32(1) << (shift - 1)
+		if rem > half || rem == half && h&1 == 1 {
+			h++
+		}
+		return sign | uint16(min(h, 0x400)) // 0x400: rounded up to the smallest normal, which is right
+	}
+	h := uint32(exp)<<10 | mant>>13
+	rem := mant & 0x1fff
+	if rem > 0x1000 || rem == 0x1000 && h&1 == 1 {
+		h++ // may carry into the exponent, which is still right
+	}
+	return sign | uint16(min(h, 0x7c00)&0x7fff)
 }
