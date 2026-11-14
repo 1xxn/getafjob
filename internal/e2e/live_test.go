@@ -86,7 +86,14 @@ func TestLiveCenter(t *testing.T) {
 	}
 	tab.Shot("focus")
 
+	// The live center shows the run itself: no floating dock on top of it.
+	if tab.Eval("return getComputedStyle(document.getElementById('live-dock')).display") != `"none"` {
+		t.Fatal("the dock floats over the live center")
+	}
+
 	// Dock: open, pick the run, keep the same live view across a page change.
+	tab.Click(`.shell-side a[href="/jobs"]`)
+	tab.WaitFor("location.pathname === '/jobs'")
 	tab.Click("[data-dock-toggle]")
 	tab.WaitFor(`document.querySelector('[data-dock-run="` + app + `"]')`)
 	tab.Click(`[data-dock-run="` + app + `"]`)
@@ -95,8 +102,8 @@ func TestLiveCenter(t *testing.T) {
 	tab.WaitWithin(30*time.Second, "(document.querySelector('.dock-screen [data-live-view]')?.dataset.mode || 'connecting') !== 'connecting'")
 	tab.Eval("document.querySelector('.dock-screen [data-live-view]').dataset.e2e = 'kept'; return true")
 	before := tab.Eval("return document.querySelector('.dock-screen [data-live-view]').dataset.mode")
-	tab.Click(`.shell-side a[href="/jobs"]`)
-	tab.WaitFor("location.pathname === '/jobs'")
+	tab.Click(`.shell-side a[href="/"]`)
+	tab.WaitFor("location.pathname === '/'")
 	if tab.Eval("return document.querySelector('.dock-screen [data-live-view]')?.dataset.e2e") != `"kept"` {
 		t.Fatal("the dock's live view did not survive navigation")
 	}

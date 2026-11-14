@@ -1648,7 +1648,8 @@
     z-index: var(--z-dock);
   }
 
-  .shell-dock:empty {
+  .shell-dock:empty,
+  body:has([data-live-center]) .shell-dock {
     display: none;
   }
 
