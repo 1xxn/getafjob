@@ -1090,6 +1090,8 @@
   "notify.test.body": "This channel works.",
   "notify.your_turn.title": "getafjob: your turn",
   "notify.your_turn.body": "An application needs your answer.",
+  "notify.approval.title": "getafjob: ready to send",
+  "notify.approval.body": "An application is filled out and waits for your approval.",
   "notify.handoff_closing.title": "getafjob: your turn soon ends",
   "notify.handoff_closing.body": "An application waits for you until {time}. After that it is parked.",
   "activity.title": "Activity",

@@ -127,6 +127,19 @@ func (n *notifyAppNotifier) YourTurn(ctx context.Context, userID, appID uuid.UUI
 	})
 }
 
+// ApprovalAsked tells the user that an application is filled out and waits for the approval before the submit.
+func (n *notifyAppNotifier) ApprovalAsked(ctx context.Context, userID, _ uuid.UUID) {
+	_ = n.svc.Notify(ctx, notify.Notification{
+		UserID:    userID,
+		Event:     notify.EventApprovalQueued,
+		Key:       "approval",
+		URL:       "/approvals",
+		Priority:  notify.PriorityHigh,
+		Tags:      []string{"white_check_mark", "robot"},
+		CreatedAt: time.Now(),
+	})
+}
+
 // adminNotifySummary queues a daily summary run now.
 func adminNotifySummary(ctx context.Context, args []string, env Env) int {
 	if len(args) != 0 {

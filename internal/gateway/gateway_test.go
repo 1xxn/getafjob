@@ -83,6 +83,12 @@ func codeOf(err error) connect.Code { return connect.CodeOf(err) }
 
 func queue(t *testing.T, pool *pgxpool.Pool, apps *application.Service) uuid.UUID {
 	t.Helper()
+	return queueApp(t, pool, apps, true)
+}
+
+// queueApp queues an application of a new user; approved runs submit without asking.
+func queueApp(t *testing.T, pool *pgxpool.Pool, apps *application.Service, approved bool) uuid.UUID {
+	t.Helper()
 	ctx := t.Context()
 	var u uuid.UUID
 	var job int64
@@ -96,6 +102,12 @@ func queue(t *testing.T, pool *pgxpool.Pool, apps *application.Service) uuid.UUI
 	}); err != nil {
 		t.Fatal(err)
 	}
+	if !approved {
+		if _, _, err := apps.Queue(ctx, u, job); err != nil {
+			t.Fatal(err)
+		}
+		return u
+	}
 	id, err := apps.Create(ctx, u, job)
 	if err != nil {
 		t.Fatal(err)
@@ -104,6 +116,29 @@ func queue(t *testing.T, pool *pgxpool.Pool, apps *application.Service) uuid.UUI
 		t.Fatal(err)
 	}
 	return u
+}
+
+// A submit that needs the user's approval answers aborted and tells the user at once.
+func TestBeginSubmitAsksForApprovalAndNotifies(t *testing.T) {
+	pool, apps, c, _, srv := setupWithServer(t)
+	ctx := t.Context()
+	var notified []uuid.UUID
+	srv.NotifyApproval = func(_ context.Context, userID, _ uuid.UUID) { notified = append(notified, userID) }
+	reg, err := c.Register(with(ctx, secret), &runnerv1.RegisterRequest{Version: "test"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	u := queueApp(t, pool, apps, false)
+	l, err := c.Lease(with(ctx, secret), &runnerv1.LeaseRequest{RunnerId: reg.GetRunnerId()})
+	if err != nil || l.GetRun() == nil {
+		t.Fatalf("lease: %v", err)
+	}
+	if _, err := c.BeginSubmit(with(ctx, l.GetRun().GetToken()), &runnerv1.BeginSubmitRequest{}); codeOf(err) != connect.CodeAborted {
+		t.Fatalf("submit without approval: %v", err)
+	}
+	if len(notified) != 1 || notified[0] != u {
+		t.Fatalf("notified = %v, want %v", notified, u)
+	}
 }
 
 var png = []byte("\x89PNG\r\n\x1a\nfake")

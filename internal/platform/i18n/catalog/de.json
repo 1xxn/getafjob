@@ -1090,6 +1090,8 @@
   "notify.test.body": "Dieser Kanal funktioniert.",
   "notify.your_turn.title": "getafjob: du bist dran",
   "notify.your_turn.body": "Eine Bewerbung braucht deine Antwort.",
+  "notify.approval.title": "getafjob: bereit zum Senden",
+  "notify.approval.body": "Eine Bewerbung ist ausgefüllt und wartet auf deine Freigabe.",
   "notify.handoff_closing.title": "getafjob: deine Zeit läuft bald ab",
   "notify.handoff_closing.body": "Eine Bewerbung wartet bis {time} auf dich. Danach wird sie geparkt.",
   "activity.title": "Aktivität",

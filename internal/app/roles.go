@@ -124,7 +124,7 @@ func serve(ctx context.Context, cfg config.Config, logger *slog.Logger) error {
 			return err
 		}
 		gw = &gateway.Server{Runs: application.NewRuns(apps, astore), Apps: apps, Shots: sealedFiles,
-			Secret: cfg.RunnerSecret.Reveal(), Logger: logger, Notify: appNotifier.YourTurn, ATSMetrics: atsMetrics,
+			Secret: cfg.RunnerSecret.Reveal(), Logger: logger, Notify: appNotifier.YourTurn, NotifyApproval: appNotifier.ApprovalAsked, ATSMetrics: atsMetrics,
 			Portals: portalsSvc,
 			Data: runData{profiles: profiles, items: profile.NewItems(pstore, env), docs: docs, stations: profile.NewStations(pstore, env), jobs: astore, apps: astore, portals: portalsSvc, now: time.Now,
 				fixture: devFixtureHost(cfg, logger)}}
