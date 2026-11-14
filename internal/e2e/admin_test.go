@@ -69,6 +69,9 @@ func TestAdmin(t *testing.T) {
 		t.Error("egress proxy not shown as reachable")
 	}
 	tab.El(`[data-fact="admin.system.backup"] .ui-tone-warning`)
+	// The maintenance switch is there and off; turning it on is covered by unit tests, not here: a journey must not
+	// close the shared stack for the others.
+	tab.El(`[data-maintenance="off"] [data-maintenance-start]`)
 	tab.Axe("/admin/system")
 
 	phone := OpenIn(t, Admin(t), 375, 812, "light")

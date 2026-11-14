@@ -4128,6 +4128,13 @@
     text-align: center;
   }
 
+  /* the admin's note on the maintenance page (#518) */
+  .pub-note {
+    margin: var(--space-3) 0 0;
+    text-align: center;
+    font-weight: 600;
+  }
+
   .pub-foot {
     display: flex;
     flex-wrap: wrap;
