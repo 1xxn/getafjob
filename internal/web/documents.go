@@ -44,6 +44,11 @@ func (s *Server) renderDocuments(w http.ResponseWriter, r *http.Request, u *iden
 			Created: views.When(r.Context(), d.CreatedAt), Label: d.Label, Language: d.Language, Focus: strings.Join(d.Focus, ", "),
 			Import: s.Importer != nil && (d.Mime == profile.MimePDF || d.Mime == profile.MimeDOCX)}
 	}
+	// Saving a variant, deleting or a failed import answer a POST under its own path: the address bar shows the
+	// documents page, so a reload does not land on a path that has no page.
+	if r.Method == http.MethodPost {
+		w.Header().Set("HX-Replace-Url", "/documents")
+	}
 	s.render(w, r, status, views.DocumentsPage(u.DisplayName, s.candidateHead(r.Context(), u, "documents"), notice, failed, rows))
 }
 

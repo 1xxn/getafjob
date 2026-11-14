@@ -360,8 +360,8 @@ func TestFitInspectorAndCVVariantSwitcher(t *testing.T) {
 		"label-" + cv1ID:    {"Backend Specialist"},
 		"language-" + cv1ID: {"en"},
 		"focus-" + cv1ID:    {"golang, postgresql"},
-	}, session, nil); rec.Code != http.StatusOK {
-		t.Fatalf("set variant 1: %d", rec.Code)
+	}, session, nil); rec.Code != http.StatusOK || rec.Header().Get("HX-Replace-Url") != "/documents" {
+		t.Fatalf("set variant 1: %d, address %q", rec.Code, rec.Header().Get("HX-Replace-Url"))
 	}
 
 	if rec := a.upload("cv", "cv-frontend.pdf", pdf, session); rec.Code != http.StatusSeeOther {
