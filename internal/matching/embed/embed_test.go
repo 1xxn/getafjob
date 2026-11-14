@@ -132,3 +132,40 @@ func TestLoadCutsColumnsAndRejectsBadFiles(t *testing.T) {
 		t.Fatal("garbage accepted")
 	}
 }
+
+func TestHalfRoundTrip(t *testing.T) {
+	for _, f := range []float32{0, 1, -1, 0.5, 0.1, -0.333, 65504, 1e-5, -6e-8, 3.14159} {
+		got := half(floatToHalf(f))
+		if diff := math.Abs(float64(got - f)); diff > math.Abs(float64(f))*1e-3+6e-8 {
+			t.Errorf("half(floatToHalf(%v)) = %v", f, got)
+		}
+	}
+	// Just below the smallest normal rounds up to it.
+	if got := floatToHalf(math.Float32frombits(0x387fffff)); got != 0x400 {
+		t.Errorf("rounding into the normal range = %#x", got)
+	}
+	if floatToHalf(1e6) != 0x7c00 || floatToHalf(float32(math.Inf(-1))) != 0xfc00 {
+		t.Error("overflow is not infinity")
+	}
+	for h := range 1 << 16 { // every finite half survives the trip
+		if f := half(uint16(h)); !math.IsNaN(float64(f)) && floatToHalf(f) != uint16(h) && f != 0 {
+			t.Fatalf("half %#x -> %v -> %#x", h, f, floatToHalf(f))
+		}
+	}
+}
+
+func TestPack(t *testing.T) {
+	dir := writeModel(t, wordPiece, [][]float32{{0, 0, 9}, {1, 0, 9}, {1, 0, 9}, {0, 1, 9}, {0, 0, 9}, {0.5, 0.25, 9}}, "F32")
+	out := filepath.Join(t.TempDir(), "packed")
+	if err := Pack(dir, out, 2); err != nil {
+		t.Fatal(err)
+	}
+	m, err := Load(out, 0)
+	if err != nil || m.Dim() != 2 {
+		t.Fatalf("Load packed = %v, dim %d", err, m.Dim())
+	}
+	a, _ := m.Embed("cafe")
+	if math.Abs(float64(a[0])-0.894) > 0.01 || math.Abs(float64(a[1])-0.447) > 0.01 {
+		t.Fatalf("packed vector %v", a)
+	}
+}

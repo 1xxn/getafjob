@@ -1,6 +1,6 @@
 # syntax=docker/dockerfile:1@sha256:4edf897a3ffa55b89f906fc8cc78afdb3f1834cc9c7083565e611a8a7d5fe99e
 # One Dockerfile, three images:
-#   app:    serve, worker, migrate, admin (distroless, non-root)
+#   app:    serve, worker, migrate, admin (distroless, non-root; with the embedding model for matching)
 #   runner: browser runner on headless-shell (Chromium with sandbox, non-root)
 #   egress: smokescreen egress proxy (blocks private networks and cloud metadata)
 
@@ -22,6 +22,21 @@ RUN --mount=type=cache,target=/go/pkg/mod \
 # Empty blob directory, owned by the non-root user in the app image (named volumes copy its ownership).
 RUN mkdir -p /out/blobs
 
+# Static embedding model for matching (ADR 0029): a pinned revision checked against its SHA-256, cut to 256
+# columns as float16 (about 54 MB). Nothing is downloaded at run time.
+FROM --platform=$BUILDPLATFORM golang:1.27.4-trixie@sha256:b54b2639de8c1bfe538ec5ffc45f29b1932235ac5f6d63c059853646677112d9 AS embed
+ENV CGO_ENABLED=0 GOTOOLCHAIN=local GOFLAGS=-trimpath
+ARG EMBED_MODEL=https://huggingface.co/sentence-transformers/static-similarity-mrl-multilingual-v1/resolve/b68f4122911bcffcd6e1f695f2d99cd6788972d8/0_StaticEmbedding
+ADD --checksum=sha256:8245ab78ee71dded845a82d2270fcb9e785b29dad0e1619f69d5390c47d9ba00 ${EMBED_MODEL}/model.safetensors /upstream/model.safetensors
+ADD --checksum=sha256:11aaf894a4ccf3d95e8830e27c0f8152791fbbff2b988e29a265580b86edd216 ${EMBED_MODEL}/tokenizer.json /upstream/tokenizer.json
+WORKDIR /src
+COPY go.mod go.sum ./
+COPY internal/matching/embed internal/matching/embed
+RUN --mount=type=cache,target=/go/pkg/mod \
+    --mount=type=cache,target=/root/.cache/go-build \
+    go run ./internal/matching/embed/pack -from /upstream -to /out/embed -dims 256
+COPY deploy/embed/LICENSE deploy/embed/NOTICE /out/embed/
+
 # smokescreen comes from the build module in deploy/egress: a pinned release with dependencies raised to
 # versions without known vulnerabilities (go.sum verified, Renovate-managed).
 FROM --platform=$BUILDPLATFORM golang:1.27.4-trixie@sha256:b54b2639de8c1bfe538ec5ffc45f29b1932235ac5f6d63c059853646677112d9 AS smokescreen
@@ -37,6 +52,7 @@ RUN --mount=type=cache,target=/go/pkg/mod \
 FROM gcr.io/distroless/static-debian13:nonroot@sha256:25ac8f0c3b2334a9eb05452266bd4697864a8c8ef0ef71e5e6480d7f92868329 AS app
 COPY --from=build /out/getafjob /usr/local/bin/getafjob
 COPY --from=build --chown=65532:65532 /out/blobs /var/lib/getafjob/blobs
+COPY --from=embed /out/embed /usr/share/getafjob/embed
 USER 65532:65532
 EXPOSE 8080 8081
 ENTRYPOINT ["/usr/local/bin/getafjob"]

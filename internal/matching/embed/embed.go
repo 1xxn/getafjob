@@ -1,6 +1,6 @@
 // Package embed turns text into a vector with a static embedding model (Model2Vec, sentence-transformers
 // StaticEmbedding): a tokenizer and one vector per token, averaged. There are no network layers, so a text costs a
-// table lookup per token; the model runs in-process on any CPU (#485).
+// table lookup per token; the model runs in-process on any CPU (#485, ADR 0029).
 package embed
 
 import (
@@ -10,11 +10,12 @@ import (
 	"os"
 )
 
-// Model is a static embedding model: a tokenizer and a token table of Dim columns.
+// Model is a static embedding model: a tokenizer and a token table of Dim columns, kept as float16 (half the
+// memory of float32; the precision is far beyond what a mean of token vectors needs).
 type Model struct {
 	tok   *Tokenizer
 	dim   int
-	table []float32 // rows of dim, one per token id
+	table []uint16 // float16 rows of dim, one per token id
 }
 
 // Load reads tokenizer.json and model.safetensors from dir. dims > 0 keeps only the first dims columns (Matryoshka
@@ -34,26 +35,14 @@ func Load(dir string, dims int) (*Model, error) {
 		return nil, err
 	}
 	defer func() { _ = f.Close() }()
-	t, err := readTable(f)
+	t, err := readTable(f, dims)
 	if err != nil {
 		return nil, fmt.Errorf("embed: %w", err)
 	}
 	if t.rows < tok.Size() {
 		return nil, fmt.Errorf("embed: table has %d rows for %d tokens", t.rows, tok.Size())
 	}
-	m := &Model{tok: tok, dim: t.cols, table: t.data}
-	if dims > 0 && dims < t.cols {
-		m.table, m.dim = cut(t.data, t.rows, t.cols, dims), dims
-	}
-	return m, nil
-}
-
-func cut(data []float32, rows, cols, dims int) []float32 {
-	out := make([]float32, rows*dims)
-	for r := range rows {
-		copy(out[r*dims:(r+1)*dims], data[r*cols:r*cols+dims])
-	}
-	return out
+	return &Model{tok: tok, dim: t.cols, table: t.data}, nil
 }
 
 // Dim is the length of the vectors.
@@ -70,9 +59,8 @@ func (m *Model) Embed(text string) ([]float32, error) {
 	}
 	v := make([]float32, m.dim)
 	for _, id := range ids {
-		row := m.table[id*m.dim : (id+1)*m.dim]
-		for i, x := range row {
-			v[i] += x
+		for i, h := range m.table[id*m.dim : (id+1)*m.dim] {
+			v[i] += halfToFloat[h]
 		}
 	}
 	normalize(v)

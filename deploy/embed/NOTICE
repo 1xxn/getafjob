@@ -1,0 +1,8 @@
+Embedding model shipped in the app image under /usr/share/getafjob/embed (ADR 0029)
+
+sentence-transformers/static-similarity-mrl-multilingual-v1
+https://huggingface.co/sentence-transformers/static-similarity-mrl-multilingual-v1
+Revision b68f4122911bcffcd6e1f695f2d99cd6788972d8, licensed under the Apache License, Version 2.0 (LICENSE).
+
+Modified: the token table is cut to its first 256 of 1024 columns and stored as float16
+(internal/matching/embed/pack). The tokenizer is unchanged.
