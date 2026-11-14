@@ -48,10 +48,12 @@ var roleTerms = func() [][]term {
 	return out
 }()
 
+// userSkill is a skill of the user: idx is its place in the dictionary, -1 for one the dictionary does not know
+// (found in the text as typed).
 type userSkill struct {
-	name   string
-	weight int
-	terms  []term
+	name  string
+	idx   int
+	terms []term
 }
 
 var skillTerms = func() [][]term {
@@ -71,68 +73,31 @@ func userSkills(list []string) []userSkill {
 		if t == "" {
 			continue
 		}
-		us := userSkill{name: strings.TrimSpace(s), weight: 1, terms: []term{t}}
+		us := userSkill{name: strings.TrimSpace(s), idx: -1, terms: []term{t}}
 		if i := slices.IndexFunc(skillTerms, func(ts []term) bool { return slices.Contains(ts, t) }); i >= 0 {
-			us = userSkill{name: skills[i].name, weight: skills[i].weight, terms: skillTerms[i]}
+			us = userSkill{name: skills[i].name, idx: i, terms: skillTerms[i]}
 		} else if i := slices.IndexFunc(skillTerms, func(ts []term) bool { _, ok := anyIn(ts, pad(t)); return ok }); i >= 0 {
-			us = userSkill{name: skills[i].name, weight: skills[i].weight, terms: skillTerms[i]}
+			us = userSkill{name: skills[i].name, idx: i, terms: skillTerms[i]}
 		}
-		if !slices.ContainsFunc(out, func(o userSkill) bool { return o.name == us.name }) {
-			out = append(out, us)
+		out = addSkill(out, us)
+	}
+	// Tools bring their concept along (PyTorch: machine learning, Python), so a job asking for the concept does
+	// not count it as missing.
+	for i := 0; i < len(out); i++ {
+		for _, name := range implied[out[i].name] {
+			if k := slices.IndexFunc(skills, func(s skill) bool { return s.name == name }); k >= 0 {
+				out = addSkill(out, userSkill{name: name, idx: k, terms: skillTerms[k]})
+			}
 		}
 	}
 	return out
 }
 
-// skillHitsAndMissing compares the user's skills with the known skills a job names. Skills named only in its
-// nice-to-have sentences (preferred) count when the user has them and are not missing when not.
-func (m *Matcher) skillHitsAndMissing(text, preferred string) (hits []string, missing []string, points int, code string) {
-	var have, want int
-	for _, s := range m.skills {
-		if _, ok := anyIn(s.terms, text); ok {
-			have += s.weight
-			hits = append(hits, s.name)
-		}
+func addSkill(list []userSkill, s userSkill) []userSkill {
+	if slices.ContainsFunc(list, func(o userSkill) bool { return o.name == s.name }) {
+		return list
 	}
-	want = have
-	for i, k := range skills {
-		if slices.Contains(hits, k.name) {
-			continue
-		}
-		if _, ok := anyIn(skillTerms[i], text); ok && !onlyPreferred(skillTerms[i], text, preferred) {
-			want += k.weight
-			missing = append(missing, k.name)
-		}
-	}
-	if want == 0 {
-		return nil, nil, maxSkills * 2 / 5, "skills.unknown"
-	}
-	switch {
-	case have == 0:
-		code = "skills.none"
-	case len(missing) == 0:
-		code = "skills.all" // every known skill the job asks for is in the profile
-	default:
-		code = "skills.fit"
-	}
-	points = min(maxSkills*have/min(max(want, 6), 12), maxSkills)
-	return hits, missing, points, code
-}
-
-// onlyPreferred reports whether every mention of a skill sits in the job's nice-to-have sentences.
-func onlyPreferred(ts []term, text, preferred string) bool {
-	if preferred == "" {
-		return false
-	}
-	if _, ok := anyIn(ts, preferred); !ok {
-		return false
-	}
-	for _, t := range ts {
-		if strings.Count(text, " "+string(t)) > strings.Count(preferred, " "+string(t)) {
-			return false
-		}
-	}
-	return true
+	return append(list, s)
 }
 
 // skillReason puts the skill comparison of skillHitsAndMissing into a reason. Known skills the user lacks lower the

@@ -37,8 +37,7 @@ func TestPreferredText(t *testing.T) {
 	}
 	// A skill named only as nice to have is not missing; one named as required too is.
 	m := NewMatcher(Criteria{Skills: []string{"Go"}}, nil)
-	p := Prepare(Job{Description: desc}, nil)
-	_, missing, _, _ := m.skillHitsAndMissing(p.text, p.preferred)
+	_, missing, _, _ := m.skillFit(Prepare(Job{Description: desc}, nil))
 	if strings.Contains(strings.Join(missing, ","), "Rust") || !strings.Contains(strings.Join(missing, ","), "Kubernetes") {
 		t.Errorf("missing = %v", missing)
 	}

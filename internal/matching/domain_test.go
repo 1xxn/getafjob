@@ -83,7 +83,7 @@ func TestSkills(t *testing.T) {
 		{"Kochen im Team", "skills.all", 4, 4, ""},
 	}
 	for _, tt := range tests {
-		r := skillReason(m.skillHitsAndMissing(normalize(tt.text), ""))
+		r := skillReason(m.skillFit(Prepare(Job{Description: tt.text}, nil)))
 		if r.Code != tt.code || r.Points < tt.min || r.Points > tt.max || !strings.Contains(r.Params["missing"], tt.missing) {
 			t.Errorf("%q: %+v", tt.text, r)
 		}
@@ -255,10 +255,11 @@ func TestSkillsFor(t *testing.T) {
 	c := Criteria{Skills: []string{"Go", "Kubernetes"}}
 	fit := SkillsFor(c, Job{Title: "Senior Go Developer",
 		Description: "We need strong Go and Kubernetes experience. PostgreSQL and Docker are also required. Rust is a plus."})
-	if !slices.Equal(fit.Have, []string{"Go", "Kubernetes"}) {
+	// Kubernetes brings Docker along.
+	if !slices.Equal(fit.Have, []string{"Go", "Kubernetes", "Docker"}) {
 		t.Errorf("Have = %v", fit.Have)
 	}
-	if !slices.Contains(fit.Missing, "PostgreSQL") || !slices.Contains(fit.Missing, "Docker") || slices.Contains(fit.Missing, "Rust") {
+	if !slices.Equal(fit.Missing, []string{"PostgreSQL"}) {
 		t.Errorf("Missing = %v", fit.Missing)
 	}
 	// The points of a result add up to its score.
