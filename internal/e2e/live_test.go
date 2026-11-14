@@ -70,7 +70,7 @@ func startRun(t *testing.T, tab *Tab) string {
 func TestLiveCenter(t *testing.T) {
 	tab := OpenIn(t, Demo(t), 1440, 900, "light")
 	app := startRun(t, tab)
-	live := `['view', 'interactive'].includes(document.querySelector('%s')?.dataset.mode)`
+	live := `['view', 'interactive', 'answers'].includes(document.querySelector('%s')?.dataset.mode)`
 
 	tab.Go("/live")
 	tab.WaitWithin(60*time.Second, "document.getElementById('run-"+app+"')")
