@@ -471,6 +471,8 @@
   "handoff.save_continue": "Speichern und weiter",
   "evidence.job_link": "Stellenanzeige",
   "evidence.fields.title": "Ausgefüllte Felder",
+  "evidence.fields.yes": "Ja",
+  "evidence.fields.no": "Nein",
   "evidence.fields.empty": "Noch keine Felder ausgefüllt.",
   "evidence.fields.field": "Feld",
   "evidence.fields.value": "Wert",

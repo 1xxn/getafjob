@@ -122,9 +122,13 @@ func TestFillEveryKindAndVerify(t *testing.T) {
 	if err != nil {
 		t.Fatalf("fill: %v (done %+v)", err, done)
 	}
-	shown := map[string]string{}
+	shown, kinds := map[string]string{}, map[string]string{}
 	for _, d := range done {
 		shown[strings.Fields(d.Label)[0]] = d.Shown
+		kinds[strings.Fields(d.Label)[0]] = d.Kind
+	}
+	if kinds["I"] != "checkbox" || kinds["First"] != "text" {
+		t.Errorf("kinds = %v", kinds)
 	}
 	want := map[string]string{"First": "Max", "Email": "max.mustermann@example.org", "Country": "Germany",
 		"Do": "Nein", "Languages": "German; English", "I": "checked", "CV": "Max_Mustermann_CV.pdf",

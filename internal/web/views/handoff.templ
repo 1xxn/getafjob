@@ -87,6 +87,20 @@ type EvidenceFieldRow struct {
 	Label  string
 	Value  string
 	Source string
+	Kind   string // field kind; a checkbox shows as yes or no
+}
+
+// Shown is the value as the user reads it: a checkbox is yes or no, not the browser's "checked".
+func (f EvidenceFieldRow) Shown(ctx context.Context) string {
+	switch f.Kind {
+	case "checkbox", "aria_checkbox":
+		if f.Value == "checked" {
+			return T(ctx, "evidence.fields.yes")
+		}
+		return T(ctx, "evidence.fields.no")
+	default:
+		return f.Value
+	}
 }
 
 // TimelineRow is one chronological event or checkpoint on the application evidence page.
