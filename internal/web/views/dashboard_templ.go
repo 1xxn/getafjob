@@ -75,9 +75,9 @@ func (d DashboardData) fresh() bool {
 // dayLabel is a short date for the reader's locale: "Nov 12" or "12.11.".
 func dayLabel(ctx context.Context, t time.Time) string {
 	if Locale(ctx) == "de" {
-		return t.UTC().Format("02.01.")
+		return t.In(Zone(ctx)).Format("02.01.")
 	}
-	return t.UTC().Format("Jan 2")
+	return t.In(Zone(ctx)).Format("Jan 2")
 }
 
 func queuedHint(ctx context.Context, n int) string {
