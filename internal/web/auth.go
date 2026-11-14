@@ -108,17 +108,25 @@ func (s *Server) linkSubmit(w http.ResponseWriter, r *http.Request, _ *identity.
 	http.Redirect(w, r, "/", http.StatusSeeOther)
 }
 
-func (s *Server) inviteForm(w http.ResponseWriter, r *http.Request, _ *identity.User) {
+func (s *Server) inviteForm(w http.ResponseWriter, r *http.Request, u *identity.User) {
 	token := r.PathValue("token")
 	inv, err := s.Identity.PendingInvitation(r.Context(), token)
 	if err != nil {
 		s.problem(w, r, nil, http.StatusBadRequest, "invite.title", views.T(r.Context(), "msg.identity.invitation_invalid"))
 		return
 	}
-	s.render(w, r, http.StatusOK, views.Invite("/invite/"+token, inv.Email, "", ""))
+	s.render(w, r, http.StatusOK, views.Invite("/invite/"+token, inv.Email, sessionEmail(u), "", ""))
 }
 
-func (s *Server) inviteSubmit(w http.ResponseWriter, r *http.Request, _ *identity.User) {
+// sessionEmail is the address of the open session, if any.
+func sessionEmail(u *identity.User) string {
+	if u == nil {
+		return ""
+	}
+	return u.Email
+}
+
+func (s *Server) inviteSubmit(w http.ResponseWriter, r *http.Request, u *identity.User) {
 	token := r.PathValue("token")
 	name := identity.CleanDisplayName(r.PostFormValue("name"))
 	locale := i18n.Parse(r.PostFormValue("locale"))
@@ -130,7 +138,7 @@ func (s *Server) inviteSubmit(w http.ResponseWriter, r *http.Request, _ *identit
 			s.problem(w, r, nil, http.StatusBadRequest, "invite.title", views.T(ctx, "msg.identity.invitation_invalid"))
 			return
 		}
-		s.render(w, r, http.StatusUnprocessableEntity, views.Invite("/invite/"+token, inv.Email, "", views.T(ctx, "invite.name_required")))
+		s.render(w, r, http.StatusUnprocessableEntity, views.Invite("/invite/"+token, inv.Email, sessionEmail(u), "", views.T(ctx, "invite.name_required")))
 		return
 	}
 	_, session, err := s.Identity.AcceptInvitation(ctx, token, name, locale)

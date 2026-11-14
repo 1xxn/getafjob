@@ -93,6 +93,7 @@
   "invite.name_hint": "How getafjob addresses you, e.g. Max Mustermann.",
   "invite.name_label": "Your name",
   "invite.name_required": "Please enter your name.",
+  "invite.signed_in": "You are signed in as {email}. Creating this account signs you out of that one in this browser.",
   "invite.submit": "Create account",
   "invite.text": "You have been invited with the address {email}. Choose how getafjob should address you.",
   "invite.title": "Create your account",

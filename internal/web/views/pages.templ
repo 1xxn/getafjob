@@ -55,10 +55,15 @@ templ ConfirmLink(action string) {
 	}
 }
 
-templ Invite(action, email, name, nameError string) {
+// Invite creates the invited account; signedIn is the address of a session already open in this browser, which the
+// new account replaces.
+templ Invite(action, email, signedIn, name, nameError string) {
 	@Layout(Page{Title: T(ctx, "invite.title")}) {
 		@pubHead("user", T(ctx, "invite.title"), T(ctx, "invite.text", "email", email))
 		<form method="post" action={ templ.SafeURL(action) } class="pub-form">
+			if signedIn != "" {
+				@ui.Alert(ui.AlertProps{Tone: ui.Warning, Text: T(ctx, "invite.signed_in", "email", signedIn)})
+			}
 			@ui.Input(ui.InputProps{FieldProps: ui.FieldProps{Name: "name", Label: T(ctx, "invite.name_label"),
 				Hint: T(ctx, "invite.name_hint"), Error: nameError, Required: true}, Value: name, Autocomplete: "name", MaxLength: 200})
 			@ui.Select(ui.SelectProps{FieldProps: ui.FieldProps{ID: "f-locale", Name: "locale", Label: T(ctx, "invite.locale_label")},

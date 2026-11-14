@@ -5,6 +5,7 @@ import (
 	"errors"
 	"net/http"
 	"net/url"
+	"regexp"
 	"strings"
 	"testing"
 	"time"
@@ -52,6 +53,14 @@ func TestAdminConsole(t *testing.T) {
 	if rec.Code != http.StatusOK || !strings.Contains(rec.Body.String(), "https://jobs.example.org/invite/") || !strings.Contains(rec.Body.String(), "data-invite-row=\"erika.musterfrau@example.org\"") ||
 		rec.Header().Get("HX-Replace-Url") != "/admin/users" {
 		t.Fatalf("invite %d: %s", rec.Code, rec.Body.String())
+	}
+	// Opening the link while signed in names the open session, which the new account replaces.
+	link := regexp.MustCompile(`/invite/[A-Za-z0-9_-]+`).FindString(rec.Body.String())
+	if body := a.do(http.MethodGet, link, nil, admin, nil).Body.String(); !strings.Contains(body, "You are signed in as admin@example.org") {
+		t.Errorf("invite page while signed in: %s", body)
+	}
+	if body := a.do(http.MethodGet, link, nil, "", nil).Body.String(); strings.Contains(body, "You are signed in") {
+		t.Error("invite page warns without a session")
 	}
 	if rec := a.do(http.MethodPost, "/admin/invites", url.Values{"email": {"max.mustermann@example.com"}, "role": {"user"}}, admin, nil); rec.Code != http.StatusUnprocessableEntity || !strings.Contains(rec.Body.String(), "exists already") {
 		t.Errorf("taken address %d", rec.Code)

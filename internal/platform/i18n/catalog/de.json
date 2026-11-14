@@ -93,6 +93,7 @@
   "invite.name_hint": "So spricht getafjob dich an, z. B. Max Mustermann.",
   "invite.name_label": "Dein Name",
   "invite.name_required": "Bitte gib deinen Namen ein.",
+  "invite.signed_in": "Du bist als {email} angemeldet. Wenn du dieses Konto anlegst, wirst du in diesem Browser von jenem abgemeldet.",
   "invite.submit": "Konto anlegen",
   "invite.text": "Du wurdest mit der Adresse {email} eingeladen. Wähle, wie getafjob dich ansprechen soll.",
   "invite.title": "Konto anlegen",
