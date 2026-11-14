@@ -41,11 +41,11 @@ Nothing is sent twice, every value has a source, and a click without effect is r
 
 | Level | What happens |
 |---|---|
-| Suggest only | getafjob finds and ranks jobs; you start every application yourself. |
-| Fill in and approve (default) | getafjob fills out forms on its own and sends only after your approval. |
+| Suggest only (default) | getafjob finds and ranks jobs; you start every application yourself. |
+| Fill in and approve | getafjob fills out forms on its own and sends only after your approval. |
 | Autonomous by rule | getafjob sends on its own when every field has a source and no rule asks for you. |
 
-Change the level under Settings, Automation.
+Nothing is queued on your behalf until you choose another level. Change it under Settings, Automation.
 
 ## Track
 

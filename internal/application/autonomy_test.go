@@ -12,8 +12,9 @@ func TestAutonomySettings(t *testing.T) {
 	if err := DefaultSettings.Validate(); err != nil {
 		t.Fatalf("DefaultSettings invalid: %v", err)
 	}
-	if !DefaultSettings.AutoQueue() {
-		t.Fatalf("DefaultSettings.AutoQueue() = false, want true")
+	// Nothing is queued before the user turns automation on (ADR 0028).
+	if DefaultSettings.AutoQueue() {
+		t.Fatalf("DefaultSettings.AutoQueue() = true, want false")
 	}
 
 	suggest := Settings{Level: LevelSuggest, MinScore: 50, DailyLimit: 10}

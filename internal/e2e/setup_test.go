@@ -19,6 +19,8 @@ func TestSetup(t *testing.T) {
 		fresh.El(`.wiz[data-setup-step="` + next + `"]`)
 	}
 	fresh.El(`#setup-matches`)
+	// A new user's automation is off until they turn it on: the last step says what to do next (ADR 0028).
+	fresh.El(`[data-setup-after="false"] a[href="/settings/automation"]`)
 	fresh.Shot("fresh-matches")
 
 	for _, v := range []struct {

@@ -18,6 +18,8 @@ type SetupData struct {
 	Stations []string      // profile step: positions found in the CV, "title, company"
 	Matches  SetupMatchesData
 	Passkeys bool // matches step: the user has a passkey
+	// AutoScore is the score from which getafjob queues applications on its own; 0 when nothing runs on its own.
+	AutoScore int
 }
 
 // SetupMatchesData is the live part of the last step: the first ranked jobs while the search runs.
@@ -202,6 +204,7 @@ templ SetupPage(d SetupData) {
 					</form>
 				case "matches":
 					@SetupMatches(d.Matches)
+					@setupAfter(d.AutoScore)
 					if !d.Passkeys {
 						@PasskeyNudge()
 					}
@@ -214,6 +217,21 @@ templ SetupPage(d SetupData) {
 			}
 		</section>
 	}
+}
+
+// setupAfter tells what runs on its own after the onboarding: nothing unless the user chose automation.
+templ setupAfter(autoScore int) {
+	<section class="wiz-card stack" aria-labelledby="setup-after" data-setup-after={ boolAttr(autoScore > 0) }>
+		<h2 id="setup-after">{ T(ctx, "setup.after.title") }</h2>
+		if autoScore > 0 {
+			<p>{ T(ctx, "setup.after.auto", "score", autoScore) }</p>
+		} else {
+			<p>{ T(ctx, "setup.after.manual") }</p>
+		}
+		<div>
+			@ui.Button(ui.ButtonProps{Label: T(ctx, "setup.after.settings"), Href: "/settings/automation", Size: "sm", Icon: "settings"})
+		</div>
+	</section>
 }
 
 // SetupMatches lists the best jobs so far; it refreshes when a crawl starts or ends and when the jobs are rated.

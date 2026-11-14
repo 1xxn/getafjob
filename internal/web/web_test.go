@@ -1139,6 +1139,21 @@ func TestSetupAssistant(t *testing.T) {
 	}
 	resume("/setup/matches")
 
+	// Nothing runs on its own until the user chooses it: suggest is preselected, and the last step says so.
+	if page := a.do(http.MethodGet, "/setup/automation", nil, session, nil).Body.String(); !strings.Contains(page, `value="suggest" checked`) {
+		t.Error("suggest is not the preselected level")
+	}
+	if page := a.do(http.MethodGet, "/setup/matches", nil, session, nil).Body.String(); !strings.Contains(page, `data-setup-after="false"`) ||
+		!strings.Contains(page, "Nothing runs on its own") {
+		t.Error("last step does not say that nothing runs on its own")
+	}
+	if rec := a.do(http.MethodPost, "/setup/automation", url.Values{"autonomy_level": {"approve"}}, session, nil); rec.Header().Get("Location") != "/setup/matches" {
+		t.Fatalf("automation save %d", rec.Code)
+	}
+	if page := a.do(http.MethodGet, "/setup/matches", nil, session, nil).Body.String(); !strings.Contains(page, "Automatic applications are on") {
+		t.Error("last step does not name the automation")
+	}
+
 	// Automation stores the level only.
 	if rec := a.do(http.MethodPost, "/setup/automation", url.Values{"autonomy_level": {"bogus"}}, session, nil); rec.Code != http.StatusUnprocessableEntity {
 		t.Fatalf("invalid level %d", rec.Code)
