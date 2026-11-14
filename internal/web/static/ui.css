@@ -3304,6 +3304,15 @@
     list-style: none;
   }
 
+  /* Reasons are sentences: they wrap instead of pushing the page wider than a phone. */
+  .appr-reasons li {
+    min-width: 0;
+  }
+
+  .appr-reasons .ui-badge {
+    white-space: normal;
+  }
+
   .appr-actions {
     display: flex;
     flex-wrap: wrap;
