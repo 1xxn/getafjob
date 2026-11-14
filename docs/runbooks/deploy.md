@@ -2,6 +2,9 @@
 
 Status: Production-ready (Phase 4, #49).
 
+For the first installation on a bare server (DNS, mail, hardening, Docker, secrets, first admin) see
+[install.md](install.md).
+
 getafjob uses a hardened, automated Docker Compose deployment architecture with separate Compose projects for staging
 and production, GitHub Environment approval gates for production releases, and automatic rollback on health check failure.
 
