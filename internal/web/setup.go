@@ -164,6 +164,9 @@ func (s *Server) renderSetup(w http.ResponseWriter, r *http.Request, u *identity
 // setupMatches reads the best rated jobs and the state of the crawl.
 func (s *Server) setupMatches(ctx context.Context, u *identity.User) views.SetupMatchesData {
 	var d views.SetupMatchesData
+	if snap, err := s.Profile.Get(ctx, u.ID); err == nil && len(snap.Preferences.Titles) == 0 {
+		d.NoTitles = true
+	}
 	if s.Jobs != nil {
 		l, err := s.Jobs.List(ctx, u.ID, matching.Filter{Decisions: []matching.Decision{matching.Match, matching.Maybe},
 			Sort: "match", Page: 1})

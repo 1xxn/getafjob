@@ -29,11 +29,13 @@ type SetupMatchesData struct {
 	Rated   bool // the user has ratings at all
 	Crawl   CrawlStatusData
 	Started bool // a crawl ran or is on its way
+	// NoTitles: the user named no job title, so nothing is rated until they do.
+	NoTitles bool
 }
 
 // waiting reports whether the list may still change on its own, so it refreshes itself.
 func (d SetupMatchesData) waiting() bool {
-	return d.Crawl.Running || d.Crawl.Queued || !d.Rated
+	return !d.NoTitles && (d.Crawl.Running || d.Crawl.Queued || !d.Rated)
 }
 
 func stepIndex(step string) int {
@@ -261,7 +263,12 @@ templ SetupMatches(d SetupMatchesData) {
 			}
 		</div>
 		if len(d.Top) == 0 {
-			if d.waiting() {
+			if d.NoTitles {
+				@ui.EmptyState(ui.EmptyProps{Icon: "search", Title: T(ctx, "setup.matches.no_titles"), Text: T(ctx, "setup.matches.no_titles_text")}) {
+					@ui.Button(ui.ButtonProps{Label: T(ctx, "setup.matches.no_titles_link"), Href: "/setup/search", Variant: "primary",
+						Attrs: templ.Attributes{"data-setup-no-titles": ""}})
+				}
+			} else if d.waiting() {
 				@ui.EmptyState(ui.EmptyProps{Icon: "clock", Title: T(ctx, "setup.matches.wait"), Text: T(ctx, "setup.matches.wait_text")})
 			} else {
 				@ui.EmptyState(ui.EmptyProps{Icon: "search", Title: T(ctx, "setup.matches.none"), Text: T(ctx, "setup.matches.none_text")})
