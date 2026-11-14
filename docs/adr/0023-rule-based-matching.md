@@ -1,6 +1,6 @@
 # 0023. Rule-based matching with stored reasons
 
-- Status: accepted
+- Status: accepted; scoring superseded by [0029](0029-hybrid-matching-with-static-embeddings.md)
 - Date: 2026-11-05
 - Deciders: maintainer
 
