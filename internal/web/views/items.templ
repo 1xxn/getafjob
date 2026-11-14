@@ -37,7 +37,7 @@ templ AnswersPage(name string, h CandidateHead, f Form, d AnswersData) {
 				class="apps-search"
 				aria-label={ T(ctx, "answers.search") }
 				{ HX(ctx, "hx-get", "/answers", "hx-target", "#answer-list", "hx-select", "#answer-list", "hx-swap", "outerHTML transition:false", "hx-push-url", "true",
-					"hx-sync", "this:replace", "hx-trigger", "submit, input changed delay:300ms from:input")... }
+					"hx-sync", "this:replace", "hx-trigger", "submit, input changed delay:300ms from:.apps-search input")... }
 			>
 				@ui.Input(ui.InputProps{FieldProps: ui.FieldProps{Name: "q", Label: T(ctx, "answers.search"), HideLabel: true},
 					Type: "search", Value: d.Query, Placeholder: T(ctx, "answers.search_placeholder"), MaxLength: 200})

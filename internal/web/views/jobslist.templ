@@ -241,7 +241,7 @@ templ jobsFilters(d JobsData) {
 		role="search"
 		aria-label={ T(ctx, "jobs.filters") }
 		{ HX(ctx, "hx-get", "/jobs", "hx-target", "#results", "hx-swap", "outerHTML transition:false", "hx-push-url", "true",
-			"hx-trigger", "submit, change from:select, input changed delay:400ms from:input")... }
+			"hx-trigger", "submit, change from:.jobs-filters select, input changed delay:400ms from:.jobs-filters input")... }
 	>
 		<div class="jobs-filter-search">
 			@ui.Input(ui.InputProps{FieldProps: ui.FieldProps{Name: "q", Label: T(ctx, "jobs.search_label"), HideLabel: true},
