@@ -251,63 +251,24 @@ func TestEvaluateDecision(t *testing.T) {
 	}
 }
 
-func TestInspectFit(t *testing.T) {
-	c := Criteria{
-		Titles:     []string{"Senior Go Engineer"},
-		Skills:     []string{"Go", "Kubernetes"},
-		YearsTotal: "6",
-		Locations:  []string{"Berlin"},
-		Remote:     true,
+func TestSkillsFor(t *testing.T) {
+	c := Criteria{Skills: []string{"Go", "Kubernetes"}}
+	fit := SkillsFor(c, Job{Title: "Senior Go Developer",
+		Description: "We need strong Go and Kubernetes experience. PostgreSQL and Docker are also required. Rust is a plus."})
+	if !slices.Equal(fit.Have, []string{"Go", "Kubernetes"}) {
+		t.Errorf("Have = %v", fit.Have)
 	}
-	j := Job{
-		ID:          1,
-		Title:       "Senior Go Developer",
-		Location:    "Berlin",
-		Workplace:   "hybrid",
-		Description: "We need strong Go and Kubernetes experience. PostgreSQL and Docker are also required.",
-		Posted:      now,
+	if !slices.Contains(fit.Missing, "PostgreSQL") || !slices.Contains(fit.Missing, "Docker") || slices.Contains(fit.Missing, "Rust") {
+		t.Errorf("Missing = %v", fit.Missing)
 	}
-	fit := InspectFit(c, j, now)
-	if fit.Score <= 0 {
-		t.Fatalf("Score = %d, want > 0", fit.Score)
+	// The points of a result add up to its score.
+	r := NewMatcher(c, nil).Evaluate(Job{Title: "Go Developer", Description: "Go, Kubernetes"}, now)
+	sum := 0
+	for _, rs := range r.Reasons {
+		sum += rs.Points
 	}
-	if !slices.Contains(fit.MatchingSkills, "Go") {
-		t.Errorf("MatchingSkills missing Go: %v", fit.MatchingSkills)
-	}
-	if !slices.Contains(fit.MatchingSkills, "Kubernetes") {
-		t.Errorf("MatchingSkills missing Kubernetes: %v", fit.MatchingSkills)
-	}
-	if !slices.Contains(fit.MissingSkills, "PostgreSQL") {
-		t.Errorf("MissingSkills missing PostgreSQL: %v", fit.MissingSkills)
-	}
-	if !slices.Contains(fit.MissingSkills, "Docker") {
-		t.Errorf("MissingSkills missing Docker: %v", fit.MissingSkills)
-	}
-	if fit.CandidateLevel != "senior" {
-		t.Errorf("CandidateLevel = %q, want senior", fit.CandidateLevel)
-	}
-	if fit.JobLevel != "senior" {
-		t.Errorf("JobLevel = %q, want senior", fit.JobLevel)
-	}
-	if fit.LocationReason != "location.city" || fit.LocationParams["city"] == "" {
-		t.Errorf("location reason %q without its city: %v", fit.LocationReason, fit.LocationParams)
-	}
-	if fit.SkillPoints <= 0 || fit.MaxSkillPoints != 35 {
-		t.Errorf("SkillPoints = %d / %d", fit.SkillPoints, fit.MaxSkillPoints)
-	}
-	if fit.TitlePoints <= 0 || fit.MaxTitlePoints != 40 {
-		t.Errorf("TitlePoints = %d / %d", fit.TitlePoints, fit.MaxTitlePoints)
-	}
-	// The breakdown adds up to the score of Evaluate.
-	if r := NewMatcher(c, nil).Evaluate(j, now); r.Score != fit.Score || r.Decision != fit.Decision {
-		t.Errorf("Evaluate = %d %s, InspectFit = %d %s", r.Score, r.Decision, fit.Score, fit.Decision)
-	}
-	// An excluded title scores 0, and so do its parts.
-	c.ExcludeTitles = []string{"developer"}
-	ex := InspectFit(c, j, now)
-	if ex.Score != 0 || ex.Decision != Skip || ex.TitlePoints != 0 || ex.SkillPoints != 0 || len(ex.MatchingSkills) != 0 ||
-		len(ex.Reasons) != 1 || ex.Reasons[0].Code != "title.excluded" {
-		t.Errorf("excluded: %+v", ex)
+	if sum != r.Score {
+		t.Errorf("points %d, score %d: %+v", sum, r.Score, r.Reasons)
 	}
 }
 

@@ -63,8 +63,8 @@ func (s *Server) jobPage(w http.ResponseWriter, r *http.Request, u *identity.Use
 	}
 	c := criteriaFromSnapshot(snap)
 	mj := matchingJob(j)
-	inspection := matching.InspectFit(c, mj, time.Now())
-	d.Fit = buildFitData(r.Context(), j.JobID, inspection, "")
+	skills := matching.SkillsFor(c, mj)
+	d.Fit = buildFitData(j.JobID, skills, "")
 	d.CV = s.buildCVVariantData(r.Context(), u.ID, j, "")
 	if s.Apps != nil {
 		if app, err := s.Apps.ByJob(r.Context(), u.ID, j.JobID); err == nil {
@@ -137,8 +137,8 @@ func (s *Server) addJobSkill(w http.ResponseWriter, r *http.Request, u *identity
 		}
 		c := criteriaFromSnapshot(snap)
 		mj := matchingJob(j)
-		inspection := matching.InspectFit(c, mj, time.Now())
-		d := buildFitData(r.Context(), id, inspection, skill)
+		skills := matching.SkillsFor(c, mj)
+		d := buildFitData(id, skills, skill)
 		s.render(w, r, http.StatusOK, views.FitInspector(d))
 		return
 	}
@@ -423,86 +423,8 @@ func matchingJob(j matching.Detail) matching.Job {
 	}
 }
 
-func buildFitData(ctx context.Context, jobID int64, fit matching.FitInspection, addedSkill string) views.FitData {
-	d := views.FitData{
-		JobID:          jobID,
-		Score:          fit.Score,
-		Decision:       string(fit.Decision),
-		MatchingSkills: fit.MatchingSkills,
-		MissingSkills:  fit.MissingSkills,
-		AddedSkill:     addedSkill,
-	}
-
-	d.Breakdown = append(d.Breakdown, views.FitBreakdownItem{
-		Dimension: "title",
-		Label:     views.T(ctx, "jobs.fit.dim_title"),
-		Points:    fit.TitlePoints,
-		Max:       fit.MaxTitlePoints,
-	})
-
-	skillsDetail := views.T(ctx, "jobs.fit.dim_skills_detail", "matches", len(fit.MatchingSkills), "missing", len(fit.MissingSkills))
-	d.Breakdown = append(d.Breakdown, views.FitBreakdownItem{
-		Dimension: "skills",
-		Label:     views.T(ctx, "jobs.fit.dim_skills"),
-		Points:    fit.SkillPoints,
-		Max:       fit.MaxSkillPoints,
-		Detail:    skillsDetail,
-	})
-
-	candLvl := fit.CandidateLevel
-	if candLvl == "" {
-		candLvl = "–"
-	}
-	jobLvl := fit.JobLevel
-	if jobLvl == "" {
-		jobLvl = "–"
-	}
-	seniorityDetail := views.T(ctx, "jobs.fit.dim_seniority_detail", "candidate", candLvl, "job", jobLvl)
-	d.Breakdown = append(d.Breakdown, views.FitBreakdownItem{
-		Dimension: "seniority",
-		Label:     views.T(ctx, "jobs.fit.dim_seniority"),
-		Points:    fit.SeniorityPoints,
-		Max:       fit.MaxSeniorityPoints,
-		Detail:    seniorityDetail,
-	})
-
-	locDetail := ""
-	if fit.LocationReason != "" {
-		locDetail = reasonText(ctx, matching.Reason{Code: fit.LocationReason, Params: fit.LocationParams})
-	}
-	d.Breakdown = append(d.Breakdown, views.FitBreakdownItem{
-		Dimension: "location",
-		Label:     views.T(ctx, "jobs.fit.dim_location"),
-		Points:    fit.LocationPoints,
-		Max:       fit.MaxLocationPoints,
-		Detail:    locDetail,
-	})
-
-	if fit.LanguagePoints != 0 {
-		d.Breakdown = append(d.Breakdown, views.FitBreakdownItem{
-			Dimension: "language",
-			Label:     views.T(ctx, "jobs.fit.dim_language"),
-			Points:    fit.LanguagePoints,
-		})
-	}
-
-	if fit.SalaryPoints != 0 {
-		d.Breakdown = append(d.Breakdown, views.FitBreakdownItem{
-			Dimension: "salary",
-			Label:     views.T(ctx, "jobs.fit.dim_salary"),
-			Points:    fit.SalaryPoints,
-		})
-	}
-
-	if fit.RecencyPoints != 0 {
-		d.Breakdown = append(d.Breakdown, views.FitBreakdownItem{
-			Dimension: "recency",
-			Label:     views.T(ctx, "jobs.fit.dim_recency"),
-			Points:    fit.RecencyPoints,
-		})
-	}
-
-	return d
+func buildFitData(jobID int64, fit matching.SkillFit, addedSkill string) views.FitData {
+	return views.FitData{JobID: jobID, MatchingSkills: fit.Have, MissingSkills: fit.Missing, AddedSkill: addedSkill}
 }
 
 func (s *Server) buildCVVariantData(ctx context.Context, userID uuid.UUID, j matching.Detail, notice string) views.CVVariantData {

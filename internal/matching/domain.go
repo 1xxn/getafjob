@@ -179,7 +179,7 @@ func (m *Matcher) EvaluatePrepared(p *Prepared, now time.Time) Result {
 	return r
 }
 
-// scored keeps the parts of one evaluation for InspectFit; all zero when the title is excluded.
+// scored keeps the parts of one evaluation; all zero when the title is excluded.
 type scored struct {
 	title, skills, level, location, language, salary, recency, similarity Reason
 	hits, missing                                                         []string
@@ -300,66 +300,17 @@ func recencyFactor(r Reason) float64 {
 	return 1
 }
 
-// FitInspection is a granular breakdown of how a candidate matches a job.
-type FitInspection struct {
-	Score              int               `json:"score"`
-	Decision           Decision          `json:"decision"`
-	MatchingSkills     []string          `json:"matching_skills"`
-	MissingSkills      []string          `json:"missing_skills"`
-	SkillPoints        int               `json:"skill_points"`
-	MaxSkillPoints     int               `json:"max_skill_points"`
-	TitlePoints        int               `json:"title_points"`
-	MaxTitlePoints     int               `json:"max_title_points"`
-	SeniorityPoints    int               `json:"seniority_points"`
-	MaxSeniorityPoints int               `json:"max_seniority_points"`
-	CandidateLevel     string            `json:"candidate_level"`
-	JobLevel           string            `json:"job_level"`
-	LocationPoints     int               `json:"location_points"`
-	MaxLocationPoints  int               `json:"max_location_points"`
-	LocationReason     string            `json:"location_reason"`
-	LocationParams     map[string]string `json:"location_params,omitempty"`
-	Workplace          string            `json:"workplace"`
-	LanguagePoints     int               `json:"language_points"`
-	SalaryPoints       int               `json:"salary_points"`
-	RecencyPoints      int               `json:"recency_points"`
-	Reasons            []Reason          `json:"reasons"`
+// SkillFit is the skill comparison of one job for the job page: the user's skills it names and the known skills
+// it asks for that the profile lacks (nice-to-have ones are not missing). The score itself comes from the stored
+// result, so the page and the list never disagree.
+type SkillFit struct {
+	Have    []string
+	Missing []string
 }
 
-// InspectFit breaks a job's result down into its parts, the same evaluation as Evaluate; an excluded title shows
-// no points, as its score is 0.
-func (m *Matcher) InspectFit(j Job, now time.Time) FitInspection {
-	p := Prepare(j, m.emb)
-	res, sc := m.evaluate(p, now)
-	w := weightsRulesOnly
-	if sc.similarity.Code != "" {
-		w = weightsWithModel
-	}
-	return FitInspection{
-		Score:              res.Score,
-		Decision:           res.Decision,
-		MatchingSkills:     sc.hits,
-		MissingSkills:      sc.missing,
-		SkillPoints:        sc.skills.Points,
-		MaxSkillPoints:     int(math.Round(100 * w.skills)),
-		TitlePoints:        sc.title.Points,
-		MaxTitlePoints:     int(math.Round(100 * w.title)),
-		SeniorityPoints:    sc.level.Points,
-		MaxSeniorityPoints: int(math.Round(100 * w.level)),
-		CandidateLevel:     levelNames[m.level],
-		JobLevel:           levelNames[p.level],
-		LocationPoints:     sc.location.Points,
-		MaxLocationPoints:  0,
-		LocationReason:     sc.location.Code,
-		LocationParams:     sc.location.Params,
-		Workplace:          j.Workplace,
-		LanguagePoints:     sc.language.Points,
-		SalaryPoints:       sc.salary.Points,
-		RecencyPoints:      sc.recency.Points,
-		Reasons:            res.Reasons,
-	}
-}
-
-// InspectFit evaluates criteria against a job with granular breakdown.
-func InspectFit(c Criteria, j Job, now time.Time) FitInspection {
-	return NewMatcher(c, nil).InspectFit(j, now)
+// SkillsFor compares c's skills with j.
+func SkillsFor(c Criteria, j Job) SkillFit {
+	p := Prepare(j, nil)
+	have, missing, _, _ := NewMatcher(c, nil).skillHitsAndMissing(p.text, p.preferred)
+	return SkillFit{Have: have, Missing: missing}
 }

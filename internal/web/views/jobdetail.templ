@@ -118,7 +118,8 @@ templ JobPage(d JobData) {
 					if (d.ApplyMode == "portal" || d.ApplyMode == "email") && d.ApplicationState == "" {
 						@ExternalApply(d.ApplyMode, d.ApplyHost, or(d.ApplyURL, d.URL), d.Row.ID)
 					}
-					@ui.Card(ui.CardProps{Title: T(ctx, "jobs.reasons"), Subtitle: T(ctx, "jobs.computed", "when", d.Computed)}) {
+					@ui.Card(ui.CardProps{Title: T(ctx, "jobs.reasons"), Subtitle: T(ctx, "match.decision."+d.Row.Decision) + " · " +
+						T(ctx, "jobs.score", "score", d.Row.Score) + " · " + T(ctx, "jobs.computed", "when", d.Computed)}) {
 						<ul class="job-reasons">
 							for _, rs := range d.Reasons {
 								<li class={ templ.KV("job-reason-hard", rs.Hard) }>
@@ -194,7 +195,7 @@ templ externalActions(link string, jobID int64) {
 
 templ FitInspector(d FitData) {
 	<div id="fit-inspector">
-		@ui.Card(ui.CardProps{Title: T(ctx, "jobs.fit.title"), Subtitle: T(ctx, "match.decision."+d.Decision) + " · " + T(ctx, "jobs.score", "score", d.Score)}) {
+		@ui.Card(ui.CardProps{Title: T(ctx, "jobs.fit.title")}) {
 			if d.AddedSkill != "" {
 				@ui.Alert(ui.AlertProps{Tone: ui.Success, Text: T(ctx, "jobs.fit.skill_added", "skill", d.AddedSkill)})
 			}
@@ -231,22 +232,6 @@ templ FitInspector(d FitData) {
 					}
 				</ul>
 			}
-			<h3 class="job-panel-sub">{ T(ctx, "jobs.fit.breakdown_title") }</h3>
-			<ul class="jd-breakdown">
-				for i, b := range d.Breakdown {
-					<li>
-						if b.Max > 0 {
-							@ui.ProgressBar(ui.ProgressProps{ID: "fit-" + itoa(i), Label: b.Label, Value: max(0, b.Points), Max: b.Max,
-								ValueText: itoa(b.Points) + " / " + itoa(b.Max)})
-						} else {
-							<p class="jd-break-row"><span>{ b.Label }</span><span>{ points(b.Points) }</span></p>
-						}
-						if b.Detail != "" {
-							<p class="app-hint">{ b.Detail }</p>
-						}
-					</li>
-				}
-			</ul>
 		}
 	</div>
 }

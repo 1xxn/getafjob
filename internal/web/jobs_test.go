@@ -453,7 +453,7 @@ func TestFitInspectorAndCVVariantSwitcher(t *testing.T) {
 	}
 	body := detailRec.Body.String()
 
-	// Check Fit Inspector
+	// Skills for this job
 	if !strings.Contains(body, `id="fit-inspector"`) {
 		t.Fatal("fit inspector missing")
 	}
@@ -466,11 +466,9 @@ func TestFitInspectorAndCVVariantSwitcher(t *testing.T) {
 	if !strings.Contains(body, "PostgreSQL") || !strings.Contains(body, "Docker") {
 		t.Fatalf("missing skills PostgreSQL / Docker not found")
 	}
-	if !strings.Contains(body, "Score breakdown") {
-		t.Fatal("score breakdown title not found")
-	}
-	if !strings.Contains(body, "Skills overlap") || !strings.Contains(body, "Seniority level") {
-		t.Fatal("breakdown dimensions missing")
+	// The score is explained once, by the stored reasons; the skill card has no second score.
+	if strings.Contains(body, "Score breakdown") || !strings.Contains(body, "Skills for this job") {
+		t.Fatal("the score is explained twice")
 	}
 
 	// Check CV Variant Switcher
