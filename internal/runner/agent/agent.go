@@ -10,6 +10,7 @@ import (
 	"log/slog"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 	"sync"
 	"time"
@@ -43,6 +44,13 @@ type Agent struct {
 	// browser is then closed to free the runner and the answer starts a new run (#201). 0: 2 min.
 	QuestionHold time.Duration
 	Parallel     int // runs that work at the same time; runs waiting for the user do not count; 0: 1
+}
+
+func (a *Agent) log() *slog.Logger {
+	if a != nil && a.Logger != nil {
+		return a.Logger
+	}
+	return slog.New(slog.DiscardHandler)
 }
 
 // slots counts the runs of an agent. A run waiting for the user keeps its browser but frees its slot, so other
@@ -209,15 +217,28 @@ func (a *Agent) RunOne(ctx context.Context, run *runnerv1.Run) error {
 		}
 	}
 	ad := ats.For("", append([]string{run.GetStartUrl()}, run.GetOrigins()...)...)
+	runLog := a.log().With("run_id", run.GetRunId(), "ats", ad.Name)
 	e := ad.NewEngine(&executor.Executor{Docs: docs}, &planner.Planner{K: k}, c, a.Wait)
+	e.Logger = runLog
+	startTime := time.Now()
+	endState := "error"
+	defer func() {
+		lvl := slog.LevelInfo
+		if endState == "error" || endState == "submit_unknown" {
+			lvl = slog.LevelWarn
+		}
+		runLog.Log(ctx, lvl, "run ended", "state", endState, "duration_ms", time.Since(startTime).Milliseconds())
+	}()
+	runLog.InfoContext(ctx, "run started")
 	if err := p.Context(ctx).Navigate(run.GetStartUrl()); err != nil {
+		endState = "parked"
 		return c.Park(ctx, "open the posting: "+err.Error(), nil)
 	}
 	_ = p.Context(ctx).WaitLoad()
 	if info, err := p.Info(); err == nil && (ats.IsPortal(ad.Name) || run.GetPortal() != "") {
 		html, _ := p.HTML()
 		if ats.IsSessionExpired(run.GetPortal(), info.URL, html) {
-			a.Logger.WarnContext(ctx, "portal session expired, requesting handoff", "portal", run.GetPortal())
+			runLog.WarnContext(ctx, "portal session expired, requesting handoff", "portal", run.GetPortal())
 			if err := c.Ask(ctx, []engine.Question{{
 				Kind:  "session_expired",
 				Label: fmt.Sprintf("Portal session expired for %s. Please sign in again in the remote browser.", run.GetPortal()),
@@ -229,6 +250,7 @@ func (a *Agent) RunOne(ctx context.Context, run *runnerv1.Run) error {
 				return herr
 			}
 			if !ok {
+				endState = "stopped"
 				return nil
 			}
 			if res, err := (proto.NetworkGetCookies{}).Call(p); err == nil && len(res.Cookies) > 0 {
@@ -242,6 +264,7 @@ func (a *Agent) RunOne(ctx context.Context, run *runnerv1.Run) error {
 				}
 			}
 			if err := p.Context(ctx).Navigate(run.GetStartUrl()); err != nil {
+				endState = "parked"
 				return c.Park(ctx, "open posting after sign in: "+err.Error(), nil)
 			}
 			_ = p.Context(ctx).WaitLoad()
@@ -249,8 +272,30 @@ func (a *Agent) RunOne(ctx context.Context, run *runnerv1.Run) error {
 	}
 	form, err := e.Prepare(ctx, p)
 	if err != nil {
+		endState = "parked"
+		runLog.WarnContext(ctx, "run prepare failed", "step", engine.StepPrepare, "reason_code", "no_form")
 		shot, _ := p.Screenshot(false, nil)
 		return c.Park(ctx, noFormReason(run.GetStartUrl(), err), shot)
+	}
+	if form != nil {
+		addOrigin := func(o string) {
+			if o != "" && !slices.Contains(k.Origins, o) {
+				k.Origins = append(k.Origins, o)
+			}
+		}
+		if info, infoErr := form.Info(); infoErr == nil {
+			for _, o := range ats.Origins("", info.URL) {
+				addOrigin(o)
+			}
+		}
+		if st, exErr := browser.Extract(form); exErr == nil {
+			for _, fr := range st.Frames {
+				if orig := fr.Origin(); ats.IsKnownOrigin(orig) {
+					addOrigin(orig)
+				}
+			}
+		}
+		e.Planner = &planner.Planner{K: k}
 	}
 	if form != nil && form != p {
 		stopStream()
@@ -265,17 +310,23 @@ func (a *Agent) RunOne(ctx context.Context, run *runnerv1.Run) error {
 				return herr
 			}
 			if !ok {
+				endState = "stopped"
 				return nil
 			}
 			for _, an := range ans {
 				k.Answers = append(k.Answers, planner.Answer{ID: an.GetId(), Question: an.GetQuestion(), Answer: an.GetAnswer()})
 			}
 			e.Planner = &planner.Planner{K: k}
-		case err == nil, errors.Is(err, engine.ErrParked):
+		case err == nil:
+			endState = "submitted"
+			return nil
+		case errors.Is(err, engine.ErrParked):
+			endState = "parked"
 			return nil
 		case c.submitting:
 			// The submit was registered and the click may have gone out: no report; the server turns the run into
 			// submit_unknown, which is reconciled and never retried.
+			endState = "submit_unknown"
 			return err
 		default:
 			shot, _ := form.Screenshot(false, nil)

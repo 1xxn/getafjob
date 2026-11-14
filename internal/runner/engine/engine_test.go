@@ -1,6 +1,10 @@
 package engine
 
 import (
+	"bytes"
+	"context"
+	"log/slog"
+	"strings"
 	"testing"
 
 	"github.com/1xxn/getafjob/internal/runner/browser"
@@ -12,6 +16,7 @@ func TestButtonTexts(t *testing.T) {
 		"Submit application": "final", "Bewerbung absenden": "final", "Jetzt bewerben": "final", "Apply": "final",
 		"Send": "final", "Bewerbung einreichen": "final", "Bewerben": "final", "Senden": "final",
 		"Weiter": "next", "Next": "next", "Continue": "next", "Fortfahren": "next",
+		"Review application": "next", "Bewerbung überprüfen": "next", "Vorschau": "next",
 		"Save draft": "", "Sender settings": "", "Applying tips": "",
 	} {
 		got := ""
@@ -108,5 +113,50 @@ func TestSecurityCodeDetection(t *testing.T) {
 	st.Frames[0].Fields[1].Value = "A1B2C3D4"
 	if qs := securityCode(st); len(qs) != 0 {
 		t.Fatalf("filled security code still asked: %+v", qs)
+	}
+}
+
+func TestApplyAndRejectRegexes(t *testing.T) {
+	for _, txt := range []string{
+		"Externe Seite öffnen",
+		"Zur Stellenanzeige",
+		"Zum Original",
+		"View original",
+		"Apply on company site",
+		"Jetzt bewerben",
+	} {
+		if !applyRx.MatchString(txt) {
+			t.Errorf("applyRx should match %q", txt)
+		}
+	}
+	for _, txt := range []string{"Alle Cookies ablehnen", "Nur notwendige Cookies", "Reject all"} {
+		if !rejectRx.MatchString(txt) {
+			t.Errorf("rejectRx should match %q", txt)
+		}
+	}
+}
+
+type noopCoord struct{}
+
+func (noopCoord) Checkpoint(context.Context, Checkpoint) error          { return nil }
+func (noopCoord) Ask(context.Context, []Question) error                 { return nil }
+func (noopCoord) BeginSubmit(context.Context) error                     { return nil }
+func (noopCoord) Submitted(context.Context, bool, browser.Effect) error { return nil }
+func (noopCoord) Park(context.Context, string, []byte) error            { return nil }
+
+func TestRunLogsContainNoPII(t *testing.T) {
+	var buf bytes.Buffer
+	e := &Engine{
+		Coord:  noopCoord{},
+		Logger: slog.New(slog.NewTextHandler(&buf, nil)),
+	}
+	_ = e.ask(context.Background(), []Question{{Kind: "field", Label: "Secret Question Max-Mustermann"}})
+	_ = e.park(context.Background(), nil, "fill: secret-value-Max-Mustermann")
+	out := buf.String()
+	if !strings.Contains(out, "step=ask") || !strings.Contains(out, "reason_code=fill") {
+		t.Fatalf("expected structured step and reason_code in logs, got %q", out)
+	}
+	if strings.Contains(out, "Max-Mustermann") || strings.Contains(out, "secret-value") {
+		t.Fatalf("sensitive field/value leaked into logs: %q", out)
 	}
 }

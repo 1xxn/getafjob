@@ -8,6 +8,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"log/slog"
 	"regexp"
 	"strings"
 	"time"
@@ -99,6 +100,7 @@ type Engine struct {
 	Exec    *executor.Executor
 	Planner Planner
 	Coord   Coordinator
+	Logger  *slog.Logger
 	Wait    time.Duration // per click; 0: 8 s (submits load the next page)
 	// FillBeforeAsk fills the known fields of a page before asking for the rest, so the user takes over a nearly
 	// complete form (#196). Off for ATS that keep drafts of what is typed (candidate accounts), so a parked
@@ -106,6 +108,32 @@ type Engine struct {
 	FillBeforeAsk bool
 	now           func() time.Time
 	page          int // form page of the last Run; Run continues there after the user answers
+}
+
+func (e *Engine) log() *slog.Logger {
+	if e != nil && e.Logger != nil {
+		return e.Logger
+	}
+	return slog.New(slog.DiscardHandler)
+}
+
+func parkReasonCode(reason string) string {
+	switch {
+	case reason == ParkApproval:
+		return "approval"
+	case strings.HasPrefix(reason, "fill:"):
+		return "fill"
+	case strings.HasPrefix(reason, "next page:"):
+		return "next_page"
+	case strings.HasPrefix(reason, "submit:") || strings.HasPrefix(reason, "submit had no effect") || strings.HasPrefix(reason, "the form rejected"):
+		return "submit"
+	case strings.HasPrefix(reason, "no submit or next button") || strings.HasPrefix(reason, "unclear form button"):
+		return "no_form_button"
+	case strings.HasPrefix(reason, "no form"):
+		return "no_form"
+	default:
+		return "other"
+	}
 }
 
 func (e *Engine) wait() time.Duration {
@@ -161,6 +189,7 @@ func (e *Engine) Run(ctx context.Context, p *rod.Page) error {
 				st = newSt
 			}
 		}
+		e.log().InfoContext(ctx, "run step", "step", StepExtract, "page", page, "fields", len(st.Fields()), "buttons", len(st.Buttons()))
 		if err := e.checkpoint(ctx, p, page, StepExtract, st, nil, nil, dialogs); err != nil {
 			return err
 		}
@@ -189,8 +218,10 @@ func (e *Engine) Run(ctx context.Context, p *rod.Page) error {
 		}
 		st, filled, err := e.Exec.Fill(st, plan)
 		if err != nil {
+			e.log().WarnContext(ctx, "run step failed", "step", StepExecute, "page", page)
 			return e.park(ctx, p, fmt.Sprintf("fill: %v", err))
 		}
+		e.log().InfoContext(ctx, "run step", "step", StepExecute, "page", page, "filled_count", len(filled))
 		if err := e.checkpoint(ctx, p, page, StepExecute, st, filled, nil, dialogs); err != nil {
 			return err
 		}
@@ -212,6 +243,7 @@ func (e *Engine) Run(ctx context.Context, p *rod.Page) error {
 			return err
 		}
 		_ = p.Timeout(e.wait()).WaitLoad()
+		time.Sleep(150 * time.Millisecond)
 	}
 	return e.park(ctx, p, fmt.Sprintf("more than %d form pages", maxPages))
 }
@@ -260,7 +292,7 @@ func formButton(st *browser.State, plan executor.Plan) (browser.Button, bool, er
 	return browser.Button{}, false, fmt.Errorf("unclear form button %q: neither send nor next", candidates[0].Text)
 }
 
-var nextRx = regexp.MustCompile(`(?i)\b(next|continue)\b|weiter|fortfahren`)
+var nextRx = regexp.MustCompile(`(?i)\b(next|continue|review)\b|weiter|fortfahren|überprüfen|ueberpruefen|vorschau`)
 
 // submit is the only path to the final click: register first, then click, then report.
 func (e *Engine) submit(ctx context.Context, p *rod.Page, page int, st *browser.State, btn browser.Button,
@@ -269,6 +301,7 @@ func (e *Engine) submit(ctx context.Context, p *rod.Page, page int, st *browser.
 	if err := e.checkpoint(ctx, p, page, StepSubmit, st, nil, nil, dialogs); err != nil {
 		return err
 	}
+	e.log().InfoContext(ctx, "run step", "step", StepSubmit, "page", page)
 	if err := e.Coord.BeginSubmit(ctx); err != nil {
 		switch {
 		case errors.Is(err, ErrNeedsApproval):
@@ -281,6 +314,7 @@ func (e *Engine) submit(ctx context.Context, p *rod.Page, page int, st *browser.
 	eff, err := st.Submit(btn.ID, e.wait()) //nolint:contextcheck // the page carries ctx (bound in Run)
 	var ne *browser.NoEffectError
 	if errors.As(err, &ne) {
+		e.log().WarnContext(ctx, "run parked", "step", "park", "reason_code", "submit")
 		_ = e.Coord.Park(ctx, "submit had no effect after one retry", ne.Screenshot)
 		return ErrParked
 	}
@@ -288,6 +322,7 @@ func (e *Engine) submit(ctx context.Context, p *rod.Page, page int, st *browser.
 		return err // the server turns a submit that never reports into submit_unknown
 	}
 	if len(eff.Invalid) > 0 {
+		e.log().WarnContext(ctx, "run parked", "step", "park", "reason_code", "submit")
 		shot, _ := p.Screenshot(false, nil)
 		_ = e.Coord.Park(ctx, fmt.Sprintf("the form rejected the submit: %v", eff.Invalid), shot)
 		return ErrParked
@@ -304,6 +339,8 @@ func (e *Engine) submit(ctx context.Context, p *rod.Page, page int, st *browser.
 			time.Sleep(250 * time.Millisecond)
 		}
 	}
+	e.log().InfoContext(ctx, "run step", "step", StepVerify, "page", page,
+		"confirmed", confirmed, "navigated", eff.Navigated, "dom_changed", eff.DOM, "request", eff.Request, "invalid_count", len(eff.Invalid))
 	_ = e.checkpoint(ctx, p, page, StepVerify, after, nil, &eff, dialogs)
 	return e.Coord.Submitted(ctx, confirmed, eff)
 }
@@ -363,6 +400,7 @@ func securityCode(st *browser.State) []Question {
 }
 
 func (e *Engine) ask(ctx context.Context, qs []Question) error {
+	e.log().InfoContext(ctx, "run step", "step", "ask", "questions", len(qs))
 	if err := e.Coord.Ask(ctx, qs); err != nil {
 		return err
 	}
@@ -370,7 +408,11 @@ func (e *Engine) ask(ctx context.Context, qs []Question) error {
 }
 
 func (e *Engine) park(ctx context.Context, p *rod.Page, reason string) error {
-	shot, _ := p.Screenshot(false, nil)
+	var shot []byte
+	if p != nil {
+		shot, _ = p.Screenshot(false, nil)
+	}
+	e.log().InfoContext(ctx, "run parked", "step", "park", "reason_code", parkReasonCode(reason))
 	if err := e.Coord.Park(ctx, reason, shot); err != nil {
 		return err
 	}
