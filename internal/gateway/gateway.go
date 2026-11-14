@@ -59,22 +59,24 @@ type PortalSessionSaver interface {
 
 // Server implements the runner service.
 type Server struct {
-	Runs         *application.Runs
-	Apps         *application.Service
-	Data         Data
-	Shots        Screenshots
-	Secret       string // shared by the server's runners; empty: no runner can register
-	Logger       *slog.Logger
-	Notify       func(ctx context.Context, userID, appID uuid.UUID)
-	ATSMetrics   *ats.Tracker
-	Portals      PortalSessionSaver
-	StepDuration metric.Float64Histogram
-	handoffs     sync.Map // map[uuid.UUID]*HandoffSession
-	runners      sync.Map // map[string]runnerSession
-	runSteps     sync.Map // map[uuid.UUID]runStepState
-	frameAuth    sync.Map // map[string]frameGrant, token -> run for screencast frames
-	seen         sync.Map // map[uuid.UUID]time.Time, run -> last call of its runner
-	sessionOf    sync.Map // map[string]uuid.UUID, run token -> application of its live session
+	Runs   *application.Runs
+	Apps   *application.Service
+	Data   Data
+	Shots  Screenshots
+	Secret string // shared by the server's runners; empty: no runner can register
+	Logger *slog.Logger
+	Notify func(ctx context.Context, userID, appID uuid.UUID)
+	// NotifyApproval tells the user that a filled application waits for the approval (nil: no notice).
+	NotifyApproval func(ctx context.Context, userID, appID uuid.UUID)
+	ATSMetrics     *ats.Tracker
+	Portals        PortalSessionSaver
+	StepDuration   metric.Float64Histogram
+	handoffs       sync.Map // map[uuid.UUID]*HandoffSession
+	runners        sync.Map // map[string]runnerSession
+	runSteps       sync.Map // map[uuid.UUID]runStepState
+	frameAuth      sync.Map // map[string]frameGrant, token -> run for screencast frames
+	seen           sync.Map // map[uuid.UUID]time.Time, run -> last call of its runner
+	sessionOf      sync.Map // map[string]uuid.UUID, run token -> application of its live session
 }
 
 // Lost runs: a runner calls at least every keepalive interval (agent: 20 s); after reapIdle without a call the
@@ -536,7 +538,11 @@ func (s *Server) BeginSubmit(ctx context.Context, req *runnerv1.BeginSubmitReque
 	if err != nil {
 		return nil, err
 	}
-	return &runnerv1.BeginSubmitResponse{}, code(s.Runs.BeginSubmit(ctx, ref))
+	err = s.Runs.BeginSubmit(ctx, ref)
+	if errors.Is(err, application.ErrNeedsApproval) && s.NotifyApproval != nil {
+		s.NotifyApproval(ctx, ref.UserID, ref.AppID)
+	}
+	return &runnerv1.BeginSubmitResponse{}, code(err)
 }
 
 // Submitted records the submit.
