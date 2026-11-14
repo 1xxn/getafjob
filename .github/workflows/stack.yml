@@ -201,6 +201,8 @@ jobs:
           docker compose -f deploy/compose.yaml -f deploy/compose.dev.yaml --profile dev up -d --no-build --wait --wait-timeout 300
       - name: smoke test through caddy and the egress policy
         run: deploy/smoke.sh
+      - name: "rehearsal: maintenance page while serve is down"
+        run: deploy/test-fallback.sh
       - name: "rehearsal: backup and restore into a fresh stack"
         run: deploy/test-restore.sh
       - name: "rehearsal: deploy and automatic rollback"

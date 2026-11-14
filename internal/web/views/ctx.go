@@ -2,6 +2,7 @@
 package views
 
 //go:generate go tool templ generate
+//go:generate go run ./staticpage
 
 import (
 	"context"
