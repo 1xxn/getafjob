@@ -230,3 +230,33 @@ func TestPgstoreActivity(t *testing.T) {
 		t.Errorf("locale %q %v", l, err)
 	}
 }
+
+// A park that only waits for the approval asked right before, or that the user did, is no news; other parks are.
+func TestPgstoreActivityQuietParks(t *testing.T) {
+	ctx := context.Background()
+	pool := dbtest.AppPool(t)
+	st := pgstore.New(pool)
+	u := user(t, pool, "parks@example.org")
+	app := application(t, pool, u, job(t, pool, "Muster GmbH", "Platform Engineer"), "parked")
+	t0 := time.Date(2026, 11, 14, 9, 0, 0, 0, time.UTC)
+	for i, reason := range []string{"waiting for your approval", "parked by user", "answered without active session", "captcha needs a human"} {
+		if err := db.InSystemTx(ctx, pool, func(tx pgx.Tx) error {
+			_, err := tx.Exec(ctx, `INSERT INTO application_events (application_id, user_id, event, from_state, to_state, actor, detail, at)
+				VALUES ($1, $2, 'park', 'needs_input', 'parked', 'runner', jsonb_build_object('reason', $3::text), $4)`,
+				app, u, reason, t0.Add(time.Duration(i)*time.Minute))
+			return err
+		}); err != nil {
+			t.Fatal(err)
+		}
+	}
+	items, err := st.Activity(ctx, u, t0.Add(time.Hour), 10)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(items) != 1 || !items[0].At.Equal(t0.Add(3*time.Minute)) {
+		t.Fatalf("items = %+v", items)
+	}
+	if n, _ := st.CountActivitySince(ctx, u, time.Time{}); n != 1 {
+		t.Errorf("unread = %d, want 1", n)
+	}
+}
