@@ -143,6 +143,9 @@ function initLiveView(box: HTMLElement): () => void {
       if (stopped) return;
       if (ev.code === NOT_LIVE || (ev.code === 1000 && ev.reason === 'session ended')) {
         setMode('ended');
+        if (box.closest('.live-focus')) {
+          document.body.dispatchEvent(new CustomEvent('getafjob:app', { detail: { app: appId } }));
+        }
         if (box.dataset.onEnd === 'reload') {
           // The run finished or parked: reload once so the page shows the result and evidence.
           stopped = true;
@@ -320,7 +323,7 @@ function syncDock(): void {
   dock.hidden = ids.length === 0;
   const count = dock.querySelector('[data-dock-count]');
   if (count) count.textContent = countText.replace('{n}', String(ids.length));
-  if (ids.length === 0 || dock.querySelector('#dock-body')?.hasAttribute('hidden')) {
+  if (ids.length === 0 || dock.querySelector('#dock-body')?.hasAttribute('hidden') || document.querySelector('[data-live-center]')) {
     showRun(null);
     return;
   }

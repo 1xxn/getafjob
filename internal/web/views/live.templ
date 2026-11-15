@@ -137,6 +137,29 @@ templ LiveGrid(runs []ActiveRunItem) {
 	</div>
 }
 
+templ LiveFocusMeta(r ActiveRunItem) {
+	<p
+		id="live-focus-meta"
+		class="live-focus-meta"
+		{ HX(ctx, "hx-get", "/live?run=" + r.AppID, "hx-trigger", "getafjob:app from:body delay:700ms", "hx-swap", "outerMorph transition:false")... }
+	>
+		if r.Company != "" {
+			<span>{ r.Company }</span>
+		}
+		if r.StateKey != "" && !r.Live {
+			@ui.StatusPill(ui.StatusProps{Label: T(ctx, r.StateKey), Tone: r.Tone})
+		} else {
+			// Both live states are rendered; handoff.ts shows the one the live view reports (your turn or running).
+			<span data-live-state="waiting" hidden?={ !r.Waiting }>
+				@ui.StatusPill(ui.StatusProps{Label: T(ctx, "live.state.waiting"), Tone: ui.Warning})
+			</span>
+			<span data-live-state="running" hidden?={ r.Waiting }>
+				@ui.StatusPill(ui.StatusProps{Label: T(ctx, "live.state.running"), Tone: ui.Accent, Live: true})
+			</span>
+		}
+	</p>
+}
+
 templ liveFocus(d LiveData) {
 	<div class="live-focus">
 		<div class="live-focus-main">
@@ -147,18 +170,7 @@ templ liveFocus(d LiveData) {
 				</a>
 			</p>
 			<h1>{ runLabel(*d.Focus) }</h1>
-			<p class="live-focus-meta">
-				if d.Focus.Company != "" {
-					<span>{ d.Focus.Company }</span>
-				}
-				// Both states are rendered; handoff.ts shows the one the live view reports (your turn or running).
-				<span data-live-state="waiting" hidden?={ !d.Focus.Waiting }>
-					@ui.StatusPill(ui.StatusProps{Label: T(ctx, "live.state.waiting"), Tone: ui.Warning})
-				</span>
-				<span data-live-state="running" hidden?={ d.Focus.Waiting }>
-					@ui.StatusPill(ui.StatusProps{Label: T(ctx, "live.state.running"), Tone: ui.Accent, Live: true})
-				</span>
-			</p>
+			@LiveFocusMeta(*d.Focus)
 			@LiveScreen(LiveScreenProps{AppID: d.Focus.AppID, Size: "full", Controls: true})
 		</div>
 		<aside class="live-focus-side" aria-label={ T(ctx, "live.actions") }>

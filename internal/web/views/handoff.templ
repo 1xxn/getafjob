@@ -135,6 +135,9 @@ type ActiveRunItem struct {
 	Company  string
 	Current  bool
 	Waiting  bool // the run waits for the user
+	StateKey string
+	Tone     ui.Tone
+	Live     bool
 }
 
 // LiveIndicator is the top bar pill with the user's live runs; empty when nothing runs.

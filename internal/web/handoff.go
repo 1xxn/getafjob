@@ -260,7 +260,8 @@ func (s *Server) activeRuns(ctx context.Context, userID, current uuid.UUID) []vi
 			continue // a parked or finished run may hold its browser a moment longer; it is not live any more
 		}
 		out = append(out, views.ActiveRunItem{AppID: id.String(), JobID: b.JobID, Current: id == current,
-			Waiting: b.State == application.NeedsInput, JobTitle: b.Title, Company: b.Company})
+			Waiting: b.State == application.NeedsInput, StateKey: "apps.state." + string(b.State),
+			Tone: appTone(b.State), Live: liveStates[b.State], JobTitle: b.Title, Company: b.Company})
 	}
 	return out
 }

@@ -1,8 +1,12 @@
 package httpx
 
 import (
+	"cmp"
+	"context"
+	"log/slog"
 	"net/http"
 	"strings"
+	"time"
 
 	"go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp"
 	"go.opentelemetry.io/otel/attribute"
@@ -23,12 +27,21 @@ func Instrument(next http.Handler) http.Handler {
 		}))
 }
 
+type routeKey struct{}
+
+type routeSlot struct {
+	pattern string
+}
+
 // Routes names span and metrics after the pattern the mux matched ("GET /jobs/{id}") and replaces the raw path and
 // query in the span (sign-in links carry tokens) with the path template, or nothing for unmatched requests.
 func Routes(mux *http.ServeMux) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		_, pattern := mux.Handler(r) // the pattern ServeHTTP will match; it does not depend on how the request is passed
-		defer name(r, pattern)       // also after a panic, before the span ends
+		if slot, ok := r.Context().Value(routeKey{}).(*routeSlot); ok && slot != nil {
+			slot.pattern = pattern
+		}
+		defer name(r, pattern) // also after a panic, before the span ends
 		mux.ServeHTTP(w, r)
 	})
 }
@@ -49,4 +62,52 @@ func name(r *http.Request, pattern string) {
 	if l, ok := otelhttp.LabelerFromContext(r.Context()); ok {
 		l.Add(route)
 	}
+}
+
+type statusRecorder struct {
+	http.ResponseWriter
+	status int
+	wrote  bool
+}
+
+func (w *statusRecorder) WriteHeader(code int) {
+	if !w.wrote {
+		w.status, w.wrote = code, true
+	}
+	w.ResponseWriter.WriteHeader(code)
+}
+
+func (w *statusRecorder) Write(b []byte) (int, error) {
+	if !w.wrote {
+		w.status, w.wrote = http.StatusOK, true
+	}
+	return w.ResponseWriter.Write(b)
+}
+
+func (w *statusRecorder) Unwrap() http.ResponseWriter { return w.ResponseWriter }
+
+// RequestLog logs every HTTP request by its matched route pattern (r.Pattern, never the raw URL, query, user,
+// IP or body, so one-time tokens and personal data never reach the log). Static assets and health checks log at
+// debug level.
+func RequestLog(next http.Handler, logger *slog.Logger) http.Handler {
+	if logger == nil {
+		return next
+	}
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		start := time.Now()
+		slot := &routeSlot{}
+		ctx := context.WithValue(r.Context(), routeKey{}, slot)
+		r = r.WithContext(ctx)
+		rec := &statusRecorder{ResponseWriter: w, status: http.StatusOK}
+		next.ServeHTTP(rec, r)
+		route := cmp.Or(slot.pattern, r.Pattern, r.Method)
+		level := slog.LevelInfo
+		if route == "GET /healthz" || route == "GET /readyz" || strings.HasPrefix(route, "GET /static/") ||
+			route == "/healthz" || route == "/readyz" || strings.HasPrefix(route, "/static/") ||
+			r.URL.Path == "/healthz" || r.URL.Path == "/readyz" || strings.HasPrefix(r.URL.Path, "/static/") {
+			level = slog.LevelDebug
+		}
+		logger.Log(ctx, level, "http request", "route", route, "status", rec.status,
+			"duration", time.Since(start).Round(time.Microsecond))
+	})
 }

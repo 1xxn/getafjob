@@ -755,7 +755,7 @@ func niPanel(o NIOpen) templ.Component {
 			return templ_7745c5c3_Err
 		}
 		if o.Live {
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 52, "<div class=\"ni-live\">")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 52, "<div class=\"ni-live\"><span hidden data-live-center></span>")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}

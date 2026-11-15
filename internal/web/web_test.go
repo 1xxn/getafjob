@@ -139,8 +139,8 @@ func newApp(t *testing.T, opts ...func(*web.Server)) *app {
 		o(srv)
 	}
 	srv.Register(mux)
-	return &app{t: t, h: httpx.Protect(mux, 1<<20, true, httpx.Upload{Path: "/documents", Max: web.MaxUpload},
-		httpx.Upload{Path: "/setup/cv", Max: web.MaxUpload}), ids: ids, mail: mb, pool: pool}
+	return &app{t: t, h: httpx.RequestLog(httpx.Protect(httpx.Routes(mux), 1<<20, true, httpx.Upload{Path: "/documents", Max: web.MaxUpload},
+		httpx.Upload{Path: "/setup/cv", Max: web.MaxUpload}), srv.Logger), ids: ids, mail: mb, pool: pool}
 }
 
 func (a *app) do(method, path string, form url.Values, cookie string, hdr map[string]string) *httptest.ResponseRecorder {
@@ -1283,3 +1283,59 @@ type testCrawlQueue struct{}
 
 func (testCrawlQueue) QueueCrawl(context.Context) (bool, error) { return true, nil }
 func (testCrawlQueue) IsQueued(context.Context) (bool, error)   { return false, nil }
+
+func TestRequestLogOmitsTokens(t *testing.T) {
+	var buf bytes.Buffer
+	logger := slog.New(slog.NewTextHandler(&buf, &slog.HandlerOptions{Level: slog.LevelDebug}))
+	a := newApp(t, func(s *web.Server) { s.Logger = logger })
+
+	link, _, err := a.ids.Invite(t.Context(), identity.InviteRequest{Email: "log-test@example.com", Role: identity.RoleUser})
+	if err != nil {
+		t.Fatal(err)
+	}
+	invitePath := strings.TrimPrefix(link, "https://jobs.example.org")
+	inviteToken := invitePath[strings.LastIndex(invitePath, "/")+1:]
+
+	if rec := a.do(http.MethodGet, invitePath+"?unused=secret-invite-q", nil, "", nil); rec.Code != http.StatusOK {
+		t.Fatalf("GET invite: %d", rec.Code)
+	}
+	if _, _, err := a.ids.AcceptInvitation(t.Context(), inviteToken, "LogTester", "en"); err != nil {
+		t.Fatal(err)
+	}
+
+	if rec := a.do(http.MethodPost, "/login", url.Values{"email": {"log-test@example.com"}}, "", nil); rec.Code != http.StatusOK {
+		t.Fatalf("POST /login: %d", rec.Code)
+	}
+	var loginPath string
+	for _, f := range strings.Fields(a.mail.last.Text) {
+		if strings.HasPrefix(f, "https://jobs.example.org/login/link/") {
+			loginPath = strings.TrimPrefix(f, "https://jobs.example.org")
+		}
+	}
+	if loginPath == "" {
+		t.Fatal("missing sign-in link in mail")
+	}
+	loginToken := loginPath[strings.LastIndex(loginPath, "/")+1:]
+	if rec := a.do(http.MethodGet, loginPath+"?next=secret-login-q", nil, "", nil); rec.Code != http.StatusOK {
+		t.Fatalf("GET login link: %d", rec.Code)
+	}
+	if rec := a.do(http.MethodGet, "/static/js/shell.js", nil, "", nil); rec.Code != http.StatusOK {
+		t.Fatalf("GET /static/js/shell.js: %d", rec.Code)
+	}
+
+	out := buf.String()
+	for _, secret := range []string{inviteToken, loginToken, "secret-invite-q", "secret-login-q", "log-test@example.com"} {
+		if strings.Contains(out, secret) {
+			t.Fatalf("request log leaked %q:\n%s", secret, out)
+		}
+	}
+	for _, want := range []string{
+		`level=INFO msg="http request" route="GET /invite/{token}" status=200`,
+		`level=INFO msg="http request" route="GET /login/link/{token}" status=200`,
+		`level=DEBUG msg="http request" route="GET /static/" status=200`,
+	} {
+		if !strings.Contains(out, want) {
+			t.Errorf("request log missing %q in:\n%s", want, out)
+		}
+	}
+}

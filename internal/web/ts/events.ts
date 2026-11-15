@@ -29,7 +29,11 @@ function initEvents(): void {
     if (watched && watched.dataset.watchApp === ev.app) {
       const shown = watched.dataset.watchState ?? '';
       if (LIVE.has(shown) !== LIVE.has(ev.to)) {
-        location.reload();
+        if (document.querySelector('form[data-dirty]')) {
+          watched.dataset.watchState = ev.to;
+        } else {
+          location.reload();
+        }
       }
     }
   });

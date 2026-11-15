@@ -358,6 +358,9 @@ type ActiveRunItem struct {
 	Company  string
 	Current  bool
 	Waiting  bool // the run waits for the user
+	StateKey string
+	Tone     ui.Tone
+	Live     bool
 }
 
 // LiveIndicator is the top bar pill with the user's live runs; empty when nothing runs.
@@ -422,7 +425,7 @@ func LiveIndicator(runs []ActiveRunItem) templ.Component {
 			var templ_7745c5c3_Var17 string
 			templ_7745c5c3_Var17, templ_7745c5c3_Err = templ.JoinStringErrs(T(ctx, "live.indicator", "count", len(runs)))
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `handoff.templ`, Line: 145, Col: 49}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `handoff.templ`, Line: 148, Col: 49}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var17))
 			if templ_7745c5c3_Err != nil {

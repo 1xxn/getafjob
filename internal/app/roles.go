@@ -163,8 +163,8 @@ func serve(ctx context.Context, cfg config.Config, logger *slog.Logger) error {
 		System: systemFacts{pool: pool, cfg: cfg}, Ops: adminOps{pool: pool, queue: inserter},
 		Maintenance: newMaintenanceControl(pool, maint, cfg)}).Register(mux)
 
-	h := httpx.Instrument(httpx.Protect(maintenanceAPI(maint, httpx.Routes(mux)), maxBody, cfg.PublicURL.Scheme == "https",
-		httpx.Upload{Path: "/documents", Max: web.MaxUpload}, httpx.Upload{Path: "/setup/cv", Max: web.MaxUpload}))
+	h := httpx.Instrument(httpx.RequestLog(httpx.Protect(maintenanceAPI(maint, httpx.Routes(mux)), maxBody, cfg.PublicURL.Scheme == "https",
+		httpx.Upload{Path: "/documents", Max: web.MaxUpload}, httpx.Upload{Path: "/setup/cv", Max: web.MaxUpload}), logger))
 
 	// UI and gateway stop together: when one fails, the other is shut down.
 	ctx, stop := context.WithCancel(ctx)
