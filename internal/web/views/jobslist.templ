@@ -241,7 +241,7 @@ templ jobsFilters(d JobsData) {
 		role="search"
 		aria-label={ T(ctx, "jobs.filters") }
 		{ HX(ctx, "hx-get", "/jobs", "hx-target", "#results", "hx-swap", "outerHTML transition:false", "hx-push-url", "true",
-			"hx-trigger", "submit, change target:select, input changed delay:400ms target:input")... }
+			"hx-sync", "this:replace", "hx-trigger", "submit, change target:select, input changed delay:400ms target:input")... }
 	>
 		<div class="jobs-filter-search">
 			@ui.Input(ui.InputProps{FieldProps: ui.FieldProps{Name: "q", Label: T(ctx, "jobs.search_label"), HideLabel: true},
@@ -278,11 +278,6 @@ templ JobsPage(d JobsData) {
 		</div>
 		@jobsFilters(d)
 		@JobResults(d)
-		<form id="row-action" method="post" action="/jobs/bulk" hidden>
-			<input type="hidden" name="back" value={ d.Back }/>
-			<input type="hidden" name="ids" value=""/>
-			<input type="hidden" name="action" value=""/>
-		</form>
 	}
 }
 
@@ -366,6 +361,11 @@ templ JobResults(d JobsData) {
 				<p class="job-panel-hint">{ T(ctx, "jobs.panel_hint") }</p>
 			}
 		</aside>
+		<form id="row-action" method="post" action="/jobs/bulk" hidden>
+			<input type="hidden" name="back" value={ d.Back }/>
+			<input type="hidden" name="ids" value=""/>
+			<input type="hidden" name="action" value=""/>
+		</form>
 	</div>
 }
 

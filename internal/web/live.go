@@ -63,13 +63,14 @@ func (s *Server) livePage(w http.ResponseWriter, r *http.Request, u *identity.Us
 				http.Redirect(w, r, "/live", http.StatusSeeOther)
 				return
 			}
-			if !liveStates[app.State] {
+			if !liveStates[app.State] && !partial(r) {
 				// The run ended: its result is on the application page.
 				http.Redirect(w, r, "/applications/"+appID.String(), http.StatusSeeOther) //nolint:gosec // a parsed UUID, always a local path
 				return
 			}
-			// Live but between two browser sessions for a moment: keep the focus, the picture connects when it can.
-			item := views.ActiveRunItem{AppID: appID.String(), JobID: app.JobID, Waiting: app.State == application.NeedsInput}
+			// Live (or just finished for an htmx status refresh): keep the focus meta current.
+			item := views.ActiveRunItem{AppID: appID.String(), JobID: app.JobID, Waiting: app.State == application.NeedsInput,
+				StateKey: "apps.state." + string(app.State), Tone: appTone(app.State), Live: liveStates[app.State]}
 			if s.Jobs != nil {
 				if j, err := s.Jobs.Detail(r.Context(), u.ID, app.JobID); err == nil {
 					item.JobTitle, item.Company = j.Title, j.Company
@@ -77,6 +78,10 @@ func (s *Server) livePage(w http.ResponseWriter, r *http.Request, u *identity.Us
 			}
 			d.Focus = &item
 		}
+	}
+	if partial(r) && d.Focus != nil {
+		s.render(w, r, http.StatusOK, views.LiveFocusMeta(*d.Focus))
+		return
 	}
 	s.render(w, r, http.StatusOK, views.LivePage(d))
 }

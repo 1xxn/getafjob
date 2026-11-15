@@ -362,6 +362,7 @@ templ appOverviewTab(d AppDetailData) {
 templ appLiveTab(d AppDetailData) {
 	if d.Live {
 		<div class="app-live">
+			<span hidden data-live-center></span>
 			@LiveScreen(LiveScreenProps{AppID: d.AppID, Size: "full", Controls: true, ReloadOnEnd: true})
 			<div class="app-actions">
 				<form method="post" action={ templ.URL("/applications/" + d.AppID + "/park") }>
@@ -461,7 +462,7 @@ templ appEvidenceTab(d AppDetailData) {
 }
 
 templ appNotesTab(d AppDetailData) {
-	<form method="post" action={ templ.URL("/tracker/" + d.AppID + "/notes") } class="app-notes" data-notes-form>
+	<form method="post" action={ templ.URL("/tracker/" + d.AppID + "/notes") } class="app-notes" data-notes-form data-dirty-guard>
 		<input type="hidden" name="back" value={ "/applications/" + d.AppID + "?tab=notes" }/>
 		@ui.Textarea(ui.TextareaProps{FieldProps: ui.FieldProps{ID: "app-notes", Name: "notes", Label: T(ctx, "apps.notes.text")},
 			Value: d.Notes.Notes, Rows: 6, MaxLength: 10000})

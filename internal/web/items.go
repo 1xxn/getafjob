@@ -65,9 +65,11 @@ func (s *Server) itemSaved(w http.ResponseWriter, r *http.Request, u *identity.U
 	case err == nil:
 		http.Redirect(w, r, back+"?saved=1", http.StatusSeeOther)
 	case errors.Is(err, profile.ErrInvalid):
+		w.Header().Set("HX-Replace-Url", back)
 		f.Errors, f.Notice, f.Failed = fieldErrors(r, err), views.T(r.Context(), "profile.invalid"), true
 		render(w, r, u, http.StatusUnprocessableEntity, f)
 	case errors.Is(err, profile.ErrTooManyItems):
+		w.Header().Set("HX-Replace-Url", back)
 		f.Notice, f.Failed = views.T(r.Context(), "profile.error.too_many"), true
 		render(w, r, u, http.StatusConflict, f)
 	case errors.Is(err, profile.ErrNotFound):

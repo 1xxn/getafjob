@@ -20,10 +20,11 @@ type DialogProps struct {
 	CloseLabel string
 	Drawer     bool // slides in from the side instead of centered
 	Start      bool // drawer on the start side (navigation) instead of the end side
+	Open       bool // start opened (e.g. re-rendering validation errors)
 }
 
 templ Dialog(p DialogProps) {
-	<dialog id={ p.ID } class={ "ui-dialog", templ.KV("ui-drawer", p.Drawer), templ.KV("ui-drawer-start", p.Drawer && p.Start) } aria-labelledby={ p.ID + "-title" } closedby="any">
+	<dialog id={ p.ID } class={ "ui-dialog", templ.KV("ui-drawer", p.Drawer), templ.KV("ui-drawer-start", p.Drawer && p.Start) } aria-labelledby={ p.ID + "-title" } closedby="any" open?={ p.Open }>
 		<header class="ui-dialog-head">
 			<h2 id={ p.ID + "-title" }>{ p.Title }</h2>
 			<button type="button" class="ui-btn ui-btn-ghost ui-btn-icon" aria-label={ p.CloseLabel } title={ p.CloseLabel } { CloseDialog(p.ID)... }>

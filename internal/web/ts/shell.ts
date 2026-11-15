@@ -255,7 +255,10 @@ document.addEventListener(
   (e) => {
     const form = e.target as HTMLFormElement;
     // The button that submits may carry its own question (a delete next to save).
-    const text = ((e as SubmitEvent).submitter as HTMLElement | null)?.dataset.confirm || form.dataset.confirm;
+    let text = ((e as SubmitEvent).submitter as HTMLElement | null)?.dataset.confirm || form.dataset.confirm;
+    if (!text && !form.hasAttribute('data-dirty') && dirty()) {
+      text = document.querySelector<HTMLElement>('[data-t-unsaved]')?.dataset.tUnsaved ?? '';
+    }
     if (!text || confirmed === form) {
       confirmed = null;
       return;
@@ -270,6 +273,7 @@ document.addEventListener(
     body.textContent = text;
     ok.onclick = () => {
       dialog.close();
+      for (const f of document.querySelectorAll<HTMLFormElement>('form[data-dirty]')) delete f.dataset.dirty;
       confirmed = form;
       form.requestSubmit(submitter instanceof HTMLButtonElement ? submitter : undefined);
     };

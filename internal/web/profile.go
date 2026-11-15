@@ -181,8 +181,10 @@ func (s *Server) stationFailed(w http.ResponseWriter, r *http.Request, u *identi
 	var ve *profile.ValidationError
 	switch {
 	case errors.Is(err, profile.ErrTooManyStations):
+		w.Header().Set("HX-Replace-Url", "/profile")
 		s.renderProfile(w, r, u, http.StatusUnprocessableEntity, views.T(r.Context(), "profile.station.too_many"), true)
 	case errors.As(err, &ve):
+		w.Header().Set("HX-Replace-Url", "/profile")
 		s.renderProfile(w, r, u, http.StatusUnprocessableEntity, views.T(r.Context(), "profile.station.invalid"), true)
 	default:
 		s.failed(w, r, u, err)
@@ -837,6 +839,7 @@ type secretNoticeKey struct{}
 // secret into the URL, and with it into the history, logs and referrers; the answer is never cached.
 func (s *Server) showSecret(w http.ResponseWriter, r *http.Request, u *identity.User, notice string) {
 	w.Header().Set("Cache-Control", "no-store")
+	w.Header().Set("HX-Replace-Url", "/settings/integrations")
 	r = r.WithContext(context.WithValue(r.Context(), secretNoticeKey{}, notice))
 	r.SetPathValue("section", "integrations")
 	s.preferencesPage(w, r, u)

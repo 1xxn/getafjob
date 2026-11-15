@@ -381,7 +381,7 @@ func AnswersPage(name string, h CandidateHead, f Form, d AnswersData) templ.Comp
 				}
 				return nil
 			})
-			templ_7745c5c3_Err = ui.Dialog(ui.DialogProps{ID: "dlg-answer", Title: T(ctx, "answers.add"), CloseLabel: T(ctx, "shell.close")}).Render(templ.WithChildren(ctx, templ_7745c5c3_Var13), templ_7745c5c3_Buffer)
+			templ_7745c5c3_Err = ui.Dialog(ui.DialogProps{ID: "dlg-answer", Title: T(ctx, "answers.add"), CloseLabel: T(ctx, "shell.close"), Open: len(f.Errors) > 0}).Render(templ.WithChildren(ctx, templ_7745c5c3_Var13), templ_7745c5c3_Buffer)
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
@@ -700,7 +700,7 @@ func TextsPage(name string, h CandidateHead, f Form, texts []TextRow, placeholde
 				}
 				return nil
 			})
-			templ_7745c5c3_Err = ui.Dialog(ui.DialogProps{ID: "dlg-text", Title: T(ctx, "texts.add"), CloseLabel: T(ctx, "shell.close")}).Render(templ.WithChildren(ctx, templ_7745c5c3_Var25), templ_7745c5c3_Buffer)
+			templ_7745c5c3_Err = ui.Dialog(ui.DialogProps{ID: "dlg-text", Title: T(ctx, "texts.add"), CloseLabel: T(ctx, "shell.close"), Open: len(f.Errors) > 0}).Render(templ.WithChildren(ctx, templ_7745c5c3_Var25), templ_7745c5c3_Buffer)
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}

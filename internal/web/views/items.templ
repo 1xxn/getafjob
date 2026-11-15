@@ -85,7 +85,7 @@ templ AnswersPage(name string, h CandidateHead, f Form, d AnswersData) {
 				</details>
 			}
 		</div>
-		@ui.Dialog(ui.DialogProps{ID: "dlg-answer", Title: T(ctx, "answers.add"), CloseLabel: T(ctx, "shell.close")}) {
+		@ui.Dialog(ui.DialogProps{ID: "dlg-answer", Title: T(ctx, "answers.add"), CloseLabel: T(ctx, "shell.close"), Open: len(f.Errors) > 0}) {
 			<form method="post" action="/answers" class="app-notes" data-dirty-guard>
 				@ui.Input(ui.InputProps{FieldProps: ui.FieldProps{Name: "question", Label: T(ctx, "answers.question"), Hint: T(ctx, "answers.question_hint"),
 					Error: f.Errors["question"]}, Value: f.Values["question"], MaxLength: 300, Attrs: templ.Attributes{"autofocus": true}})
@@ -153,7 +153,7 @@ templ TextsPage(name string, h CandidateHead, f Form, texts []TextRow, placehold
 				</details>
 			}
 		</div>
-		@ui.Dialog(ui.DialogProps{ID: "dlg-text", Title: T(ctx, "texts.add"), CloseLabel: T(ctx, "shell.close")}) {
+		@ui.Dialog(ui.DialogProps{ID: "dlg-text", Title: T(ctx, "texts.add"), CloseLabel: T(ctx, "shell.close"), Open: len(f.Errors) > 0}) {
 			<form method="post" action="/texts" class="app-notes" data-dirty-guard>
 				@ui.Input(ui.InputProps{FieldProps: ui.FieldProps{Name: "name", Label: T(ctx, "texts.name"), Error: f.Errors["name"]}, Value: f.Values["name"], MaxLength: 100,
 					Attrs: templ.Attributes{"autofocus": true}})
