@@ -1008,7 +1008,7 @@ func TestCVReviewAndImport(t *testing.T) {
 		t.Fatalf("review get %d: %s", rev.Code, rev.Body.String())
 	}
 	revBody := rev.Body.String()
-	for _, want := range []string{"Lead Platform Engineer", "Muster Cloud GmbH", "TU Berlin", "M.Sc.", "Computer Science", "Built cloud developer platform"} {
+	for _, want := range []string{"Lead Platform Engineer", "Muster Cloud GmbH", "TU Berlin", "M.Sc.", "Computer Science", "Built cloud developer platform", `name="prof_present"`, `name="prof_first_name"`, `name="prof_skills"`} {
 		if !strings.Contains(revBody, want) {
 			t.Errorf("review page lacks %q", want)
 		}
@@ -1055,6 +1055,43 @@ func TestCVReviewAndImport(t *testing.T) {
 	if rec := a.do(http.MethodPost, "/documents/"+docID+"/review", refused, session, nil); rec.Code != http.StatusUnprocessableEntity ||
 		!strings.Contains(rec.Body.String(), "were not saved") {
 		t.Errorf("refused entry %d: %s", rec.Code, rec.Body.String())
+	}
+}
+
+func TestCVReviewSavesEditedProfileFields(t *testing.T) {
+	a := newApp(t)
+	session := signedIn(t, a)
+	cv := cvDocx(t, "Max Mustermann", "10115 Berlin", "max.mustermann@example.org | +49 30 1234567",
+		"Skills", "Go, Kubernetes")
+	if rec := a.upload("cv", "cv.docx", cv, session); rec.Code != http.StatusSeeOther {
+		t.Fatalf("upload %d", rec.Code)
+	}
+	page := a.do(http.MethodGet, "/documents", nil, session, nil).Body.String()
+	idx := strings.Index(page, `href="/documents/`)
+	if idx < 0 {
+		t.Fatalf("no document in page: %s", page)
+	}
+	docID := page[idx+len(`href="/documents/`):][:36]
+
+	form := url.Values{
+		"exp_count":       {"0"},
+		"edu_count":       {"0"},
+		"include_profile": {"1"},
+		"prof_present":    {"1"},
+		"prof_first_name": {"Moritz"},
+		"prof_last_name":  {"Mustermann"},
+		"prof_skills":     {"Go, Rust"},
+		"prof_languages":  {"German: native, French: B2"},
+	}
+	saveRec := a.do(http.MethodPost, "/documents/"+docID+"/review", form, session, nil)
+	if saveRec.Code != http.StatusSeeOther || saveRec.Header().Get("Location") != "/profile?imported=1" {
+		t.Fatalf("review post %d: %s", saveRec.Code, saveRec.Body.String())
+	}
+	profBody := a.do(http.MethodGet, "/profile?imported=1", nil, session, nil).Body.String()
+	for _, want := range []string{`value="Moritz"`, "Rust", "French: B2"} {
+		if !strings.Contains(profBody, want) {
+			t.Errorf("profile lacks edited value %q", want)
+		}
 	}
 }
 

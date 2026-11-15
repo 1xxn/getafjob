@@ -94,22 +94,22 @@ templ DocumentReviewPage(p DocumentReviewProps) {
 				</div>
 				<div class="card rv-box">
 					@rvCheck("include_profile", T(ctx, "documents.review_profile_include"), true, true)
-					if len(p.Profile.Skills) > 0 {
-						<p class="muted rv-note rv-note-first">
-							<strong>{ T(ctx, "profile.field.skills") }:</strong> { strings.Join(p.Profile.Skills, ", ") }
-						</p>
-					}
-					if len(p.Profile.Languages) > 0 {
-						<p class="muted rv-note">
-							<strong>{ T(ctx, "profile.field.languages") }:</strong>
-							for j, lang := range p.Profile.Languages {
-								if j > 0 {
-									, 
-								}
-								{ lang.Name } ({ lang.Level })
-							}
-						</p>
-					}
+					<input type="hidden" name="prof_present" value="1"/>
+					<div class="grid rv-grid rv-mt-sm">
+						@ui.Input(rvInput(ctx, "profile.field.first_name", "prof_first_name", p.Profile.Personal.FirstName, 200, false))
+						@ui.Input(rvInput(ctx, "profile.field.last_name", "prof_last_name", p.Profile.Personal.LastName, 200, false))
+						@ui.Input(rvInput(ctx, "profile.field.email", "prof_email", p.Profile.Personal.Email, 200, false))
+						@ui.Input(rvInput(ctx, "profile.field.phone", "prof_phone", p.Profile.Personal.Phone, 50, false))
+						@ui.Input(rvInput(ctx, "profile.field.city", "prof_city", p.Profile.Personal.City, 200, false))
+						@ui.Input(rvInput(ctx, "profile.field.postal_code", "prof_postal_code", p.Profile.Personal.PostalCode, 20, false))
+						@ui.Input(rvInput(ctx, "profile.field.current_title", "prof_current_title", p.Profile.Work.CurrentTitle, 200, false))
+						@ui.Input(rvInput(ctx, "profile.field.current_employer", "prof_current_employer", p.Profile.Work.CurrentEmployer, 200, false))
+						@ui.Input(rvInput(ctx, "profile.field.linkedin", "prof_linkedin", p.Profile.Personal.LinkedIn, 200, false))
+						@ui.Input(rvInput(ctx, "profile.field.github", "prof_github", p.Profile.Personal.GitHub, 200, false))
+						@ui.Input(rvInput(ctx, "profile.field.website", "prof_website", p.Profile.Personal.Website, 200, false))
+						@ui.Input(rvInput(ctx, "profile.field.skills", "prof_skills", strings.Join(p.Profile.Skills, ", "), 2000, false))
+						@ui.Input(rvInput(ctx, "profile.field.languages", "prof_languages", joinLangs(p.Profile.Languages), 500, false))
+					</div>
 				</div>
 				<div class="rv-actions">
 					@ui.Button(ui.ButtonProps{Label: T(ctx, "documents.review_confirm"), Variant: "primary", Type: "submit"})
@@ -154,3 +154,14 @@ templ rvCheck(name, label string, checked, strong bool) {
 
 // bulletLines puts one description line per row.
 func bulletLines(b []string) string { return strings.Join(b, string(rune(10))) }
+
+func joinLangs(ls []profile.Language) string {
+	out := make([]string, 0, len(ls))
+	for _, l := range ls {
+		entry := strings.TrimSuffix(strings.TrimSpace(l.Name+": "+l.Level), ":")
+		if entry != "" {
+			out = append(out, entry)
+		}
+	}
+	return strings.Join(out, ", ")
+}

@@ -182,7 +182,7 @@ templ DashboardBody(d DashboardData) {
 							}
 						</ul>
 						if d.Parked > 5 {
-							<p class="dash-more"><a href="/pipeline">{ T(ctx, "dash.parked_more", "n", d.Parked-5) }</a></p>
+							<p class="dash-more"><a href="/applications?group=attention">{ T(ctx, "dash.parked_more", "n", d.Parked-5) }</a></p>
 						}
 					}
 				</section>

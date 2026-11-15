@@ -103,14 +103,14 @@ func DefaultPreferences(userID uuid.UUID, fallbackEmail string) Preferences {
 	now := time.Now()
 	return Preferences{
 		UserID:              userID,
-		EmailEnabled:        fallbackEmail != "",
+		EmailEnabled:        false,
 		EmailAddress:        fallbackEmail,
 		WebPushEnabled:      true,
 		NtfyEnabled:         false,
 		NtfyURL:             "https://ntfy.sh",
 		NtfyTopic:           "",
 		NtfyToken:           "",
-		DailySummaryEnabled: true,
+		DailySummaryEnabled: false,
 		DailySummaryTime:    "18:00",
 		QuietHoursEnabled:   false,
 		QuietHoursStart:     "22:00",

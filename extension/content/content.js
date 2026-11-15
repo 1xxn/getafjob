@@ -197,7 +197,11 @@
         label = el.getAttribute('aria-label').trim();
       }
 
-      const id = el.id || el.name || `field_${detected.length}`;
+      let id = el.id || el.name;
+      if (!id) {
+        id = `field_${detected.length}`;
+        el.setAttribute('data-gaj-assist-id', id);
+      }
       detected.push({
         id,
         name: el.name || id,
@@ -241,6 +245,15 @@
     });
   }
 
+  function escapeHTML(str) {
+    return String(str ?? '')
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;')
+      .replace(/'/g, '&#39;');
+  }
+
   function renderDock(data) {
     const existing = shadowRoot.querySelector('.dock, .fab');
     if (existing) existing.remove();
@@ -266,7 +279,7 @@
       if (data.missing_required && data.missing_required.length > 0) {
         const warn = document.createElement('div');
         warn.className = 'warning-box';
-        warn.innerHTML = `<strong>Missing required fields:</strong><br>${data.missing_required.map(m => `• ${m}`).join('<br>')}`;
+        warn.innerHTML = `<strong>Missing required fields:</strong><br>${data.missing_required.map(m => `• ${escapeHTML(m)}`).join('<br>')}`;
         body.appendChild(warn);
       }
 
@@ -276,10 +289,10 @@
           item.className = 'match-item';
           item.innerHTML = `
             <div class="match-label">
-              <span>${m.field_id}</span>
-              <span class="match-prov">${m.provenance}</span>
+              <span>${escapeHTML(m.field_id)}</span>
+              <span class="match-prov">${escapeHTML(m.provenance)}</span>
             </div>
-            <div class="match-val">${m.value}</div>
+            <div class="match-val">${escapeHTML(m.value)}</div>
           `;
           body.appendChild(item);
         }
@@ -331,22 +344,48 @@
         <button class="dock-close">✕</button>
       </div>
       <div class="dock-body">
-        <div class="warning-box">${msg}</div>
+        <div class="warning-box">${escapeHTML(msg)}</div>
       </div>
     `;
     dock.querySelector('.dock-close').addEventListener('click', renderFloatingButton);
     shadowRoot.appendChild(dock);
   }
 
+  function setNativeValue(el, value) {
+    const tag = el.tagName;
+    if (tag === 'INPUT' && (el.type === 'checkbox' || el.type === 'radio')) {
+      const checked = value === true || value === 'true' || value === '1' || value === 'yes' || value === 'on';
+      const setter = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, 'checked')?.set;
+      if (setter) {
+        setter.call(el, checked);
+      } else {
+        el.checked = checked;
+      }
+      return;
+    }
+    const proto = tag === 'TEXTAREA'
+      ? window.HTMLTextAreaElement.prototype
+      : tag === 'SELECT'
+        ? window.HTMLSelectElement.prototype
+        : window.HTMLInputElement.prototype;
+    const setter = Object.getOwnPropertyDescriptor(proto, 'value')?.set;
+    if (setter) {
+      setter.call(el, value);
+    } else {
+      el.value = value;
+    }
+  }
+
   function applyApprovedValues(matches) {
     for (const m of matches) {
-      let el = document.getElementById(m.field_id);
-      if (!el) {
-        el = document.querySelector(`[name="${m.field_id}"]`);
-      }
+      const rawId = String(m.field_id);
+      const escId = typeof CSS !== 'undefined' && CSS.escape ? CSS.escape(rawId) : rawId.replace(/["\\]/g, '\\$&');
+      const el = document.getElementById(m.field_id)
+        || document.querySelector(`[name="${escId}"]`)
+        || document.querySelector(`[data-gaj-assist-id="${escId}"]`);
       if (el) {
         el.focus();
-        el.value = m.value;
+        setNativeValue(el, m.value);
         el.dispatchEvent(new Event('input', { bubbles: true }));
         el.dispatchEvent(new Event('change', { bubbles: true }));
         el.blur();

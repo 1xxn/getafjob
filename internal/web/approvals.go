@@ -160,6 +160,7 @@ func (s *Server) approvalReview(w http.ResponseWriter, r *http.Request, u *ident
 			cv = s.buildCVVariantData(r.Context(), u.ID, j, "")
 		}
 	}
+	cv.ActionURL = "/approvals/" + d.AppID + "/cv"
 	s.render(w, r, http.StatusOK, views.ApprovalReview(d, cv))
 }
 
@@ -196,6 +197,16 @@ func (s *Server) approvalSetCV(w http.ResponseWriter, r *http.Request, u *identi
 	}
 
 	if partial(r) {
+		if s.Jobs != nil && s.Apps != nil {
+			if app, err := s.Apps.Get(r.Context(), u.ID, appID); err == nil {
+				if j, err := s.Jobs.Detail(r.Context(), u.ID, app.JobID); err == nil {
+					cv := s.buildCVVariantData(r.Context(), u.ID, j, views.T(r.Context(), "jobs.cv_switcher.saved"))
+					cv.ActionURL = "/approvals/" + appID.String() + "/cv"
+					s.render(w, r, http.StatusOK, views.CVVariantSwitcher(cv))
+					return
+				}
+			}
+		}
 		s.approvalsPage(w, r, u)
 		return
 	}

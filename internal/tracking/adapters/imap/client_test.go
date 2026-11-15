@@ -4,6 +4,7 @@ import (
 	"bufio"
 	"context"
 	"crypto/tls"
+	"encoding/base64"
 	"errors"
 	"fmt"
 	"net"
@@ -179,5 +180,92 @@ func TestPlaintextMailboxIsRefused(t *testing.T) {
 	err := c.TestConnection(t.Context(), tracking.MailboxAccount{Host: "imap.example.org", Port: 143}, "secret")
 	if !errors.Is(err, imap.ErrPlaintext) || dialed {
 		t.Fatalf("err = %v, dialed = %v; want ErrPlaintext without a dial", err, dialed)
+	}
+}
+
+func TestImapDecodesMIMEAndBoundedPeek(t *testing.T) {
+	ctx := context.Background()
+	clientConn, serverConn := net.Pipe()
+	defer clientConn.Close()
+	defer serverConn.Close()
+
+	var fetchCmd string
+	var wg sync.WaitGroup
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
+		reader := bufio.NewReader(serverConn)
+		_, _ = fmt.Fprintf(serverConn, "* OK Ready\r\n")
+		for {
+			line, err := reader.ReadString('\n')
+			if err != nil {
+				return
+			}
+			parts := strings.SplitN(strings.TrimSpace(line), " ", 2)
+			if len(parts) < 2 {
+				continue
+			}
+			tag, cmd := parts[0], parts[1]
+			switch {
+			case strings.HasPrefix(cmd, "LOGIN"), strings.HasPrefix(cmd, "EXAMINE"):
+				_, _ = fmt.Fprintf(serverConn, "%s OK done\r\n", tag)
+			case strings.HasPrefix(cmd, "UID SEARCH"):
+				_, _ = fmt.Fprintf(serverConn, "* SEARCH 201 202\r\n%s OK done\r\n", tag)
+			case strings.HasPrefix(cmd, "UID FETCH 201"):
+				fetchCmd = cmd
+				qpBody := "From: HR <hr@example.org>\r\n" +
+					"Subject: Interview Einladung\r\n" +
+					"Content-Type: multipart/mixed; boundary=\"mix\"\r\n" +
+					"\r\n" +
+					"--mix\r\n" +
+					"Content-Type: multipart/alternative; boundary=\"alt\"\r\n" +
+					"\r\n" +
+					"--alt\r\n" +
+					"Content-Type: text/plain; charset=utf-8\r\n" +
+					"Content-Transfer-Encoding: quoted-printable\r\n" +
+					"\r\n" +
+					"Hallo Max,=0D=0AWir laden Sie ein.\r\n" +
+					"--alt--\r\n" +
+					"--mix--\r\n"
+				_, _ = fmt.Fprintf(serverConn, "* 1 FETCH (UID 201 BODY[]<0> {%d}\r\n%s)\r\n%s OK done\r\n", len(qpBody), qpBody, tag)
+			case strings.HasPrefix(cmd, "UID FETCH 202"):
+				b64 := base64.StdEncoding.EncodeToString([]byte("<p>Absage f&uuml;r Ihre Bewerbung</p>"))
+				htmlMail := "From: Jobs <jobs@example.org>\r\n" +
+					"Subject: Update\r\n" +
+					"Content-Type: multipart/alternative; boundary=\"alt2\"\r\n" +
+					"\r\n" +
+					"--alt2\r\n" +
+					"Content-Type: text/html; charset=utf-8\r\n" +
+					"Content-Transfer-Encoding: base64\r\n" +
+					"\r\n" +
+					b64 + "\r\n" +
+					"--alt2--\r\n"
+				_, _ = fmt.Fprintf(serverConn, "* 2 FETCH (UID 202 BODY[]<0> {%d}\r\n%s)\r\n%s OK done\r\n", len(htmlMail), htmlMail, tag)
+			case strings.HasPrefix(cmd, "LOGOUT"):
+				_, _ = fmt.Fprintf(serverConn, "%s OK bye\r\n", tag)
+				return
+			}
+		}
+	}()
+
+	client := imap.NewClientWithDialer(func(_ context.Context, _, _ string, _ *tls.Config) (net.Conn, error) {
+		return clientConn, nil
+	})
+	msgs, _, _, err := client.FetchNewMessages(ctx, tracking.MailboxAccount{Host: "imap.example.org", Port: 993, TLS: true, Username: "u"}, "p")
+	wg.Wait()
+	if err != nil {
+		t.Fatalf("FetchNewMessages: %v", err)
+	}
+	if !strings.Contains(fetchCmd, "BODY.PEEK[]<0.65536>") {
+		t.Fatalf("expected bounded BODY.PEEK[]<0.65536>, got %q", fetchCmd)
+	}
+	if len(msgs) != 2 {
+		t.Fatalf("len(msgs) = %d, want 2", len(msgs))
+	}
+	if !strings.Contains(msgs[0].Body, "Hallo Max") || strings.Contains(msgs[0].Body, "=0D") {
+		t.Errorf("decoded QP nested body = %q", msgs[0].Body)
+	}
+	if !strings.Contains(msgs[1].Body, "Absage") || strings.Contains(msgs[1].Body, "<p>") {
+		t.Errorf("decoded base64 HTML fallback = %q", msgs[1].Body)
 	}
 }

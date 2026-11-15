@@ -1,6 +1,23 @@
 # TLS termination in front of serve. GETAFJOB_TLS_MODE: internal (local CA, development) or acme (production).
 {
 	admin localhost:2019
+	log default {
+		exclude admin.api
+		format filter {
+			wrap json
+			fields {
+				request>headers delete
+				request>remote_ip delete
+				request>client_ip delete
+				request>uri regexp "(?:(/login/link/|/invite/)[^?]+)|(\\?.*$)" "${1}[REDACTED]"
+			}
+		}
+	}
+	log admin_api {
+		include admin.api
+		level WARN
+		format json
+	}
 }
 
 (tls-internal) {

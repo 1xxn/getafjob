@@ -36,6 +36,9 @@ func Prepare(j Job, emb Embedder) *Prepared {
 		p.lang = "en"
 	}
 	p.salaryTop = salaryTop(j.Description)
+	if j.SalaryCurrency == "" || strings.EqualFold(j.SalaryCurrency, "EUR") || j.SalaryCurrency == "€" {
+		p.salaryTop = max(p.salaryTop, j.SalaryMax, j.SalaryMin)
+	}
 	p.years = yearsAsked(p.text)
 	p.level = levelOf(p.title)
 	if p.level == levelUnknown && p.years > 0 {

@@ -267,9 +267,9 @@ func spoken(list []Language) map[string]bool {
 	for _, l := range list {
 		var lang string
 		switch n := normalize(l.Name); {
-		case strings.Contains(n, " deutsch") || strings.Contains(n, " german"):
+		case n == " de " || strings.HasPrefix(n, " de ") || strings.Contains(n, " deutsch") || strings.Contains(n, " german"):
 			lang = "de"
-		case strings.Contains(n, " englisch") || strings.Contains(n, " english"):
+		case n == " en " || strings.HasPrefix(n, " en ") || strings.Contains(n, " englisch") || strings.Contains(n, " english"):
 			lang = "en"
 		default:
 			continue

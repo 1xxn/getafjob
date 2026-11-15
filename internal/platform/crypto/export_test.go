@@ -1,5 +1,7 @@
 package crypto
 
+import "time"
+
 // OpenWrapped exposes unwrap to the fuzz test.
 func OpenWrapped(k *Keyring, id string, b []byte) ([]byte, error) {
 	return k.unwrap(id, b, []byte("fuzz"))
@@ -12,4 +14,9 @@ func SealForTest(plain []byte) ([]byte, error) {
 		return nil, err
 	}
 	return seal(a, plain, nil)
+}
+
+// SetNowForTest overrides the clock of an Envelope for deterministic cache expiry tests.
+func SetNowForTest(e *Envelope, now func() time.Time) {
+	e.now = now
 }

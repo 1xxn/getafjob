@@ -58,14 +58,22 @@ func portalWorkplace(s string) discovery.Workplace {
 	}
 }
 
+func portalLocations(single string, many []string) []string {
+	if len(many) > 0 {
+		return many
+	}
+	return []string{or(single, "Germany")}
+}
+
 // LinkedIn searches public job listings via LinkedIn's guest search endpoint.
 type LinkedIn struct {
 	c *Client
 	conditional
-	Queries  []string
-	Location string
-	MaxPages int
-	Pause    time.Duration
+	Queries   []string
+	Location  string
+	Locations []string
+	MaxPages  int
+	Pause     time.Duration
 }
 
 // NewLinkedIn returns the LinkedIn source.
@@ -90,52 +98,55 @@ func (s *LinkedIn) Fetch(ctx context.Context) (discovery.Batch, error) {
 	seen := map[string]int{}
 	var out []discovery.Posting
 	var lastValidators discovery.Validators
-	for qi, q := range s.Queries {
-		for page := 0; page < s.MaxPages; page++ {
-			if qi > 0 || page > 0 {
-				if err := s.c.sleep(ctx, s.Pause); err != nil {
+	locs := portalLocations(s.Location, s.Locations)
+	for li, loc := range locs {
+		for qi, q := range s.Queries {
+			for page := 0; page < s.MaxPages; page++ {
+				if li > 0 || qi > 0 || page > 0 {
+					if err := s.c.sleep(ctx, s.Pause); err != nil {
+						return discovery.Batch{}, err
+					}
+				}
+				start := page * 25
+				vals := url.Values{"keywords": {q}, "location": {loc}, "start": {strconv.Itoa(start)}}
+				endpoint := "https://www.linkedin.com/jobs-guest/jobs/api/seeMoreJobPostings/search"
+
+				var b []byte
+				var next discovery.Validators
+				var notModified bool
+				var err error
+				if len(locs) == 1 && qi == 0 && page == 0 && (s.since.ETag != "" || s.since.LastModified != "") {
+					b, next, notModified, err = s.c.GetConditional(ctx, s.Name(), endpoint, vals, "text/html", s.since)
+					if notModified {
+						return discovery.Batch{NotModified: true, Validators: next}, nil
+					}
+				} else {
+					b, err = s.c.GetBytes(ctx, s.Name(), endpoint, vals, "text/html")
+				}
+				if Status(err) == http.StatusTooManyRequests && len(out) > 0 {
+					return discovery.Batch{Postings: out, Validators: lastValidators}, nil
+				}
+				if err != nil {
 					return discovery.Batch{}, err
 				}
-			}
-			start := page * 25
-			vals := url.Values{"keywords": {q}, "location": {s.Location}, "start": {strconv.Itoa(start)}}
-			endpoint := "https://www.linkedin.com/jobs-guest/jobs/api/seeMoreJobPostings/search"
-
-			var b []byte
-			var next discovery.Validators
-			var notModified bool
-			var err error
-			if qi == 0 && page == 0 && (s.since.ETag != "" || s.since.LastModified != "") {
-				b, next, notModified, err = s.c.GetConditional(ctx, s.Name(), endpoint, vals, "text/html", s.since)
-				if notModified {
-					return discovery.Batch{NotModified: true, Validators: next}, nil
+				if next.ETag != "" || next.LastModified != "" {
+					lastValidators = next
 				}
-			} else {
-				b, err = s.c.GetBytes(ctx, s.Name(), endpoint, vals, "text/html")
-			}
-			if Status(err) == http.StatusTooManyRequests && len(out) > 0 {
-				return discovery.Batch{Postings: out, Validators: lastValidators}, nil
-			}
-			if err != nil {
-				return discovery.Batch{}, err
-			}
-			if next.ETag != "" || next.LastModified != "" {
-				lastValidators = next
-			}
-			postings := parseLinkedInSearch(b, s.Name())
-			if len(postings) == 0 {
-				break
-			}
-			for _, p := range postings {
-				if i, dup := seen[p.ExternalID]; dup {
-					out[i] = p
-					continue
+				postings := parseLinkedInSearch(b, s.Name())
+				if len(postings) == 0 {
+					break
 				}
-				seen[p.ExternalID] = len(out)
-				out = append(out, p)
-			}
-			if len(postings) < 25 {
-				break
+				for _, p := range postings {
+					if i, dup := seen[p.ExternalID]; dup {
+						out[i] = p
+						continue
+					}
+					seen[p.ExternalID] = len(out)
+					out = append(out, p)
+				}
+				if len(postings) < 25 {
+					break
+				}
 			}
 		}
 	}
@@ -256,10 +267,11 @@ func parseLinkedInSearch(b []byte, src string) []discovery.Posting {
 type Indeed struct {
 	c *Client
 	conditional
-	Queries  []string
-	Location string
-	MaxPages int
-	Pause    time.Duration
+	Queries   []string
+	Location  string
+	Locations []string
+	MaxPages  int
+	Pause     time.Duration
 }
 
 // NewIndeed returns the Indeed source.
@@ -284,52 +296,55 @@ func (s *Indeed) Fetch(ctx context.Context) (discovery.Batch, error) {
 	seen := map[string]int{}
 	var out []discovery.Posting
 	var lastValidators discovery.Validators
-	for qi, q := range s.Queries {
-		for page := 0; page < s.MaxPages; page++ {
-			if qi > 0 || page > 0 {
-				if err := s.c.sleep(ctx, s.Pause); err != nil {
+	locs := portalLocations(s.Location, s.Locations)
+	for li, loc := range locs {
+		for qi, q := range s.Queries {
+			for page := 0; page < s.MaxPages; page++ {
+				if li > 0 || qi > 0 || page > 0 {
+					if err := s.c.sleep(ctx, s.Pause); err != nil {
+						return discovery.Batch{}, err
+					}
+				}
+				start := page * 10
+				vals := url.Values{"q": {q}, "l": {loc}, "start": {strconv.Itoa(start)}, "fromage": {"14"}}
+				endpoint := "https://www.indeed.com/jobs"
+
+				var b []byte
+				var next discovery.Validators
+				var notModified bool
+				var err error
+				if len(locs) == 1 && qi == 0 && page == 0 && (s.since.ETag != "" || s.since.LastModified != "") {
+					b, next, notModified, err = s.c.GetConditional(ctx, s.Name(), endpoint, vals, "text/html,application/json", s.since)
+					if notModified {
+						return discovery.Batch{NotModified: true, Validators: next}, nil
+					}
+				} else {
+					b, err = s.c.GetBytes(ctx, s.Name(), endpoint, vals, "text/html,application/json")
+				}
+				if Status(err) == http.StatusTooManyRequests && len(out) > 0 {
+					return discovery.Batch{Postings: out, Validators: lastValidators}, nil
+				}
+				if err != nil {
 					return discovery.Batch{}, err
 				}
-			}
-			start := page * 10
-			vals := url.Values{"q": {q}, "l": {s.Location}, "start": {strconv.Itoa(start)}, "fromage": {"14"}}
-			endpoint := "https://www.indeed.com/jobs"
-
-			var b []byte
-			var next discovery.Validators
-			var notModified bool
-			var err error
-			if qi == 0 && page == 0 && (s.since.ETag != "" || s.since.LastModified != "") {
-				b, next, notModified, err = s.c.GetConditional(ctx, s.Name(), endpoint, vals, "text/html,application/json", s.since)
-				if notModified {
-					return discovery.Batch{NotModified: true, Validators: next}, nil
+				if next.ETag != "" || next.LastModified != "" {
+					lastValidators = next
 				}
-			} else {
-				b, err = s.c.GetBytes(ctx, s.Name(), endpoint, vals, "text/html,application/json")
-			}
-			if Status(err) == http.StatusTooManyRequests && len(out) > 0 {
-				return discovery.Batch{Postings: out, Validators: lastValidators}, nil
-			}
-			if err != nil {
-				return discovery.Batch{}, err
-			}
-			if next.ETag != "" || next.LastModified != "" {
-				lastValidators = next
-			}
-			postings := parseIndeedSearch(b, s.Name())
-			if len(postings) == 0 {
-				break
-			}
-			for _, p := range postings {
-				if i, dup := seen[p.ExternalID]; dup {
-					out[i] = p
-					continue
+				postings := parseIndeedSearch(b, s.Name())
+				if len(postings) == 0 {
+					break
 				}
-				seen[p.ExternalID] = len(out)
-				out = append(out, p)
-			}
-			if len(postings) < 10 {
-				break
+				for _, p := range postings {
+					if i, dup := seen[p.ExternalID]; dup {
+						out[i] = p
+						continue
+					}
+					seen[p.ExternalID] = len(out)
+					out = append(out, p)
+				}
+				if len(postings) < 10 {
+					break
+				}
 			}
 		}
 	}
@@ -511,10 +526,11 @@ func parseIndeedSearch(b []byte, src string) []discovery.Posting {
 type Glassdoor struct {
 	c *Client
 	conditional
-	Queries  []string
-	Location string
-	MaxPages int
-	Pause    time.Duration
+	Queries   []string
+	Location  string
+	Locations []string
+	MaxPages  int
+	Pause     time.Duration
 }
 
 // NewGlassdoor returns the Glassdoor source.
@@ -539,48 +555,51 @@ func (s *Glassdoor) Fetch(ctx context.Context) (discovery.Batch, error) {
 	seen := map[string]int{}
 	var out []discovery.Posting
 	var lastValidators discovery.Validators
-	for qi, q := range s.Queries {
-		for page := 1; page <= s.MaxPages; page++ {
-			if qi > 0 || page > 1 {
-				if err := s.c.sleep(ctx, s.Pause); err != nil {
+	locs := portalLocations(s.Location, s.Locations)
+	for li, loc := range locs {
+		for qi, q := range s.Queries {
+			for page := 1; page <= s.MaxPages; page++ {
+				if li > 0 || qi > 0 || page > 1 {
+					if err := s.c.sleep(ctx, s.Pause); err != nil {
+						return discovery.Batch{}, err
+					}
+				}
+				vals := url.Values{"sc.keyword": {q}, "locKeyword": {loc}, "page": {strconv.Itoa(page)}}
+				endpoint := "https://www.glassdoor.com/Job/jobs.htm"
+
+				var b []byte
+				var next discovery.Validators
+				var notModified bool
+				var err error
+				if len(locs) == 1 && qi == 0 && page == 1 && (s.since.ETag != "" || s.since.LastModified != "") {
+					b, next, notModified, err = s.c.GetConditional(ctx, s.Name(), endpoint, vals, "text/html,application/json", s.since)
+					if notModified {
+						return discovery.Batch{NotModified: true, Validators: next}, nil
+					}
+				} else {
+					b, err = s.c.GetBytes(ctx, s.Name(), endpoint, vals, "text/html,application/json")
+				}
+				if Status(err) == http.StatusTooManyRequests && len(out) > 0 {
+					return discovery.Batch{Postings: out, Validators: lastValidators}, nil
+				}
+				if err != nil {
 					return discovery.Batch{}, err
 				}
-			}
-			vals := url.Values{"sc.keyword": {q}, "locKeyword": {s.Location}, "page": {strconv.Itoa(page)}}
-			endpoint := "https://www.glassdoor.com/Job/jobs.htm"
-
-			var b []byte
-			var next discovery.Validators
-			var notModified bool
-			var err error
-			if qi == 0 && page == 1 && (s.since.ETag != "" || s.since.LastModified != "") {
-				b, next, notModified, err = s.c.GetConditional(ctx, s.Name(), endpoint, vals, "text/html,application/json", s.since)
-				if notModified {
-					return discovery.Batch{NotModified: true, Validators: next}, nil
+				if next.ETag != "" || next.LastModified != "" {
+					lastValidators = next
 				}
-			} else {
-				b, err = s.c.GetBytes(ctx, s.Name(), endpoint, vals, "text/html,application/json")
-			}
-			if Status(err) == http.StatusTooManyRequests && len(out) > 0 {
-				return discovery.Batch{Postings: out, Validators: lastValidators}, nil
-			}
-			if err != nil {
-				return discovery.Batch{}, err
-			}
-			if next.ETag != "" || next.LastModified != "" {
-				lastValidators = next
-			}
-			postings := parseGlassdoorSearch(b, s.Name())
-			if len(postings) == 0 {
-				break
-			}
-			for _, p := range postings {
-				if i, dup := seen[p.ExternalID]; dup {
-					out[i] = p
-					continue
+				postings := parseGlassdoorSearch(b, s.Name())
+				if len(postings) == 0 {
+					break
 				}
-				seen[p.ExternalID] = len(out)
-				out = append(out, p)
+				for _, p := range postings {
+					if i, dup := seen[p.ExternalID]; dup {
+						out[i] = p
+						continue
+					}
+					seen[p.ExternalID] = len(out)
+					out = append(out, p)
+				}
 			}
 		}
 	}

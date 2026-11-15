@@ -127,6 +127,10 @@ SET checked_at = EXCLUDED.checked_at, recheck_at = EXCLUDED.recheck_at, result =
 UPDATE boards
 SET last_crawled_at = sqlc.arg(at),
     last_error      = nullif(sqlc.arg(last_error)::text, ''),
+    company         = CASE WHEN sqlc.arg(company)::text <> ''
+                            AND (boards.company = '' OR lower(boards.company) = lower(replace(replace(boards.slug, '-', ' '), '_', ' ')))
+                           THEN sqlc.arg(company)::text
+                           ELSE boards.company END,
     etag            = CASE WHEN sqlc.arg(last_error)::text = '' THEN nullif(sqlc.arg(etag)::text, '') ELSE etag END,
     last_modified   = CASE WHEN sqlc.arg(last_error)::text = '' THEN nullif(sqlc.arg(last_modified)::text, '') ELSE last_modified END
 WHERE id = sqlc.arg(id);

@@ -39,8 +39,12 @@ func (s *Store) OpenJobs(ctx context.Context, afterID int64, limit int) ([]match
 	}
 	out := make([]matching.Job, len(rows))
 	for i, r := range rows {
-		out[i] = matching.Job{ID: r.ID, Company: r.Company, Title: r.Title, Location: r.Location,
-			Workplace: r.Workplace, Description: r.Description, Posted: date(r.Posted), FirstSeen: r.FirstSeen}
+		out[i] = matching.Job{
+			ID: r.ID, Company: r.Company, Title: r.Title, Location: r.Location,
+			Workplace: r.Workplace, Description: r.Description,
+			SalaryMin: int(r.SalaryMin), SalaryMax: int(r.SalaryMax), SalaryCurrency: r.SalaryCurrency,
+			Posted: date(r.Posted), FirstSeen: r.FirstSeen,
+		}
 	}
 	return out, nil
 }

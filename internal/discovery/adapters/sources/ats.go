@@ -79,7 +79,7 @@ func (s *Greenhouse) Fetch(ctx context.Context) (discovery.Batch, error) {
 			location = join("; ", location, o)
 		}
 		out = append(out, discovery.Posting{
-			Source: s.Name(), ExternalID: id(j.ID), Company: or(j.Company, company), Title: strings.TrimSpace(j.Title),
+			Source: s.Name(), ExternalID: id(j.ID), Company: boardCompany(s.company, j.Company, s.board, company), Title: strings.TrimSpace(j.Title),
 			Location: location, URL: j.URL, Description: htmltext.Text(j.Content), Posted: day(or(j.Published, j.Updated)),
 		})
 	}
@@ -271,7 +271,7 @@ func (s *SmartRecruiters) Fetch(ctx context.Context) (discovery.Batch, error) {
 				wp = discovery.WorkplaceHybrid
 			}
 			out = append(out, discovery.Posting{
-				Source: s.Name(), ExternalID: j.ID, Company: or(s.company, or(j.Company.Name, s.id)),
+				Source: s.Name(), ExternalID: j.ID, Company: boardCompany(s.company, j.Company.Name, s.id, s.id),
 				Title: strings.TrimSpace(j.Name), Location: or(j.Location.Full, join(", ", j.Location.City, j.Location.Country)),
 				URL:    "https://jobs.smartrecruiters.com/" + url.PathEscape(s.id) + "/" + url.PathEscape(j.ID),
 				Posted: day(j.Released), Workplace: wp,
@@ -367,7 +367,7 @@ func (s *Personio) Fetch(ctx context.Context) (discovery.Batch, error) {
 			extra = nil
 		}
 		out = append(out, discovery.Posting{
-			Source: s.Name(), ExternalID: pid, Company: or(s.company, or(p.Subcompany, pretty(s.slug))),
+			Source: s.Name(), ExternalID: pid, Company: boardCompany(s.company, p.Subcompany, s.slug, pretty(s.slug)),
 			Title: strings.TrimSpace(p.Name), Location: join("; ", append([]string{p.Office}, p.Offices...)...),
 			URL: host + "/job/" + url.PathEscape(pid), Description: join("\n\n", texts...), Posted: day(p.CreatedAt),
 			Extra: extra,
@@ -421,7 +421,7 @@ func (s *Recruitee) Fetch(ctx context.Context) (discovery.Batch, error) {
 			wp = discovery.WorkplaceHybrid
 		}
 		out = append(out, discovery.Posting{
-			Source: s.Name(), ExternalID: id(j.ID), Company: or(s.company, or(j.Company, pretty(s.slug))),
+			Source: s.Name(), ExternalID: id(j.ID), Company: boardCompany(s.company, j.Company, s.slug, pretty(s.slug)),
 			Title: strings.TrimSpace(j.Title), Location: or(join(", ", j.City, j.Country), j.Location),
 			URL: j.URL, ApplyURL: j.ApplyURL, Description: htmltext.Text(j.Description + "\n" + j.Requirements),
 			Posted: day(j.Published), Workplace: wp,
@@ -467,7 +467,7 @@ func (s *Workable) Fetch(ctx context.Context) (discovery.Batch, error) {
 			wp = discovery.WorkplaceRemote
 		}
 		out = append(out, discovery.Posting{
-			Source: s.Name(), ExternalID: or(j.Shortcode, or(j.Code, j.URL)), Company: or(s.company, or(data.Name, pretty(s.slug))),
+			Source: s.Name(), ExternalID: or(j.Shortcode, or(j.Code, j.URL)), Company: boardCompany(s.company, data.Name, s.slug, pretty(s.slug)),
 			Title: strings.TrimSpace(j.Title), Location: join(", ", j.City, j.Country), URL: j.URL, ApplyURL: j.ApplyURL,
 			Description: htmltext.Text(j.Description), Posted: day(j.Published), Workplace: wp,
 		})

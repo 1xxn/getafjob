@@ -6,6 +6,7 @@ import (
 	"encoding/base64"
 	"errors"
 	"testing"
+	"time"
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
@@ -160,5 +161,53 @@ func TestSealRefusesHugePlaintext(t *testing.T) {
 	}
 	if _, err := crypto.SealForTest(make([]byte, 1024)); err != nil {
 		t.Fatal(err)
+	}
+}
+
+func TestEnvelopeCache(t *testing.T) {
+	pool := dbtest.AppPool(t)
+	ctx := t.Context()
+	ring, err := crypto.NewKeyring(newKey(t), "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	now := time.Date(2026, 11, 15, 1, 0, 0, 0, time.UTC)
+	env := crypto.NewEnvelope(ring, pool)
+	crypto.SetNowForTest(env, func() time.Time { return now })
+
+	u := user(t, pool, "cache@example.org")
+	plain := []byte("cached secret")
+	ct, err := env.Seal(ctx, u, "p", plain)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Remove the DB key row to prove subsequent Open hits the in-memory cache within TTL.
+	if err := db.InUserTx(ctx, pool, u, func(tx pgx.Tx) error {
+		_, err := tx.Exec(ctx, "DELETE FROM user_keys WHERE user_id = $1", u)
+		return err
+	}); err != nil {
+		t.Fatal(err)
+	}
+	if got, err := env.Open(ctx, u, "p", ct); err != nil || !bytes.Equal(got, plain) {
+		t.Fatalf("cached open = %q, %v", got, err)
+	}
+
+	// Expiry evicts the entry and reads from DB (which now has no key).
+	now = now.Add(6 * time.Minute)
+	if _, err := env.Open(ctx, u, "p", ct); !errors.Is(err, crypto.ErrNoKey) {
+		t.Fatalf("after TTL expiry err = %v, want ErrNoKey", err)
+	}
+
+	// Re-create key, warm cache, then Forget invalidates it immediately.
+	ct2, err := env.Seal(ctx, u, "p", plain)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if ok, err := env.Forget(ctx, u); err != nil || !ok {
+		t.Fatalf("forget = %v, %v", ok, err)
+	}
+	if _, err := env.Open(ctx, u, "p", ct2); !errors.Is(err, crypto.ErrNoKey) {
+		t.Fatalf("after forget err = %v, want ErrNoKey", err)
 	}
 }

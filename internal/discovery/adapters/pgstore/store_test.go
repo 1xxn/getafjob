@@ -591,3 +591,64 @@ func TestCrawlRechecksImports(t *testing.T) {
 		}
 	}
 }
+
+func TestMultiCityDoesNotMergeCrossCity(t *testing.T) {
+	st := pgstore.New(dbtest.AppPool(t))
+	ctx, now := context.Background(), time.Now()
+	berlinID, _, err := st.UpsertPosting(ctx, posting("greenhouse:acme", "1", "ACME GmbH", "Backend Engineer", "Berlin"), now)
+	if err != nil || berlinID == 0 {
+		t.Fatalf("berlin insert = %d, %v", berlinID, err)
+	}
+	munichID, ch, err := st.UpsertPosting(ctx, posting("linkedin", "99", "ACME", "Backend Engineer (m/w/d)", "Munich"), now)
+	if err != nil {
+		t.Fatalf("munich upsert = %v", err)
+	}
+	if munichID == berlinID || ch != discovery.ChangeNew {
+		t.Fatalf("munich posting merged into berlin (%d vs %d, change=%s)", munichID, berlinID, ch)
+	}
+	sameCityID, _, err := st.UpsertPosting(ctx, posting("arbeitnow", "77", "ACME", "Backend Engineer (m/w/d)", "Berlin, Germany"), now)
+	if err != nil || sameCityID != berlinID {
+		t.Fatalf("same city = %d, %v; want %d", sameCityID, err, berlinID)
+	}
+}
+
+func TestSaveBoardStatesUpdatesSlugCompany(t *testing.T) {
+	pool := dbtest.AppPool(t)
+	ctx := context.Background()
+	st := pgstore.New(pool)
+	if _, _, err := st.ImportBoards(ctx, []discovery.Board{
+		{ATS: "greenhouse", Slug: "addepar1", Company: "Addepar1"},
+		{ATS: "greenhouse", Slug: "realtimeboardglobal", Company: "Miro"},
+	}); err != nil {
+		t.Fatal(err)
+	}
+	boards, err := st.EnabledBoards(ctx)
+	if err != nil || len(boards) != 2 {
+		t.Fatalf("boards = %+v, %v", boards, err)
+	}
+	bySlug := map[string]int64{}
+	for _, b := range boards {
+		bySlug[b.Slug] = b.ID
+	}
+	at := time.Date(2026, 11, 15, 1, 0, 0, 0, time.UTC)
+	if err := st.SaveBoardStates(ctx, []discovery.BoardState{
+		{ID: bySlug["addepar1"], Company: "Addepar"},
+		{ID: bySlug["realtimeboardglobal"], Company: "Realtime Board Inc."},
+	}, at); err != nil {
+		t.Fatal(err)
+	}
+	after, err := st.EnabledBoards(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	got := map[string]string{}
+	for _, b := range after {
+		got[b.Slug] = b.Company
+	}
+	if got["addepar1"] != "Addepar" {
+		t.Errorf("addepar1 company = %q, want %q", got["addepar1"], "Addepar")
+	}
+	if got["realtimeboardglobal"] != "Miro" {
+		t.Errorf("realtimeboardglobal company = %q, want %q (explicit name kept)", got["realtimeboardglobal"], "Miro")
+	}
+}

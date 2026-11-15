@@ -1,5 +1,8 @@
 -- name: OpenJobsPage :many
-SELECT id, company, title, location, workplace, description, posted, first_seen FROM jobs
+SELECT id, company, title, location, workplace, description,
+  coalesce(salary_min, 0)::integer AS salary_min,
+  coalesce(salary_max, 0)::integer AS salary_max,
+  salary_currency, posted, first_seen FROM jobs
 WHERE status = 'open' AND id > $1 ORDER BY id LIMIT $2;
 
 -- name: SaveMatches :exec
