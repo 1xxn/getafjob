@@ -236,6 +236,13 @@ templ FitInspector(d FitData) {
 	</div>
 }
 
+func cvActionURL(d CVVariantData) string {
+	if d.ActionURL != "" {
+		return d.ActionURL
+	}
+	return "/jobs/" + i64(d.JobID) + "/cv"
+}
+
 templ CVVariantSwitcher(d CVVariantData) {
 	<div id="cv-switcher">
 		@ui.Card(ui.CardProps{Title: T(ctx, "jobs.cv_switcher.title"), Subtitle: T(ctx, "jobs.cv_switcher.hint")}) {
@@ -247,8 +254,8 @@ templ CVVariantSwitcher(d CVVariantData) {
 			} else {
 				<form
 					method="post"
-					action={ templ.URL("/jobs/" + i64(d.JobID) + "/cv") }
-					{ HX(ctx, "hx-post", "/jobs/" + i64(d.JobID) + "/cv", "hx-target", "#cv-switcher", "hx-swap", "outerHTML transition:false", "hx-trigger", "change")... }
+					action={ templ.URL(cvActionURL(d)) }
+					{ HX(ctx, "hx-post", cvActionURL(d), "hx-target", "#cv-switcher", "hx-swap", "outerHTML transition:false", "hx-trigger", "change")... }
 				>
 					<fieldset class="ui-fieldset">
 						<legend class="ui-sr">{ T(ctx, "jobs.cv_switcher.title") }</legend>

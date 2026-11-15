@@ -489,14 +489,19 @@ const saveBoardState = `-- name: SaveBoardState :exec
 UPDATE boards
 SET last_crawled_at = $1,
     last_error      = nullif($2::text, ''),
-    etag            = CASE WHEN $2::text = '' THEN nullif($3::text, '') ELSE etag END,
-    last_modified   = CASE WHEN $2::text = '' THEN nullif($4::text, '') ELSE last_modified END
-WHERE id = $5
+    company         = CASE WHEN $3::text <> ''
+                            AND (boards.company = '' OR lower(boards.company) = lower(replace(replace(boards.slug, '-', ' '), '_', ' ')))
+                           THEN $3::text
+                           ELSE boards.company END,
+    etag            = CASE WHEN $2::text = '' THEN nullif($4::text, '') ELSE etag END,
+    last_modified   = CASE WHEN $2::text = '' THEN nullif($5::text, '') ELSE last_modified END
+WHERE id = $6
 `
 
 type SaveBoardStateParams struct {
 	At           *time.Time
 	LastError    string
+	Company      string
 	Etag         string
 	LastModified string
 	ID           int64
@@ -507,6 +512,7 @@ func (q *Queries) SaveBoardState(ctx context.Context, arg SaveBoardStateParams) 
 	_, err := q.db.Exec(ctx, saveBoardState,
 		arg.At,
 		arg.LastError,
+		arg.Company,
 		arg.Etag,
 		arg.LastModified,
 		arg.ID,

@@ -412,14 +412,17 @@ func criteriaFromSnapshot(snap profile.Snapshot) matching.Criteria {
 
 func matchingJob(j matching.Detail) matching.Job {
 	return matching.Job{
-		ID:          j.JobID,
-		Company:     j.Company,
-		Title:       j.Title,
-		Location:    j.Location,
-		Workplace:   j.Workplace,
-		Description: j.Description,
-		Posted:      j.Posted,
-		FirstSeen:   j.FirstSeen,
+		ID:             j.JobID,
+		Company:        j.Company,
+		Title:          j.Title,
+		Location:       j.Location,
+		Workplace:      j.Workplace,
+		Description:    j.Description,
+		SalaryMin:      j.SalaryMin,
+		SalaryMax:      j.SalaryMax,
+		SalaryCurrency: j.SalaryCurrency,
+		Posted:         j.Posted,
+		FirstSeen:      j.FirstSeen,
 	}
 }
 

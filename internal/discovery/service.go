@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"sort"
+	"strings"
 	"sync"
 	"time"
 )
@@ -50,6 +51,8 @@ type Report struct {
 	// Validators per source that answered; save them only after the crawl succeeded, or the next crawl may skip
 	// changes it never stored.
 	Validators map[string]Validators
+	// Companies records the first non-empty posting company per crawled source.
+	Companies map[string]string
 }
 
 type fetched struct {
@@ -80,7 +83,7 @@ func (s *Service) Crawl(ctx context.Context, sources []Source) (rep Report, err 
 		return Report{}, err
 	}
 	rep = Report{RunID: runID, Stats: Stats{Changes: map[Change]int{}}, Errors: map[string]string{},
-		Validators: map[string]Validators{}}
+		Validators: map[string]Validators{}, Companies: map[string]string{}}
 	defer func() {
 		if err == nil {
 			return
@@ -147,6 +150,9 @@ func (s *Service) Crawl(ctx context.Context, sources []Source) (rep Report, err 
 	for _, it := range items {
 		if it.p.Stub {
 			continue // no details this time (cap or failure); the next crawl tries again
+		}
+		if c := strings.TrimSpace(it.p.Company); c != "" && rep.Companies[it.src.Name()] == "" {
+			rep.Companies[it.src.Name()] = c
 		}
 		if err := ctx.Err(); err != nil {
 			return rep, err

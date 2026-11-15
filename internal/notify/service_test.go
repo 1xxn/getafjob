@@ -368,3 +368,28 @@ func TestPreferencesInvalid(t *testing.T) {
 		t.Errorf("Invalid() = %q, want %q", got, want)
 	}
 }
+
+func TestFreshAccountSendsNoNotificationMailByDefault(t *testing.T) {
+	ctx := context.Background()
+	u := uuid.New()
+	st := newFakeStore()
+	st.emails[u] = "fresh@example.org"
+	_ = st.SavePreferences(ctx, notify.DefaultPreferences(u, "fresh@example.org"))
+
+	em := &fakeEmailClient{}
+	wp := &fakeWebPushClient{}
+	svc := notify.NewService(st, nil, em, wp, "https://app.example.org", nil)
+	svc.SetNow(func() time.Time { return time.Date(2026, 11, 15, 18, 15, 0, 0, time.UTC) })
+
+	if err := svc.Notify(ctx, notify.Notification{
+		UserID: u, Event: notify.EventApprovalQueued, Title: "Approval needed", Body: "Check", URL: "/approvals",
+	}); err != nil {
+		t.Fatal(err)
+	}
+	if sent, err := svc.CheckAndSendDailySummaries(ctx); err != nil || sent != 0 {
+		t.Fatalf("CheckAndSendDailySummaries = %d, %v; want 0", sent, err)
+	}
+	if len(em.sentTo) != 0 {
+		t.Fatalf("fresh account sent emails = %v, want none", em.sentTo)
+	}
+}

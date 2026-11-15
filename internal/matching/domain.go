@@ -33,14 +33,17 @@ type Language struct {
 
 // Job is the part of a job that matching reads.
 type Job struct {
-	ID          int64
-	Company     string
-	Title       string
-	Location    string
-	Workplace   string // remote, hybrid, onsite or empty
-	Description string
-	Posted      time.Time // zero: unknown
-	FirstSeen   time.Time
+	ID             int64
+	Company        string
+	Title          string
+	Location       string
+	Workplace      string // remote, hybrid, onsite or empty
+	Description    string
+	SalaryMin      int
+	SalaryMax      int
+	SalaryCurrency string
+	Posted         time.Time // zero: unknown
+	FirstSeen      time.Time
 }
 
 // Decision is what getafjob suggests for a job.

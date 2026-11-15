@@ -9,6 +9,7 @@ import (
 	"encoding/json"
 	"errors"
 	"slices"
+	"strings"
 	"time"
 
 	"github.com/jackc/pgx/v5"
@@ -182,7 +183,7 @@ func sameJob(ctx context.Context, qs *q.Queries, p discovery.Posting, mk string)
 		return nil, err
 	}
 	for i := range rows {
-		if rows[i].Source != p.Source {
+		if rows[i].Source != p.Source && compatibleLocation(rows[i].Location, p.Location) {
 			return &rows[i], nil
 		}
 	}
@@ -194,6 +195,22 @@ func sameJob(ctx context.Context, qs *q.Queries, p discovery.Posting, mk string)
 		}
 	}
 	return nil, nil
+}
+
+func compatibleLocation(a, b string) bool {
+	fa, fb := discovery.Fold(a), discovery.Fold(b)
+	if fa == "" || fb == "" || fa == fb || strings.Contains(fa, fb) || strings.Contains(fb, fa) {
+		return true
+	}
+	ca, cb := primaryCity(fa), primaryCity(fb)
+	return ca != "" && ca == cb
+}
+
+func primaryCity(folded string) string {
+	if i := strings.IndexAny(folded, ",;/|("); i >= 0 {
+		folded = folded[:i]
+	}
+	return strings.TrimSpace(folded)
 }
 
 func updateParams(id int64, fp, mk, hash string, p discovery.Posting, alt []string, merge bool, at time.Time) q.UpdateJobParams {
@@ -438,7 +455,8 @@ func (s *Store) SaveBoardStates(ctx context.Context, states []discovery.BoardSta
 	return s.system(ctx, func(qs *q.Queries) error {
 		for _, st := range states {
 			if err := qs.SaveBoardState(ctx, q.SaveBoardStateParams{
-				ID: st.ID, At: &at, LastError: st.Error, Etag: st.Validators.ETag, LastModified: st.Validators.LastModified,
+				ID: st.ID, At: &at, LastError: st.Error, Company: st.Company,
+				Etag: st.Validators.ETag, LastModified: st.Validators.LastModified,
 			}); err != nil {
 				return err
 			}

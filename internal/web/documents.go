@@ -316,17 +316,23 @@ func (s *Server) documentReviewSave(w http.ResponseWriter, r *http.Request, u *i
 	}
 
 	if r.PostFormValue("include_profile") != "" {
-		parsed, err := s.Importer.Extract(r.Context(), u.ID, id)
-		if err != nil {
-			s.failed(w, r, u, err)
-			return
+		var importedProf profile.Profile
+		if r.PostFormValue("prof_present") != "" {
+			importedProf = readReviewedProfile(r)
+		} else {
+			parsed, err := s.Importer.Extract(r.Context(), u.ID, id)
+			if err != nil {
+				s.failed(w, r, u, err)
+				return
+			}
+			importedProf = parsed.Profile
 		}
 		snap, err := s.Profile.Get(r.Context(), u.ID)
 		if err != nil {
 			s.failed(w, r, u, err)
 			return
 		}
-		if err := s.Profile.SaveProfile(r.Context(), u.ID, cvimport.Merge(snap.Profile, parsed.Profile), snap.Version); !refused(err) {
+		if err := s.Profile.SaveProfile(r.Context(), u.ID, cvimport.Merge(snap.Profile, importedProf), snap.Version); !refused(err) {
 			s.failed(w, r, u, err)
 			return
 		}
@@ -345,4 +351,51 @@ func formCount(r *http.Request, name string) int {
 		return 0
 	}
 	return n
+}
+
+func readReviewedProfile(r *http.Request) profile.Profile {
+	v := func(name string) string { return strings.TrimSpace(r.PostFormValue(name)) }
+	splitList := func(raw string) []string {
+		var out []string
+		for _, part := range strings.FieldsFunc(raw, func(c rune) bool { return c == ',' || c == '\n' || c == '\r' }) {
+			if s := strings.TrimSpace(part); s != "" {
+				out = append(out, s)
+			}
+		}
+		return out
+	}
+	var langs []profile.Language
+	for _, entry := range splitList(v("prof_languages")) {
+		var name, level string
+		if n, l, ok := strings.Cut(entry, ":"); ok {
+			name, level = strings.TrimSpace(n), strings.TrimSpace(l)
+		} else if i := strings.IndexByte(entry, '('); i > 0 {
+			name = strings.TrimSpace(entry[:i])
+			level = strings.TrimSpace(strings.TrimSuffix(entry[i+1:], ")"))
+		} else {
+			name = entry
+		}
+		if name != "" {
+			langs = append(langs, profile.Language{Name: name, Level: level})
+		}
+	}
+	return profile.Profile{
+		Personal: profile.Personal{
+			FirstName:  v("prof_first_name"),
+			LastName:   v("prof_last_name"),
+			Email:      v("prof_email"),
+			Phone:      v("prof_phone"),
+			City:       v("prof_city"),
+			PostalCode: v("prof_postal_code"),
+			LinkedIn:   v("prof_linkedin"),
+			GitHub:     v("prof_github"),
+			Website:    v("prof_website"),
+		},
+		Work: profile.Work{
+			CurrentTitle:    v("prof_current_title"),
+			CurrentEmployer: v("prof_current_employer"),
+		},
+		Skills:    splitList(v("prof_skills")),
+		Languages: langs,
+	}
 }

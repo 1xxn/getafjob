@@ -71,14 +71,17 @@ func (a *AppMatchEvaluator) EvaluateAndSave(ctx context.Context, userID uuid.UUI
 	m := matching.NewMatcher(criteria, nil)
 	posted, _ := time.Parse(time.DateOnly, p.Posted)
 	mj := matching.Job{
-		ID:          jobID,
-		Company:     p.Company,
-		Title:       p.Title,
-		Location:    p.Location,
-		Workplace:   string(p.Workplace),
-		Description: p.Description,
-		Posted:      posted,
-		FirstSeen:   at,
+		ID:             jobID,
+		Company:        p.Company,
+		Title:          p.Title,
+		Location:       p.Location,
+		Workplace:      string(p.Workplace),
+		Description:    p.Description,
+		SalaryMin:      p.SalaryMin,
+		SalaryMax:      p.SalaryMax,
+		SalaryCurrency: p.SalaryCurrency,
+		Posted:         posted,
+		FirstSeen:      at,
 	}
 	res := m.Evaluate(mj, at)
 	return a.matching.SaveMatches(ctx, userID, []matching.Result{res}, at)

@@ -489,3 +489,44 @@ func TestNoLeaseInMaintenance(t *testing.T) {
 		t.Fatalf("lease after maintenance: %v", err)
 	}
 }
+
+type countingData struct {
+	calls atomic.Int32
+}
+
+func (c *countingData) RunData(ctx context.Context, _ uuid.UUID, _ int64) (*runnerv1.Run, error) {
+	c.calls.Add(1)
+	return data{}.RunData(ctx, uuid.Nil, 0)
+}
+
+func (c *countingData) Document(ctx context.Context, u uuid.UUID, id string) ([]byte, error) {
+	return data{}.Document(ctx, u, id)
+}
+
+func TestFetchDocumentUsesLeaseAllowlist(t *testing.T) {
+	pool, apps, c, _, srv := setupWithServer(t)
+	cd := &countingData{}
+	srv.Data = cd
+	ctx := t.Context()
+	reg, err := c.Register(with(ctx, secret), &runnerv1.RegisterRequest{Version: "test"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	queue(t, pool, apps)
+	l, err := c.Lease(with(ctx, secret), &runnerv1.LeaseRequest{RunnerId: reg.GetRunnerId()})
+	if err != nil || l.GetRun() == nil {
+		t.Fatalf("lease: %v", err)
+	}
+	tok := l.GetRun().GetToken()
+	docID := l.GetRun().GetDocuments()[0].GetId()
+	resp, err := c.FetchDocument(with(ctx, tok), &runnerv1.FetchDocumentRequest{DocumentId: docID})
+	if err != nil || len(resp.GetContent()) == 0 {
+		t.Fatalf("FetchDocument = %v, %v", resp, err)
+	}
+	if _, err := c.FetchDocument(with(ctx, tok), &runnerv1.FetchDocumentRequest{DocumentId: "0192f3a4-5b6c-7d8e-9f01-0000000000ff"}); codeOf(err) != connect.CodePermissionDenied {
+		t.Fatalf("unauthorized doc err = %v, want PermissionDenied", err)
+	}
+	if got := cd.calls.Load(); got != 1 {
+		t.Fatalf("RunData calls = %d, want 1 (only from Lease)", got)
+	}
+}

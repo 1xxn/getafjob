@@ -166,11 +166,21 @@ func crawlSources(ctx context.Context, c *sources.Client, boards discovery.Board
 		if len(terms.Cities) > 0 {
 			out = append(out, sources.NewArbeitsagentur(c, terms.Queries, terms.Cities))
 		}
-		loc := "Germany"
+		locs := []string{"Germany"}
 		if len(terms.Cities) > 0 {
-			loc = terms.Cities[0] + ", Germany"
+			n := min(len(terms.Cities), 5)
+			locs = make([]string, n)
+			for i, city := range terms.Cities[:n] {
+				locs[i] = city + ", Germany"
+			}
 		}
-		out = append(out, sources.NewLinkedIn(c, terms.Queries, loc), sources.NewIndeed(c, terms.Queries, loc), sources.NewGlassdoor(c, terms.Queries, loc))
+		li := sources.NewLinkedIn(c, terms.Queries, locs[0])
+		li.Locations = locs
+		in := sources.NewIndeed(c, terms.Queries, locs[0])
+		in.Locations = locs
+		gd := sources.NewGlassdoor(c, terms.Queries, locs[0])
+		gd.Locations = locs
+		out = append(out, li, in, gd)
 	}
 	list, err := boards.EnabledBoards(ctx)
 	if err != nil {
@@ -196,7 +206,7 @@ func crawlSources(ctx context.Context, c *sources.Client, boards discovery.Board
 func boardStates(ids map[string]int64, rep discovery.Report) []discovery.BoardState {
 	out := make([]discovery.BoardState, 0, len(ids))
 	for name, id := range ids {
-		out = append(out, discovery.BoardState{ID: id, Error: rep.Errors[name], Validators: rep.Validators[name]})
+		out = append(out, discovery.BoardState{ID: id, Company: rep.Companies[name], Error: rep.Errors[name], Validators: rep.Validators[name]})
 	}
 	slices.SortFunc(out, func(a, b discovery.BoardState) int { return cmp.Compare(a.ID, b.ID) })
 	return out

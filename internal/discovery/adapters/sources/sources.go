@@ -148,6 +148,20 @@ func pretty(slug string) string {
 	return strings.Join(words, " ")
 }
 
+// slugName reports whether company is empty or derived purely from slug.
+func slugName(company, slug string) bool {
+	c := strings.TrimSpace(company)
+	return c == "" || strings.EqualFold(c, slug) || strings.EqualFold(c, pretty(slug))
+}
+
+// boardCompany chooses between a configured board company name and one discovered from the ATS payload.
+func boardCompany(configured, discovered, slug, fallback string) string {
+	if slugName(configured, slug) {
+		return or(discovered, or(configured, fallback))
+	}
+	return or(configured, or(discovered, fallback))
+}
+
 // join joins the non-empty, trimmed parts.
 func join(sep string, parts ...string) string {
 	out := make([]string, 0, len(parts))

@@ -6,6 +6,8 @@ import (
 	"context"
 	"crypto/rand"
 	"errors"
+	"slices"
+	"sync"
 	"time"
 
 	"github.com/google/uuid"
@@ -19,20 +21,31 @@ import (
 // ErrNoKey reports that a user has no data key (never created, or forgotten: the data is gone).
 var ErrNoKey = errors.New("user has no data key")
 
-// rotateBatch bounds the keys re-wrapped per transaction.
-const rotateBatch = 500
+const (
+	// rotateBatch bounds the keys re-wrapped per transaction.
+	rotateBatch = 500
+	// cacheTTL bounds how long an unwrapped per-user data key is kept in memory.
+	cacheTTL = 5 * time.Minute
+)
+
+type cachedKey struct {
+	dk      []byte
+	expires time.Time
+}
 
 // Envelope seals and opens data per user. Data keys live in user_keys (row-level security), wrapped with the
 // master key; they are created on first use.
 type Envelope struct {
-	ring *Keyring
-	pool *pgxpool.Pool
-	now  func() time.Time
+	ring  *Keyring
+	pool  *pgxpool.Pool
+	now   func() time.Time
+	mu    sync.RWMutex
+	cache map[uuid.UUID]cachedKey
 }
 
 // NewEnvelope returns an envelope over the keys in pool.
 func NewEnvelope(ring *Keyring, pool *pgxpool.Pool) *Envelope {
-	return &Envelope{ring: ring, pool: pool, now: time.Now}
+	return &Envelope{ring: ring, pool: pool, now: time.Now, cache: make(map[uuid.UUID]cachedKey)}
 }
 
 // keyAAD binds a wrapped data key to its user.
@@ -80,10 +93,23 @@ func (e *Envelope) Forget(ctx context.Context, userID uuid.UUID) (bool, error) {
 		n, err = q.New(tx).DeleteDataKey(ctx, userID)
 		return err
 	})
+	if err == nil {
+		e.mu.Lock()
+		delete(e.cache, userID)
+		e.mu.Unlock()
+	}
 	return n > 0, err
 }
 
 func (e *Envelope) dataKey(ctx context.Context, userID uuid.UUID, create bool) ([]byte, error) {
+	e.mu.RLock()
+	if c, ok := e.cache[userID]; ok && e.now().Before(c.expires) {
+		dk := slices.Clone(c.dk)
+		e.mu.RUnlock()
+		return dk, nil
+	}
+	e.mu.RUnlock()
+
 	var dk []byte
 	err := db.InUserTx(ctx, e.pool, userID, func(tx pgx.Tx) error {
 		qs := q.New(tx)
@@ -103,7 +129,16 @@ func (e *Envelope) dataKey(ctx context.Context, userID uuid.UUID, create bool) (
 		dk, err = e.ring.unwrap(row.MasterKeyID, row.Wrapped, keyAAD(userID))
 		return err
 	})
-	return dk, err
+	if err != nil {
+		return nil, err
+	}
+	e.mu.Lock()
+	if e.cache == nil {
+		e.cache = make(map[uuid.UUID]cachedKey)
+	}
+	e.cache[userID] = cachedKey{dk: slices.Clone(dk), expires: e.now().Add(cacheTTL)}
+	e.mu.Unlock()
+	return dk, nil
 }
 
 func (e *Envelope) createKey(ctx context.Context, qs *q.Queries, userID uuid.UUID) error {
@@ -121,6 +156,9 @@ func (e *Envelope) createKey(ctx context.Context, qs *q.Queries, userID uuid.UUI
 // Rotate re-wraps every data key that is not wrapped with the current master key (the old key must be in the
 // keyring). It returns the number of keys re-wrapped; the data itself is not touched.
 func (e *Envelope) Rotate(ctx context.Context) (int, error) {
+	e.mu.Lock()
+	clear(e.cache)
+	e.mu.Unlock()
 	total := 0
 	for {
 		n := 0

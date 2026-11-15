@@ -74,6 +74,7 @@ type CVVariantItem struct {
 // CVVariantData holds the CV variant switcher data.
 type CVVariantData struct {
 	JobID      int64
+	ActionURL  string
 	Variants   []CVVariantItem
 	SelectedID string
 	Notice     string

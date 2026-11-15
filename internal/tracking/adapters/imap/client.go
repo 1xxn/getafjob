@@ -7,11 +7,13 @@ import (
 	"bufio"
 	"context"
 	"crypto/tls"
+	"encoding/base64"
 	"errors"
 	"fmt"
 	"io"
 	"mime"
 	"mime/multipart"
+	"mime/quotedprintable"
 	"net"
 	"net/mail"
 	"net/textproto"
@@ -150,6 +152,13 @@ func (c *Client) connect(ctx context.Context, acc tracking.MailboxAccount) (net.
 	return c.dial(ctx, "tcp", addr, &tls.Config{ServerName: acc.Host, MinVersion: tls.VersionTLS12})
 }
 
+const (
+	// commandTimeout bounds every individual IMAP command/read cycle once connected.
+	commandTimeout = 30 * time.Second
+	// maxFetchBytes caps how much of each message BODY.PEEK requests so large attachments are never downloaded.
+	maxFetchBytes = 64 * 1024
+)
+
 type session struct {
 	conn   net.Conn
 	reader *bufio.Reader
@@ -163,17 +172,25 @@ func newSession(conn net.Conn) *session {
 	}
 }
 
+func (s *session) bumpDeadline(d time.Duration) {
+	if s.conn != nil {
+		_ = s.conn.SetDeadline(time.Now().Add(d))
+	}
+}
+
 func (s *session) nextTag() string {
 	s.tagNum++
 	return fmt.Sprintf("A%04d", s.tagNum)
 }
 
 func (s *session) sendCommand(cmd string) error {
+	s.bumpDeadline(commandTimeout)
 	_, err := fmt.Fprintf(s.conn, "%s\r\n", cmd)
 	return err
 }
 
 func (s *session) readGreeting() error {
+	s.bumpDeadline(commandTimeout)
 	line, err := s.reader.ReadString('\n')
 	if err != nil {
 		return err
@@ -290,17 +307,18 @@ func (s *session) searchNewUIDs(lastUID uint32) ([]uint32, error) {
 	}
 }
 
-// fetchMessagePeek fetches the message headers and body text using BODY.PEEK so \Seen is NEVER set.
+// fetchMessagePeek fetches the message headers and bounded body text using BODY.PEEK so \Seen is NEVER set.
 func (s *session) fetchMessagePeek(uid uint32) (tracking.EmailMessage, error) {
 	tag := s.nextTag()
-	// RFC 3501: BODY.PEEK does NOT set \Seen flag
-	cmd := fmt.Sprintf("%s UID FETCH %d (UID RFC822.SIZE BODY.PEEK[])", tag, uid)
+	// RFC 3501: BODY.PEEK does NOT set \Seen flag; <0.N> bounds transfer size to headers + first N bytes.
+	cmd := fmt.Sprintf("%s UID FETCH %d (UID RFC822.SIZE BODY.PEEK[]<0.%d>)", tag, uid, maxFetchBytes)
 	if err := s.sendCommand(cmd); err != nil {
 		return tracking.EmailMessage{}, err
 	}
 
 	var rawRFC822 []byte
 	for {
+		s.bumpDeadline(commandTimeout)
 		line, err := s.reader.ReadString('\n')
 		if err != nil {
 			return tracking.EmailMessage{}, err
@@ -313,7 +331,7 @@ func (s *session) fetchMessagePeek(uid uint32) (tracking.EmailMessage, error) {
 			end := strings.LastIndex(line, "}")
 			if start >= 0 && end > start {
 				sizeStr := line[start+1 : end]
-				if size, err := strconv.Atoi(sizeStr); err == nil && size > 0 {
+				if size, err := strconv.Atoi(sizeStr); err == nil && size > 0 && size <= 1<<20 {
 					buf := make([]byte, size)
 					if _, err := io.ReadFull(s.reader, buf); err == nil {
 						rawRFC822 = buf
@@ -375,47 +393,82 @@ func parseRawEmail(uid uint32, raw []byte) (tracking.EmailMessage, error) {
 	}, nil
 }
 
-// extractPlainText parses multipart or plain text email bodies.
+// extractPlainText parses multipart (including nested alternatives) or single-part email bodies,
+// decoding Content-Transfer-Encoding and falling back to stripped text/html when no text/plain part exists.
 func extractPlainText(header mail.Header, r io.Reader) string {
-	contentType := header.Get("Content-Type")
+	plain, html := extractMIME(header.Get("Content-Type"), header.Get("Content-Transfer-Encoding"), r, 0)
+	if plain != "" {
+		return plain
+	}
+	return html
+}
+
+func extractMIME(contentType, cte string, r io.Reader, depth int) (plain, html string) {
+	if depth > 4 {
+		return "", ""
+	}
 	if contentType == "" {
-		b, _ := io.ReadAll(io.LimitReader(r, 64*1024))
-		return string(b)
+		return decodePartBody(r, cte), ""
 	}
 
 	mediaType, params, err := mime.ParseMediaType(contentType)
 	if err != nil {
-		b, _ := io.ReadAll(io.LimitReader(r, 64*1024))
-		return string(b)
+		return decodePartBody(r, cte), ""
 	}
 
 	if strings.HasPrefix(mediaType, "multipart/") {
-		mr := multipart.NewReader(r, params["boundary"])
-		var plainBuilder strings.Builder
+		boundary := params["boundary"]
+		if boundary == "" {
+			return "", ""
+		}
+		mr := multipart.NewReader(r, boundary)
+		var plains, htmls []string
 		for {
 			p, err := mr.NextPart()
 			if err != nil {
 				break
 			}
-			partType, _, _ := mime.ParseMediaType(p.Header.Get("Content-Type"))
-			if partType == "text/plain" {
-				b, _ := io.ReadAll(io.LimitReader(p, 32*1024))
-				plainBuilder.Write(b)
-				plainBuilder.WriteString("\n")
+			subPlain, subHTML := extractMIME(
+				p.Header.Get("Content-Type"),
+				p.Header.Get("Content-Transfer-Encoding"),
+				p,
+				depth+1,
+			)
+			_ = p.Close()
+			if subPlain != "" {
+				plains = append(plains, subPlain)
+			}
+			if subHTML != "" {
+				htmls = append(htmls, subHTML)
 			}
 		}
-		if plainBuilder.Len() > 0 {
-			return plainBuilder.String()
-		}
-		return ""
+		return strings.Join(plains, "\n"), strings.Join(htmls, "\n")
 	}
 
-	b, _ := io.ReadAll(io.LimitReader(r, 64*1024))
-	raw := string(b)
-	if mediaType == "text/html" {
-		return stripHTML(raw)
+	raw := decodePartBody(r, cte)
+	switch mediaType {
+	case "text/plain":
+		return raw, ""
+	case "text/html":
+		return "", stripHTML(raw)
+	default:
+		return "", ""
 	}
-	return raw
+}
+
+func decodePartBody(r io.Reader, cte string) string {
+	limited := io.LimitReader(r, maxFetchBytes)
+	switch strings.ToLower(strings.TrimSpace(cte)) {
+	case "quoted-printable":
+		b, _ := io.ReadAll(io.LimitReader(quotedprintable.NewReader(limited), maxFetchBytes))
+		return string(b)
+	case "base64":
+		b, _ := io.ReadAll(io.LimitReader(base64.NewDecoder(base64.StdEncoding, limited), maxFetchBytes))
+		return string(b)
+	default:
+		b, _ := io.ReadAll(limited)
+		return string(b)
+	}
 }
 
 func stripHTML(s string) string {

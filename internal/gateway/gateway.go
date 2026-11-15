@@ -142,6 +142,7 @@ type runStepState struct {
 	at      time.Time
 	adapter string
 	portal  string
+	docs    []string
 }
 
 type runnerIdentity struct {
@@ -445,7 +446,11 @@ func (s *Server) Lease(ctx context.Context, req *runnerv1.LeaseRequest) (*runner
 	urls := append([]string{run.GetStartUrl()}, run.GetOrigins()...)
 	adapter := ats.Detect("", urls...)
 	_ = s.Runs.SetAdapter(ctx, ref, adapter)
-	s.runSteps.Store(ref.RunID, runStepState{at: time.Now(), adapter: adapter, portal: run.GetPortal()})
+	docIDs := make([]string, 0, len(run.GetDocuments()))
+	for _, d := range run.GetDocuments() {
+		docIDs = append(docIDs, d.GetId())
+	}
+	s.runSteps.Store(ref.RunID, runStepState{at: time.Now(), adapter: adapter, portal: run.GetPortal(), docs: docIDs})
 	s.Logger.InfoContext(ctx, "run leased", "run", l.RunID, "runner", runnerID, "host", l.Host)
 	return &runnerv1.LeaseResponse{Run: run}, nil
 }
@@ -456,16 +461,27 @@ func (s *Server) FetchDocument(ctx context.Context, req *runnerv1.FetchDocumentR
 	if err != nil {
 		return nil, err
 	}
-	app, err := s.Apps.Get(ctx, ref.UserID, ref.AppID)
-	if err != nil {
-		return nil, err
-	}
-	run, err := s.Data.RunData(ctx, ref.UserID, app.JobID)
-	if err != nil {
-		return nil, err
-	}
 	id := req.GetDocumentId()
-	if !slices.ContainsFunc(run.GetDocuments(), func(d *runnerv1.Document) bool { return d.GetId() == id }) {
+	allowed := false
+	cached := false
+	if val, ok := s.runSteps.Load(ref.RunID); ok {
+		if docs := val.(runStepState).docs; docs != nil {
+			cached = true
+			allowed = slices.Contains(docs, id)
+		}
+	}
+	if !cached {
+		app, err := s.Apps.Get(ctx, ref.UserID, ref.AppID)
+		if err != nil {
+			return nil, err
+		}
+		run, err := s.Data.RunData(ctx, ref.UserID, app.JobID)
+		if err != nil {
+			return nil, err
+		}
+		allowed = slices.ContainsFunc(run.GetDocuments(), func(d *runnerv1.Document) bool { return d.GetId() == id })
+	}
+	if !allowed {
 		return nil, connect.NewError(connect.CodePermissionDenied, "not a document of this run")
 	}
 	b, err := s.Data.Document(ctx, ref.UserID, id)
@@ -743,7 +759,7 @@ func (s *Server) recordStepDuration(ctx context.Context, ref application.RunRef,
 	}
 	st := val.(runStepState)
 	took := time.Since(st.at)
-	s.runSteps.Store(ref.RunID, runStepState{at: time.Now(), adapter: st.adapter, portal: st.portal})
+	s.runSteps.Store(ref.RunID, runStepState{at: time.Now(), adapter: st.adapter, portal: st.portal, docs: st.docs})
 	if h := s.histogram(); h != nil {
 		h.Record(ctx, took.Seconds(), metric.WithAttributes(
 			attribute.String("step", step),

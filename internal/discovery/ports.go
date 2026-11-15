@@ -102,6 +102,7 @@ type Board struct {
 // then stay as they were).
 type BoardState struct {
 	ID         int64
+	Company    string
 	Validators Validators
 	Error      string
 }

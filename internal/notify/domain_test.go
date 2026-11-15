@@ -101,3 +101,13 @@ func TestFormatSummary(t *testing.T) {
 		t.Errorf("German summary: %q %q", title, body)
 	}
 }
+
+func TestDefaultPreferencesOptInEmail(t *testing.T) {
+	p := notify.DefaultPreferences(uuid.New(), "user@example.org")
+	if p.EmailEnabled {
+		t.Errorf("DefaultPreferences.EmailEnabled = true, want false")
+	}
+	if p.DailySummaryEnabled {
+		t.Errorf("DefaultPreferences.DailySummaryEnabled = true, want false")
+	}
+}

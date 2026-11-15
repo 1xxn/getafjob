@@ -74,3 +74,20 @@ func TestSimilarityInWords(t *testing.T) {
 		}
 	}
 }
+
+func TestStructuredSalaryAndISOLanguageCodes(t *testing.T) {
+	p := Prepare(Job{
+		Title:          "Backend Engineer",
+		Description:    "Wir entwickeln Cloud-Systeme in Go.",
+		SalaryMin:      70000,
+		SalaryMax:      90000,
+		SalaryCurrency: "EUR",
+	}, nil)
+	if p.salaryTop != 90000 {
+		t.Fatalf("salaryTop = %d, want 90000", p.salaryTop)
+	}
+	langs := spoken([]Language{{Name: "de-DE", Level: "C2"}, {Name: "en", Level: "C1"}})
+	if !langs["de"] || !langs["en"] {
+		t.Fatalf("spoken = %+v, want both de and en", langs)
+	}
+}
