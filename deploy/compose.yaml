@@ -171,7 +171,7 @@ services:
 
   # Development only (profile dev): catches all mail; web UI on http://127.0.0.1:8025.
   mailpit:
-    image: axllent/mailpit:v1.33.0@sha256:9b3a463be15354c0f0eba91697d80e3e0d8a5623ef0e627cacc836bc17fd5231
+    image: axllent/mailpit:v1.33.1@sha256:aef2aacc11f075ec0fb6874275ee4a421e688e11a96ebb296134d1735c7761ce
     profiles: [dev]
     read_only: true
     tmpfs: [/tmp]
@@ -186,7 +186,7 @@ services:
 
   caddy:
     <<: *hardening
-    image: caddy:2.11.7-alpine@sha256:e70b164da81ef698b3ad19af799ea6086ce6d9e48ed4079eb9fe26f6fbf14ee5
+    image: caddy:2.11.9-alpine@sha256:003a97808e781aa9f7e75cc2f43d34d461099031faf5e20faefb9f61126836f0
     cap_add: [NET_BIND_SERVICE]
     environment:
       GETAFJOB_DOMAIN: ${GETAFJOB_DOMAIN:-localhost}
@@ -210,7 +210,7 @@ services:
 
   # Observability profile: Prometheus, Tempo, Loki, Grafana and OpenTelemetry collector.
   otel-collector:
-    image: otel/opentelemetry-collector-contrib:0.164.0@sha256:340c9ca6a36617084c6661bdc4f0fe92b7cda5a805d61673ec8db375fddc522b
+    image: otel/opentelemetry-collector-contrib:0.165.0@sha256:e40d61f10c9a617cca1ffd1be4d7e2b3a4b0f0001798ff07e58cabe82e618cea
     profiles: [observability]
     read_only: true
     cap_drop: [ALL]
@@ -224,7 +224,7 @@ services:
     restart: unless-stopped
 
   prometheus:
-    image: prom/prometheus:v3.15.1@sha256:fa3302279710be2f21a8301ec17a8b4f2301fd829bd113839b3b6b02b6f191a2
+    image: prom/prometheus:v3.16.0@sha256:e04987641b57704f408e31f6373ba4138ecf27cb4a165d24aabb6c38fddd0f06
     profiles: [observability]
     read_only: true
     cap_drop: [ALL]
@@ -257,7 +257,7 @@ services:
     restart: unless-stopped
 
   loki:
-    image: grafana/loki:3.7.9@sha256:0db216b630ae1f348a1584c67f3cead8b4c1fc839169a39501db664744158e28
+    image: grafana/loki:3.7.10@sha256:b43c257ccfc925d4a50b8717cac61a3b51df8c48d01847936057e5c4075a24a7
     profiles: [observability]
     read_only: true
     cap_drop: [ALL]
@@ -272,7 +272,7 @@ services:
     restart: unless-stopped
 
   grafana:
-    image: grafana/grafana:13.3.0@sha256:488984b716c0862639f91a698adbe2862677a5a07bad42da5f03f3030883b205
+    image: grafana/grafana:13.3.1@sha256:0615ec4fbd4072004b7d86b46ded63013a74b7d6eb1119273dd89e8fa25c13cf
     profiles: [observability]
     read_only: true
     cap_drop: [ALL]
