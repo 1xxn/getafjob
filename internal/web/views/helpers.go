@@ -90,3 +90,15 @@ func anyWaiting(runs []ActiveRunItem) bool {
 
 // DayLabel is a short date for the reader's locale, as the dashboard shows it.
 func DayLabel(ctx context.Context, t time.Time) string { return dayLabel(ctx, t) }
+
+// ScoreLabel turns a numeric match score into a plain fit label.
+func ScoreLabel(ctx context.Context, score int) string {
+	switch {
+	case score >= 80:
+		return T(ctx, "match.fit.very_good")
+	case score >= 60:
+		return T(ctx, "match.fit.good")
+	default:
+		return T(ctx, "match.fit.maybe")
+	}
+}
