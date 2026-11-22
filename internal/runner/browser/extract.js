@@ -3,9 +3,8 @@
 // CAPTCHA signals.
 (frameIndex) => {
   const W = window;
-  if (!W.__gaj) W.__gaj = { n: 0, byKey: {}, labels: {} };
+  if (!W.__gaj) W.__gaj = { n: 0, byKey: {} };
   if (!W.__gaj.byKey) W.__gaj.byKey = {};
-  if (!W.__gaj.labels) W.__gaj.labels = {};
   const PREFIX = `${frameIndex}-`;
   const clean = (s) => (s || "").replace(/\s+/g, " ").trim();
   const textOf = (el) => (el ? clean(el.innerText || el.textContent || "") : "");
@@ -129,13 +128,6 @@
     if (key) W.__gaj.byKey[key] = id;
     el.setAttribute("data-gaj", id);
     return id;
-  };
-  const stableLabel = (id, rawLabel) => {
-    const l = clean(rawLabel);
-    if (l && !W.__gaj.labels[id]) {
-      W.__gaj.labels[id] = l;
-    }
-    return W.__gaj.labels[id] || l;
   };
 
   const lookup = (root, id) => {
@@ -271,7 +263,7 @@
         const id = tag(el);
         let rawLabel = labelOf(el) || contextLabel(el.parentElement || el);
         if (!rawLabel || GENERIC_UPLOAD_RX.test(rawLabel.split(" | ")[0].trim())) rawLabel = uploadContext(el) || rawLabel;
-        const label = stableLabel(id, rawLabel);
+        const label = rawLabel;
         fields.push({ id, kind: "file", label, required: isRequired(el, label), accept: el.accept || "",
           name: el.name || "", html_id: el.id || "",
           multiple: !!el.multiple, value: el.files && el.files.length ? Array.from(el.files).map((f) => f.name).join(", ") : "",
@@ -288,7 +280,7 @@
           : [el];
         if (type === "checkbox" && members.length <= 1) {
           const id = tag(el);
-          const label = stableLabel(id, labelOf(el));
+          const label = labelOf(el);
           fields.push({ id, kind: "checkbox", label, required: isRequired(el, label), value: el.checked ? "checked" : "",
             hint: describedBy(el) });
           continue;
@@ -298,7 +290,7 @@
         seenGroups.add(key);
         const options = members.map((m) => ({ id: tag(m), label: clean(labelsOf(m).join(" ")) || m.value, checked: m.checked }));
         const id = tag(members[0]);
-        const question = stableLabel(id, groupQuestion(members, options.map((o) => o.label)));
+        const question = groupQuestion(members, options.map((o) => o.label));
         fields.push({ id, kind: type === "radio" ? "radio" : "checkbox_group", label: question,
           required: members.some((m) => m.required) || /\*/.test(question), options,
           value: options.filter((o) => o.checked).map((o) => o.label).join("; ") });
@@ -307,12 +299,12 @@
       if (!visible(el) || ariaHidden(el) || shimInput(el)) continue;
       if (type === "password") {
         const id = tag(el);
-        fields.push({ id, kind: "password", label: stableLabel(id, labelOf(el)), required: !!el.required, value: "" });
+        fields.push({ id, kind: "password", label: labelOf(el), required: !!el.required, value: "" });
         continue;
       }
       if (!TEXT_TYPES.has(type)) continue;
       const id = tag(el);
-      const label = stableLabel(id, labelOf(el));
+      const label = labelOf(el);
       const role = el.getAttribute("role");
       const combo = role === "combobox" || el.getAttribute("aria-autocomplete") === "list" || !!el.getAttribute("aria-controls") && el.getAttribute("aria-expanded") !== null;
       fields.push({ id, kind: combo ? "combobox" : (type === "date" ? "date" : "text"), input_type: type || "text",
@@ -322,14 +314,14 @@
     } else if (t === "TEXTAREA") {
       if (!visible(el) || ariaHidden(el) || shimInput(el)) continue;
       const id = tag(el);
-      const label = stableLabel(id, labelOf(el));
+      const label = labelOf(el);
       fields.push({ id, kind: "textarea", label, required: isRequired(el, label), value: el.value || "",
         hint: describedBy(el), max_length: el.maxLength > 0 ? el.maxLength : 0, name: el.name || "",
         invalid: el.getAttribute("aria-invalid") === "true" });
     } else if (t === "SELECT") {
       if (!visible(el) && !(el.parentElement && visible(el.parentElement))) continue;
       const id = tag(el);
-      const label = stableLabel(id, labelOf(el));
+      const label = labelOf(el);
       const options = Array.from(el.options).slice(0, 250).map((o) => ({ label: clean(o.text), value: o.value }));
       const chosen = Array.from(el.selectedOptions).filter((o) => o.value !== "" && !PLACEHOLDER_RX.test(clean(o.text)));
       fields.push({ id, kind: "select", label, required: isRequired(el, label), multiple: !!el.multiple, options,
@@ -338,7 +330,7 @@
     } else if (el.isContentEditable && el.getAttribute("contenteditable") !== null && !(el.parentElement && el.parentElement.isContentEditable)) {
       if (!visible(el)) continue;
       const id = tag(el);
-      const label = stableLabel(id, labelOf(el));
+      const label = labelOf(el);
       fields.push({ id, kind: "richtext", label, required: isRequired(el, label), value: textOf(el).slice(0, 500) });
     } else {
       const role = el.getAttribute && el.getAttribute("role");
@@ -347,7 +339,7 @@
       if ((!role && !listButton) || !visible(el)) continue;
       if ((role === "combobox" || listButton) && t !== "INPUT") {
         const id = tag(el);
-        const label = stableLabel(id, labelOf(el));
+        const label = labelOf(el);
         const shown = textOf(el).slice(0, 120);
         fields.push({ id, kind: "combobox", label, required: isRequired(el, label),
           value: PLACEHOLDER_RX.test(shown) ? "" : shown });
@@ -355,7 +347,7 @@
         // An ARIA radio or checkbox is named by its own label or text; the context would merge its neighbours.
         const id = tag(el);
         const own = el.getAttribute("aria-label") || (el.getAttribute("aria-labelledby") ? labelOf(el) : "") || textOf(el);
-        const label = stableLabel(id, clean(own).slice(0, 300) || labelOf(el));
+        const label = clean(own).slice(0, 300) || labelOf(el);
         fields.push({ id, kind: role === "radio" ? "aria_radio" : "aria_checkbox", label,
           required: isRequired(el, label), value: el.getAttribute("aria-checked") === "true" ? "checked" : "" });
       } else if (role === "group" || role === "radiogroup") {
@@ -363,7 +355,7 @@
         if (btns.length >= 2) {
           const options = btns.map((b) => ({ id: tag(b), label: textOf(b), checked: b.getAttribute("aria-pressed") === "true" }));
           const id = tag(el);
-          const question = stableLabel(id, groupQuestion(btns, options.map((o) => o.label)) || labelOf(el));
+          const question = groupQuestion(btns, options.map((o) => o.label)) || labelOf(el);
           fields.push({ id, kind: "radio", label: question,
             required: isRequired(el, question), options,
             value: options.filter((o) => o.checked).map((o) => o.label).join("; ") });
