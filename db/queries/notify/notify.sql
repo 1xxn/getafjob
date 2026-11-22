@@ -4,20 +4,26 @@ WHERE user_id = $1;
 
 -- name: UpsertPreferences :exec
 INSERT INTO notify_preferences (
-    user_id, email_enabled, email_address, webpush_enabled,
+    user_id, email_enabled, email_needs_input, email_approvals, email_search_alerts, email_daily_summary,
+    email_address, webpush_enabled,
     ntfy_enabled, ntfy_url, ntfy_topic, ntfy_token,
     daily_summary_enabled, daily_summary_time,
     quiet_hours_enabled, quiet_hours_start, quiet_hours_end,
     created_at, updated_at
 ) VALUES (
-    $1, $2, $3, $4,
-    $5, $6, $7, $8,
-    $9, $10,
-    $11, $12, $13,
-    $14, $14
+    $1, $2, $3, $4, $5, $6,
+    $7, $8,
+    $9, $10, $11, $12,
+    $13, $14,
+    $15, $16, $17,
+    $18, $18
 )
 ON CONFLICT (user_id) DO UPDATE SET
     email_enabled = EXCLUDED.email_enabled,
+    email_needs_input = EXCLUDED.email_needs_input,
+    email_approvals = EXCLUDED.email_approvals,
+    email_search_alerts = EXCLUDED.email_search_alerts,
+    email_daily_summary = EXCLUDED.email_daily_summary,
     email_address = EXCLUDED.email_address,
     webpush_enabled = EXCLUDED.webpush_enabled,
     ntfy_enabled = EXCLUDED.ntfy_enabled,
@@ -35,7 +41,7 @@ ON CONFLICT (user_id) DO UPDATE SET
 SELECT np.*, u.email AS user_email
 FROM notify_preferences np
 JOIN users u ON u.id = np.user_id
-WHERE np.daily_summary_enabled = true;
+WHERE np.daily_summary_enabled = true OR np.email_daily_summary = true;
 
 -- name: UpdateLastSummaryAt :exec
 UPDATE notify_preferences
@@ -107,3 +113,31 @@ SELECT seen_at FROM notify_reads WHERE user_id = $1;
 -- name: SetSeenAt :exec
 INSERT INTO notify_reads (user_id, seen_at) VALUES ($1, $2)
 ON CONFLICT (user_id) DO UPDATE SET seen_at = GREATEST(notify_reads.seen_at, EXCLUDED.seen_at);
+
+-- name: EnqueuePendingEmail :exec
+INSERT INTO notify_email_pending (user_id, kind, title, body, url, created_at)
+VALUES ($1, $2, $3, $4, $5, $6);
+
+-- name: ListDueEmailPending :many
+WITH due AS (
+    SELECT np.user_id, np.kind
+    FROM notify_email_pending np
+    GROUP BY np.user_id, np.kind
+    HAVING MIN(np.created_at) <= sqlc.arg(ready_before)
+)
+SELECT p.id, p.user_id, p.kind, p.title, p.body, p.url, p.created_at
+FROM notify_email_pending p
+JOIN due g ON g.user_id = p.user_id AND g.kind = p.kind
+LEFT JOIN notify_email_sent s ON s.user_id = p.user_id AND s.kind = p.kind
+WHERE s.sent_at IS NULL OR s.sent_at <= sqlc.arg(ready_before)
+ORDER BY p.user_id, p.kind, p.created_at, p.id;
+
+-- name: DeletePendingEmailUpTo :exec
+DELETE FROM notify_email_pending
+WHERE user_id = $1 AND kind = $2 AND id <= $3;
+
+-- name: UpsertEmailSent :exec
+INSERT INTO notify_email_sent (user_id, kind, sent_at)
+VALUES ($1, $2, $3)
+ON CONFLICT (user_id, kind) DO UPDATE SET
+    sent_at = GREATEST(notify_email_sent.sent_at, EXCLUDED.sent_at);

@@ -257,6 +257,8 @@ func periodicJobs(cfg config.Config) []*river.PeriodicJob {
 			func() (river.JobArgs, *river.InsertOpts) { return DailySummaryArgs{}, nil }, start),
 		river.NewPeriodicJob(river.PeriodicInterval(time.Hour),
 			func() (river.JobArgs, *river.InsertOpts) { return SearchAlertArgs{}, nil }, start),
+		river.NewPeriodicJob(river.PeriodicInterval(time.Minute),
+			func() (river.JobArgs, *river.InsertOpts) { return EmailBundleArgs{}, nil }, start),
 	}
 	if cfg.CrawlInterval > 0 {
 		// Not on start: a deploy or restart never starts a crawl, and the first one is always started by hand.

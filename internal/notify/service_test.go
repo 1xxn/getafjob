@@ -20,6 +20,9 @@ type fakeStore struct {
 	locales   map[uuid.UUID]i18n.Locale
 	seen      map[uuid.UUID]time.Time
 	activity  []notify.ActivityItem // newest first
+	pending   []notify.PendingEmail
+	nextID    int64
+	lastSent  map[string]time.Time
 }
 
 func newFakeStore() *fakeStore {
@@ -29,6 +32,7 @@ func newFakeStore() *fakeStore {
 		summaries: make(map[uuid.UUID]time.Time),
 		locales:   make(map[uuid.UUID]i18n.Locale),
 		seen:      make(map[uuid.UUID]time.Time),
+		lastSent:  make(map[string]time.Time),
 	}
 }
 
@@ -48,7 +52,7 @@ func (f *fakeStore) SavePreferences(_ context.Context, p notify.Preferences) err
 func (f *fakeStore) ListDailySummaryCandidates(_ context.Context) ([]notify.Preferences, error) {
 	var res []notify.Preferences
 	for _, p := range f.prefs {
-		if p.DailySummaryEnabled {
+		if p.DailySummaryEnabled || p.EmailDailySummary {
 			res = append(res, p)
 		}
 	}
@@ -108,6 +112,63 @@ func (f *fakeStore) DailyStats(_ context.Context, userID uuid.UUID, _ time.Time)
 	return s, nil
 }
 
+func (f *fakeStore) EnqueuePendingEmail(_ context.Context, item notify.PendingEmail) error {
+	f.nextID++
+	item.ID = f.nextID
+	f.pending = append(f.pending, item)
+	return nil
+}
+
+func (f *fakeStore) ListDueEmailBundles(_ context.Context, readyBefore time.Time) ([]notify.PendingEmailBundle, error) {
+	type key struct {
+		u uuid.UUID
+		k string
+	}
+	order := []key{}
+	grouped := map[key][]notify.PendingEmail{}
+	for _, it := range f.pending {
+		k := key{u: it.UserID, k: it.Kind}
+		if _, exists := grouped[k]; !exists {
+			order = append(order, k)
+		}
+		grouped[k] = append(grouped[k], it)
+	}
+	var out []notify.PendingEmailBundle
+	for _, k := range order {
+		items := grouped[k]
+		minAt := items[0].CreatedAt
+		for _, it := range items[1:] {
+			if it.CreatedAt.Before(minAt) {
+				minAt = it.CreatedAt
+			}
+		}
+		if minAt.After(readyBefore) {
+			continue
+		}
+		if last, ok := f.lastSent[k.u.String()+"|"+k.k]; ok && last.After(readyBefore) {
+			continue
+		}
+		out = append(out, notify.PendingEmailBundle{UserID: k.u, Kind: k.k, Items: items})
+	}
+	return out, nil
+}
+
+func (f *fakeStore) MarkEmailBundleSent(_ context.Context, userID uuid.UUID, kind string, upToID int64, sentAt time.Time) error {
+	var rem []notify.PendingEmail
+	for _, it := range f.pending {
+		if it.UserID == userID && it.Kind == kind && it.ID <= upToID {
+			continue
+		}
+		rem = append(rem, it)
+	}
+	f.pending = rem
+	k := userID.String() + "|" + kind
+	if sentAt.After(f.lastSent[k]) {
+		f.lastSent[k] = sentAt
+	}
+	return nil
+}
+
 type fakeNtfyClient struct {
 	sent []notify.Notification
 }
@@ -163,15 +224,18 @@ func TestNotifyDispatchAllChannels(t *testing.T) {
 	em := &fakeEmailClient{}
 	wp := &fakeWebPushClient{}
 
+	now := time.Date(2026, 11, 8, 12, 0, 0, 0, time.UTC)
 	svc := notify.NewService(st, nt, em, wp, "https://app.example.org", nil)
+	svc.SetNow(func() time.Time { return now })
 
 	n := notify.Notification{
-		UserID:   u,
-		Event:    notify.EventNeedsInput,
-		Title:    "Input needed",
-		Body:     "Please answer question",
-		URL:      "/applications/123",
-		Priority: notify.PriorityHigh,
+		UserID:    u,
+		Event:     notify.EventNeedsInput,
+		Title:     "Input needed",
+		Body:      "Please answer question",
+		URL:       "/applications/123",
+		Priority:  notify.PriorityHigh,
+		CreatedAt: now,
 	}
 
 	if err := svc.Notify(ctx, n); err != nil {
@@ -184,6 +248,15 @@ func TestNotifyDispatchAllChannels(t *testing.T) {
 	}
 	if len(wp.sentURLs) != 1 || wp.sentURLs[0] != "https://app.example.org/applications/123" {
 		t.Errorf("webpush url = %v", wp.sentURLs)
+	}
+
+	// Non-urgent event email waits for the 15-minute bundle flush.
+	if len(em.sentTo) != 0 {
+		t.Fatalf("expected queued email before bundle window, got %v", em.sentTo)
+	}
+	now = now.Add(notify.BundleWindow)
+	if sent, err := svc.FlushEmailBundles(ctx); err != nil || sent != 1 {
+		t.Fatalf("FlushEmailBundles = %d, %v", sent, err)
 	}
 
 	// Mail goes to the verified account address, never to the typed one.
@@ -391,5 +464,126 @@ func TestFreshAccountSendsNoNotificationMailByDefault(t *testing.T) {
 	}
 	if len(em.sentTo) != 0 {
 		t.Fatalf("fresh account sent emails = %v, want none", em.sentTo)
+	}
+}
+
+func TestNotifyBundlesFiveApprovalsIntoOneMail(t *testing.T) {
+	ctx := context.Background()
+	u := uuid.New()
+	st := newFakeStore()
+	st.emails[u] = "user@example.org"
+	_ = st.SavePreferences(ctx, notify.Preferences{UserID: u, EmailApprovals: true})
+
+	em := &fakeEmailClient{}
+	svc := notify.NewService(st, nil, em, nil, "https://app.example.org", nil)
+	t0 := time.Date(2026, 11, 22, 10, 0, 0, 0, time.UTC)
+	now := t0
+	svc.SetNow(func() time.Time { return now })
+
+	for i := 1; i <= 5; i++ {
+		now = t0.Add(time.Duration(i*10) * time.Second)
+		if err := svc.Notify(ctx, notify.Notification{
+			UserID:    u,
+			Event:     notify.EventApprovalQueued,
+			Title:     "Role " + string(rune('0'+i)),
+			Body:      "Ready to submit",
+			URL:       "/approvals",
+			Priority:  notify.PriorityHigh,
+			CreatedAt: now,
+		}); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	now = t0.Add(5 * time.Minute)
+	if sent, err := svc.FlushEmailBundles(ctx); err != nil || sent != 0 || len(em.sentTo) != 0 {
+		t.Fatalf("before 15m window: sent=%d err=%v mails=%d", sent, err, len(em.sentTo))
+	}
+
+	now = t0.Add(15*time.Minute + 10*time.Second)
+	if sent, err := svc.FlushEmailBundles(ctx); err != nil || sent != 1 || len(em.sentTo) != 1 {
+		t.Fatalf("at 15m window: sent=%d err=%v mails=%d", sent, err, len(em.sentTo))
+	}
+	if !strings.Contains(em.sentSubj[0], "5 applications wait for approval") {
+		t.Errorf("subject = %q", em.sentSubj[0])
+	}
+	for i := 1; i <= 5; i++ {
+		if !strings.Contains(em.sentBody[0], "Role "+string(rune('0'+i))) {
+			t.Errorf("bundled body missing item %d: %s", i, em.sentBody[0])
+		}
+	}
+
+	// A 6th approval right after waits another 15 minutes before another email goes out.
+	now = now.Add(time.Minute)
+	if err := svc.Notify(ctx, notify.Notification{
+		UserID: u, Event: notify.EventApprovalQueued, Title: "Role 6", Body: "Ready", URL: "/approvals", CreatedAt: now,
+	}); err != nil {
+		t.Fatal(err)
+	}
+	now = now.Add(5 * time.Minute)
+	if sent, err := svc.FlushEmailBundles(ctx); err != nil || sent != 0 || len(em.sentTo) != 1 {
+		t.Fatalf("within cooldown: sent=%d err=%v mails=%d", sent, err, len(em.sentTo))
+	}
+	now = now.Add(15 * time.Minute)
+	if sent, err := svc.FlushEmailBundles(ctx); err != nil || sent != 1 || len(em.sentTo) != 2 {
+		t.Fatalf("after cooldown: sent=%d err=%v mails=%d", sent, err, len(em.sentTo))
+	}
+}
+
+func TestNotifyUrgentHandoffClosingSendsImmediately(t *testing.T) {
+	ctx := context.Background()
+	u := uuid.New()
+	st := newFakeStore()
+	st.emails[u] = "user@example.org"
+	_ = st.SavePreferences(ctx, notify.Preferences{UserID: u, EmailNeedsInput: true})
+
+	em := &fakeEmailClient{}
+	svc := notify.NewService(st, nil, em, nil, "https://app.example.org", nil)
+	if err := svc.Notify(ctx, notify.Notification{
+		UserID: u, Event: notify.EventHandoffClosing, Title: "Closing soon", Body: "Finish check", URL: "/needs-input", Priority: notify.PriorityHigh,
+	}); err != nil {
+		t.Fatal(err)
+	}
+	if len(em.sentTo) != 1 {
+		t.Fatalf("urgent handoff_closing sent %d emails immediately, want 1", len(em.sentTo))
+	}
+}
+
+func TestNotifyPerEventEmailOptIn(t *testing.T) {
+	ctx := context.Background()
+	u := uuid.New()
+	st := newFakeStore()
+	st.emails[u] = "user@example.org"
+	_ = st.SavePreferences(ctx, notify.Preferences{
+		UserID:            u,
+		EmailApprovals:    true,
+		EmailDailySummary: true,
+		DailySummaryTime:  "18:00",
+	})
+
+	em := &fakeEmailClient{}
+	wp := &fakeWebPushClient{}
+	svc := notify.NewService(st, nil, em, wp, "https://app.example.org", nil)
+	svc.SetNow(func() time.Time { return time.Date(2026, 11, 22, 18, 10, 0, 0, time.UTC) })
+
+	for _, ev := range []notify.Event{notify.EventNeedsInput, notify.EventSearchAlert} {
+		if err := svc.Notify(ctx, notify.Notification{UserID: u, Event: ev, Title: string(ev), Body: "b"}); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if len(st.pending) != 0 || len(em.sentTo) != 0 {
+		t.Fatalf("opted-out kinds queued=%d sent=%d, want 0/0", len(st.pending), len(em.sentTo))
+	}
+	if err := svc.Notify(ctx, notify.Notification{UserID: u, Event: notify.EventApprovalQueued, Title: "ok", Body: "b"}); err != nil {
+		t.Fatal(err)
+	}
+	if len(st.pending) != 1 {
+		t.Fatalf("opted-in approval pending=%d, want 1", len(st.pending))
+	}
+	if sent, err := svc.CheckAndSendDailySummaries(ctx); err != nil || sent != 1 {
+		t.Fatalf("CheckAndSendDailySummaries = %d, %v", sent, err)
+	}
+	if len(em.sentTo) != 1 || len(wp.sentUsers) != 0 {
+		t.Fatalf("summary email=%d webpush=%d, want 1/0", len(em.sentTo), len(wp.sentUsers))
 	}
 }

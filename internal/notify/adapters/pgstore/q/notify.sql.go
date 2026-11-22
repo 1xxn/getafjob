@@ -198,8 +198,50 @@ func (q *Queries) CountSubmissionsSince(ctx context.Context, arg CountSubmission
 	return column_1, err
 }
 
+const deletePendingEmailUpTo = `-- name: DeletePendingEmailUpTo :exec
+DELETE FROM notify_email_pending
+WHERE user_id = $1 AND kind = $2 AND id <= $3
+`
+
+type DeletePendingEmailUpToParams struct {
+	UserID uuid.UUID
+	Kind   string
+	ID     int64
+}
+
+func (q *Queries) DeletePendingEmailUpTo(ctx context.Context, arg DeletePendingEmailUpToParams) error {
+	_, err := q.db.Exec(ctx, deletePendingEmailUpTo, arg.UserID, arg.Kind, arg.ID)
+	return err
+}
+
+const enqueuePendingEmail = `-- name: EnqueuePendingEmail :exec
+INSERT INTO notify_email_pending (user_id, kind, title, body, url, created_at)
+VALUES ($1, $2, $3, $4, $5, $6)
+`
+
+type EnqueuePendingEmailParams struct {
+	UserID    uuid.UUID
+	Kind      string
+	Title     string
+	Body      string
+	Url       string
+	CreatedAt time.Time
+}
+
+func (q *Queries) EnqueuePendingEmail(ctx context.Context, arg EnqueuePendingEmailParams) error {
+	_, err := q.db.Exec(ctx, enqueuePendingEmail,
+		arg.UserID,
+		arg.Kind,
+		arg.Title,
+		arg.Body,
+		arg.Url,
+		arg.CreatedAt,
+	)
+	return err
+}
+
 const getPreferences = `-- name: GetPreferences :one
-SELECT user_id, email_enabled, email_address, webpush_enabled, ntfy_enabled, ntfy_url, ntfy_topic, ntfy_token, daily_summary_enabled, daily_summary_time, last_summary_at, quiet_hours_enabled, quiet_hours_start, quiet_hours_end, created_at, updated_at FROM notify_preferences
+SELECT user_id, email_enabled, email_address, webpush_enabled, ntfy_enabled, ntfy_url, ntfy_topic, ntfy_token, daily_summary_enabled, daily_summary_time, last_summary_at, quiet_hours_enabled, quiet_hours_start, quiet_hours_end, created_at, updated_at, email_needs_input, email_approvals, email_search_alerts, email_daily_summary FROM notify_preferences
 WHERE user_id = $1
 `
 
@@ -223,6 +265,10 @@ func (q *Queries) GetPreferences(ctx context.Context, userID uuid.UUID) (NotifyP
 		&i.QuietHoursEnd,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.EmailNeedsInput,
+		&i.EmailApprovals,
+		&i.EmailSearchAlerts,
+		&i.EmailDailySummary,
 	)
 	return i, err
 }
@@ -260,11 +306,54 @@ func (q *Queries) GetUserLocale(ctx context.Context, id uuid.UUID) (string, erro
 	return locale, err
 }
 
+const listDueEmailPending = `-- name: ListDueEmailPending :many
+WITH due AS (
+    SELECT np.user_id, np.kind
+    FROM notify_email_pending np
+    GROUP BY np.user_id, np.kind
+    HAVING MIN(np.created_at) <= $1
+)
+SELECT p.id, p.user_id, p.kind, p.title, p.body, p.url, p.created_at
+FROM notify_email_pending p
+JOIN due g ON g.user_id = p.user_id AND g.kind = p.kind
+LEFT JOIN notify_email_sent s ON s.user_id = p.user_id AND s.kind = p.kind
+WHERE s.sent_at IS NULL OR s.sent_at <= $1
+ORDER BY p.user_id, p.kind, p.created_at, p.id
+`
+
+func (q *Queries) ListDueEmailPending(ctx context.Context, readyBefore time.Time) ([]NotifyEmailPending, error) {
+	rows, err := q.db.Query(ctx, listDueEmailPending, readyBefore)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []NotifyEmailPending{}
+	for rows.Next() {
+		var i NotifyEmailPending
+		if err := rows.Scan(
+			&i.ID,
+			&i.UserID,
+			&i.Kind,
+			&i.Title,
+			&i.Body,
+			&i.Url,
+			&i.CreatedAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const listEnabledDailySummaryUsers = `-- name: ListEnabledDailySummaryUsers :many
-SELECT np.user_id, np.email_enabled, np.email_address, np.webpush_enabled, np.ntfy_enabled, np.ntfy_url, np.ntfy_topic, np.ntfy_token, np.daily_summary_enabled, np.daily_summary_time, np.last_summary_at, np.quiet_hours_enabled, np.quiet_hours_start, np.quiet_hours_end, np.created_at, np.updated_at, u.email AS user_email
+SELECT np.user_id, np.email_enabled, np.email_address, np.webpush_enabled, np.ntfy_enabled, np.ntfy_url, np.ntfy_topic, np.ntfy_token, np.daily_summary_enabled, np.daily_summary_time, np.last_summary_at, np.quiet_hours_enabled, np.quiet_hours_start, np.quiet_hours_end, np.created_at, np.updated_at, np.email_needs_input, np.email_approvals, np.email_search_alerts, np.email_daily_summary, u.email AS user_email
 FROM notify_preferences np
 JOIN users u ON u.id = np.user_id
-WHERE np.daily_summary_enabled = true
+WHERE np.daily_summary_enabled = true OR np.email_daily_summary = true
 `
 
 type ListEnabledDailySummaryUsersRow struct {
@@ -284,6 +373,10 @@ type ListEnabledDailySummaryUsersRow struct {
 	QuietHoursEnd       string
 	CreatedAt           time.Time
 	UpdatedAt           time.Time
+	EmailNeedsInput     bool
+	EmailApprovals      bool
+	EmailSearchAlerts   bool
+	EmailDailySummary   bool
 	UserEmail           string
 }
 
@@ -313,6 +406,10 @@ func (q *Queries) ListEnabledDailySummaryUsers(ctx context.Context) ([]ListEnabl
 			&i.QuietHoursEnd,
 			&i.CreatedAt,
 			&i.UpdatedAt,
+			&i.EmailNeedsInput,
+			&i.EmailApprovals,
+			&i.EmailSearchAlerts,
+			&i.EmailDailySummary,
 			&i.UserEmail,
 		); err != nil {
 			return nil, err
@@ -356,22 +453,46 @@ func (q *Queries) UpdateLastSummaryAt(ctx context.Context, arg UpdateLastSummary
 	return err
 }
 
+const upsertEmailSent = `-- name: UpsertEmailSent :exec
+INSERT INTO notify_email_sent (user_id, kind, sent_at)
+VALUES ($1, $2, $3)
+ON CONFLICT (user_id, kind) DO UPDATE SET
+    sent_at = GREATEST(notify_email_sent.sent_at, EXCLUDED.sent_at)
+`
+
+type UpsertEmailSentParams struct {
+	UserID uuid.UUID
+	Kind   string
+	SentAt time.Time
+}
+
+func (q *Queries) UpsertEmailSent(ctx context.Context, arg UpsertEmailSentParams) error {
+	_, err := q.db.Exec(ctx, upsertEmailSent, arg.UserID, arg.Kind, arg.SentAt)
+	return err
+}
+
 const upsertPreferences = `-- name: UpsertPreferences :exec
 INSERT INTO notify_preferences (
-    user_id, email_enabled, email_address, webpush_enabled,
+    user_id, email_enabled, email_needs_input, email_approvals, email_search_alerts, email_daily_summary,
+    email_address, webpush_enabled,
     ntfy_enabled, ntfy_url, ntfy_topic, ntfy_token,
     daily_summary_enabled, daily_summary_time,
     quiet_hours_enabled, quiet_hours_start, quiet_hours_end,
     created_at, updated_at
 ) VALUES (
-    $1, $2, $3, $4,
-    $5, $6, $7, $8,
-    $9, $10,
-    $11, $12, $13,
-    $14, $14
+    $1, $2, $3, $4, $5, $6,
+    $7, $8,
+    $9, $10, $11, $12,
+    $13, $14,
+    $15, $16, $17,
+    $18, $18
 )
 ON CONFLICT (user_id) DO UPDATE SET
     email_enabled = EXCLUDED.email_enabled,
+    email_needs_input = EXCLUDED.email_needs_input,
+    email_approvals = EXCLUDED.email_approvals,
+    email_search_alerts = EXCLUDED.email_search_alerts,
+    email_daily_summary = EXCLUDED.email_daily_summary,
     email_address = EXCLUDED.email_address,
     webpush_enabled = EXCLUDED.webpush_enabled,
     ntfy_enabled = EXCLUDED.ntfy_enabled,
@@ -389,6 +510,10 @@ ON CONFLICT (user_id) DO UPDATE SET
 type UpsertPreferencesParams struct {
 	UserID              uuid.UUID
 	EmailEnabled        bool
+	EmailNeedsInput     bool
+	EmailApprovals      bool
+	EmailSearchAlerts   bool
+	EmailDailySummary   bool
 	EmailAddress        string
 	WebpushEnabled      bool
 	NtfyEnabled         bool
@@ -407,6 +532,10 @@ func (q *Queries) UpsertPreferences(ctx context.Context, arg UpsertPreferencesPa
 	_, err := q.db.Exec(ctx, upsertPreferences,
 		arg.UserID,
 		arg.EmailEnabled,
+		arg.EmailNeedsInput,
+		arg.EmailApprovals,
+		arg.EmailSearchAlerts,
+		arg.EmailDailySummary,
 		arg.EmailAddress,
 		arg.WebpushEnabled,
 		arg.NtfyEnabled,

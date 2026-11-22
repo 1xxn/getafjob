@@ -54,6 +54,10 @@ func (s *Store) GetPreferences(ctx context.Context, userID uuid.UUID) (notify.Pr
 		prefs = notify.Preferences{
 			UserID:              r.UserID,
 			EmailEnabled:        r.EmailEnabled,
+			EmailNeedsInput:     r.EmailNeedsInput,
+			EmailApprovals:      r.EmailApprovals,
+			EmailSearchAlerts:   r.EmailSearchAlerts,
+			EmailDailySummary:   r.EmailDailySummary,
 			EmailAddress:        r.EmailAddress,
 			WebPushEnabled:      r.WebpushEnabled,
 			NtfyEnabled:         r.NtfyEnabled,
@@ -86,6 +90,10 @@ func (s *Store) SavePreferences(ctx context.Context, p notify.Preferences) error
 		return qs.UpsertPreferences(ctx, q.UpsertPreferencesParams{
 			UserID:              p.UserID,
 			EmailEnabled:        p.EmailEnabled,
+			EmailNeedsInput:     p.EmailNeedsInput,
+			EmailApprovals:      p.EmailApprovals,
+			EmailSearchAlerts:   p.EmailSearchAlerts,
+			EmailDailySummary:   p.EmailDailySummary,
 			EmailAddress:        p.EmailAddress,
 			WebpushEnabled:      p.WebPushEnabled,
 			NtfyEnabled:         p.NtfyEnabled,
@@ -115,6 +123,10 @@ func (s *Store) ListDailySummaryCandidates(ctx context.Context) ([]notify.Prefer
 			candidates[i] = notify.Preferences{
 				UserID:              r.UserID,
 				EmailEnabled:        r.EmailEnabled,
+				EmailNeedsInput:     r.EmailNeedsInput,
+				EmailApprovals:      r.EmailApprovals,
+				EmailSearchAlerts:   r.EmailSearchAlerts,
+				EmailDailySummary:   r.EmailDailySummary,
 				EmailAddress:        r.EmailAddress,
 				WebPushEnabled:      r.WebpushEnabled,
 				NtfyEnabled:         r.NtfyEnabled,
@@ -271,5 +283,67 @@ func (s *Store) SeenAt(ctx context.Context, userID uuid.UUID) (time.Time, error)
 func (s *Store) MarkSeen(ctx context.Context, userID uuid.UUID, at time.Time) error {
 	return s.user(ctx, userID, func(qs *q.Queries) error {
 		return qs.SetSeenAt(ctx, q.SetSeenAtParams{UserID: userID, SeenAt: at})
+	})
+}
+
+// EnqueuePendingEmail stores one notification for quarter-hour email bundling.
+func (s *Store) EnqueuePendingEmail(ctx context.Context, item notify.PendingEmail) error {
+	return s.user(ctx, item.UserID, func(qs *q.Queries) error {
+		return qs.EnqueuePendingEmail(ctx, q.EnqueuePendingEmailParams{
+			UserID:    item.UserID,
+			Kind:      item.Kind,
+			Title:     item.Title,
+			Body:      item.Body,
+			Url:       item.URL,
+			CreatedAt: item.CreatedAt,
+		})
+	})
+}
+
+// ListDueEmailBundles returns per-(user, kind) batches ready to send before readyBefore.
+func (s *Store) ListDueEmailBundles(ctx context.Context, readyBefore time.Time) ([]notify.PendingEmailBundle, error) {
+	var bundles []notify.PendingEmailBundle
+	err := s.system(ctx, func(qs *q.Queries) error {
+		rows, err := qs.ListDueEmailPending(ctx, readyBefore)
+		if err != nil {
+			return err
+		}
+		for _, r := range rows {
+			item := notify.PendingEmail{
+				ID:        r.ID,
+				UserID:    r.UserID,
+				Kind:      r.Kind,
+				Title:     r.Title,
+				Body:      r.Body,
+				URL:       r.Url,
+				CreatedAt: r.CreatedAt,
+			}
+			n := len(bundles)
+			if n == 0 || bundles[n-1].UserID != r.UserID || bundles[n-1].Kind != r.Kind {
+				bundles = append(bundles, notify.PendingEmailBundle{
+					UserID: r.UserID,
+					Kind:   r.Kind,
+					Items:  []notify.PendingEmail{item},
+				})
+				continue
+			}
+			bundles[n-1].Items = append(bundles[n-1].Items, item)
+		}
+		return nil
+	})
+	return bundles, err
+}
+
+// MarkEmailBundleSent deletes sent pending items up to upToID and records sentAt in one transaction.
+func (s *Store) MarkEmailBundleSent(ctx context.Context, userID uuid.UUID, kind string, upToID int64, sentAt time.Time) error {
+	return s.user(ctx, userID, func(qs *q.Queries) error {
+		if err := qs.DeletePendingEmailUpTo(ctx, q.DeletePendingEmailUpToParams{
+			UserID: userID, Kind: kind, ID: upToID,
+		}); err != nil {
+			return err
+		}
+		return qs.UpsertEmailSent(ctx, q.UpsertEmailSentParams{
+			UserID: userID, Kind: kind, SentAt: sentAt,
+		})
 	})
 }

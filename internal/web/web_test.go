@@ -623,6 +623,20 @@ func TestProfilePages(t *testing.T) {
 		!regexp.MustCompile(`<input[^>]*name="notify_webpush_enabled"[^>]*disabled`).MatchString(body) {
 		t.Error("web push switch is offered without a VAPID key")
 	}
+	// All per-event email switches start unchecked and persist selectively.
+	for _, field := range []string{"notify_email_needs_input", "notify_email_approvals", "notify_email_search_alerts", "notify_email_daily_summary"} {
+		if !strings.Contains(body, `name="`+field+`"`) || regexp.MustCompile(`<input[^>]*name="`+field+`"[^>]*checked`).MatchString(body) {
+			t.Errorf("%s initial state wrong on /settings/notifications", field)
+		}
+	}
+	if rec := a.do(http.MethodPost, "/preferences", url.Values{"section": {"notifications"}, "notify_email_approvals": {"on"}}, session, nil); rec.Code != http.StatusSeeOther {
+		t.Fatalf("save notification events %d", rec.Code)
+	}
+	body = a.do(http.MethodGet, "/settings/notifications", nil, session, nil).Body.String()
+	if !regexp.MustCompile(`<input[^>]*name="notify_email_approvals"[^>]*checked`).MatchString(body) ||
+		regexp.MustCompile(`<input[^>]*name="notify_email_needs_input"[^>]*checked`).MatchString(body) {
+		t.Error("per-event email preference did not persist selectively")
+	}
 	port := url.Values{"section": {"integrations"}, "mailbox_host": {"imap.example.org"}, "mailbox_username": {"max"}, "mailbox_port": {"99999"}}
 	if rec := a.do(http.MethodPost, "/preferences", port, session, nil); rec.Code != http.StatusUnprocessableEntity || !strings.Contains(rec.Body.String(), `value="99999"`) {
 		t.Fatalf("invalid mailbox port %d", rec.Code)

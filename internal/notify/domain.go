@@ -62,6 +62,10 @@ type Notification struct {
 type Preferences struct {
 	UserID              uuid.UUID
 	EmailEnabled        bool
+	EmailNeedsInput     bool
+	EmailApprovals      bool
+	EmailSearchAlerts   bool
+	EmailDailySummary   bool
 	EmailAddress        string // unused: mail goes to the verified account address only
 	WebPushEnabled      bool
 	NtfyEnabled         bool
@@ -76,6 +80,68 @@ type Preferences struct {
 	QuietHoursEnd       string // "HH:MM", defaults to "08:00"
 	CreatedAt           time.Time
 	UpdatedAt           time.Time
+}
+
+// BundleWindow is the minimum interval between non-urgent bundled digest emails of the same kind (#515).
+const BundleWindow = 15 * time.Minute
+
+// Email bundle kinds stored in notify_email_pending / notify_email_sent.
+const (
+	EmailKindNeedsInput   = "needs_input"
+	EmailKindApprovals    = "approvals"
+	EmailKindSearchAlerts = "search_alerts"
+	EmailKindDailySummary = "daily_summary"
+)
+
+// EmailBundleKind classifies an event into its email digest kind and whether it bypasses bundling.
+func EmailBundleKind(ev Event) (kind string, immediate bool) {
+	switch ev {
+	case EventApprovalQueued:
+		return EmailKindApprovals, false
+	case EventSearchAlert:
+		return EmailKindSearchAlerts, false
+	case EventNeedsInput, EventStatusSuggestion:
+		return EmailKindNeedsInput, false
+	case EventDailySummary:
+		return EmailKindDailySummary, true
+	case EventHandoffClosing, EventTest:
+		return EmailKindNeedsInput, true
+	default:
+		return EmailKindNeedsInput, true
+	}
+}
+
+// AnyEmailEvent reports whether at least one per-event email opt-in flag is enabled.
+func (p Preferences) AnyEmailEvent() bool {
+	return p.EmailNeedsInput || p.EmailApprovals || p.EmailSearchAlerts || p.EmailDailySummary
+}
+
+// EmailForKind reports whether the user opted in to emails for the given bundle kind.
+func (p Preferences) EmailForKind(kind string) bool {
+	if !p.AnyEmailEvent() {
+		return p.EmailEnabled
+	}
+	switch kind {
+	case EmailKindNeedsInput:
+		return p.EmailNeedsInput
+	case EmailKindApprovals:
+		return p.EmailApprovals
+	case EmailKindSearchAlerts:
+		return p.EmailSearchAlerts
+	case EmailKindDailySummary:
+		return p.EmailDailySummary
+	default:
+		return false
+	}
+}
+
+// EmailFor reports whether the user opted in to email notifications for ev.
+func (p Preferences) EmailFor(ev Event) bool {
+	if ev == EventTest {
+		return p.AnyEmailEvent() || p.EmailEnabled
+	}
+	kind, _ := EmailBundleKind(ev)
+	return p.EmailForKind(kind)
 }
 
 // ntfyTopicRx is the topic shape ntfy accepts; it keeps the topic one path segment of the server URL.
@@ -130,7 +196,7 @@ func (p Preferences) InQuietHours(t time.Time) bool {
 
 // IsSummaryDue returns true if daily summary is enabled and due at current time.
 func (p Preferences) IsSummaryDue(now time.Time) bool {
-	if !p.DailySummaryEnabled {
+	if !p.DailySummaryEnabled && !p.EmailDailySummary {
 		return false
 	}
 	targetHour, targetMin, err := parseHourMinute(p.DailySummaryTime)

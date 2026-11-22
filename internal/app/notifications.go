@@ -211,3 +211,35 @@ func (w *searchAlertWorker) Work(ctx context.Context, _ *river.Job[SearchAlertAr
 	}
 	return err
 }
+
+// EmailBundleArgs flushes bundled non-urgent notification emails whose 15-minute window is due (#515).
+type EmailBundleArgs struct{}
+
+// Kind implements river.JobArgs.
+func (EmailBundleArgs) Kind() string { return "email_bundles" }
+
+// InsertOpts ensures at most one email bundle flush waits or runs.
+func (EmailBundleArgs) InsertOpts() river.InsertOpts {
+	return DailySummaryArgs{}.InsertOpts()
+}
+
+type emailBundleWorker struct {
+	river.WorkerDefaults[EmailBundleArgs]
+	svc    *notify.Service
+	logger *slog.Logger
+}
+
+func (w *emailBundleWorker) Timeout(*river.Job[EmailBundleArgs]) time.Duration {
+	return 15 * time.Minute
+}
+
+func (w *emailBundleWorker) Work(ctx context.Context, _ *river.Job[EmailBundleArgs]) error {
+	n, err := w.svc.FlushEmailBundles(ctx)
+	if err != nil {
+		return err
+	}
+	if n > 0 {
+		w.logger.InfoContext(ctx, "bundled notification emails sent", "count", n)
+	}
+	return nil
+}

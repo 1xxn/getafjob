@@ -99,39 +99,51 @@ func (s *Service) Notify(ctx context.Context, n Notification) error {
 	}
 
 	var errs []error
+	sendPushNtfy := n.Event != EventDailySummary || prefs.DailySummaryEnabled
 
 	// 1. Web Push
-	if prefs.WebPushEnabled && s.webpush != nil {
-		link := n.URL
-		if link != "" && !strings.HasPrefix(link, "http://") && !strings.HasPrefix(link, "https://") && s.baseURL != "" {
-			link = s.baseURL + "/" + strings.TrimLeft(link, "/")
-		}
+	if sendPushNtfy && prefs.WebPushEnabled && s.webpush != nil {
+		link := s.absURL(n.URL)
 		if err := s.webpush.SendWebPush(ctx, n.UserID, n.Title, n.Body, link); err != nil {
 			errs = append(errs, fmt.Errorf("webpush: %w", err))
 		}
 	}
 
-	// 2. Email
-	if prefs.EmailEnabled && s.email != nil {
+	// 2. Email (opt-in per event kind; non-urgent events bundle per kind and quarter hour)
+	if prefs.EmailFor(n.Event) && s.email != nil {
 		// Only the account address, which sign-in has verified: getafjob never mails an address the user typed.
 		to, _ := s.store.GetUserEmail(ctx, n.UserID)
 		if to != "" {
-			emailBody := n.Body
-			if n.URL != "" {
-				link := n.URL
-				if !strings.HasPrefix(link, "http://") && !strings.HasPrefix(link, "https://") && s.baseURL != "" {
-					link = s.baseURL + "/" + strings.TrimLeft(link, "/")
+			link := s.absURL(n.URL)
+			if kind, immediate := EmailBundleKind(n.Event); immediate {
+				emailBody := n.Body
+				if link != "" {
+					emailBody += "\n\n" + link
 				}
-				emailBody += "\n\n" + link
-			}
-			if err := s.email.SendEmail(ctx, to, n.Title, emailBody); err != nil {
-				errs = append(errs, fmt.Errorf("email: %w", err))
+				if err := s.email.SendEmail(ctx, to, n.Title, emailBody); err != nil {
+					errs = append(errs, fmt.Errorf("email: %w", err))
+				}
+			} else {
+				createdAt := n.CreatedAt
+				if createdAt.IsZero() {
+					createdAt = s.now()
+				}
+				if err := s.store.EnqueuePendingEmail(ctx, PendingEmail{
+					UserID:    n.UserID,
+					Kind:      kind,
+					Title:     n.Title,
+					Body:      n.Body,
+					URL:       link,
+					CreatedAt: createdAt,
+				}); err != nil {
+					errs = append(errs, fmt.Errorf("email queue: %w", err))
+				}
 			}
 		}
 	}
 
 	// 3. ntfy
-	if prefs.NtfyEnabled && s.ntfy != nil && strings.TrimSpace(prefs.NtfyTopic) != "" {
+	if sendPushNtfy && prefs.NtfyEnabled && s.ntfy != nil && strings.TrimSpace(prefs.NtfyTopic) != "" {
 		if err := s.ntfy.SendNtfy(ctx, prefs.NtfyURL, prefs.NtfyTopic, prefs.NtfyToken, n); err != nil {
 			errs = append(errs, fmt.Errorf("ntfy: %w", err))
 		}
@@ -141,6 +153,88 @@ func (s *Service) Notify(ctx context.Context, n Notification) error {
 		return errors.Join(errs...)
 	}
 	return nil
+}
+
+func (s *Service) absURL(raw string) string {
+	if raw == "" || strings.HasPrefix(raw, "http://") || strings.HasPrefix(raw, "https://") || s.baseURL == "" {
+		return raw
+	}
+	return s.baseURL + "/" + strings.TrimLeft(raw, "/")
+}
+
+// FlushEmailBundles sends at most one bundled digest email per user and kind every BundleWindow (#515).
+func (s *Service) FlushEmailBundles(ctx context.Context) (int, error) {
+	if s.email == nil {
+		return 0, nil
+	}
+	now := s.now()
+	bundles, err := s.store.ListDueEmailBundles(ctx, now.Add(-BundleWindow))
+	if err != nil {
+		return 0, fmt.Errorf("listing due email bundles: %w", err)
+	}
+	sent := 0
+	for _, b := range bundles {
+		if len(b.Items) == 0 {
+			continue
+		}
+		var maxID int64
+		for _, it := range b.Items {
+			if it.ID > maxID {
+				maxID = it.ID
+			}
+		}
+		prefs, err := s.GetPreferences(ctx, b.UserID)
+		if err != nil {
+			s.logger.WarnContext(ctx, "loading preferences for email bundle", "user_id", b.UserID, "err", err)
+			continue
+		}
+		to, _ := s.store.GetUserEmail(ctx, b.UserID)
+		if !prefs.EmailForKind(b.Kind) || to == "" {
+			if err := s.store.MarkEmailBundleSent(ctx, b.UserID, b.Kind, maxID, now); err != nil {
+				s.logger.WarnContext(ctx, "draining disabled email bundle", "user_id", b.UserID, "kind", b.Kind, "err", err)
+			}
+			continue
+		}
+		subj, body := s.formatBundle(ctx, b)
+		if err := s.email.SendEmail(ctx, to, subj, body); err != nil {
+			s.logger.WarnContext(ctx, "sending email bundle", "user_id", b.UserID, "kind", b.Kind, "err", err)
+			continue
+		}
+		if err := s.store.MarkEmailBundleSent(ctx, b.UserID, b.Kind, maxID, now); err != nil {
+			s.logger.WarnContext(ctx, "recording email bundle send", "user_id", b.UserID, "kind", b.Kind, "err", err)
+			continue
+		}
+		sent++
+	}
+	return sent, nil
+}
+
+func (s *Service) formatBundle(ctx context.Context, b PendingEmailBundle) (subj, body string) {
+	if len(b.Items) == 1 {
+		it := b.Items[0]
+		body = it.Body
+		if it.URL != "" {
+			body += "\n\n" + it.URL
+		}
+		return it.Title, body
+	}
+	l, err := s.store.UserLocale(ctx, b.UserID)
+	if err != nil {
+		l = i18n.Default
+	}
+	subj = i18n.T(l, "notify.bundle."+b.Kind+".title", map[string]any{"n": len(b.Items)})
+	parts := make([]string, 0, len(b.Items))
+	for _, it := range b.Items {
+		lines := []string{"• " + it.Title}
+		if it.Body != "" {
+			lines = append(lines, "  "+it.Body)
+		}
+		if it.URL != "" {
+			lines = append(lines, "  "+it.URL)
+		}
+		parts = append(parts, strings.Join(lines, "\n"))
+	}
+	return subj, strings.Join(parts, "\n\n")
 }
 
 // SendDailySummary aggregates stats and sends the 24h summary notification to a user.

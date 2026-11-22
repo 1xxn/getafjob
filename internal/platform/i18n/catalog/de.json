@@ -519,7 +519,13 @@
   "track.match.title": "Die Mail nennt den Jobtitel.",
   "profile.notify.title": "Kanäle",
   "profile.notify.hint": "getafjob sagt dir sofort Bescheid, wenn ein Lauf dich braucht (CAPTCHA, Rückfrage, Freigabe), und schickt eine tägliche Zusammenfassung, per Mail, Web Push oder ntfy.",
+  "profile.notify.email_title": "Benachrichtigungen per Mail an deine Kontoadresse",
+  "profile.notify.email_hint": "Aktiviere nur die Mail-Benachrichtigungen, die du möchtest. Mails derselben Art werden alle 15 Minuten gebündelt; dringende Hinweise gehen sofort raus.",
   "profile.field.notify_email_enabled": "Benachrichtigungen per Mail an deine Kontoadresse",
+  "profile.field.notify_email_needs_input": "Rückfragen und Prüfungen, die dich brauchen",
+  "profile.field.notify_email_approvals": "Bewerbungen, die auf Freigabe warten",
+  "profile.field.notify_email_search_alerts": "Treffer gespeicherter Suchen",
+  "profile.field.notify_email_daily_summary": "Tägliche Bewerbungszusammenfassung per Mail",
   "profile.field.notify_webpush_enabled": "Web-Push-Benachrichtigungen aktivieren",
   "profile.field.notify_ntfy_enabled": "ntfy-Benachrichtigungen aktivieren",
   "profile.field.notify_ntfy_url": "ntfy-Server-URL",
@@ -1277,5 +1283,8 @@
   "searches.done.deleted": "Suche gelöscht.",
   "searches.done.invalid": "Ein Name braucht 1 bis 100 Zeichen.",
   "notify.search_alert.title": "Neue Jobs: {name}",
-  "notify.search_alert.body": "{count} {count|neuer Job passt|neue Jobs passen} zu deiner gespeicherten Suche {name}."
+  "notify.search_alert.body": "{count} {count|neuer Job passt|neue Jobs passen} zu deiner gespeicherten Suche {name}.",
+  "notify.bundle.needs_input.title": "getafjob: {n} {n|Bewerbung braucht|Bewerbungen brauchen} dich",
+  "notify.bundle.approvals.title": "getafjob: {n} {n|Bewerbung wartet|Bewerbungen warten} auf Freigabe",
+  "notify.bundle.search_alerts.title": "getafjob: {n} {n|Suchmeldung|Suchmeldungen}"
 }
