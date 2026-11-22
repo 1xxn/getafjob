@@ -519,7 +519,13 @@
   "track.match.title": "The mail names the job title.",
   "profile.notify.title": "Channels",
   "profile.notify.hint": "getafjob tells you right away when a run needs you (a CAPTCHA, a question, an approval) and sends a daily summary, by mail, Web Push or ntfy.",
+  "profile.notify.email_title": "Email notifications to your account address",
+  "profile.notify.email_hint": "Turn on only the emails you want. Events of the same kind are bundled every 15 minutes; urgent alerts go out right away.",
   "profile.field.notify_email_enabled": "Email notifications to your account address",
+  "profile.field.notify_email_needs_input": "Questions and checks that need you",
+  "profile.field.notify_email_approvals": "Applications waiting for approval",
+  "profile.field.notify_email_search_alerts": "Saved search alerts",
+  "profile.field.notify_email_daily_summary": "Daily application summary by email",
   "profile.field.notify_webpush_enabled": "Enable Web Push notifications",
   "profile.field.notify_ntfy_enabled": "Enable ntfy notifications",
   "profile.field.notify_ntfy_url": "ntfy server URL",
@@ -1277,5 +1283,8 @@
   "searches.done.deleted": "Search deleted.",
   "searches.done.invalid": "A name needs 1 to 100 characters.",
   "notify.search_alert.title": "New jobs: {name}",
-  "notify.search_alert.body": "{count} new {count|job matches|jobs match} your saved search {name}."
+  "notify.search_alert.body": "{count} new {count|job matches|jobs match} your saved search {name}.",
+  "notify.bundle.needs_input.title": "getafjob: {n} {n|application needs|applications need} you",
+  "notify.bundle.approvals.title": "getafjob: {n} {n|application waits|applications wait} for approval",
+  "notify.bundle.search_alerts.title": "getafjob: {n} search {n|alert|alerts}"
 }

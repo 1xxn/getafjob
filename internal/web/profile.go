@@ -481,6 +481,10 @@ func preferencesForm(p profile.Preferences, a application.Settings, mb tracking.
 			"easy_apply_terms_accepted":    a.EasyApplyTermsAcceptedAt != nil,
 			"mailbox_enabled":              mb.Enabled,
 			"notify_email_enabled":         np.EmailEnabled,
+			"notify_email_needs_input":     np.EmailNeedsInput,
+			"notify_email_approvals":       np.EmailApprovals,
+			"notify_email_search_alerts":   np.EmailSearchAlerts,
+			"notify_email_daily_summary":   np.EmailDailySummary,
 			"notify_webpush_enabled":       np.WebPushEnabled,
 			"notify_ntfy_enabled":          np.NtfyEnabled,
 			"notify_daily_summary_enabled": np.DailySummaryEnabled,
@@ -701,7 +705,11 @@ func (s *Server) preferencesSave(w http.ResponseWriter, r *http.Request, u *iden
 	np := s.notifyPreferences(r.Context(), u)
 	var notifyBad []string
 	if sectionIs(section, "notifications") {
-		np.EmailEnabled = r.PostFormValue("notify_email_enabled") == "on"
+		np.EmailNeedsInput = r.PostFormValue("notify_email_needs_input") == "on"
+		np.EmailApprovals = r.PostFormValue("notify_email_approvals") == "on"
+		np.EmailSearchAlerts = r.PostFormValue("notify_email_search_alerts") == "on"
+		np.EmailDailySummary = r.PostFormValue("notify_email_daily_summary") == "on"
+		np.EmailEnabled = np.AnyEmailEvent() || r.PostFormValue("notify_email_enabled") == "on"
 		np.WebPushEnabled = r.PostFormValue("notify_webpush_enabled") == "on"
 		np.NtfyEnabled = r.PostFormValue("notify_ntfy_enabled") == "on"
 		if urlStr := strings.TrimSpace(r.PostFormValue("notify_ntfy_url")); urlStr != "" {

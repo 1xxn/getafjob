@@ -242,6 +242,7 @@ func worker(ctx context.Context, cfg config.Config, logger *slog.Logger) error {
 	river.AddWorker(workers, &dailySummaryWorker{svc: notifySvc, logger: logger})
 	river.AddWorker(workers, &searchAlertWorker{searches: matching.NewSavedSearches(mstore, matching.NewListings(mstore)),
 		notify: notifySvc, logger: logger})
+	river.AddWorker(workers, &emailBundleWorker{svc: notifySvc, logger: logger})
 	river.AddWorker(workers, &planWorker{svc: apps, logger: logger})
 	tstore := trackingstore.New(pool)
 	tcipher := trackingcrypto.NewCipher(env)

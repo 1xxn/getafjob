@@ -47,6 +47,7 @@ func TestJobQueueAssignments(t *testing.T) {
 		{"inbox", (InboxArgs{}).InsertOpts().Queue, queue.Mail},
 		{"daily_summary", (DailySummaryArgs{}).InsertOpts().Queue, queue.Mail},
 		{"search_alert", (SearchAlertArgs{}).InsertOpts().Queue, queue.Mail},
+		{"email_bundles", (EmailBundleArgs{}).InsertOpts().Queue, queue.Mail},
 		{"plan", (PlanArgs{}).InsertOpts().Queue, queue.Apply},
 		{"recover", (RecoverArgs{}).InsertOpts().Queue, queue.Apply},
 		{"handoff", (HandoffArgs{}).InsertOpts().Queue, queue.Apply},

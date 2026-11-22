@@ -411,7 +411,12 @@ templ PreferencesPage(name string, f Form, section string) {
 					<input type="hidden" name="section" value="notifications"/>
 					<h2>{ T(ctx, "profile.notify.title") }</h2>
 					<p class="muted">{ T(ctx, "profile.notify.hint") }</p>
-					@ui.Checkbox(check(ctx, f, "notify_email_enabled"))
+					<h3>{ T(ctx, "profile.notify.email_title") }</h3>
+					<p class="ui-hint">{ T(ctx, "profile.notify.email_hint") }</p>
+					@ui.Checkbox(check(ctx, f, "notify_email_needs_input"))
+					@ui.Checkbox(check(ctx, f, "notify_email_approvals"))
+					@ui.Checkbox(check(ctx, f, "notify_email_search_alerts"))
+					@ui.Checkbox(check(ctx, f, "notify_email_daily_summary"))
 					@ui.Checkbox(webPush(ctx, f))
 					@ui.Checkbox(check(ctx, f, "notify_ntfy_enabled"))
 					@ui.Input(input(ctx, f, "notify_ntfy_url", "url", "", 254))

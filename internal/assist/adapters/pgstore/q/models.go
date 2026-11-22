@@ -232,6 +232,22 @@ type Match struct {
 	ComputedAt time.Time
 }
 
+type NotifyEmailPending struct {
+	ID        int64
+	UserID    uuid.UUID
+	Kind      string
+	Title     string
+	Body      string
+	Url       string
+	CreatedAt time.Time
+}
+
+type NotifyEmailSent struct {
+	UserID uuid.UUID
+	Kind   string
+	SentAt time.Time
+}
+
 type NotifyPreference struct {
 	UserID              uuid.UUID
 	EmailEnabled        bool
@@ -249,6 +265,10 @@ type NotifyPreference struct {
 	QuietHoursEnd       string
 	CreatedAt           time.Time
 	UpdatedAt           time.Time
+	EmailNeedsInput     bool
+	EmailApprovals      bool
+	EmailSearchAlerts   bool
+	EmailDailySummary   bool
 }
 
 type NotifyRead struct {

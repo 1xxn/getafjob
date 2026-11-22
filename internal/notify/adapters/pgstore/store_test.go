@@ -95,6 +95,9 @@ func TestPgstoreNotify(t *testing.T) {
 	p1 := notify.Preferences{
 		UserID:              u1,
 		EmailEnabled:        true,
+		EmailNeedsInput:     true,
+		EmailApprovals:      true,
+		EmailDailySummary:   true,
 		EmailAddress:        "notifications@user1.example.org",
 		WebPushEnabled:      true,
 		NtfyEnabled:         true,
@@ -116,7 +119,8 @@ func TestPgstoreNotify(t *testing.T) {
 	if err != nil {
 		t.Fatalf("GetPreferences: %v", err)
 	}
-	if got.EmailAddress != "notifications@user1.example.org" || got.NtfyTopic != "alerts-user1" || got.DailySummaryTime != "19:00" {
+	if got.EmailAddress != "notifications@user1.example.org" || got.NtfyTopic != "alerts-user1" || got.DailySummaryTime != "19:00" ||
+		!got.EmailNeedsInput || !got.EmailApprovals || got.EmailSearchAlerts || !got.EmailDailySummary {
 		t.Errorf("GetPreferences = %+v", got)
 	}
 
@@ -258,5 +262,48 @@ func TestPgstoreActivityQuietParks(t *testing.T) {
 	}
 	if n, _ := st.CountActivitySince(ctx, u, time.Time{}); n != 1 {
 		t.Errorf("unread = %d, want 1", n)
+	}
+}
+
+func TestPgstoreEmailBundles(t *testing.T) {
+	ctx := context.Background()
+	pool := dbtest.AppPool(t)
+	st := pgstore.New(pool)
+	u := user(t, pool, "bundle@example.org")
+	t0 := time.Date(2026, 11, 22, 12, 0, 0, 0, time.UTC)
+
+	for i := 0; i < 3; i++ {
+		if err := st.EnqueuePendingEmail(ctx, notify.PendingEmail{
+			UserID: u, Kind: notify.EmailKindApprovals, Title: "Role", Body: "Ready", URL: "/approvals", CreatedAt: t0.Add(time.Duration(i) * time.Minute),
+		}); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	// Only 5 minutes elapsed -> not due yet for 15-minute window
+	if due, err := st.ListDueEmailBundles(ctx, t0.Add(-10*time.Minute)); err != nil || len(due) != 0 {
+		t.Fatalf("before 15m: due=%v, err=%v", due, err)
+	}
+
+	// At t0+15m -> readyBefore is t0
+	due, err := st.ListDueEmailBundles(ctx, t0)
+	if err != nil || len(due) != 1 || len(due[0].Items) != 3 {
+		t.Fatalf("at 15m: due=%+v, err=%v", due, err)
+	}
+	if err := st.MarkEmailBundleSent(ctx, u, notify.EmailKindApprovals, due[0].Items[2].ID, t0.Add(15*time.Minute)); err != nil {
+		t.Fatal(err)
+	}
+
+	// Next item queued at t0+16m is suppressed until t0+31m
+	if err := st.EnqueuePendingEmail(ctx, notify.PendingEmail{
+		UserID: u, Kind: notify.EmailKindApprovals, Title: "Role 4", Body: "Ready", URL: "/approvals", CreatedAt: t0.Add(16 * time.Minute),
+	}); err != nil {
+		t.Fatal(err)
+	}
+	if due, err := st.ListDueEmailBundles(ctx, t0.Add(10*time.Minute)); err != nil || len(due) != 0 {
+		t.Fatalf("during cooldown: due=%v, err=%v", due, err)
+	}
+	if due, err := st.ListDueEmailBundles(ctx, t0.Add(16*time.Minute)); err != nil || len(due) != 1 || len(due[0].Items) != 1 {
+		t.Fatalf("after cooldown: due=%+v, err=%v", due, err)
 	}
 }
