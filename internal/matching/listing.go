@@ -34,6 +34,7 @@ type Filter struct {
 	FreshnessDays int        // 1 (24h), 3, 7, 14, 30, or 0 (all)
 	Sort          string     // "match", "newest", "salary", "company"
 	Blocked       bool       // show only blocked jobs
+	FormOnly      bool       // only jobs that take applications through a form (applymode.Form)
 	SeenAfter     time.Time  // only jobs first seen after it (saved search alerts); zero: all
 	SeenBefore    time.Time  // only jobs first seen at or before it (saved search alerts); zero: all
 	Page          int        // from 1

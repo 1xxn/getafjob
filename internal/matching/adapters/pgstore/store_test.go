@@ -3,6 +3,7 @@ package pgstore_test
 import (
 	"context"
 	"errors"
+	"strconv"
 	"testing"
 	"time"
 
@@ -14,6 +15,7 @@ import (
 	discoverystore "github.com/1xxn/getafjob/internal/discovery/adapters/pgstore"
 	"github.com/1xxn/getafjob/internal/matching"
 	"github.com/1xxn/getafjob/internal/matching/adapters/pgstore"
+	"github.com/1xxn/getafjob/internal/platform/applymode"
 	"github.com/1xxn/getafjob/internal/platform/db"
 	"github.com/1xxn/getafjob/internal/platform/db/dbtest"
 )
@@ -369,4 +371,63 @@ func TestAdvancedDiscoveryFiltersSortingAndBlocklist(t *testing.T) {
 			t.Fatalf("query took %v, want sub-100ms", elapsed)
 		}
 	})
+}
+
+// The form-only filter runs in SQL, agrees with applymode.Of and counts all pages (#541).
+func TestFormOnlyFilterMatchesApplyMode(t *testing.T) {
+	pool := dbtest.AppPool(t)
+	ctx := t.Context()
+	now := time.Now()
+	uID := user(t, pool, "form-filter@example.com")
+	st := pgstore.New(pool)
+	cases := []struct{ url, apply string }{
+		{"https://boards.greenhouse.io/acme/jobs/1", ""},
+		{"https://www.arbeitsagentur.de/jobsuche/jobdetail/1", ""},
+		{"https://www.arbeitsagentur.de/jobsuche/jobdetail/2", "https://acme.example.org/apply"},
+		{"https://acme.example.org/jobs/3", "mailto:jobs@acme.example.org"},
+		{"https://acme.example.org/jobs/4", "https://de.StepStone.de./job/4"},
+		{"https://user@jobs.example.net:8443/5", ""},
+		{"https://acme.example.org/jobs/6", "MAILTO:hr@acme.example.org"},
+	}
+	want := map[int64]bool{}
+	var results []matching.Result
+	for i, c := range cases {
+		var id int64
+		fp := "form-" + strconv.Itoa(i)
+		if err := db.InSystemTx(ctx, pool, func(tx pgx.Tx) error {
+			return tx.QueryRow(ctx, `INSERT INTO jobs (fingerprint, match_key, source, external_id, company, title, location,
+				workplace, url, apply_url, description, content_hash, first_seen, last_seen)
+				VALUES ($1, $1, 'test', $1, 'Acme', 'Go Engineer', 'Berlin', 'remote', $2, $3, 'Go', 'h', $4, $4) RETURNING id`,
+				fp, c.url, c.apply, now).Scan(&id)
+		}); err != nil {
+			t.Fatal(err)
+		}
+		want[id] = applymode.Of(c.url, c.apply) == applymode.Form
+		results = append(results, matching.Result{JobID: id, Score: 90 - i, Decision: matching.Match})
+	}
+	if err := st.SaveMatches(ctx, uID, results, now); err != nil {
+		t.Fatal(err)
+	}
+	items, total, err := st.ListMatches(ctx, uID, matching.Filter{FormOnly: true}, 0, 2)
+	if err != nil {
+		t.Fatal(err)
+	}
+	forms := 0
+	for _, ok := range want {
+		if ok {
+			forms++
+		}
+	}
+	if total != forms || len(items) != min(2, forms) {
+		t.Fatalf("total = %d, items = %d; want %d forms", total, len(items), forms)
+	}
+	all, _, err := st.ListMatches(ctx, uID, matching.Filter{FormOnly: true}, 0, 100)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, it := range all {
+		if !want[it.JobID] {
+			t.Errorf("job %d is not a form job", it.JobID)
+		}
+	}
 }

@@ -63,6 +63,13 @@ WHERE m.user_id = sqlc.arg(user_id) AND j.status = 'open'
       )
     END
   )
+  -- portal_hosts set: only jobs with an application form (no mailto, apply page not on one of these job boards).
+  AND (cardinality(sqlc.arg(portal_hosts)::text[]) = 0 OR (
+    j.apply_url NOT ILIKE 'mailto:%' AND NOT EXISTS (
+      SELECT 1 FROM unnest(sqlc.arg(portal_hosts)::text[]) p,
+        LATERAL (SELECT rtrim(lower(substring(coalesce(nullif(trim(j.apply_url), ''), j.url)
+          FROM '^[A-Za-z][A-Za-z0-9+.-]*://(?:[^@/?#]*@)?([^/:?#]+)')), '.') AS host) x
+      WHERE x.host = p OR x.host LIKE '%.' || p)))
 ORDER BY
   CASE WHEN sqlc.arg(sort)::text = 'newest' THEN coalesce(j.posted::timestamptz, j.first_seen) END DESC NULLS LAST,
   CASE WHEN sqlc.arg(sort)::text = 'salary' THEN coalesce(j.salary_max, j.salary_min, 0) END DESC NULLS LAST,

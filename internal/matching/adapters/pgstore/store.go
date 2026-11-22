@@ -17,6 +17,7 @@ import (
 
 	"github.com/1xxn/getafjob/internal/matching"
 	"github.com/1xxn/getafjob/internal/matching/adapters/pgstore/q"
+	"github.com/1xxn/getafjob/internal/platform/applymode"
 	"github.com/1xxn/getafjob/internal/platform/db"
 )
 
@@ -106,6 +107,7 @@ func (s *Store) ListMatches(ctx context.Context, userID uuid.UUID, f matching.Fi
 			FreshnessDays: int32(min(max(f.FreshnessDays, 0), 365)),
 			Query:         f.Query,
 			ShowBlocked:   f.Blocked,
+			PortalHosts:   portalHosts(f.FormOnly),
 			SeenAfter:     optTime(f.SeenAfter),
 			SeenBefore:    optTime(f.SeenBefore),
 			Sort:          f.Sort,
@@ -376,4 +378,12 @@ func (s *Store) MatchedUntil(ctx context.Context, userID uuid.UUID) (at time.Tim
 		at = time.Time{}
 	}
 	return at, err
+}
+
+// portalHosts are the job board hosts the form-only filter excludes; nil turns the filter off.
+func portalHosts(formOnly bool) []string {
+	if !formOnly {
+		return nil
+	}
+	return applymode.Portals()
 }

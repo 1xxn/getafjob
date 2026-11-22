@@ -234,13 +234,20 @@ WHERE m.user_id = $1 AND j.status = 'open'
       )
     END
   )
+  -- portal_hosts set: only jobs with an application form (no mailto, apply page not on one of these job boards).
+  AND (cardinality($12::text[]) = 0 OR (
+    j.apply_url NOT ILIKE 'mailto:%' AND NOT EXISTS (
+      SELECT 1 FROM unnest($12::text[]) p,
+        LATERAL (SELECT rtrim(lower(substring(coalesce(nullif(trim(j.apply_url), ''), j.url)
+          FROM '^[A-Za-z][A-Za-z0-9+.-]*://(?:[^@/?#]*@)?([^/:?#]+)')), '.') AS host) x
+      WHERE x.host = p OR x.host LIKE '%.' || p)))
 ORDER BY
-  CASE WHEN $12::text = 'newest' THEN coalesce(j.posted::timestamptz, j.first_seen) END DESC NULLS LAST,
-  CASE WHEN $12::text = 'salary' THEN coalesce(j.salary_max, j.salary_min, 0) END DESC NULLS LAST,
-  CASE WHEN $12::text = 'company' THEN lower(j.company) END ASC,
-  CASE WHEN $12::text = 'match' OR $12::text = '' THEN m.score END DESC,
+  CASE WHEN $13::text = 'newest' THEN coalesce(j.posted::timestamptz, j.first_seen) END DESC NULLS LAST,
+  CASE WHEN $13::text = 'salary' THEN coalesce(j.salary_max, j.salary_min, 0) END DESC NULLS LAST,
+  CASE WHEN $13::text = 'company' THEN lower(j.company) END ASC,
+  CASE WHEN $13::text = 'match' OR $13::text = '' THEN m.score END DESC,
   j.id DESC
-LIMIT $14::integer OFFSET $13::integer
+LIMIT $15::integer OFFSET $14::integer
 `
 
 type ListMatchesParams struct {
@@ -255,6 +262,7 @@ type ListMatchesParams struct {
 	SeenBefore    *time.Time
 	Query         string
 	ShowBlocked   bool
+	PortalHosts   []string
 	Sort          string
 	PageOffset    int32
 	PageSize      int32
@@ -294,6 +302,7 @@ func (q *Queries) ListMatches(ctx context.Context, arg ListMatchesParams) ([]Lis
 		arg.SeenBefore,
 		arg.Query,
 		arg.ShowBlocked,
+		arg.PortalHosts,
 		arg.Sort,
 		arg.PageOffset,
 		arg.PageSize,
