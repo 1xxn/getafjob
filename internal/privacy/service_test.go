@@ -4,6 +4,7 @@ import (
 	"archive/zip"
 	"bytes"
 	"context"
+	"errors"
 	"io"
 	"strings"
 	"testing"
@@ -22,7 +23,7 @@ type fakeIdentity struct {
 	user     identity.User
 	passkeys []identity.PasskeyInfo
 	sessions []identity.SessionInfo
-	events   []identity.AuditEvent
+	events   []identity.AuditEntry
 	deleted  uuid.UUID
 	cleaned  bool
 }
@@ -42,7 +43,7 @@ func (f *fakeIdentity) Sessions(_ context.Context, _ uuid.UUID, _ string) ([]ide
 	return f.sessions, nil
 }
 
-func (f *fakeIdentity) AuditEvents(_ context.Context, _ uuid.UUID) ([]identity.AuditEvent, error) {
+func (f *fakeIdentity) AuditEvents(_ context.Context, _ uuid.UUID) ([]identity.AuditEntry, error) {
 	return f.events, nil
 }
 
@@ -62,6 +63,19 @@ type fakeProfile struct {
 
 func (f *fakeProfile) Get(_ context.Context, _ uuid.UUID) (profile.Snapshot, error) {
 	return f.snap, nil
+}
+
+type fakeStations struct {
+	works []profile.WorkExperience
+	err   error
+}
+
+func (f *fakeStations) WorkExperiences(_ context.Context, _ uuid.UUID) ([]profile.WorkExperience, error) {
+	return f.works, f.err
+}
+
+func (f *fakeStations) Educations(_ context.Context, _ uuid.UUID) ([]profile.EducationStation, error) {
+	return []profile.EducationStation{{Institution: "TU Musterstadt", Degree: "M.Sc."}}, f.err
 }
 
 type fakeItems struct {
@@ -162,8 +176,8 @@ func TestExportGeneratesValidZip(t *testing.T) {
 		passkeys: []identity.PasskeyInfo{
 			{Name: "YubiKey 5", CreatedAt: now.Add(-10 * time.Hour)},
 		},
-		events: []identity.AuditEvent{
-			{Actor: "user", Code: "identity.signed_in"},
+		events: []identity.AuditEntry{
+			{At: now.Add(-48 * time.Hour), AuditEvent: identity.AuditEvent{Actor: "user", Code: "identity.signed_in"}},
 		},
 	}
 	fProf := &fakeProfile{
@@ -215,7 +229,9 @@ func TestExportGeneratesValidZip(t *testing.T) {
 	fKeys := &fakeKeys{}
 	fBlobs := &fakeBlobs{}
 
-	svc := privacy.NewService(fIds, fProf, fItems, fDocs, fApps, fMatch, fKeys, fBlobs).WithClock(func() time.Time { return now })
+	fStations := &fakeStations{works: []profile.WorkExperience{{Company: "Musterfirma GmbH", Title: "Lead Engineer"}}}
+	svc := privacy.NewService(fIds, fProf, fItems, fDocs, fApps, fMatch, fKeys, fBlobs).WithStations(fStations).
+		WithClock(func() time.Time { return now })
 
 	var buf bytes.Buffer
 	if err := svc.Export(ctx, userID, &buf); err != nil {
@@ -255,6 +271,19 @@ func TestExportGeneratesValidZip(t *testing.T) {
 	}
 	if entries["documents/cv_2026.pdf"] != "%PDF-1.4 test" {
 		t.Errorf("document content mismatch: %q", entries["documents/cv_2026.pdf"])
+	}
+	if !strings.Contains(entries["profile.json"], "Musterfirma GmbH") || !strings.Contains(entries["profile.json"], "TU Musterstadt") {
+		t.Errorf("profile.json missing work history or education: %s", entries["profile.json"])
+	}
+	if want := now.Add(-48 * time.Hour).UTC().Format(time.RFC3339); !strings.Contains(entries["audit_events.json"], want) {
+		t.Errorf("audit event without its own time %s: %s", want, entries["audit_events.json"])
+	}
+
+	// A part that cannot be read fails the export instead of leaving it out.
+	fStations.err = errors.New("cannot open")
+	buf.Reset()
+	if err := svc.Export(ctx, userID, &buf); err == nil || buf.Len() != 0 {
+		t.Fatalf("export with an unreadable part: err %v, %d bytes written", err, buf.Len())
 	}
 }
 

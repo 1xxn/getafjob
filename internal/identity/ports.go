@@ -116,7 +116,7 @@ type Store interface {
 	// DeleteUser permanently removes a user and their cascading tenant rows.
 	DeleteUser(ctx context.Context, userID uuid.UUID) error
 	// AuditEvents returns all audit log events recorded for a user.
-	AuditEvents(ctx context.Context, userID uuid.UUID) ([]AuditEvent, error)
+	AuditEvents(ctx context.Context, userID uuid.UUID) ([]AuditEntry, error)
 }
 
 // Mail is a plain-text mail.

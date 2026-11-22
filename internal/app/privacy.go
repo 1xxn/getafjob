@@ -52,7 +52,8 @@ func newPrivacyServiceFromConfig(cfg config.Config, pool *pgxpool.Pool) (*privac
 	apps := application.NewService(applicationstore.New(pool))
 	listings := matching.NewListings(matchingstore.New(pool))
 
-	return privacy.NewService(ids, profiles, items, docs, apps, listings, env, sealedFiles), nil
+	return privacy.NewService(ids, profiles, items, docs, apps, listings, env, sealedFiles).
+		WithStations(profile.NewStations(pstore, env)), nil
 }
 
 func adminDeleteUser(ctx context.Context, args []string, env Env) int {

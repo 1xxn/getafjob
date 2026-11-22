@@ -359,7 +359,7 @@ func (s *Service) DeleteUser(ctx context.Context, userID uuid.UUID) error {
 }
 
 // AuditEvents returns all audit log events recorded for a user.
-func (s *Service) AuditEvents(ctx context.Context, userID uuid.UUID) ([]AuditEvent, error) {
+func (s *Service) AuditEvents(ctx context.Context, userID uuid.UUID) ([]AuditEntry, error) {
 	return s.store.AuditEvents(ctx, userID)
 }
 

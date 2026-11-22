@@ -16,7 +16,7 @@ type IdentityService interface {
 	UserByID(ctx context.Context, id uuid.UUID) (identity.User, error)
 	Passkeys(ctx context.Context, userID uuid.UUID) ([]identity.PasskeyInfo, error)
 	Sessions(ctx context.Context, userID uuid.UUID, currentToken string) ([]identity.SessionInfo, error)
-	AuditEvents(ctx context.Context, userID uuid.UUID) ([]identity.AuditEvent, error)
+	AuditEvents(ctx context.Context, userID uuid.UUID) ([]identity.AuditEntry, error)
 	DeleteUser(ctx context.Context, userID uuid.UUID) error
 	Cleanup(ctx context.Context) error
 }
@@ -24,6 +24,12 @@ type IdentityService interface {
 // ProfileService supplies the personal applicant profile.
 type ProfileService interface {
 	Get(ctx context.Context, userID uuid.UUID) (profile.Snapshot, error)
+}
+
+// StationService supplies the work history and education.
+type StationService interface {
+	WorkExperiences(ctx context.Context, userID uuid.UUID) ([]profile.WorkExperience, error)
+	Educations(ctx context.Context, userID uuid.UUID) ([]profile.EducationStation, error)
 }
 
 // ItemService supplies answer bank and text blocks.
