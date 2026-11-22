@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<rss version="2.0" xmlns:content="http://purl.org/rss/1.0/modules/content/">
+<channel>
+  <title>Jobs in IT &amp; Software Development | Berlin Startup Jobs</title>
+  <link>https://berlinstartupjobs.com/engineering/</link>
+  <item>
+    <title>Senior Go Developer // Beispielwerk</title>
+    <link>https://berlinstartupjobs.com/engineering/senior-go-developer-beispielwerk/</link>
+    <pubDate>Tue, 17 Nov 2026 16:14:11 +0000</pubDate>
+    <guid isPermaLink="false">https://berlinstartupjobs.com/?p=450001</guid>
+    <description><![CDATA[<p>Build backend systems with Go and PostgreSQL.</p>]]></description>
+    <post-id xmlns="com-wordpress:feed-additions:1">450001</post-id>
+  </item>
+  <item>
+    <title>Platform Engineer</title>
+    <link>https://berlinstartupjobs.com/engineering/platform-engineer/</link>
+    <pubDate>Mon, 16 Nov 2026 10:00:00 +0000</pubDate>
+    <guid isPermaLink="false">https://berlinstartupjobs.com/?p=450002</guid>
+    <description><![CDATA[<p>Kubernetes and Terraform infrastructure.</p>]]></description>
+  </item>
+</channel>
+</rss>

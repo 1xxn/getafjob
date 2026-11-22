@@ -42,10 +42,10 @@ func TestCrawlSources(t *testing.T) {
 		terms searchTerms
 		want  string
 	}{
-		{searchTerms{}, "google apple:germany-DEU arbeitnow greenhouse:acme workday:muster/External"},
-		{searchTerms{Queries: []string{"Go"}}, "google apple:germany-DEU arbeitnow himalayas amazon linkedin indeed glassdoor greenhouse:acme workday:muster/External"},
+		{searchTerms{}, "google apple:germany-DEU arbeitnow berlinstartupjobs greenhouse:acme workday:muster/External"},
+		{searchTerms{Queries: []string{"Go"}}, "google apple:germany-DEU arbeitnow berlinstartupjobs himalayas amazon linkedin indeed glassdoor greenhouse:acme workday:muster/External"},
 		{searchTerms{Queries: []string{"Go"}, Cities: []string{"Berlin"}},
-			"google apple:germany-DEU arbeitnow himalayas amazon arbeitsagentur linkedin indeed glassdoor greenhouse:acme workday:muster/External"},
+			"google apple:germany-DEU arbeitnow berlinstartupjobs himalayas amazon arbeitsagentur linkedin indeed glassdoor greenhouse:acme workday:muster/External"},
 	}
 	for _, tc := range cases {
 		got, _, err := crawlSources(context.Background(), c, boards, tc.terms, logger)

@@ -30,12 +30,12 @@ func TestProbes(t *testing.T) {
 		got = append(got, b.ATS+":"+b.Slug)
 	}
 	want := "greenhouse:Beispiel lever:beispiel " +
-		"greenhouse:beispiellabs ashby:beispiellabs lever:beispiellabs recruitee:beispiellabs workable:beispiellabs personio:beispiellabs " +
-		"greenhouse:beispiel-labs ashby:beispiel-labs lever:beispiel-labs recruitee:beispiel-labs workable:beispiel-labs personio:beispiel-labs"
+		"greenhouse:beispiellabs ashby:beispiellabs lever:beispiellabs recruitee:beispiellabs workable:beispiellabs personio:beispiellabs softgarden:beispiellabs join:beispiellabs " +
+		"greenhouse:beispiel-labs ashby:beispiel-labs lever:beispiel-labs recruitee:beispiel-labs workable:beispiel-labs personio:beispiel-labs softgarden:beispiel-labs join:beispiel-labs"
 	if strings.Join(got, " ") != want {
 		t.Errorf("probes = %v", got)
 	}
-	if one := sources.Probes(candidate("Muster")); len(one) != 6 || one[0].Slug != "muster" {
+	if one := sources.Probes(candidate("Muster")); len(one) != 8 || one[0].Slug != "muster" {
 		t.Errorf("single word: %v", one)
 	}
 }

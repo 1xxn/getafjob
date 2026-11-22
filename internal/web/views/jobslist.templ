@@ -80,7 +80,8 @@ func decisionOptions(ctx context.Context, d JobsData) []ui.Option {
 // the search does not drop it.
 func sourceOptions(ctx context.Context, cur string) []ui.Option {
 	pairs := []string{"", T(ctx, "jobs.source.any"), "greenhouse", "Greenhouse", "lever", "Lever", "ashby", "Ashby",
-		"workday", "Workday", "personio", "Personio", "smartrecruiters", "SmartRecruiters", "recruitee", "Recruitee",
+		"workday", "Workday", "personio", "Personio", "softgarden", "softgarden", "join", "JOIN",
+		"successfactors", "SuccessFactors", "smartrecruiters", "SmartRecruiters", "recruitee", "Recruitee",
 		"workable", "Workable"}
 	known := false
 	for i := 0; i < len(pairs); i += 2 {

@@ -9,10 +9,10 @@ import (
 )
 
 // guessSystems are the systems whose boards are tried by company name, most common first.
-var guessSystems = []string{"greenhouse", "ashby", "lever", "recruitee", "workable", "personio"}
+var guessSystems = []string{"greenhouse", "ashby", "lever", "recruitee", "workable", "personio", "softgarden", "join"}
 
 // maxProbes bounds the boards fetched for one company.
-const maxProbes = 14
+const maxProbes = 18
 
 // Finder implements discovery.BoardFinder: boards named by the hits' links first, then boards guessed from the
 // company name. A board counts only if it lists one of the hits (same MatchKey).

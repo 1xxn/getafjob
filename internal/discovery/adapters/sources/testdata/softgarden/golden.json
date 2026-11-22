@@ -1,0 +1,31 @@
+{
+  "complete": true,
+  "postings": [
+    {
+      "Source": "softgarden:beispielwerk",
+      "ExternalID": "6300001",
+      "Company": "Beispielwerk",
+      "Title": "Backend Developer (m/w/d)",
+      "Location": "Düsseldorf",
+      "URL": "https://beispielwerk.softgarden.io/job/6300001/Backend-Developer-m-w-d",
+      "ApplyURL": "",
+      "Description": "Wir bauen Microservices mit Go und PostgreSQL.",
+      "Posted": "2026-11-19",
+      "Workplace": "",
+      "Extra": null
+    },
+    {
+      "Source": "softgarden:beispielwerk",
+      "ExternalID": "6300002",
+      "Company": "Beispielwerk",
+      "Title": "QA Engineer (m/w/d)",
+      "Location": "Berlin; Remote",
+      "URL": "https://beispielwerk.softgarden.io/job/6300002/QA-Engineer-m-w-d",
+      "ApplyURL": "",
+      "Description": "End-to-end Tests automatisieren.",
+      "Posted": "2026-11-10",
+      "Workplace": "",
+      "Extra": null
+    }
+  ]
+}

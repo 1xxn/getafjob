@@ -12,6 +12,7 @@ func TestOf(t *testing.T) {
 		{"https://www.arbeitsagentur.de/jobsuche/jobdetail/10000-1", "https://jobs.lever.co/acme/1", Form},
 		{"https://www.arbeitnow.com/jobs/companies/acme/go-dev", "", Portal},
 		{"https://himalayas.app/companies/acme/jobs/go", "https://himalayas.app/companies/acme/jobs/go/apply", Portal},
+		{"https://berlinstartupjobs.com/engineering/go-dev/", "", Portal},
 		{"https://example.org/jobs/1", "mailto:jobs@example.org", Email},
 		{"https://example.org/jobs/1", " MAILTO:Jobs@Example.org ", Email},
 		{"https://www.linkedin.com/jobs/view/1", "", Form}, // Easy Apply belongs to the portals module

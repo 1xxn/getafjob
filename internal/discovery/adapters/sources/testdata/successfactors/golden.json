@@ -1,0 +1,35 @@
+{
+  "complete": true,
+  "postings": [
+    {
+      "Source": "successfactors:beispielwerk",
+      "ExternalID": "1450001",
+      "Company": "Beispielwerk",
+      "Title": "Backend Developer (m/w/d)",
+      "Location": "Essen, NW, DE",
+      "URL": "https://jobs.beispielwerk.example/job/Essen-Backend-Developer/1450001/",
+      "ApplyURL": "",
+      "Description": "Microservices mit Go und Kubernetes.\n\n• CI/CD\n\n• PostgreSQL",
+      "Posted": "2026-11-18",
+      "Workplace": "",
+      "Extra": {
+        "path": "/job/Essen-Backend-Developer/1450001/"
+      }
+    },
+    {
+      "Source": "successfactors:beispielwerk",
+      "ExternalID": "1450002",
+      "Company": "Beispielwerk",
+      "Title": "Cloud Architect (d/f/m)",
+      "Location": "Munich",
+      "URL": "https://jobs.beispielwerk.example/job/Munich-Cloud-Architect/1450002/",
+      "ApplyURL": "",
+      "Description": "Cloud-Architektur und Betrieb in Azure und AWS.",
+      "Posted": "2026-11-20",
+      "Workplace": "",
+      "Extra": {
+        "path": "/job/Munich-Cloud-Architect/1450002/"
+      }
+    }
+  ]
+}

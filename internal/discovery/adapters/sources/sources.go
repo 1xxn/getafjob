@@ -40,7 +40,7 @@ func FromBoard(c *Client, b Board) (discovery.Source, error) {
 	slug := strings.TrimSpace(b.Slug)
 	bad := func(why string) error { return fmt.Errorf("%w: %s %q: %s", ErrBadBoard, b.ATS, slug, why) }
 	switch b.ATS {
-	case "personio", "recruitee":
+	case "personio", "recruitee", "softgarden", "join":
 		slug = strings.ToLower(slug)
 		if !hostLabel.MatchString(slug) {
 			return nil, bad("slug")
@@ -94,6 +94,22 @@ func FromBoard(c *Client, b Board) (discovery.Source, error) {
 		return &Personio{c: c, slug: slug, company: company}, nil
 	case "recruitee":
 		return &Recruitee{c: c, slug: slug, company: company}, nil
+	case "softgarden":
+		return &Softgarden{c: c, slug: slug, company: company}, nil
+	case "join":
+		return &Join{c: c, slug: slug, company: company}, nil
+	case "successfactors":
+		var cfg struct {
+			Host     string `json:"host"`
+			Location string `json:"location"`
+			Search   string `json:"search"`
+			Max      int    `json:"max"`
+		}
+		if err := config(b.Config, &cfg); err != nil || !hostName.MatchString(cfg.Host) || !netguard.PublicURL("https://"+cfg.Host) {
+			return nil, bad("config")
+		}
+		return &SuccessFactors{c: c, host: cfg.Host, slug: slug, company: or(company, pretty(slug)),
+			location: cfg.Location, search: cfg.Search, max: cfg.Max}, nil
 	case "workable":
 		return &Workable{c: c, slug: slug, company: company}, nil
 	case "workday":

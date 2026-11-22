@@ -66,13 +66,14 @@ const StaleAfter = 21 * 24 * time.Hour
 
 // aggregators are job boards that list jobs of many companies; company boards win over them.
 var aggregators = map[string]bool{
-	"arbeitnow":      true,
-	"himalayas":      true,
-	"arbeitsagentur": true,
-	"portal":         true,
-	"linkedin":       true,
-	"indeed":         true,
-	"glassdoor":      true,
+	"arbeitnow":         true,
+	"berlinstartupjobs": true,
+	"himalayas":         true,
+	"arbeitsagentur":    true,
+	"portal":            true,
+	"linkedin":          true,
+	"indeed":            true,
+	"glassdoor":         true,
 }
 
 // IsAggregator reports whether source is a job board rather than a company's own board.

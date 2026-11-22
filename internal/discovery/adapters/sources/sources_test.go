@@ -270,6 +270,33 @@ func TestSources(t *testing.T) {
 			s.MaxPages = 1
 			return s
 		}},
+		{"softgarden", map[string][]string{
+			"GET https://beispielwerk.softgarden.io/de/vacancies":                        {"vacancies.html"},
+			"GET https://beispielwerk.softgarden.io/job/6300001/Backend-Developer-m-w-d": {"job1.html"},
+			"GET https://beispielwerk.softgarden.io/job/6300002/QA-Engineer-m-w-d":       {"job2.html"},
+		}, func(t *testing.T, c *sources.Client) discovery.Source {
+			return board(t, c, "softgarden", "beispielwerk", "Beispielwerk", "")
+		}},
+		{"join", map[string][]string{
+			"GET https://join.com/companies/beispielwerk":                             {"company.html"},
+			"GET https://join.com/companies/beispielwerk/1690001-senior-go-developer": {"job1.html"},
+			"GET https://join.com/companies/beispielwerk/1690002-platform-engineer":   {"job2.html"},
+		}, func(t *testing.T, c *sources.Client) discovery.Source {
+			return board(t, c, "join", "beispielwerk", "", "")
+		}},
+		{"successfactors", map[string][]string{
+			"GET https://jobs.beispielwerk.example/search/?locationsearch=Germany&q=&startrow=0":  {"search.html"},
+			"GET https://jobs.beispielwerk.example/search/?locationsearch=Germany&q=&startrow=25": {"empty.html"},
+			"GET https://jobs.beispielwerk.example/job/Essen-Backend-Developer/1450001/":          {"job1.html"},
+			"GET https://jobs.beispielwerk.example/job/Munich-Cloud-Architect/1450002/":           {"job2.html"},
+		}, func(t *testing.T, c *sources.Client) discovery.Source {
+			return board(t, c, "successfactors", "beispielwerk", "Beispielwerk", `{"host":"jobs.beispielwerk.example","location":"Germany"}`)
+		}},
+		{"berlinstartupjobs", map[string][]string{
+			"GET https://berlinstartupjobs.com/engineering/feed/": {"feed.xml"},
+		}, func(_ *testing.T, c *sources.Client) discovery.Source {
+			return sources.NewBerlinStartupJobs(c)
+		}},
 	}
 	for _, c := range cases {
 		t.Run(c.dir, func(t *testing.T) {
@@ -297,6 +324,9 @@ func TestFromBoardRejectsUnsafeSlugs(t *testing.T) {
 		{ATS: "workday", Slug: "muster", Config: json.RawMessage(`{"host":"evil.example.org","site":"External"}`)},
 		{ATS: "workday", Slug: "muster", Config: json.RawMessage(`{"host":"muster.wd3.myworkdayjobs.com.evil.org","site":"x"}`)},
 		{ATS: "workday", Slug: "muster", Config: json.RawMessage(`{"host":"muster.wd3.myworkdayjobs.com","site":"../x"}`)},
+		{ATS: "softgarden", Slug: "a/b"},
+		{ATS: "join", Slug: "-x"},
+		{ATS: "successfactors", Slug: "muster", Config: json.RawMessage(`{"host":"127.0.0.1"}`)},
 		{ATS: "taleo", Slug: "muster"},
 	} {
 		if _, err := sources.FromBoard(c, b); !errors.Is(err, sources.ErrBadBoard) {
@@ -348,11 +378,12 @@ func TestArbeitnowKeepsPagesWhenThrottled(t *testing.T) {
 func TestSourceNames(t *testing.T) {
 	cl := sources.NewClient(http.DefaultClient)
 	var names []string
-	for _, ats := range []string{"greenhouse", "ashby", "lever", "smartrecruiters", "personio", "recruitee", "workable"} {
+	for _, ats := range []string{"greenhouse", "ashby", "lever", "smartrecruiters", "personio", "recruitee", "workable", "softgarden", "join"} {
 		names = append(names, board(t, cl, ats, "acme", "", "").Name())
 	}
+	names = append(names, board(t, cl, "successfactors", "acme", "ACME", `{"host":"jobs.acme.example"}`).Name())
 	sort.Strings(names)
-	want := "ashby:acme greenhouse:acme lever:acme personio:acme recruitee:acme smartrecruiters:acme workable:acme"
+	want := "ashby:acme greenhouse:acme join:acme lever:acme personio:acme recruitee:acme smartrecruiters:acme softgarden:acme successfactors:acme workable:acme"
 	if got := strings.Join(names, " "); got != want {
 		t.Fatalf("names = %s", got)
 	}
@@ -389,7 +420,9 @@ func (b anyBody) RoundTrip(req *http.Request) (*http.Response, error) {
 func FuzzSources(f *testing.F) {
 	for _, seed := range []string{"testdata/greenhouse/jobs.json", "testdata/workday/page1.json", "testdata/personio/feed.xml",
 		"testdata/arbeitsagentur/search.json", "testdata/amazon/search.json", "testdata/smartrecruiters/page1.json",
-		"testdata/google/feed.xml", "testdata/apple/page1.html", "testdata/eightfold-pcsx/page1.json"} {
+		"testdata/google/feed.xml", "testdata/apple/page1.html", "testdata/eightfold-pcsx/page1.json",
+		"testdata/softgarden/vacancies.html", "testdata/join/company.html", "testdata/successfactors/search.html",
+		"testdata/berlinstartupjobs/feed.xml"} {
 		b, err := os.ReadFile(seed)
 		if err != nil {
 			f.Fatal(err)
@@ -403,12 +436,13 @@ func FuzzSources(f *testing.F) {
 		srcs := []discovery.Source{
 			sources.NewArbeitnow(c, 3), sources.NewHimalayas(c, []string{"go"}, "Germany"),
 			sources.NewArbeitsagentur(c, []string{"go"}, []string{"Berlin"}), sources.NewAmazon(c, []string{"go"}, "DEU"),
-			sources.NewGoogle(c), apple,
+			sources.NewGoogle(c), sources.NewBerlinStartupJobs(c), apple,
 		}
 		for _, b := range []sources.Board{
 			{ATS: "greenhouse", Slug: "x"}, {ATS: "ashby", Slug: "x"}, {ATS: "lever", Slug: "x"},
 			{ATS: "smartrecruiters", Slug: "x"}, {ATS: "personio", Slug: "x"}, {ATS: "recruitee", Slug: "x"},
-			{ATS: "workable", Slug: "x"},
+			{ATS: "workable", Slug: "x"}, {ATS: "softgarden", Slug: "x"}, {ATS: "join", Slug: "x"},
+			{ATS: "successfactors", Slug: "x", Config: json.RawMessage(`{"host":"jobs.x.example"}`)},
 			{ATS: "workday", Slug: "x", Config: json.RawMessage(`{"host":"x.wd1.myworkdayjobs.com","site":"x"}`)},
 			{ATS: "eightfold", Slug: "x.com", Config: json.RawMessage(`{"host":"jobs.x.com","api":"v2"}`)},
 			{ATS: "eightfold", Slug: "x.com", Config: json.RawMessage(`{"host":"jobs.x.com","api":"pcsx"}`)},

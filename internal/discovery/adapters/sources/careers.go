@@ -169,6 +169,7 @@ var (
 		{"smartrecruiters", slugPath("jobs.smartrecruiters.com")},
 		{"smartrecruiters", slugPath("careers.smartrecruiters.com")},
 		{"workable", slugPath("apply.workable.com")},
+		{"join", regexp.MustCompile(`^https?://join\.com/companies/([a-z0-9](?:[a-z0-9-]*[a-z0-9])?)(?:[/?#]|$)`)},
 	}
 	atsByHost = []struct {
 		ats string
@@ -176,10 +177,11 @@ var (
 	}{
 		{"personio", regexp.MustCompile(`^https?://([a-z0-9-]+)\.jobs\.personio\.(?:de|com)(?:[/?#]|$)`)},
 		{"recruitee", regexp.MustCompile(`^https?://([a-z0-9-]+)\.recruitee\.com(?:[/?#]|$)`)},
+		{"softgarden", regexp.MustCompile(`^https?://([a-z0-9-]+)\.softgarden\.io(?:[/?#]|$)`)},
 	}
 	workdayURL  = regexp.MustCompile(`^https?://([a-z0-9-]+)\.(wd[0-9]{1,3}\.myworkday(?:jobs|site)\.com)/(?:[a-z]{2}-[A-Z]{2}/)?([A-Za-z0-9_-]+)`)
 	greenhouseQ = regexp.MustCompile(`^https?://(?:job-)?boards(?:\.eu)?\.greenhouse\.io/embed/job_board(?:/js)?\?(?:.*&)?for=([A-Za-z0-9._-]+)`)
-	urlInText   = regexp.MustCompile(`https?://[A-Za-z0-9.-]+\.(?:greenhouse\.io|ashbyhq\.com|lever\.co|smartrecruiters\.com|workable\.com|personio\.(?:de|com)|recruitee\.com|myworkdayjobs\.com|myworkdaysite\.com)[^\s"'<>\\)]*`)
+	urlInText   = regexp.MustCompile(`https?://(?:[A-Za-z0-9.-]+\.(?:greenhouse\.io|ashbyhq\.com|lever\.co|smartrecruiters\.com|workable\.com|personio\.(?:de|com)|recruitee\.com|softgarden\.io|myworkdayjobs\.com|myworkdaysite\.com)|join\.com/companies/)[^\s"'<>\\)]*`)
 	notSlugs    = map[string]bool{"embed": true, "api": true, "j": true, "jobs": true, "v1": true, "static": true, "assets": true}
 )
 
