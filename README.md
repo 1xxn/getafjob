@@ -137,6 +137,7 @@ go tool task lint           # run pinned golangci-lint in Docker (--build-tags b
 - [Configuration Reference](docs/configuration.md) — All `GETAFJOB_*` environment variables and `_FILE` secret handling
 - [Architecture & Security Model](docs/architecture.md) — Service topology, module boundaries, runtime flows, and threat controls
 - [Production Deployment & Operations](docs/deployment.md) — Production Compose overlay, signed image deploys/rollbacks, restic backups, key rotation, and observability
+- [Architecture Decisions](docs/adr/README.md): why things are built the way they are
 - [Security Policy](SECURITY.md) — Vulnerability disclosure guidelines
 - [Contributing](CONTRIBUTING.md) — Development rules, testing suites, and PR expectations
 
