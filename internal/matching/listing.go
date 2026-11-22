@@ -54,6 +54,8 @@ type Item struct {
 	SalaryMax      int
 	SalaryCurrency string
 	Source         string
+	URL            string
+	ApplyURL       string
 	Blocked        bool
 }
 
@@ -69,8 +71,6 @@ type List struct {
 type Detail struct {
 	Item
 	Description string
-	URL         string
-	ApplyURL    string
 	Open        bool
 	Reasons     []Reason
 	ComputedAt  time.Time

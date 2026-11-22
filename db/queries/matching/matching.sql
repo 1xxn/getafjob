@@ -20,7 +20,7 @@ WHERE (matches.score, matches.decision, matches.reasons, matches.rules)
 SELECT j.id, j.title, j.company, j.location, j.workplace, j.posted, j.first_seen,
   coalesce(j.salary_min, 0)::integer AS salary_min,
   coalesce(j.salary_max, 0)::integer AS salary_max,
-  j.salary_currency, j.source, m.score, m.decision,
+  j.salary_currency, j.source, j.url, j.apply_url, m.score, m.decision,
   EXISTS (
     SELECT 1 FROM user_blocklist b
     WHERE b.user_id = m.user_id

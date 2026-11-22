@@ -25,11 +25,39 @@ var bulkActions = map[string]string{"queue": "queue", "save": "save", "skip": "s
 // maxBulk bounds one bulk action (one page of the list).
 const maxBulk = matching.PageSize
 
+const jobsHintCookie = "getafjob_jobs_hint"
+
+func jobsHintDismissed(r *http.Request) bool {
+	c, err := r.Cookie(jobsHintCookie)
+	return err == nil && c.Value == "1"
+}
+
+func (s *Server) dismissJobsHint(w http.ResponseWriter, r *http.Request, u *identity.User) {
+	if u == nil {
+		http.Redirect(w, r, "/login", http.StatusSeeOther)
+		return
+	}
+	http.SetCookie(w, &http.Cookie{
+		Name:     jobsHintCookie,
+		Value:    "1",
+		Path:     "/",
+		MaxAge:   oneYearSecond,
+		HttpOnly: true,
+		Secure:   true,
+		SameSite: http.SameSiteLaxMode,
+	})
+	if partial(r) {
+		w.WriteHeader(http.StatusOK)
+		return
+	}
+	http.Redirect(w, r, "/jobs", http.StatusSeeOther)
+}
+
 // listQuery is the job list's state in the URL: filters, sort, page and the job open beside the list.
 type listQuery struct {
-	Query, Decision, Workplace, Location, Source, Freshness, Sort string
-	MinSalary, Page                                               int
-	Job                                                           int64
+	Query, Decision, Workplace, Location, Source, Freshness, Mode, Sort string
+	MinSalary, Page                                                     int
+	Job                                                                 int64
 }
 
 var freshnessDays = map[string]int{"24h": 1, "3d": 3, "7d": 7, "14d": 14, "30d": 30}
@@ -42,6 +70,9 @@ func parseListQuery(v url.Values) listQuery {
 	}
 	if _, ok := freshnessDays[q.Freshness]; !ok {
 		q.Freshness = "all"
+	}
+	if v.Get("mode") == "form" {
+		q.Mode = "form"
 	}
 	if !slices.Contains([]string{"match", "newest", "salary", "company"}, q.Sort) {
 		q.Sort = "match"
@@ -87,6 +118,7 @@ func (q listQuery) url() string {
 	set("location", q.Location, "")
 	set("source", q.Source, "")
 	set("freshness", q.Freshness, "all")
+	set("mode", q.Mode, "")
 	set("sort", q.Sort, "match")
 	if q.MinSalary > 0 {
 		v.Set("min_salary", strconv.Itoa(q.MinSalary))
@@ -139,8 +171,9 @@ func (s *Server) jobsPage(w http.ResponseWriter, r *http.Request, u *identity.Us
 	}
 	d := views.JobsData{
 		Name: u.DisplayName, Query: lq.Query, Decision: lq.Decision, Workplace: f.Workplace, Location: f.Location,
-		Source: f.Source, MinSalary: f.MinSalary, Freshness: lq.Freshness, Sort: f.Sort,
-		Total: l.Total, Page: f.Page, Pages: (l.Total + matching.PageSize - 1) / matching.PageSize,
+		Source: f.Source, MinSalary: f.MinSalary, Freshness: lq.Freshness, Mode: lq.Mode, Sort: f.Sort,
+		ShowHint: !jobsHintDismissed(r),
+		Total:    l.Total, Page: f.Page, Pages: (l.Total + matching.PageSize - 1) / matching.PageSize,
 		Counts: map[string]int{}, BlockedCount: l.BlockedCount, Back: lq.url(), SaveQuery: lq.saveQuery(),
 	}
 	for k, n := range l.Counts {
@@ -162,11 +195,18 @@ func (s *Server) jobsPage(w http.ResponseWriter, r *http.Request, u *identity.Us
 	now := time.Now()
 	for _, it := range l.Items {
 		row := jobRow(r.Context(), it, now)
+		if lq.Mode == "form" && row.ApplyMode != "form" {
+			continue
+		}
 		row.State = stateKey(states[it.JobID], row.Age)
 		row.PanelURL = lq.with(func(q *listQuery) { q.Job = it.JobID })
 		row.PanelGet = "/jobs/" + strconv.FormatInt(it.JobID, 10) + "/panel" + query(lq.with(func(q *listQuery) { q.Job = it.JobID }))
 		row.Current = it.JobID == lq.Job
 		d.Rows = append(d.Rows, row)
+	}
+	if lq.Mode == "form" && d.Total > len(d.Rows) {
+		d.Total = len(d.Rows)
+		d.Pages = (d.Total + matching.PageSize - 1) / matching.PageSize
 	}
 	d.Chips = chips(r.Context(), lq)
 	d.PageLinks, d.PrevURL, d.NextURL = pageLinks(lq, d.Pages)
@@ -336,6 +376,9 @@ func chips(ctx context.Context, q listQuery) []views.FilterChip {
 	}
 	if q.Freshness != "all" {
 		add(t("jobs.freshness."+q.Freshness), func(c *listQuery) { c.Freshness = "all" })
+	}
+	if q.Mode == "form" {
+		add(t("jobs.chip.mode_form"), func(c *listQuery) { c.Mode = "" })
 	}
 	if q.MinSalary > 0 {
 		add(t("jobs.chip.salary", "val", views.Amount(ctx, strconv.Itoa(q.MinSalary))), func(c *listQuery) { c.MinSalary = 0 })

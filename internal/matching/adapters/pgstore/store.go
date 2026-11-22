@@ -131,6 +131,8 @@ func (s *Store) ListMatches(ctx context.Context, userID uuid.UUID, f matching.Fi
 				SalaryMax:      int(r.SalaryMax),
 				SalaryCurrency: r.SalaryCurrency,
 				Source:         r.Source,
+				URL:            r.Url,
+				ApplyURL:       r.ApplyUrl,
 				Blocked:        r.Blocked,
 			}
 			total = int(r.Total)
@@ -184,11 +186,11 @@ func (s *Store) Match(ctx context.Context, userID uuid.UUID, jobID int64) (d mat
 				SalaryMax:      int(r.SalaryMax),
 				SalaryCurrency: r.SalaryCurrency,
 				Source:         r.Source,
+				URL:            r.Url,
+				ApplyURL:       r.ApplyUrl,
 				Blocked:        r.Blocked,
 			},
 			Description: r.Description,
-			URL:         r.Url,
-			ApplyURL:    r.ApplyUrl,
 			Open:        r.Status == "open",
 			ComputedAt:  r.ComputedAt,
 		}

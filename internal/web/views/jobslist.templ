@@ -18,7 +18,9 @@ type JobsData struct {
 	Source       string // ATS platform
 	MinSalary    int
 	Freshness    string // "all", "24h", "3d", "7d", "14d", "30d"
+	Mode         string // "", "form"
 	Sort         string // "match", "newest", "salary", "company"
+	ShowHint     bool   // dismissible first-visit guidance on /jobs
 	Rows         []JobRow
 	Total        int
 	Page         int
@@ -90,6 +92,30 @@ func sourceOptions(ctx context.Context, cur string) []ui.Option {
 	return opts(cur, pairs...)
 }
 
+func (d JobsData) ExtraFilters() int {
+	n := 0
+	if d.Location != "" {
+		n++
+	}
+	if d.Freshness != "" && d.Freshness != "all" {
+		n++
+	}
+	if d.MinSalary > 0 {
+		n++
+	}
+	if d.Source != "" {
+		n++
+	}
+	if d.Mode == "form" {
+		n++
+	}
+	return n
+}
+
+func modeOptions(ctx context.Context, cur string) []ui.Option {
+	return opts(cur, "", T(ctx, "jobs.filter.mode.all"), "form", T(ctx, "jobs.filter.mode.form"))
+}
+
 func scoreTone(decision string) ui.Tone {
 	switch decision {
 	case "match":
@@ -140,7 +166,12 @@ templ jobFacts(r JobRow) {
 
 templ jobBadges(r JobRow) {
 	<span class="job-badges">
-		@ui.Badge(itoa(r.Score), scoreTone(r.Decision))
+		@ui.Badge(ScoreLabel(ctx, r.Score)+" · "+itoa(r.Score), scoreTone(r.Decision))
+		if r.ApplyMode == "form" {
+			<span class="job-mode job-mode-form">{ T(ctx, "jobs.mode.form") }</span>
+		} else if r.ApplyMode != "" {
+			<span class="job-mode job-mode-self">{ T(ctx, "jobs.mode.self") }</span>
+		}
 		if r.State != "" {
 			@ui.Badge(T(ctx, "jobs.state."+r.State), stateTone(r.State))
 		}
@@ -248,21 +279,33 @@ templ jobsFilters(d JobsData) {
 				Type: "search", Value: d.Query, Placeholder: T(ctx, "jobs.search_placeholder"), MaxLength: 200})
 		</div>
 		@ui.Select(ui.SelectProps{FieldProps: ui.FieldProps{Name: "decision", Label: T(ctx, "jobs.decision")}, Options: decisionOptions(ctx, d)})
-		@ui.Select(ui.SelectProps{FieldProps: ui.FieldProps{Name: "freshness", Label: T(ctx, "jobs.freshness")}, Options: opts(d.Freshness,
-			"all", T(ctx, "jobs.freshness.all"), "24h", T(ctx, "jobs.freshness.24h"), "3d", T(ctx, "jobs.freshness.3d"),
-			"7d", T(ctx, "jobs.freshness.7d"), "14d", T(ctx, "jobs.freshness.14d"), "30d", T(ctx, "jobs.freshness.30d"))})
 		@ui.Select(ui.SelectProps{FieldProps: ui.FieldProps{Name: "workplace", Label: T(ctx, "jobs.workplace")}, Options: opts(d.Workplace,
 			"", T(ctx, "jobs.workplace.any"), "remote", T(ctx, "jobs.workplace.remote"), "hybrid", T(ctx, "jobs.workplace.hybrid"),
 			"onsite", T(ctx, "jobs.workplace.onsite"))})
-		@ui.Input(ui.InputProps{FieldProps: ui.FieldProps{Name: "location", Label: T(ctx, "jobs.location_label")}, Value: d.Location, MaxLength: 100})
-		@ui.Select(ui.SelectProps{FieldProps: ui.FieldProps{Name: "min_salary", Label: T(ctx, "jobs.min_salary_label")}, Options: opts(itoa(d.MinSalary),
-			"0", T(ctx, "jobs.min_salary.any"), "50000", T(ctx, "jobs.min_salary.val", "val", Amount(ctx, "50000")),
-			"70000", T(ctx, "jobs.min_salary.val", "val", Amount(ctx, "70000")), "90000", T(ctx, "jobs.min_salary.val", "val", Amount(ctx, "90000")),
-			"110000", T(ctx, "jobs.min_salary.val", "val", Amount(ctx, "110000")))})
-		@ui.Select(ui.SelectProps{FieldProps: ui.FieldProps{Name: "source", Label: T(ctx, "jobs.source_label")}, Options: sourceOptions(ctx, d.Source)})
 		@ui.Select(ui.SelectProps{FieldProps: ui.FieldProps{Name: "sort", Label: T(ctx, "jobs.sort")}, Options: opts(d.Sort,
 			"match", T(ctx, "jobs.sort.match"), "newest", T(ctx, "jobs.sort.newest"), "salary", T(ctx, "jobs.sort.salary"),
 			"company", T(ctx, "jobs.sort.company"))})
+		<details class="jobs-filters-more" open?={ d.ExtraFilters() > 0 }>
+			<summary class="ui-btn ui-btn-secondary">
+				if d.ExtraFilters() > 0 {
+					{ T(ctx, "jobs.filter.more_count", "n", d.ExtraFilters()) }
+				} else {
+					{ T(ctx, "jobs.filter.more") }
+				}
+			</summary>
+			<div class="jobs-filters-more-grid">
+				@ui.Input(ui.InputProps{FieldProps: ui.FieldProps{Name: "location", Label: T(ctx, "jobs.location_label")}, Value: d.Location, MaxLength: 100})
+				@ui.Select(ui.SelectProps{FieldProps: ui.FieldProps{Name: "freshness", Label: T(ctx, "jobs.freshness")}, Options: opts(d.Freshness,
+					"all", T(ctx, "jobs.freshness.all"), "24h", T(ctx, "jobs.freshness.24h"), "3d", T(ctx, "jobs.freshness.3d"),
+					"7d", T(ctx, "jobs.freshness.7d"), "14d", T(ctx, "jobs.freshness.14d"), "30d", T(ctx, "jobs.freshness.30d"))})
+				@ui.Select(ui.SelectProps{FieldProps: ui.FieldProps{Name: "min_salary", Label: T(ctx, "jobs.min_salary_label")}, Options: opts(itoa(d.MinSalary),
+					"0", T(ctx, "jobs.min_salary.any"), "50000", T(ctx, "jobs.min_salary.val", "val", Amount(ctx, "50000")),
+					"70000", T(ctx, "jobs.min_salary.val", "val", Amount(ctx, "70000")), "90000", T(ctx, "jobs.min_salary.val", "val", Amount(ctx, "90000")),
+					"110000", T(ctx, "jobs.min_salary.val", "val", Amount(ctx, "110000")))})
+				@ui.Select(ui.SelectProps{FieldProps: ui.FieldProps{Name: "source", Label: T(ctx, "jobs.source_label")}, Options: sourceOptions(ctx, d.Source)})
+				@ui.Select(ui.SelectProps{FieldProps: ui.FieldProps{Name: "mode", Label: T(ctx, "jobs.filter.mode")}, Options: modeOptions(ctx, d.Mode)})
+			</div>
+		</details>
 		<noscript>
 			@ui.Button(ui.ButtonProps{Label: T(ctx, "jobs.apply_filter"), Type: "submit"})
 		</noscript>
@@ -276,6 +319,14 @@ templ JobsPage(d JobsData) {
 			<h1>{ T(ctx, "jobs.title") }</h1>
 			@jobsToolbar(d)
 		</div>
+		if d.ShowHint {
+			<div class="dash-nudge jobs-hint" id="jobs-hint">
+				<p>{ T(ctx, "jobs.first_hint") }</p>
+				<form method="post" action="/jobs/hint/dismiss" { HX(ctx, "hx-post", "/jobs/hint/dismiss", "hx-target", "closest .dash-nudge", "hx-swap", "outerHTML")... }>
+					<button type="submit" class="ui-btn ui-btn-ghost ui-btn-sm">{ T(ctx, "dash.nudge.dismiss") }</button>
+				</form>
+			</div>
+		}
 		@jobsFilters(d)
 		@JobResults(d)
 	}
@@ -317,16 +368,6 @@ templ JobResults(d JobsData) {
 						@ui.Button(ui.ButtonProps{Label: T(ctx, "jobs.clear_filters"), Href: "/jobs"})
 					}
 				} else {
-					<form id="bulk" method="post" action="/jobs/bulk" class="jobs-bulk" data-bulk>
-						<input type="hidden" name="back" value={ d.Back }/>
-						<span class="jobs-bulk-count" data-bulk-count data-t-none={ T(ctx, "jobs.bulk.none") } data-t-some={ T(ctx, "jobs.bulk.some", "n", "{n}") }>{ T(ctx, "jobs.bulk.none") }</span>
-						<div class="jobs-bulk-actions">
-							@ui.Button(ui.ButtonProps{Label: T(ctx, "jobs.action.queue"), Type: "submit", Size: "sm", Icon: "send", Attrs: templ.Attributes{"name": "action", "value": "queue"}})
-							@ui.Button(ui.ButtonProps{Label: T(ctx, "jobs.action.save"), Type: "submit", Size: "sm", Variant: "ghost", Icon: "bookmark", Attrs: templ.Attributes{"name": "action", "value": "save"}})
-							@ui.Button(ui.ButtonProps{Label: T(ctx, "jobs.action.skip"), Type: "submit", Size: "sm", Variant: "ghost", Icon: "x", Attrs: templ.Attributes{"name": "action", "value": "skip"}})
-							@ui.Button(ui.ButtonProps{Label: T(ctx, "jobs.action.block"), Type: "submit", Size: "sm", Variant: "ghost", Icon: "ban", Attrs: templ.Attributes{"name": "action", "value": "block"}})
-						</div>
-					</form>
 					<ol class="job-rows" data-joblist aria-label={ T(ctx, "jobs.list_label") } aria-describedby="jobs-keys">
 						for _, r := range d.Rows {
 							<li class={ "job-row", templ.KV("job-row-current", r.Current) } data-job-row data-id={ i64(r.ID) } data-state={ r.State }>
@@ -346,6 +387,16 @@ templ JobResults(d JobsData) {
 							</li>
 						}
 					</ol>
+					<form id="bulk" method="post" action="/jobs/bulk" class="jobs-bulk jobs-bulk-bottom" data-bulk>
+						<input type="hidden" name="back" value={ d.Back }/>
+						<span class="jobs-bulk-count" data-bulk-count data-t-none={ T(ctx, "jobs.bulk.none") } data-t-some={ T(ctx, "jobs.bulk.some", "n", "{n}") }>{ T(ctx, "jobs.bulk.none") }</span>
+						<div class="jobs-bulk-actions">
+							@ui.Button(ui.ButtonProps{Label: T(ctx, "jobs.action.queue"), Type: "submit", Size: "sm", Icon: "send", Attrs: templ.Attributes{"name": "action", "value": "queue"}})
+							@ui.Button(ui.ButtonProps{Label: T(ctx, "jobs.action.save"), Type: "submit", Size: "sm", Variant: "ghost", Icon: "bookmark", Attrs: templ.Attributes{"name": "action", "value": "save"}})
+							@ui.Button(ui.ButtonProps{Label: T(ctx, "jobs.action.skip"), Type: "submit", Size: "sm", Variant: "ghost", Icon: "x", Attrs: templ.Attributes{"name": "action", "value": "skip"}})
+							@ui.Button(ui.ButtonProps{Label: T(ctx, "jobs.action.block"), Type: "submit", Size: "sm", Variant: "ghost", Icon: "ban", Attrs: templ.Attributes{"name": "action", "value": "block"}})
+						</div>
+					</form>
 					<p id="jobs-keys" class="jobs-keys">{ T(ctx, "jobs.keys") }</p>
 					if len(d.PageLinks) > 0 {
 						@ui.Pagination(ui.PaginationProps{Label: T(ctx, "jobs.pages"), PrevLabel: T(ctx, "jobs.prev"), NextLabel: T(ctx, "jobs.next"),
@@ -402,11 +453,17 @@ templ JobPanel(p JobPanelData) {
 		<div class="job-panel-actions">
 			if p.Excluded {
 			} else if p.ApplyMode == "form" && !p.Applying {
-				@ui.Button(ui.ButtonProps{Label: T(ctx, "jobs.apply_now"), Href: "/jobs/" + i64(p.Row.ID) + "/apply", Variant: "primary", Icon: "send"})
-				@panelAction(p, "queue", "list", "secondary")
-			} else if p.ApplyMode != "form" && p.URL != "" && !p.Applying {
-				@ui.Button(ui.ButtonProps{Label: T(ctx, "jobs.open_posting"), Href: p.URL, Variant: "primary", Icon: "external",
-					Attrs: templ.Attributes{"rel": "noopener noreferrer external", "target": "_blank"}})
+				@panelAction(p, "queue", "send", "primary")
+				@ui.Button(ui.ButtonProps{Label: T(ctx, "jobs.preview_apply"), Href: "/jobs/" + i64(p.Row.ID) + "/apply", Variant: "ghost"})
+			} else if p.ApplyMode != "form" && !p.Applying {
+				<p class="job-panel-self">{ T(ctx, "jobs.apply_self_notice") }</p>
+				if p.URL != "" {
+					@ui.Button(ui.ButtonProps{Label: T(ctx, "jobs.open_posting"), Href: p.URL, Variant: "secondary", Icon: "external",
+						Attrs: templ.Attributes{"rel": "noopener noreferrer external", "target": "_blank"}})
+				}
+				<form method="post" action={ templ.URL("/jobs/" + i64(p.Row.ID) + "/apply-external") }>
+					@ui.Button(ui.ButtonProps{Label: T(ctx, "apply.mark_applied"), Type: "submit", Variant: "ghost", Icon: "check"})
+				</form>
 			}
 			if !p.Applying {
 				@panelAction(p, "save", "bookmark", "ghost")

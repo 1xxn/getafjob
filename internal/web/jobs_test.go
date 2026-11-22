@@ -19,6 +19,7 @@ import (
 	"github.com/1xxn/getafjob/internal/matching"
 	matchingstore "github.com/1xxn/getafjob/internal/matching/adapters/pgstore"
 	"github.com/1xxn/getafjob/internal/platform/db"
+	"github.com/1xxn/getafjob/internal/web"
 )
 
 type criteria map[uuid.UUID]matching.Criteria
@@ -827,3 +828,103 @@ func checkNonces(t *testing.T, rec *httptest.ResponseRecorder) {
 }
 
 func withoutNonces(s string) string { return nonceRx.ReplaceAllString(s, `nonce=""`) }
+
+func TestJobListApplyUX(t *testing.T) {
+	a := newApp(t)
+	ctx := t.Context()
+	session := signedIn(t, a)
+
+	ds := discoverystore.New(a.pool)
+	now := time.Now()
+	run, err := ds.StartRun(ctx, []string{}, now)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, p := range []discovery.Posting{
+		{Source: "greenhouse:acme", ExternalID: "form-1", Company: "Acme Cloud", Title: "Go Developer", Location: "Berlin",
+			URL: "https://boards.greenhouse.io/acme/jobs/1", Description: "We build with Go and PostgreSQL."},
+		{Source: "stepstone", ExternalID: "portal-1", Company: "Beispiel AG", Title: "Backend Go Engineer", Location: "Berlin",
+			URL: "https://www.stepstone.de/stellenangebote--1", Description: "We build with Go and PostgreSQL."},
+	} {
+		if _, _, err := ds.Upsert(ctx, run, p, now); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	var maxID uuid.UUID
+	var formID, portalID int64
+	if err := db.InSystemTx(ctx, a.pool, func(tx pgx.Tx) error {
+		if err := tx.QueryRow(ctx, "SELECT id FROM users WHERE email = 'max.mustermann@example.com'").Scan(&maxID); err != nil {
+			return err
+		}
+		if err := tx.QueryRow(ctx, "SELECT id FROM jobs WHERE title = 'Go Developer'").Scan(&formID); err != nil {
+			return err
+		}
+		return tx.QueryRow(ctx, "SELECT id FROM jobs WHERE title = 'Backend Go Engineer'").Scan(&portalID)
+	}); err != nil {
+		t.Fatal(err)
+	}
+
+	ms := matchingstore.New(a.pool)
+	c := criteria{maxID: {Titles: []string{"Go Developer", "Backend Go Engineer"}, Locations: []string{"Berlin"},
+		Skills: []string{"Go", "PostgreSQL"}, Languages: []matching.Language{{Name: "English", Level: "C1"}}}}
+	if _, err := matching.NewService(c, ms, ms).Run(ctx, nil); err != nil {
+		t.Fatal(err)
+	}
+
+	list := a.do(http.MethodGet, "/jobs?decision=all", nil, session, nil).Body.String()
+	for _, want := range []string{
+		`id="jobs-hint"`,
+		"1. Select jobs · 2. Apply · 3. Watch live and answer questions.",
+		`class="jobs-filters-more"`,
+		`class="job-mode job-mode-form">getafjob applies<`,
+		`class="job-mode job-mode-self">Apply yourself<`,
+		`>Apply<`,
+	} {
+		if !strings.Contains(list, want) {
+			t.Errorf("jobs list missing %q", want)
+		}
+	}
+	if strings.Contains(list, `>Queue<`) {
+		t.Error("jobs list still shows Queue jargon")
+	}
+
+	// Dismissing the hint sets getafjob_jobs_hint=1 and hides it on subsequent loads.
+	recDismiss := a.do(http.MethodPost, "/jobs/hint/dismiss", nil, session, nil)
+	if recDismiss.Code != http.StatusSeeOther || !strings.Contains(recDismiss.Header().Get("Set-Cookie"), "getafjob_jobs_hint=1") {
+		t.Fatalf("dismiss jobs hint: code=%d cookie=%q", recDismiss.Code, recDismiss.Header().Get("Set-Cookie"))
+	}
+	afterDismiss := a.do(http.MethodGet, "/jobs?decision=all", nil, "", map[string]string{
+		"Cookie": web.SessionCookie + "=" + session + "; getafjob_jobs_hint=1",
+	}).Body.String()
+	if strings.Contains(afterDismiss, `id="jobs-hint"`) {
+		t.Error("jobs hint still visible after dismissal")
+	}
+
+	// Filter by mode=form: keeps direct form jobs, drops portal jobs, opens <details>, adds removable chip.
+	onlyForm := a.do(http.MethodGet, "/jobs?decision=all&mode=form", nil, session, nil).Body.String()
+	if !strings.Contains(onlyForm, "Go Developer") || strings.Contains(onlyForm, "Backend Go Engineer") {
+		t.Errorf("mode=form filtering failed:\n%s", onlyForm)
+	}
+	if !strings.Contains(onlyForm, `<details class="jobs-filters-more" open>`) || !strings.Contains(onlyForm, `Filters (1)`) {
+		t.Error("mode=form should open extra filters and show count")
+	}
+
+	// Panel on form job: one primary Apply button + ghost Review answers link.
+	formPanel := a.do(http.MethodGet, "/jobs/"+strconv.FormatInt(formID, 10)+"/panel?job="+strconv.FormatInt(formID, 10), nil, session, nil).Body.String()
+	if !strings.Contains(formPanel, `ui-btn ui-btn-primary`) || !strings.Contains(formPanel, `value="queue"`) ||
+		!strings.Contains(formPanel, "Review answers") {
+		t.Errorf("form panel unexpected:\n%s", formPanel)
+	}
+
+	// Panel on portal job: neutral self-apply notice, secondary Open the posting link, ghost Mark as applied, NO primary button.
+	portalPanel := a.do(http.MethodGet, "/jobs/"+strconv.FormatInt(portalID, 10)+"/panel?job="+strconv.FormatInt(portalID, 10), nil, session, nil).Body.String()
+	for _, want := range []string{"You apply here yourself.", "Open the posting", "ui-btn ui-btn-secondary", "apply-external"} {
+		if !strings.Contains(portalPanel, want) {
+			t.Errorf("portal panel missing %q:\n%s", want, portalPanel)
+		}
+	}
+	if strings.Contains(portalPanel, "ui-btn-primary") {
+		t.Errorf("portal panel should not have a primary green button:\n%s", portalPanel)
+	}
+}
