@@ -6,6 +6,7 @@ import (
 	"unicode"
 	"unicode/utf8"
 
+	"github.com/1xxn/getafjob/internal/matching"
 	"github.com/1xxn/getafjob/internal/profile"
 )
 
@@ -20,8 +21,10 @@ var (
 	githubRx   = regexp.MustCompile(`(?i)(?:^|[\s(<|,;:])((?:https?://)?(?:www\.)?github\.com/[A-Za-z0-9-]{1,39}/?)`)
 	webRx      = regexp.MustCompile(`(?i)\bhttps?://[A-Za-z0-9.-]+\.[A-Za-z]{2,}(?:/[^\s]*)?`)
 	postalRx   = regexp.MustCompile(`\b(\d{5})\s+([\p{Lu}][\p{L}.-]+(?:\s[\p{Lu}][\p{L}.-]+)?)`)
+	monthNum   = `(?:0?[1-9]|1[0-2])`
 	monthName  = `(?:jan|feb|mar|mär|apr|may|mai|jun|jul|aug|sep|oct|okt|nov|dec|dez)[a-zä]*\.?`
-	dateTok    = `(?:\d{1,2}[./]\d{4}|` + monthName + `\s+\d{4}|\d{4})`
+	yearTok    = `(?:19[5-9]\d|20[0-3]\d)`
+	dateTok    = `(?:` + monthNum + `[./]` + yearTok + `|` + monthName + `\s+` + yearTok + `|` + yearTok + `)`
 	rangeRx    = regexp.MustCompile(`(?i)(` + dateTok + `)\s*(?:-|\x{2013}|\x{2014}|to|bis)\s*(` + dateTok + `|present|current|now|today|heute|jetzt|aktuell)`)
 	bulletRx   = regexp.MustCompile(`^[•·▪●◦*\-\x{2013}]\s*`)
 )
@@ -31,8 +34,11 @@ const enDash, emDash = "\xe2\x80\x93", "\xe2\x80\x94"
 
 // section names in English and German, lower case without punctuation.
 var sections = map[string][]string{
-	"summary":        {"summary", "profile", "profil", "about me", "über mich", "kurzprofil", "professional summary"},
-	"skills":         {"skills", "technical skills", "kenntnisse", "fähigkeiten", "it kenntnisse", "technologies", "tech stack", "kompetenzen"},
+	"summary": {"summary", "profile", "profil", "about me", "über mich", "kurzprofil", "professional summary"},
+	"skills": {"skills", "technical skills", "kenntnisse", "fähigkeiten", "it kenntnisse", "fachkenntnisse",
+		"technische kenntnisse", "technologies", "technologien", "technologien tools", "tools technologien",
+		"tech stack", "technischer stack", "kompetenzen", "kernkompetenzen", "kenntnisse fähigkeiten",
+		"skills technologies", "edv kenntnisse"},
 	"languages":      {"languages", "sprachen", "sprachkenntnisse"},
 	"experience":     {"experience", "work experience", "professional experience", "employment", "berufserfahrung", "berufliche erfahrung", "werdegang", "beruflicher werdegang"},
 	"education":      {"education", "ausbildung", "studium", "bildung", "academic background"},
@@ -41,8 +47,11 @@ var sections = map[string][]string{
 
 var notName = []string{"lebenslauf", "curriculum vitae", "resume", "résumé", "cv"}
 
+var headingRepl = strings.NewReplacer("-", " ", "&", " ", "/", " ", "·", " ", ":", "", "#", "", "*", "", "_", " ")
+
 func heading(line string) string {
-	l := strings.ToLower(strings.Trim(strings.TrimSpace(line), ":#*_ "))
+	l := strings.ToLower(strings.TrimSpace(line))
+	l = strings.Join(strings.Fields(headingRepl.Replace(l)), " ")
 	if l == "" || utf8.RuneCountInString(l) > 40 {
 		return ""
 	}
@@ -86,10 +95,29 @@ func Parse(text string) profile.Profile {
 	if r := []rune(p.Summary); len(r) > 1500 {
 		p.Summary = string(r[:1500])
 	}
-	p.Skills = items(parts["skills"], 60, 80)
+	p.Skills = mergeSkills(skillItems(parts["skills"], 60, 80), matching.KnownSkills(strings.Join(parts["skills"], "\n")), 80)
 	p.Certifications = items(parts["certifications"], 120, 40)
 	p.Languages = languages(parts["languages"])
 	return p
+}
+
+func mergeSkills(a, b []string, maxCount int) []string {
+	out := make([]string, 0, len(a)+len(b))
+	seen := make(map[string]bool, len(a)+len(b))
+	for _, list := range [][]string{a, b} {
+		for _, s := range list {
+			k := strings.ToLower(strings.TrimSpace(s))
+			if k == "" || seen[k] {
+				continue
+			}
+			seen[k] = true
+			out = append(out, s)
+			if len(out) >= maxCount {
+				return out
+			}
+		}
+	}
+	return out
 }
 
 // name takes the first short line of two to four capitalized words as the person's name.
@@ -156,12 +184,23 @@ func split(lines []string) map[string][]string {
 
 // items splits lines into short entries (by bullets, commas, pipes, semicolons).
 func items(lines []string, maxLen, maxCount int) []string {
+	return parseItems(lines, maxLen, maxCount, false)
+}
+
+func skillItems(lines []string, maxLen, maxCount int) []string {
+	return parseItems(lines, maxLen, maxCount, true)
+}
+
+func parseItems(lines []string, maxLen, maxCount int, stripCategory bool) []string {
 	var out []string
 	seen := map[string]bool{}
 	for _, l := range lines {
 		l = bulletRx.ReplaceAllString(l, "")
-		if _, rest, ok := strings.Cut(l, ":"); ok && utf8.RuneCountInString(l) > 30 {
-			l = rest // "Languages: Go, Python" style
+		if left, rest, ok := strings.Cut(l, ":"); ok && !strings.HasPrefix(rest, "//") && strings.TrimSpace(rest) != "" {
+			if (stripCategory && utf8.RuneCountInString(strings.TrimSpace(left)) <= 45 && !strings.ContainsAny(left, ",|;")) ||
+				utf8.RuneCountInString(l) > 30 {
+				l = rest // "Category: Go, Python" style
+			}
 		}
 		for _, it := range strings.FieldsFunc(l, func(r rune) bool { return r == ',' || r == '|' || r == ';' || r == '•' || r == '·' }) {
 			it = strings.Join(strings.Fields(it), " ")
@@ -280,12 +319,54 @@ func extractWorkplaceType(s string) (string, string) {
 	return strings.TrimSpace(s), wp
 }
 
-func parseTitleCompanyLocation(s string) (title, company, location string) {
-	s = strings.Join(strings.Fields(s), " ")
+var companySuffixes = map[string]bool{
+	"gmbh": true, "ag": true, "se": true, "kgaa": true, "kg": true, "ug": true, "ohg": true, "mbh": true,
+	"inc": true, "ltd": true, "llc": true, "corp": true, "gbr": true, "partg": true, "ev": true,
+	"stiftung": true, "university": true, "universität": true, "hochschule": true,
+}
+
+func looksLikeCompany(s string) bool {
+	for _, w := range strings.FieldsFunc(strings.ToLower(s), func(r rune) bool { return !unicode.IsLetter(r) && !unicode.IsDigit(r) }) {
+		if companySuffixes[w] {
+			return true
+		}
+	}
+	return false
+}
+
+func chooseRoleAndCompany(a, b string) (title, company string) {
+	if (looksLikeCompany(a) && !looksLikeCompany(b)) || (!matching.IsKnownRole(a) && matching.IsKnownRole(b)) {
+		return cut(b, 200), cut(a, 200)
+	}
+	return cut(a, 200), cut(b, 200)
+}
+
+var colGapRx = regexp.MustCompile(`(?:\t| {2,})`)
+
+func parseTitleCompanyLocation(raw string) (title, company, location string) {
+	locCol := ""
+	if locs := colGapRx.FindAllStringIndex(strings.TrimSpace(raw), -1); len(locs) > 0 {
+		trimmed := strings.TrimSpace(raw)
+		last := locs[len(locs)-1]
+		left := strings.TrimSpace(trimmed[:last[0]])
+		right := strings.Join(strings.Fields(trimmed[last[1]:]), " ")
+		if right != "" && utf8.RuneCountInString(right) <= 60 && !strings.ContainsAny(right, "·|") &&
+			!strings.Contains(right, " at ") && !strings.Contains(right, " bei ") &&
+			!matching.IsKnownRole(right) && !looksLikeCompany(right) &&
+			(strings.ContainsAny(left, "·|,-:"+enDash) || strings.Contains(left, " at ") || strings.Contains(left, " bei ")) {
+			locCol = cut(right, 200)
+			raw = left
+		}
+	}
+
+	s := strings.Join(strings.Fields(raw), " ")
 	for _, sep := range []string{" at ", " bei ", " @ "} {
 		if t, c, ok := strings.Cut(s, sep); ok {
 			title = cut(t, 200)
-			for _, locSep := range []string{" | ", ", ", " - ", " " + enDash + " "} {
+			if locCol != "" {
+				return title, cut(c, 200), locCol
+			}
+			for _, locSep := range []string{" · ", " | ", ", ", " - ", " " + enDash + " "} {
 				if comp, loc, ok := strings.Cut(c, locSep); ok {
 					return title, cut(comp, 200), cut(loc, 200)
 				}
@@ -293,16 +374,20 @@ func parseTitleCompanyLocation(s string) (title, company, location string) {
 			return title, cut(c, 200), ""
 		}
 	}
-	for _, sep := range []string{" | ", ", ", " - ", " " + enDash + " "} {
+	for _, sep := range []string{" · ", " | ", " " + enDash + " ", " - ", ", "} {
 		parts := strings.Split(s, sep)
-		if len(parts) >= 3 {
-			return cut(parts[0], 200), cut(parts[1], 200), cut(strings.Join(parts[2:], ", "), 200)
-		}
-		if len(parts) == 2 {
-			return cut(parts[0], 200), cut(parts[1], 200), ""
+		if len(parts) >= 2 {
+			title, company = chooseRoleAndCompany(parts[0], parts[1])
+			if locCol != "" {
+				return title, company, locCol
+			}
+			if len(parts) >= 3 {
+				return title, company, cut(strings.Join(parts[2:], ", "), 200)
+			}
+			return title, company, ""
 		}
 	}
-	return cut(s, 200), "", ""
+	return cut(s, 200), "", locCol
 }
 
 var knownDegrees = []string{
@@ -343,15 +428,70 @@ func extractGrade(s string) string {
 	return ""
 }
 
+func findDateRange(s string) []int {
+	for _, m := range rangeRx.FindAllStringSubmatchIndex(s, -1) {
+		if m[0] > 0 {
+			prev, _ := utf8.DecodeLastRuneInString(s[:m[0]])
+			if unicode.IsDigit(prev) {
+				continue
+			}
+		}
+		if m[1] < len(s) {
+			next, _ := utf8.DecodeRuneInString(s[m[1]:])
+			if unicode.IsDigit(next) || unicode.IsLetter(next) {
+				continue
+			}
+		}
+		return m
+	}
+	return nil
+}
+
+func appendBullet(we *profile.WorkExperience, bullet string, forceJoin bool) {
+	if bullet == "" {
+		return
+	}
+	if n := len(we.DescriptionBullets); n > 0 {
+		prev := we.DescriptionBullets[n-1]
+		last, _ := utf8.DecodeLastRuneInString(prev)
+		first, _ := utf8.DecodeRuneInString(bullet)
+		endsSentence := strings.ContainsRune(".!?;:", last)
+		if !endsSentence && unicode.IsLower(first) && (forceJoin || len(prev) < 600) {
+			if strings.HasSuffix(prev, "-") && !strings.HasSuffix(prev, " -") {
+				we.DescriptionBullets[n-1] = strings.TrimSuffix(prev, "-") + bullet
+			} else {
+				we.DescriptionBullets[n-1] = prev + " " + bullet
+			}
+			return
+		}
+		if forceJoin {
+			we.DescriptionBullets[n-1] = prev + " " + bullet
+			return
+		}
+	}
+	if len(we.DescriptionBullets) < 20 {
+		we.DescriptionBullets = append(we.DescriptionBullets, bullet)
+	}
+}
+
 func extractWorkExperiences(lines []string) []profile.WorkExperience {
 	var out []profile.WorkExperience
+	skipCompanyLine := -1
 	for i, l := range lines {
-		m := rangeRx.FindStringSubmatchIndex(l)
+		if len(out) > 0 && bulletRx.MatchString(l) {
+			bullet := strings.TrimSpace(bulletRx.ReplaceAllString(l, ""))
+			appendBullet(&out[len(out)-1], bullet, false)
+			continue
+		}
+		m := findDateRange(l)
 		if m == nil {
-			if n := len(out); n > 0 && bulletRx.MatchString(l) && len(out[n-1].DescriptionBullets) < 20 {
-				bullet := strings.TrimSpace(bulletRx.ReplaceAllString(l, ""))
-				if bullet != "" {
-					out[n-1].DescriptionBullets = append(out[n-1].DescriptionBullets, bullet)
+			if i == skipCompanyLine {
+				continue
+			}
+			if n := len(out); n > 0 && len(out[n-1].DescriptionBullets) > 0 &&
+				(i+1 >= len(lines) || findDateRange(lines[i+1]) == nil) {
+				if cont := strings.TrimSpace(l); cont != "" {
+					appendBullet(&out[n-1], cont, true)
 				}
 			}
 			continue
@@ -365,14 +505,22 @@ func extractWorkExperiences(lines []string) []profile.WorkExperience {
 			we.IsCurrent = true
 			we.EndDate = ""
 		}
-		rest := strings.Trim(l[:m[0]]+" "+l[m[1]:], " |,-:"+enDash+emDash)
+		left := strings.TrimRight(l[:m[0]], " |,-:"+enDash+emDash)
+		right := strings.Trim(l[m[1]:], " |,-:"+enDash+emDash)
+		rest := left
+		if rest != "" && right != "" {
+			rest += "  " + right
+		} else if rest == "" {
+			rest = right
+		}
 		if rest == "" && i > 0 {
 			rest = lines[i-1]
 		}
 		rest, we.WorkplaceType = extractWorkplaceType(rest)
 		we.Title, we.Company, we.Location = parseTitleCompanyLocation(rest)
-		if we.Company == "" && i+1 < len(lines) && rangeRx.FindStringIndex(lines[i+1]) == nil && !bulletRx.MatchString(lines[i+1]) {
+		if we.Company == "" && i+1 < len(lines) && findDateRange(lines[i+1]) == nil && !bulletRx.MatchString(lines[i+1]) {
 			we.Company = cut(lines[i+1], 200)
+			skipCompanyLine = i + 1
 		}
 		out = append(out, we)
 		if len(out) >= profile.MaxStations {
@@ -385,7 +533,7 @@ func extractWorkExperiences(lines []string) []profile.WorkExperience {
 func extractEducations(lines []string) []profile.EducationStation {
 	var out []profile.EducationStation
 	for i, l := range lines {
-		m := rangeRx.FindStringSubmatchIndex(l)
+		m := findDateRange(l)
 		if m == nil {
 			continue
 		}
@@ -403,13 +551,13 @@ func extractEducations(lines []string) []profile.EducationStation {
 			rest = lines[i-1]
 		}
 		rawDegree, inst := titleCompany(rest)
-		if inst == "" && i+1 < len(lines) && rangeRx.FindStringIndex(lines[i+1]) == nil {
+		if inst == "" && i+1 < len(lines) && findDateRange(lines[i+1]) == nil {
 			inst = cut(lines[i+1], 200)
 		}
 		ed.Institution = inst
 		ed.Degree, ed.FieldOfStudy = parseDegreeAndField(rawDegree)
 		ed.Grade = extractGrade(rest)
-		if ed.Grade == "" && i+1 < len(lines) && rangeRx.FindStringIndex(lines[i+1]) == nil {
+		if ed.Grade == "" && i+1 < len(lines) && findDateRange(lines[i+1]) == nil {
 			ed.Grade = extractGrade(lines[i+1])
 		}
 		out = append(out, ed)

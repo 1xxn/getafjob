@@ -60,6 +60,18 @@ func findSkills(text, preferred string) jobSkills {
 	return js
 }
 
+// KnownSkills extracts canonical skill names from free text using the matching skill dictionary (#506).
+func KnownSkills(text string) []string {
+	counts := skillCounts(normalize(text))
+	var out []string
+	for i, n := range counts {
+		if n > 0 {
+			out = append(out, skills[i].name)
+		}
+	}
+	return out
+}
+
 // weight is the weight of dictionary skill i; -1 (a skill the dictionary does not know) weighs 1.
 func weight(i int) float64 {
 	if i < 0 {
