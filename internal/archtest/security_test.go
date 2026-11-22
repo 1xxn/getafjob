@@ -109,3 +109,49 @@ func TestSensitiveKeywordsCoverage(t *testing.T) {
 		}
 	}
 }
+
+// docTestRx finds a test or fuzz test named in the docs; defTestRx its definition in a Go file.
+var (
+	docTestRx = regexp.MustCompile(`\b((?:Test|Fuzz)[A-Z][A-Za-z0-9_]*)\b`)
+	defTestRx = regexp.MustCompile(`(?m)^func ((?:Test|Fuzz)[A-Za-z0-9_]+)\(`)
+)
+
+// Every test that the architecture doc names as evidence for a control exists.
+func TestArchitectureDocNamesRealTests(t *testing.T) {
+	doc, err := os.ReadFile("../../docs/architecture.md")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defined := map[string]bool{}
+	err = filepath.WalkDir("../..", func(path string, d os.DirEntry, err error) error {
+		if err != nil {
+			return err
+		}
+		if d.IsDir() && (d.Name() == ".git" || d.Name() == "node_modules") {
+			return filepath.SkipDir
+		}
+		if d.IsDir() || !strings.HasSuffix(path, "_test.go") {
+			return nil
+		}
+		b, err := os.ReadFile(path)
+		if err != nil {
+			return err
+		}
+		for _, m := range defTestRx.FindAllSubmatch(b, -1) {
+			defined[string(m[1])] = true
+		}
+		return nil
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	names := docTestRx.FindAllStringSubmatch(string(doc), -1)
+	if len(names) == 0 {
+		t.Fatal("docs/architecture.md names no tests")
+	}
+	for _, m := range names {
+		if !defined[m[1]] {
+			t.Errorf("docs/architecture.md names %s, which no test defines", m[1])
+		}
+	}
+}
