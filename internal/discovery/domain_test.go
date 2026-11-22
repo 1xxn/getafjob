@@ -77,3 +77,26 @@ func FuzzMatchKey(f *testing.F) {
 		}
 	})
 }
+
+// Only web addresses enter the index: the runner opens job and apply links in a browser.
+func TestValidPostingNeedsWebURLs(t *testing.T) {
+	ok := Posting{Source: "greenhouse:acme", ExternalID: "1", Title: "Go Engineer", URL: "https://acme.example/jobs/1"}
+	if !ValidPosting(ok) {
+		t.Fatal("https posting refused")
+	}
+	for _, bad := range []string{"file:///etc/passwd", "chrome://settings", "data:text/html,x", "javascript:alert(1)", "/jobs/1", "https://"} {
+		p := ok
+		p.URL = bad
+		if ValidPosting(p) {
+			t.Errorf("URL %q accepted", bad)
+		}
+		p = ok
+		p.ApplyURL = bad
+		if ValidPosting(p) {
+			t.Errorf("apply URL %q accepted", bad)
+		}
+		if ValidStub(Posting{Stub: true, Source: "careers:acme", ExternalID: "1", URL: bad}) {
+			t.Errorf("stub URL %q accepted", bad)
+		}
+	}
+}

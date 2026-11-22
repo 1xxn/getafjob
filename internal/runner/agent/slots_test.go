@@ -60,3 +60,14 @@ func TestNoFormReason(t *testing.T) {
 		t.Errorf("other: %q", r)
 	}
 }
+
+func TestWebAddress(t *testing.T) {
+	for s, want := range map[string]bool{
+		"https://boards.example/jobs/1": true, "http://jobs.example/1": true, "HTTPS://jobs.example/": true,
+		"file:///etc/passwd": false, "chrome://settings": false, "data:text/html,x": false, "about:blank": false, "": false,
+	} {
+		if got := webAddress(s); got != want {
+			t.Errorf("webAddress(%q) = %v, want %v", s, got, want)
+		}
+	}
+}

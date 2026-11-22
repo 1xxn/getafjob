@@ -8,6 +8,7 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
+	"net/url"
 	"os"
 	"path/filepath"
 	"slices"
@@ -230,6 +231,10 @@ func (a *Agent) RunOne(ctx context.Context, run *runnerv1.Run) error {
 		runLog.Log(ctx, lvl, "run ended", "state", endState, "duration_ms", time.Since(startTime).Milliseconds())
 	}()
 	runLog.InfoContext(ctx, "run started")
+	if !webAddress(run.GetStartUrl()) { // never file:, data: or browser pages, whatever a source delivered
+		endState = "parked"
+		return c.Park(ctx, "open the posting: not a web address", nil)
+	}
 	if err := p.Context(ctx).Navigate(run.GetStartUrl()); err != nil {
 		endState = "parked"
 		return c.Park(ctx, "open the posting: "+err.Error(), nil)
@@ -643,4 +648,10 @@ func noFormReason(pageURL string, err error) string {
 	default:
 		return "find the form: " + err.Error()
 	}
+}
+
+// webAddress reports whether s is an absolute http or https URL with a host.
+func webAddress(s string) bool {
+	u, err := url.Parse(s)
+	return err == nil && (u.Scheme == "https" || u.Scheme == "http") && u.Host != ""
 }
