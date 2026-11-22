@@ -341,6 +341,7 @@ func TestPrepareReachesTheForm(t *testing.T) {
 		"popup_posting.html":            "/apply.html",                    // self-closing popup, the opener moves on
 		"cookie_posting.html":           "/greenhouse_header_submit.html", // cookie banner over the page
 		"external_posting.html":         "/greenhouse_header_submit.html", // external link to the employer form
+		"jobboard_external.html":        "/greenhouse_header_submit.html", // shadow-DOM cookie modal + external link
 		"greenhouse_header_submit.html": "/greenhouse_header_submit.html",
 	}
 	for fixture, want := range cases {
@@ -354,9 +355,17 @@ func TestPrepareReachesTheForm(t *testing.T) {
 			if err != nil || !strings.HasSuffix(info.URL, want) {
 				t.Fatalf("at %v, want %s", info, want)
 			}
-			if fixture == "cookie_posting.html" {
+			switch fixture {
+			case "cookie_posting.html":
 				if c := p.MustEval(`() => document.cookie`).Str(); c != "consent=necessary" {
 					t.Fatalf("cookie = %q", c)
+				}
+			case "jobboard_external.html":
+				if c := r.page.MustEval(`() => document.cookie`).Str(); c != "consent=declined" {
+					t.Fatalf("opener cookie = %q", c)
+				}
+				if c := p.MustEval(`() => document.cookie`).Str(); c != "consent=declined" {
+					t.Fatalf("target cookie = %q", c)
 				}
 			}
 		})
@@ -366,6 +375,13 @@ func TestPrepareReachesTheForm(t *testing.T) {
 func TestPrepareGivesUpWithoutAForm(t *testing.T) {
 	r := start(t, "clicks.html")
 	if _, err := r.engine(nil).Prepare(t.Context(), r.page); !errors.Is(err, ErrNoForm) {
+		t.Fatalf("prepare: %v", err)
+	}
+}
+
+func TestPrepareStopsOnEmailApply(t *testing.T) {
+	r := start(t, "email_posting.html")
+	if _, err := r.engine(nil).Prepare(t.Context(), r.page); !errors.Is(err, ErrEmailApply) {
 		t.Fatalf("prepare: %v", err)
 	}
 }

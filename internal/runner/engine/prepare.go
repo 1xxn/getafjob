@@ -5,6 +5,7 @@ import (
 	"errors"
 	"net/url"
 	"regexp"
+	"strings"
 	"time"
 
 	"github.com/go-rod/rod"
@@ -15,8 +16,15 @@ import (
 // ErrNoForm reports a posting from which no application form could be reached.
 var ErrNoForm = errors.New("no application form found")
 
-// maxHops bounds the clicks from the posting to the form.
-const maxHops = 4
+// ErrEmailApply reports a posting whose apply action opens an email address (mailto:).
+var ErrEmailApply = errors.New("posting requires email application")
+
+const (
+	// maxHops bounds the clicks from the posting to the form.
+	maxHops = 4
+	// maxCookieClicks bounds cookie banner dismissals per page.
+	maxCookieClicks = 3
+)
 
 var (
 	// applyRx names the link or button that leads from a posting to its form or original company page (#509).
@@ -36,20 +44,23 @@ const scrollJS = `() => { window.scrollTo(0, document.documentElement.scrollHeig
 func (e *Engine) Prepare(ctx context.Context, p *rod.Page) (*rod.Page, error) {
 	p = p.Context(ctx)
 	e.log().InfoContext(ctx, "run step", "step", StepPrepare)
-	for hop := 0; ; hop++ {
+	for hops, cookieClicks := 0, 0; ; {
 		st, err := browser.Extract(p)
 		if err != nil {
 			return p, err
 		}
+		if cookieClicks < maxCookieClicks {
+			if b, ok := pick(st, func(b browser.Button) bool { return b.Cookie && rejectRx.MatchString(b.Text) }); ok {
+				if _, err := st.Click(b.ID, e.wait()); err != nil { //nolint:contextcheck // the page carries ctx
+					return p, err
+				}
+				cookieClicks++
+				e.log().InfoContext(ctx, "prepare dismissed cookie banner", "step", StepPrepare)
+				continue // the banner is gone; read the page again (does not count as a hop)
+			}
+		}
 		if hasForm(st) {
 			return p, nil
-		}
-		if b, ok := pick(st, func(b browser.Button) bool { return b.Cookie && rejectRx.MatchString(b.Text) }); ok {
-			if _, err := st.Click(b.ID, e.wait()); err != nil { //nolint:contextcheck // the page carries ctx
-				return p, err
-			}
-			e.log().InfoContext(ctx, "prepare dismissed cookie banner", "step", StepPrepare)
-			continue // the banner is gone; read the page again (does not count as a hop)
 		}
 		if _, err := p.Eval(scrollJS); err == nil {
 			time.Sleep(500 * time.Millisecond)
@@ -57,7 +68,7 @@ func (e *Engine) Prepare(ctx context.Context, p *rod.Page) (*rod.Page, error) {
 				return p, nil
 			}
 		}
-		if hop >= maxHops {
+		if hops >= maxHops {
 			return p, ErrNoForm
 		}
 		b, ok := pick(st, func(b browser.Button) bool {
@@ -66,10 +77,15 @@ func (e *Engine) Prepare(ctx context.Context, p *rod.Page) (*rod.Page, error) {
 		if !ok {
 			return p, ErrNoForm
 		}
+		if strings.HasPrefix(strings.ToLower(strings.TrimSpace(b.Href)), "mailto:") {
+			return p, ErrEmailApply
+		}
 		eff, err := st.Click(b.ID, e.wait()) //nolint:contextcheck // the page carries ctx
 		if err != nil {
 			return p, err
 		}
+		hops++
+		cookieClicks = 0
 		for i := len(eff.NewTargets) - 1; i >= 0; i-- { // the newest tab is the form
 			tab, guard, err := browser.Adopt(p.Browser(), eff.NewTargets[i], 3*time.Second)
 			if errors.Is(err, browser.ErrPopupClosed) {
@@ -86,7 +102,7 @@ func (e *Engine) Prepare(ctx context.Context, p *rod.Page) (*rod.Page, error) {
 		time.Sleep(150 * time.Millisecond)
 		if info, err := p.Info(); err == nil {
 			if u, err := url.Parse(info.URL); err == nil && u.Hostname() != "" {
-				e.log().InfoContext(ctx, "prepare hop", "step", StepPrepare, "hop", hop+1, "host", u.Hostname())
+				e.log().InfoContext(ctx, "prepare hop", "step", StepPrepare, "hop", hops, "host", u.Hostname())
 			}
 		}
 	}

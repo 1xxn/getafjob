@@ -273,9 +273,21 @@ func (a *Agent) RunOne(ctx context.Context, run *runnerv1.Run) error {
 	form, err := e.Prepare(ctx, p)
 	if err != nil {
 		endState = "parked"
-		runLog.WarnContext(ctx, "run prepare failed", "step", engine.StepPrepare, "reason_code", "no_form")
-		shot, _ := p.Screenshot(false, nil)
-		return c.Park(ctx, noFormReason(run.GetStartUrl(), err), shot)
+		reasonCode := "no_form"
+		if errors.Is(err, engine.ErrEmailApply) {
+			reasonCode = "email_apply"
+		}
+		runLog.WarnContext(ctx, "run prepare failed", "step", engine.StepPrepare, "reason_code", reasonCode)
+		lastPage := p
+		if form != nil {
+			lastPage = form
+		}
+		lastURL := run.GetStartUrl()
+		if info, infoErr := lastPage.Info(); infoErr == nil && info.URL != "" {
+			lastURL = info.URL
+		}
+		shot, _ := lastPage.Screenshot(false, nil)
+		return c.Park(ctx, noFormReason(lastURL, err), shot)
 	}
 	if form != nil {
 		addOrigin := func(o string) {
@@ -618,10 +630,12 @@ func (c *coordinator) Park(ctx context.Context, reason string, screenshot []byte
 	return err
 }
 
-// noFormReason explains a run that found no form: on a job portal the application happens elsewhere (#159).
-func noFormReason(startURL string, err error) string {
-	host := applymode.Host(startURL)
+// noFormReason explains a run that found no form: on a job portal or mailto link the application happens elsewhere (#159).
+func noFormReason(pageURL string, err error) string {
+	host := applymode.Host(pageURL)
 	switch {
+	case errors.Is(err, engine.ErrEmailApply):
+		return "external: apply by email on " + host
 	case errors.Is(err, engine.ErrNoForm) && applymode.IsPortal(host):
 		return "external: " + host + " shows the posting but no application form; apply there or mark it as applied"
 	case errors.Is(err, engine.ErrNoForm):

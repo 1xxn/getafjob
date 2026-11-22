@@ -48,8 +48,11 @@
   const COOKIE_RX = /cookie|consent|gdpr|dsgvo|onetrust|usercentrics|didomi|cookiebot|sp_message|truste|borlabs|klaro|iubenda|cmp-|cmp_|\bcmp\b|cc-banner|cookiefirst|axeptio/i;
   const inCookieBanner = (el) => {
     for (let e = el, i = 0; e && e.nodeType === 1 && i < 15; i++, e = e.parentElement || (e.getRootNode && e.getRootNode().host)) {
-      const sig = `${e.id || ""} ${typeof e.className === "string" ? e.className : ""} ${e.getAttribute("aria-label") || ""}`;
+      const sig = `${e.tagName || ""} ${e.id || ""} ${typeof e.className === "string" ? e.className : ""} ${e.getAttribute("aria-label") || ""} ${e.getAttribute("data-testid") || ""}`;
       if (COOKIE_RX.test(sig)) return true;
+      if (e.tagName === "DIALOG" || e.getAttribute("role") === "dialog" || e.getAttribute("aria-modal") === "true") {
+        if (COOKIE_RX.test(textOf(e).slice(0, 400))) return true;
+      }
     }
     return false;
   };
@@ -370,7 +373,7 @@
   }
 
   // Buttons and links that drive the flow ("open external page" leads to the employer's form).
-  const ACTION_RX = /apply|bewerb|extern|submit|absenden|senden|send|weiter|next|continue|fortfahren|review|überprüf|ueberpruef|start|jetzt|interessiert|upload|hochladen|lebenslauf|resume|cv|manuell|manually|accept|akzeptier|zustimm|agree|allow|alle|cookie|ok\b|got it|verstanden|schließen|close|autofill|ausfüllen/i;
+  const ACTION_RX = /apply|bewerb|extern|stellenanzeige|original|unternehmens|submit|absenden|senden|send|weiter|next|continue|fortfahren|review|überprüf|ueberpruef|start|jetzt|interessiert|upload|hochladen|lebenslauf|resume|cv|manuell|manually|accept|akzeptier|zustimm|agree|allow|ablehn|reject|decline|deny|notwendig|erforderlich|essenziell|necessary|essential|alle|cookie|ok\b|got it|verstanden|schließen|close|autofill|ausfüllen/i;
   const AUTOFILL_RX = /(apply|bewerben) (with|via|mit|über) (linkedin|xing|indeed|google|seek|stepstone)|mit (linkedin|xing|indeed) bewerben|easy apply|auto-?fill|automatisch ausfüllen|(aus|mit) (dem |meinem )?lebenslauf (ausfüllen|befüllen|übernehmen|bewerben)|lebenslauf (importieren|hochladen und ausfüllen)|import (from )?(your )?(resume|cv)|(resume|cv) (import|parsing|autofill)|fill (out )?(the form )?(from|with) (your )?(resume|cv)|apply with (your )?(resume|cv)|mit lebenslauf bewerben|quick ?apply/i;
   const found = [];
   for (const el of all) {
@@ -385,14 +388,14 @@
     if (t === "A" && !ACTION_RX.test(text)) continue;
     const isNativePortalApply = (/(linkedin|indeed)\.[a-z.]+$/i.test(window.location.hostname)) && /(easy apply|einfach bewerben|indeed bewerbung|apply now|jetzt bewerben)/i.test(text);
     const isAutofill = !isNativePortalApply && AUTOFILL_RX.test(text);
-    const COOKIE_TEXT_RX = /\b(all\s+cookies|alle\s+cookies|cookie[-\s]?(einstellungen|settings|preferences)|nur\s+(notwendige|erforderliche|essenzielle)\s+cookies|only\s+(necessary|essential|required)\s+cookies)\b/i;
+    const COOKIE_TEXT_RX = /\b(all\s+cookies|alle\s+cookies|cookies?\s+(ablehnen|reject|decline|akzeptieren|accept)|cookie[-\s]?(einstellungen|settings|preferences)|nur\s+(notwendige|erforderliche|essenzielle)\s+cookies|only\s+(necessary|essential|required)\s+cookies)\b/i;
     const btn = { id: tag(el), text, kind: t === "A" ? "link" : (el.type === "submit" || /submit/i.test(el.getAttribute("type") || "") ? "submit" : "button"),
       href: t === "A" ? (el.href || "").slice(0, 300) : "", disabled: !!el.disabled || el.getAttribute("aria-disabled") === "true",
       form: formKey(el), section: sectionOf(el), autofill: isAutofill, cookie: inCookieBanner(el) || COOKIE_TEXT_RX.test(text),
       // toggle buttons (Ashby yes/no): pressed = chosen; another click would clear the choice
       pressed: el.getAttribute("aria-pressed") === "true" };
-    // Important ones first: form buttons, autofill, flow buttons; navigation last.
-    btn._rank = (btn.form ? 0 : 2) + (btn.autofill ? -2 : 0) + (ACTION_RX.test(text) ? 0 : 1) + (btn.cookie ? 1 : 0);
+    // Important ones first: form buttons, autofill, cookie consent, flow buttons; navigation last.
+    btn._rank = (btn.form ? 0 : 2) + (btn.autofill ? -2 : 0) + (ACTION_RX.test(text) ? 0 : 1) + (btn.cookie ? -1 : 0);
     found.push(btn);
     if (found.length >= 400) break;
   }
