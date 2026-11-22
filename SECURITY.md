@@ -1,8 +1,8 @@
 # Security policy
 
 getafjob stores personal data of its users (CVs, contact details, application answers, optionally mailbox access
-and portal sessions) and drives a browser on their behalf. The threat model, the controls and the findings of
-reviews are in [docs/security.md](docs/security.md).
+and portal sessions) and drives a browser on their behalf. The security model and isolation controls are documented in
+[docs/architecture.md](docs/architecture.md#security-model).
 
 ## Supported versions
 

@@ -21,7 +21,7 @@ import (
 	"github.com/1xxn/getafjob/internal/platform/db"
 )
 
-// pageBudget is the server time a page may take at the 95th percentile (docs/ui/phase-8-brief.md).
+// pageBudget is the server time a page may take at the 95th percentile.
 const pageBudget = 150 * time.Millisecond
 
 // TestJobListLatency: the pages answer within 150 ms at the 95th percentile on the default demo data (2000
@@ -86,7 +86,7 @@ func TestJobListLatency(t *testing.T) {
 	}
 }
 
-// assetBudget bounds the scripts and style sheets a page loads, gzip compressed (docs/ui/phase-8-brief.md).
+// assetBudget bounds the scripts and style sheets a page loads, gzip compressed.
 const assetBudget = 100 << 10
 
 // TestAssetBudget: the JS and CSS that a signed-in page loads stay under 100 KB compressed.

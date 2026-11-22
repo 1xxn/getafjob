@@ -3,6 +3,7 @@
 /dist/
 *.test
 *.out
+*.crt
 coverage.*
 
 # Local runtime data, never commit (real application data, screenshots, keys)
@@ -15,7 +16,9 @@ coverage.*
 /.data/
 /tmp/
 
-# Tools
+# Agent & tool leftovers
+/.claude/
+/CLAUDE.md
 /.task/
 .idea/
 .vscode/

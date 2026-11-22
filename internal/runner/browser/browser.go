@@ -1,7 +1,7 @@
 // Package browser starts Chromium for the runner, without disguise and with the sandbox on.
 //
 // go-rod's launcher defaults do not fit our threat model and are overridden explicitly here
-// (see docs/adr/0011-browser-automation-go-rod.md):
+// (see docs/architecture.md#security-model):
 //   - inside containers go-rod adds --no-sandbox → removed, the sandbox stays on (seccomp profile in Compose);
 //   - go-rod turns site isolation off (disable-features=site-per-process) → back on, pages are
 //     untrusted;

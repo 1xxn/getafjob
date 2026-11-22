@@ -9,7 +9,7 @@ import (
 	"github.com/1xxn/getafjob/internal/platform/db"
 )
 
-// adminRotate re-wraps every data key with the current master key (docs/runbooks/key-rotation.md).
+// adminRotate re-wraps every data key with the current master key (docs/deployment.md#master-key-rotation).
 func adminRotate(ctx context.Context, args []string, env Env) int {
 	if len(args) != 0 {
 		_, _ = fmt.Fprintln(env.Stderr, "usage: getafjob admin rotate-master-key")

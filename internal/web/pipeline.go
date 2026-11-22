@@ -79,7 +79,7 @@ func (s *Server) pipelinePage(w http.ResponseWriter, r *http.Request, u *identit
 	s.render(w, r, http.StatusOK, views.PipelinePage(d))
 }
 
-// trackerRedirect keeps old links working (docs/ui/sitemap.md).
+// trackerRedirect keeps legacy /tracker links redirecting to /pipeline.
 func trackerRedirect(w http.ResponseWriter, r *http.Request) {
 	http.Redirect(w, r, "/pipeline", http.StatusPermanentRedirect)
 }

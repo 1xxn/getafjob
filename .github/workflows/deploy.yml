@@ -82,7 +82,7 @@ jobs:
         run: |
           if [ -z "$SSH_HOST" ] || [ -z "$SSH_KEY" ]; then
             echo "configured=false" >> "$GITHUB_OUTPUT"
-            echo "::notice::Server access secrets (DEPLOY_SSH_HOST / DEPLOY_SSH_KEY) are not configured for environment '$ENV_NAME'. Skipping remote deployment. See docs/runbooks/deploy.md for setup instructions."
+            echo "::notice::Server access secrets (DEPLOY_SSH_HOST / DEPLOY_SSH_KEY) are not configured for environment '$ENV_NAME'. Skipping remote deployment. See docs/deployment.md for setup instructions."
           else
             echo "configured=true" >> "$GITHUB_OUTPUT"
           fi
