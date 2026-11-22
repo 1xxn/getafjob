@@ -5,6 +5,7 @@ import (
 	"errors"
 	"testing"
 
+	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
 
 	"github.com/1xxn/getafjob/internal/platform/db"
@@ -100,5 +101,48 @@ func TestStationsPostgres(t *testing.T) {
 	}
 	if err := stations.DeleteEducation(ctx, max, eid); err != nil {
 		t.Fatalf("delete education: %v", err)
+	}
+}
+
+// TestStationEditKeepsOrder: saving an edited station (the forms carry no sort order) leaves it in its place.
+func TestStationEditKeepsOrder(t *testing.T) {
+	if testing.Short() {
+		t.Skip("skipping postgres integration test in short mode")
+	}
+	pool := dbtest.AppPool(t)
+	ctx := t.Context()
+	stations := profile.NewStations(pgstore.New(pool), sealer(t, pool))
+	max := user(t, pool, "max.order@example.org")
+
+	var works []uuid.UUID
+	for _, title := range []string{"First", "Second", "Third"} {
+		id, err := stations.SaveWorkExperience(ctx, max, profile.WorkExperience{Title: title})
+		if err != nil {
+			t.Fatal(err)
+		}
+		works = append(works, id)
+	}
+	if _, err := stations.SaveWorkExperience(ctx, max, profile.WorkExperience{ID: works[2], Title: "Third, edited"}); err != nil {
+		t.Fatal(err)
+	}
+	list, err := stations.WorkExperiences(ctx, max)
+	if err != nil || len(list) != 3 || list[2].ID != works[2] || list[2].Title != "Third, edited" {
+		t.Fatalf("order after edit: %+v, %v", list, err)
+	}
+
+	var edus []uuid.UUID
+	for _, degree := range []string{"B.Sc.", "M.Sc."} {
+		id, err := stations.SaveEducation(ctx, max, profile.EducationStation{Degree: degree})
+		if err != nil {
+			t.Fatal(err)
+		}
+		edus = append(edus, id)
+	}
+	if _, err := stations.SaveEducation(ctx, max, profile.EducationStation{ID: edus[1], Degree: "M.Sc. Informatics"}); err != nil {
+		t.Fatal(err)
+	}
+	el, err := stations.Educations(ctx, max)
+	if err != nil || len(el) != 2 || el[1].ID != edus[1] {
+		t.Fatalf("education order after edit: %+v, %v", el, err)
 	}
 }

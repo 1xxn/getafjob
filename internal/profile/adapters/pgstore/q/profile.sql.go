@@ -652,7 +652,7 @@ func (q *Queries) SaveProfile(ctx context.Context, arg SaveProfileParams) (int64
 
 const updateEducation = `-- name: UpdateEducation :execrows
 UPDATE educations
-SET institution = $3, degree = $4, field_of_study = $5, start_date = $6, end_date = $7, is_current = $8, grade = $9, sort_order = $10, updated_at = $11
+SET institution = $3, degree = $4, field_of_study = $5, start_date = $6, end_date = $7, is_current = $8, grade = $9, updated_at = $10
 WHERE id = $1 AND user_id = $2
 `
 
@@ -666,10 +666,10 @@ type UpdateEducationParams struct {
 	EndDate      string
 	IsCurrent    bool
 	Grade        string
-	SortOrder    int32
 	UpdatedAt    time.Time
 }
 
+// Keeps sort_order: only UpdateEducationOrder moves an entry.
 func (q *Queries) UpdateEducation(ctx context.Context, arg UpdateEducationParams) (int64, error) {
 	result, err := q.db.Exec(ctx, updateEducation,
 		arg.ID,
@@ -681,7 +681,6 @@ func (q *Queries) UpdateEducation(ctx context.Context, arg UpdateEducationParams
 		arg.EndDate,
 		arg.IsCurrent,
 		arg.Grade,
-		arg.SortOrder,
 		arg.UpdatedAt,
 	)
 	if err != nil {
@@ -770,7 +769,7 @@ func (q *Queries) UpdateVariant(ctx context.Context, arg UpdateVariantParams) (i
 
 const updateWorkExperience = `-- name: UpdateWorkExperience :execrows
 UPDATE work_experiences
-SET company = $3, title = $4, location = $5, workplace_type = $6, start_date = $7, end_date = $8, is_current = $9, sealed_bullets = $10, sort_order = $11, updated_at = $12
+SET company = $3, title = $4, location = $5, workplace_type = $6, start_date = $7, end_date = $8, is_current = $9, sealed_bullets = $10, updated_at = $11
 WHERE id = $1 AND user_id = $2
 `
 
@@ -785,10 +784,10 @@ type UpdateWorkExperienceParams struct {
 	EndDate       string
 	IsCurrent     bool
 	SealedBullets []byte
-	SortOrder     int32
 	UpdatedAt     time.Time
 }
 
+// Keeps sort_order: only UpdateWorkExperienceOrder moves an entry.
 func (q *Queries) UpdateWorkExperience(ctx context.Context, arg UpdateWorkExperienceParams) (int64, error) {
 	result, err := q.db.Exec(ctx, updateWorkExperience,
 		arg.ID,
@@ -801,7 +800,6 @@ func (q *Queries) UpdateWorkExperience(ctx context.Context, arg UpdateWorkExperi
 		arg.EndDate,
 		arg.IsCurrent,
 		arg.SealedBullets,
-		arg.SortOrder,
 		arg.UpdatedAt,
 	)
 	if err != nil {

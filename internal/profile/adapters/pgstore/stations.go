@@ -109,7 +109,6 @@ func (s *Store) UpdateWorkExperience(ctx context.Context, w profile.StoredWorkEx
 			EndDate:       w.EndDate,
 			IsCurrent:     w.IsCurrent,
 			SealedBullets: w.SealedBullets,
-			SortOrder:     int32(w.SortOrder), //nolint:gosec // bounded by MaxStations
 			UpdatedAt:     w.UpdatedAt,
 		})
 		ok = n == 1
@@ -210,7 +209,6 @@ func (s *Store) UpdateEducation(ctx context.Context, e profile.StoredEducation) 
 			EndDate:      e.EndDate,
 			IsCurrent:    e.IsCurrent,
 			Grade:        e.Grade,
-			SortOrder:    int32(e.SortOrder), //nolint:gosec // bounded by MaxStations
 			UpdatedAt:    e.UpdatedAt,
 		})
 		ok = n == 1
