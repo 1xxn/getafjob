@@ -1094,7 +1094,8 @@ func TestCVReviewSavesEditedProfileFields(t *testing.T) {
 	a := newApp(t)
 	session := signedIn(t, a)
 	cv := cvDocx(t, "Max Mustermann", "10115 Berlin", "max.mustermann@example.org | +49 30 1234567",
-		"Skills", "Go, Kubernetes")
+		"Summary", "Platform engineer who builds developer tools and internal platforms", "Skills", "Go, Kubernetes",
+		"Certifications", "Certified Kubernetes Administrator")
 	if rec := a.upload("cv", "cv.docx", cv, session); rec.Code != http.StatusSeeOther {
 		t.Fatalf("upload %d", rec.Code)
 	}
@@ -1120,7 +1121,9 @@ func TestCVReviewSavesEditedProfileFields(t *testing.T) {
 		t.Fatalf("review post %d: %s", saveRec.Code, saveRec.Body.String())
 	}
 	profBody := a.do(http.MethodGet, "/profile?imported=1", nil, session, nil).Body.String()
-	for _, want := range []string{`value="Moritz"`, "Rust", "French: B2"} {
+	// Fields the review form does not show still come from the CV.
+	for _, want := range []string{`value="Moritz"`, "Rust", "French: B2", "Platform engineer who builds developer tools and internal platforms",
+		"Certified Kubernetes Administrator"} {
 		if !strings.Contains(profBody, want) {
 			t.Errorf("profile lacks edited value %q", want)
 		}
