@@ -1,7 +1,9 @@
 package pgstore_test
 
 import (
+	"context"
 	"errors"
+	"slices"
 	"sync"
 	"testing"
 	"time"
@@ -344,5 +346,43 @@ func TestPortalRunsOneAtATime(t *testing.T) {
 	*now = now.Add(application.PortalGap + time.Second)
 	if l := lease(); l.AppID != second {
 		t.Fatalf("after the gap leased %s, want the second LinkedIn run", l.AppID)
+	}
+}
+
+// A form page on a site the job does not name needs approval, also when every other part of the rule is green (#545).
+func TestSubmitOnAForeignOriginNeedsApproval(t *testing.T) {
+	pool, st, svc, _ := setup(t)
+	ctx := t.Context()
+	svc.WithOriginCheck(func(_ context.Context, _ int64, o string) bool { return o == "https://b.example.org" })
+	runs := application.NewRuns(svc, st)
+	max := user(t, pool, "max@example.org")
+	queued(t, svc, max, jobAt(t, pool, "https://b.example.org/2", "Muster", "muster|go"))
+	l, ok, err := runs.Lease(ctx, "r1", application.RunnerServer, nil)
+	if err != nil || !ok {
+		t.Fatalf("lease: %v, %v", ok, err)
+	}
+	ref, _ := runs.Authorize(ctx, l.Token)
+	for _, cp := range []application.Checkpoint{
+		{Step: "extract", Page: 1, URL: "https://b.example.org/2", Data: []byte(`{"fields":[]}`)},
+		{Step: "execute", Page: 1, URL: "https://B.example.org/apply",
+			Data: []byte(`{"fields":[{"id":"0-1","kind":"text"}],"filled":[{"field_id":"0-1","source":"profile.email"}]}`)},
+		{Step: "submit", Page: 2, URL: "https://partner.example.net/form", Data: []byte(`{"fields":[]}`)},
+	} {
+		cp.Screenshot = "runs/x/1.png"
+		if err := runs.Checkpoint(ctx, ref, cp); err != nil {
+			t.Fatal(err)
+		}
+	}
+	app, _ := st.Get(ctx, max, l.AppID)
+	in, err := st.RuleInput(ctx, max, app, ref.RunID, time.Now())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if want := []string{"https://b.example.org", "https://partner.example.net"}; !slices.Equal(in.FormOrigins, want) {
+		t.Fatalf("form origins = %v, want %v", in.FormOrigins, want)
+	}
+	var ae *application.ApprovalError
+	if err := runs.BeginSubmit(ctx, ref); !errors.As(err, &ae) || !slices.Contains(ae.Reasons, application.ReasonOrigin) {
+		t.Fatalf("BeginSubmit() = %v, want approval for the origin", err)
 	}
 }

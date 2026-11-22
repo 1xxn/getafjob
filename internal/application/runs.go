@@ -244,6 +244,11 @@ func (r *Runs) BeginSubmit(ctx context.Context, ref RunRef) error {
 			return err
 		}
 		in.Settings.Unlimited = s.unlimited
+		for _, o := range in.FormOrigins {
+			if s.vetted == nil || !s.vetted(ctx, app.JobID, o) {
+				in.ForeignOrigins = append(in.ForeignOrigins, o)
+			}
+		}
 		if reasons := Rule(in, now); len(reasons) > 0 {
 			qs := []Question{{Kind: QuestionApproval, Label: QuestionApproval}}
 			if _, err := s.applyChange(ctx, ref.UserID, ref.AppID, Change{Event: EvAsk, Actor: ActorRunner,

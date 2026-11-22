@@ -499,6 +499,7 @@
   "rule.reason.level": "Deine Einstellungen verlangen eine Freigabe für jede Bewerbung",
   "rule.reason.maturity": "Mit diesem Bewerbungssystem gab es noch zu wenige erfolgreiche Läufe",
   "rule.reason.open_question": "Eine Pflichtfrage ist unbeantwortet",
+  "rule.reason.origin": "Ein Formular liegt auf einer Seite, die die Stelle nicht nennt",
   "rule.reason.provenance": "Ein Feldwert hat keine bekannte Quelle",
   "rule.reason.quota": "Dein Tageslimit ist erreicht",
   "rule.reason.score": "Der Match-Score liegt unter deinem Minimum",

@@ -499,6 +499,7 @@
   "rule.reason.level": "Your settings ask you to approve every application",
   "rule.reason.maturity": "Too few successful runs on this application system yet",
   "rule.reason.open_question": "A required question has no answer",
+  "rule.reason.origin": "A form page is on a site the job does not name",
   "rule.reason.provenance": "A field value has no known source",
   "rule.reason.quota": "Your daily limit is reached",
   "rule.reason.score": "The match score is below your minimum",

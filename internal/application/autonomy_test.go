@@ -225,3 +225,15 @@ func TestGreenRule(t *testing.T) {
 		}
 	})
 }
+
+func TestRuleAsksForForeignOrigins(t *testing.T) {
+	now := time.Now()
+	in := RuleInput{FormOrigins: []string{"https://b.example.org"}}
+	if slices.Contains(Rule(in, now), ReasonOrigin) {
+		t.Fatal("vetted origins alone must not ask")
+	}
+	in.ForeignOrigins = []string{"https://partner.example.net"}
+	if !slices.Contains(Rule(in, now), ReasonOrigin) {
+		t.Fatal("a foreign origin must ask")
+	}
+}

@@ -9,6 +9,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"net/url"
 	"slices"
 	"strings"
 	"time"
@@ -222,6 +223,15 @@ func (s *Store) Apply(ctx context.Context, userID uuid.UUID, a application.App, 
 		}
 		return nil
 	})
+}
+
+// origin is scheme://host of a page URL; a URL without one stays as it is, so it never matches a vetted origin.
+func origin(raw string) string {
+	u, err := url.Parse(raw)
+	if err != nil || u.Scheme == "" || u.Host == "" {
+		return raw
+	}
+	return strings.ToLower(u.Scheme + "://" + u.Host)
 }
 
 func waitingForUserDetail(detail map[string]any) bool {
@@ -678,6 +688,11 @@ func (s *Store) RuleInput(ctx context.Context, userID uuid.UUID, app application
 					filledOrder = append(filledOrder, k)
 				}
 				filledMap[k] = f.Source
+			}
+			if len(d.Filled) > 0 || cp.Step == "submit" {
+				if o := origin(cp.Url); !slices.Contains(in.FormOrigins, o) {
+					in.FormOrigins = append(in.FormOrigins, o)
+				}
 			}
 			if cp.Step == "submit" {
 				open := 0

@@ -128,6 +128,7 @@ const (
 	ReasonFormErrors   Reason = "form_errors"   // the form shows errors
 	ReasonQuota        Reason = "quota"         // the daily limit is used up
 	ReasonMaturity     Reason = "maturity"      // the ATS adapter has not earned autonomy yet
+	ReasonOrigin       Reason = "origin"        // a form page is on a host the job does not name
 )
 
 // SubmitField is a field the run filled, as the rule sees it.
@@ -155,6 +156,10 @@ type RuleInput struct {
 	Adapter          string
 	AdapterRuns      int
 	AdapterSubmitted int
+	// FormOrigins are the origins of the form pages the run filled or submits on; ForeignOrigins those of them the
+	// job does not name (the run followed links to another site).
+	FormOrigins    []string
+	ForeignOrigins []string
 }
 
 // sourceRx is the provenance of a value (ADR 0013): a profile field, an answer, a text block, a document or input the
@@ -219,6 +224,9 @@ func Rule(in RuleInput, now time.Time) []Reason {
 	if in.Adapter == "" || in.AdapterRuns < MaturityMinRuns ||
 		float64(in.AdapterSubmitted) < MaturityMin*float64(in.AdapterRuns) {
 		add(ReasonMaturity)
+	}
+	if len(in.ForeignOrigins) > 0 {
+		add(ReasonOrigin)
 	}
 	return out
 }

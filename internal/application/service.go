@@ -36,6 +36,7 @@ type Service struct {
 	store     Store
 	now       func() time.Time
 	unlimited bool
+	vetted    func(ctx context.Context, jobID int64, origin string) bool
 }
 
 // NewService returns an application service.
@@ -44,6 +45,13 @@ func NewService(s Store) *Service { return &Service{store: s, now: time.Now} }
 // WithoutLimits turns off the throughput limits for a self-hosted instance: no daily quota and no per-host gap.
 // Guard rails (exclusions, duplicates, company window, approval rule, submit register) stay.
 func (s *Service) WithoutLimits() *Service { s.unlimited = true; return s }
+
+// WithOriginCheck sets how the rule tells whether a form origin belongs to the job. Without it every form origin
+// counts as foreign, so a submit always needs approval.
+func (s *Service) WithOriginCheck(vetted func(ctx context.Context, jobID int64, origin string) bool) *Service {
+	s.vetted = vetted
+	return s
+}
 
 // Unlimited reports whether the throughput limits are off.
 func (s *Service) Unlimited() bool { return s.unlimited }

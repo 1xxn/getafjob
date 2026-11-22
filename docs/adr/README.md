@@ -35,3 +35,4 @@ rewritten once accepted: a changed decision gets a new ADR that supersedes the o
 | [0027](0027-remove-the-ai-module.md) | Remove the AI module | accepted |
 | [0028](0028-nothing-runs-before-the-user-starts-it.md) | Nothing runs before the user starts it | accepted |
 | [0029](0029-hybrid-matching-with-static-embeddings.md) | Hybrid matching with a tech skill dictionary and static embeddings | accepted |
+| [0030](0030-approval-on-sites-the-job-does-not-name.md) | Approval on sites the job does not name | accepted |
