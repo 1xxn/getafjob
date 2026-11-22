@@ -6,6 +6,7 @@ import (
 	"context"
 	"crypto/sha256"
 	"encoding/hex"
+	"net/url"
 	"regexp"
 	"strings"
 	"time"
@@ -195,11 +196,21 @@ type ImportChecker interface {
 
 // ValidStub reports whether a stub names a job.
 func ValidStub(p Posting) bool {
-	return p.Stub && p.Source != "" && p.ExternalID != "" && p.URL != "" && len(p.URL) <= 2048 && len(p.ExternalID) <= 500
+	return p.Stub && p.Source != "" && p.ExternalID != "" && WebURL(p.URL) && len(p.ExternalID) <= 500
 }
 
-// ValidPosting reports whether a posting has what the index needs.
+// ValidPosting reports whether a posting has what the index needs. Its links must be web addresses: the runner
+// opens them in a browser.
 func ValidPosting(p Posting) bool {
-	return !p.Stub && p.Source != "" && p.ExternalID != "" && strings.TrimSpace(p.Title) != "" && p.URL != "" &&
-		len(p.Title) <= 500 && len(p.Company) <= 300 && len(p.Location) <= 1000 && len(p.URL) <= 2048
+	return !p.Stub && p.Source != "" && p.ExternalID != "" && strings.TrimSpace(p.Title) != "" && WebURL(p.URL) &&
+		(p.ApplyURL == "" || WebURL(p.ApplyURL)) && len(p.Title) <= 500 && len(p.Company) <= 300 && len(p.Location) <= 1000
+}
+
+// WebURL reports whether s is an absolute http or https address with a host, at most 2048 bytes long.
+func WebURL(s string) bool {
+	if len(s) > 2048 {
+		return false
+	}
+	u, err := url.Parse(s)
+	return err == nil && (u.Scheme == "https" || u.Scheme == "http") && u.Host != ""
 }
