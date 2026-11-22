@@ -27,7 +27,7 @@ an error. Unknown `GETAFJOB_*` variables are reported as a warning (typos), with
 | `GETAFJOB_OTEL_ENDPOINT` | none | serve, worker | OTLP/HTTP endpoint for traces and metrics, e.g. `http://otel-collector:4318`; empty: telemetry off |
 | `GETAFJOB_SHUTDOWN_TIMEOUT` | `20s` | all | graceful shutdown limit (1s to 5m) |
 | `GETAFJOB_MASTER_KEY` | none | serve, worker, admin | master key for envelope encryption, 32 bytes base64url (`admin gen-secret`); use `_FILE` |
-| `GETAFJOB_MASTER_KEY_OLD` | none | serve, worker, admin | previous master key, only during a rotation ([key-rotation.md](runbooks/key-rotation.md)); use `_FILE` |
+| `GETAFJOB_MASTER_KEY_OLD` | none | serve, worker, admin | previous master key, only during a rotation ([deployment.md](deployment.md#master-key-rotation)); use `_FILE` |
 | `GETAFJOB_BLOB_URL` | none | serve, worker | file store: `file:///var/lib/getafjob/blobs` (volume) or `s3://bucket/prefix?endpoint=https://host&region=…`; plain `http` only for a service name in the Compose network; the endpoint must be reachable from the internal networks |
 | `GETAFJOB_BLOB_ACCESS_KEY` | none | serve, worker | S3 access key; use `_FILE` |
 | `GETAFJOB_BLOB_SECRET_KEY` | none | serve, worker | S3 secret key; use `_FILE` |
@@ -36,9 +36,9 @@ an error. Unknown `GETAFJOB_*` variables are reported as a warning (typos), with
 | `GETAFJOB_VAPID_KEY` | none | serve, worker | P-256 private key for Web Push notifications, 32 bytes base64url (`admin gen-vapid-key`); use `_FILE` |
 | `GETAFJOB_VAPID_SUBJECT` | `mailto:<MAIL_FROM>` | worker | contact URI (`mailto:` or `https://`) in VAPID tokens |
 | `GETAFJOB_TIMEZONE` | `Europe/Berlin` | serve, worker | IANA time zone of daily summaries and quiet hours; the notification settings name it |
-| `GETAFJOB_EMBED_MODEL` | `/usr/share/getafjob/embed` | worker, admin | directory of the static embedding model for matching (shipped in the app image, about 55 MB in memory); empty or missing: matching uses the rules alone (ADR 0029) |
+| `GETAFJOB_EMBED_MODEL` | `/usr/share/getafjob/embed` | worker, admin | directory of the static embedding model for matching (shipped in the app image, about 55 MB in memory); empty or missing: matching uses rules alone |
 | `GETAFJOB_CRAWL_INTERVAL` | `6h` | worker | time between two scheduled crawls (30m to 168h); the schedule starts after the first crawl someone starts by hand, never on worker start; `0` schedules none (the development stack's default, `GETAFJOB_DEV_CRAWL_INTERVAL` overrides it) |
-| `GETAFJOB_EASY_APPLY_ENABLED` | `false` | serve | allows LinkedIn/Indeed Easy Apply with the user's own session cookies (each user still opts in); portal runs go one at a time per user and portal ([security.md](security.md)) |
+| `GETAFJOB_EASY_APPLY_ENABLED` | `false` | serve | allows LinkedIn/Indeed Easy Apply with the user's own session cookies (each user still opts in); portal runs go one at a time per user and portal ([architecture.md](architecture.md#security-model)) |
 
 `getafjob admin env` lists all variables; `getafjob admin check-config` validates the current environment without
 printing values. Secret values never appear in logs or error messages.

@@ -71,7 +71,7 @@ type navGroup struct {
 	Admin bool // shown to admins only
 }
 
-// navGroups follow docs/ui/sitemap.md; pages that do not exist yet join their group when they are built.
+// navGroups define the primary application sidebar and navigation structure.
 var navGroups = []navGroup{
 	{Items: []navItem{{Key: "nav.home", Href: "/", Icon: "home"}}},
 	{Key: "nav.group.discover", Items: []navItem{{Key: "nav.jobs", Href: "/jobs", Icon: "briefcase"},

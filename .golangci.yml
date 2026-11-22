@@ -43,7 +43,7 @@ linters:
         - pattern: ^print(ln)?$
         - pattern: ^fmt\.Print(f|ln)?$
           msg: write to an io.Writer or use slog
-        # Sandbox and site isolation stay on (docs/adr/0011-browser-automation-go-rod.md).
+        # Sandbox and site isolation stay on (docs/architecture.md#security-model).
         - pattern: ^flags\.NoSandbox$
           msg: the browser sandbox must stay enabled
     depguard:

@@ -2,7 +2,7 @@
 
 package browser
 
-// Phase 0 spike (#9): go-rod against the hardest form fixtures. Results: docs/adr/0011-browser-automation-go-rod.md.
+// Exercises go-rod against real HTML/ARIA form fixtures.
 
 import (
 	"encoding/json"

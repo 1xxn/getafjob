@@ -28,6 +28,6 @@ body:
     id: area
     attributes:
       label: Area
-      options: [identity, profile, discovery, matching, application, runner, tracking, notify, assist, ai, web, platform, deploy, ci]
+      options: [identity, profile, discovery, matching, application, runner, tracking, notify, assist, web, platform, deploy, ci]
     validations:
       required: true

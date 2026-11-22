@@ -1,328 +1,145 @@
-<div align="center">
-
 # getafjob
 
-**Autonomous job search and application engine written in Go.**
-
-Collects job postings, scores them per candidate profile, and fills out application forms in a real sandboxed Chromium browser with human approval gates.
+Self-hosted multi-user job discovery, matching, and browser application tool written in Go.
 
 [![CI](https://github.com/1xxn/getafjob/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/1xxn/getafjob/actions/workflows/ci.yml)
-[![CodeQL](https://github.com/1xxn/getafjob/actions/workflows/codeql.yml/badge.svg?branch=main)](https://github.com/1xxn/getafjob/actions/workflows/codeql.yml)
-[![OpenSSF Scorecard](https://api.scorecard.dev/projects/github.com/1xxn/getafjob/badge)](https://scorecard.dev/viewer/?uri=github.com/1xxn/getafjob)
-[![OpenSSF Best Practices](https://www.bestpractices.dev/projects/16347/badge)](https://www.bestpractices.dev/projects/16347)
-[![Go Reference](https://pkg.go.dev/badge/github.com/1xxn/getafjob.svg)](https://pkg.go.dev/github.com/1xxn/getafjob)
 [![Go version](https://img.shields.io/github/go-mod/go-version/1xxn/getafjob?logo=go&logoColor=white)](go.mod)
 [![License: MIT](https://img.shields.io/github/license/1xxn/getafjob)](LICENSE)
 
-[Features](#features) · [Screenshots](#screenshots) · [User Guide](docs/user-guide.md) · [How It Works](#how-it-works) · [Quickstart](#quickstart) · [Administration CLI](#administration-cli) · [Operations](#operations) · [Security & Privacy](#security--privacy) · [Roadmap](#roadmap)
-
-</div>
-
----
-
-## Overview
-
-`getafjob` is a self-hosted, multi-user automation platform that handles the repetitive mechanics of job seeking. It crawls public ATS boards and job feeds, ranks openings deterministically against your structured profile, and drives a real headless browser to fill out multi-step application forms without submitting duplicates or generating unreviewed content.
-
-### Core Principles
-- **No Cover Letters:** Enforced strictly across the pipeline. We do not generate, template, or attach cover letters.
-- **Full Traceability:** Every filled field is linked to an explicit fact in your profile or an approved answer bank entry.
-- **Zero Stealth / No Bot Disguise:** No browser fingerprint spoofing, no CAPTCHA-solving sweatshops. Bot challenges and 2FA prompts route directly to an interactive remote browser window for human completion.
-- **Defense in Depth:** Outbound network requests pass through an SSRF-filtering egress proxy; browser sessions run inside dedicated unprivileged Linux containers with seccomp filtering; multi-tenant database access is isolated by PostgreSQL Row-Level Security.
-
----
-
-## Features
-
-- **Broad ATS & Board Collection:**
-  - Native API & scrapers for 10+ ATS platforms: Greenhouse, Ashby, Lever, Workday, SmartRecruiters, Personio, Recruitee, Workable, Teamtailor, and Eightfold.
-  - Job boards & public search: Bundesagentur für Arbeit, Arbeitnow, Himalayas, and public portal search for LinkedIn, Indeed, and Glassdoor.
-  - Automatic detection of schema.org `JobPosting` and sitemaps on custom company career sites.
-  - Built-in tech employer catalog, conditional ETag requests, and deduplication into a unified index.
-
-- **Deterministic Scoring Engine:**
-  - Evaluates postings against target titles, seniority, skills, locations, remote region preferences, work authorization, salary expectations, and language proficiencies.
-  - Every match score is accompanied by a transparent, point-by-point breakdown explaining exactly why a posting ranked high or low.
-
-- **Real Browser Automation:**
-  - Headless Chromium controlled via `go-rod` inside hardened runner containers.
-  - Handles nested and out-of-process iframes (OOPIF), Shadow DOM, custom ARIA widgets (`role="combobox"`, `role="listbox"`, toggles), drag-and-drop file upload zones, and multi-step wizard flows.
-  - Centralized **submit register** enforcing at most one submission per application to prevent accidental duplicate applications.
-
-- **Configurable Autonomy & Approvals:**
-  - Three distinct autonomy tiers:
-    - `suggest` *(Default)*: Discovers and scores jobs; candidate triggers runs manually.
-    - `approve`: Automatically prepares and fills forms, then halts at `BeginSubmit` for review in the approval queue.
-    - `autonomous`: Submits automatically only when all 11 green rules pass (verified board, score threshold, salary fit, known fields).
-  - Web approval queue (`/approvals`) for inspecting form values, attached documents, and confidence metrics before giving the final submit click.
-
-- **Interactive Remote Screencast:**
-  - Live low-latency WebSocket screencast (`/applications/{id}`) to interact with the runner browser when CAPTCHAs, bot challenges, or email verification codes appear.
-
-- **Status Tracking & Pacing:**
-  - RFC 3501 read-only IMAP tracking worker to detect confirmation emails, status changes, and interview invitations without reading private emails.
-  - Rate limiting, daily submission quotas (default max 5/day), host gap throttling, and quiet-hours enforcement.
-  - Multi-channel notification delivery: Web Push (RFC 8291/8292 VAPID), SMTP email, and ntfy.
-
-- **Security & Multi-Tenancy:**
-  - Passwordless authentication with Passkeys (WebAuthn / FIDO2) and delayed recovery magic links.
-  - PostgreSQL Row-Level Security (RLS) on all tenant tables, audited by automated architecture tests.
-  - Envelope encryption (`crypto.Envelope`) using per-user keys for sensitive documents and stored portal sessions.
-  - Full GDPR compliance: Art. 17 right to erasure with cryptographic key shredding (`Forget`), Art. 20 ZIP data portability export, and automated 90-day screenshot retention pruning.
-
----
+`getafjob` collects job postings from ATS boards and public job feeds, ranks them against each user's structured profile and search preferences, and fills out application forms in a real headless Chromium browser while keeping the user in control of submissions, logins, and bot checks.
 
 ## Screenshots
 
-Taken by an end to end journey from invented demo data (`go tool task docs:screenshots`), never by hand.
+Generated from demo fixtures via `go tool task docs:screenshots`.
 
 <p align="center">
-  <img src="docs/images/job-list.png" alt="Job list with filters and match scores" width="49%">
-  <img src="docs/images/job-detail.png" alt="Job page with the reasons of its score" width="49%">
+  <img src="docs/images/job-list.png" alt="Ranked job list with filters and application status" width="49%">
+  <img src="docs/images/job-detail.png" alt="Job detail view with deterministic score breakdown" width="49%">
 </p>
 <p align="center">
-  <em>Left: jobs ranked for the user, with filters and actions on several jobs at once.<br>
-  Right: a job with every reason that adds to or takes from its score.</em>
-</p>
-
-<p align="center">
-  <img src="docs/images/needs-input.png" alt="Runs waiting for an answer" width="49%">
-  <img src="docs/images/approvals.png" alt="Applications waiting for approval" width="49%">
+  <img src="docs/images/needs-input.png" alt="Applications paused for user input or browser handoff" width="49%">
+  <img src="docs/images/approvals.png" alt="Prepared applications waiting for approval before submission" width="49%">
 </p>
 <p align="center">
-  <em>Left: runs that wait for an answer from the user.<br>
-  Right: filled applications waiting for approval before anything is sent.</em>
+  <img src="docs/images/settings.png" alt="Autonomy and search settings" width="60%">
 </p>
 
-<p align="center">
-  <img src="docs/images/settings.png" alt="Automation settings" width="60%">
-</p>
-<p align="center">
-  <em>Automation: how far getafjob may go on its own.</em>
-</p>
+## What it does
 
----
+- **Discovery (`internal/discovery`)**: Crawls company ATS boards (`Greenhouse`, `Ashby`, `Lever`, `SmartRecruiters`, `Personio`, `Recruitee`, `Workable`, `Workday`, `Softgarden`, `JOIN`, `SAP SuccessFactors`, `Eightfold`), company sitemaps and career pages (`schema.org/JobPosting`), public job feeds (`Arbeitnow`, `Arbeitsagentur`, `BerlinStartupJobs`, `Himalayas`), major career sites (`Amazon`, `Apple`, `Google`), and optional portal searches (`LinkedIn`, `Indeed`, `Glassdoor`). Uses conditional HTTP requests (`ETag`/`Last-Modified`) and deduplicates postings into a shared index.
+- **Deterministic + Local Semantic Matching (`internal/matching`)**: Applies hard constraints (titles, exclusions, seniority, location, remote/hybrid policy, salary floor, language) and ranks jobs with transparent per-reason point breakdowns. Optionally combines rule scores with an in-process quantized static token embedding model (`static-similarity-mrl-multilingual-v1`, 256 `float16` dimensions, ~55 MB in memory, runs in-process on CPU).
+- **Browser Runner & Guardrails (`internal/runner`, `internal/application`)**: Uses `go-rod` and headless Chromium inside a sandboxed container to fill multi-step forms, nested iframes, Shadow DOM, and file uploads.
+  - No stealth or anti-fingerprinting plugins (`go-rod/stealth` is forbidden in `.golangci.yml`).
+  - No cover-letter generation; every filled value requires tracked provenance from the user's profile or approved answer bank.
+  - A unique `submit_register` prevents duplicate submissions across retries and crashes.
+  - Three autonomy levels (`suggest` by default, `approve`, `autonomous`), daily limits, and an approval queue (`/approvals`).
+  - CAPTCHAs, sign-ins, 2FA prompts, and unknown questions pause the run for interactive completion over a WebSocket browser screencast (`/needs-input`).
+- **Inbox Tracking & Notifications (`internal/tracking`, `internal/notify`)**: Read-only IMAP scanning matches confirmations, rejections, and interview requests (explicitly ignoring verification/security codes). Supports Web Push (VAPID), SMTP email, and ntfy.
+- **Tenant Isolation & Encryption**: Invite-only Passkey (WebAuthn) sign-in with delayed magic-link recovery; PostgreSQL Row-Level Security (`getafjob_app`); per-user AES-256-GCM envelope encryption for documents and secrets (`admin export-user`, `admin delete-user` crypto-shredding); SSRF filtering via `internal/platform/netguard` and a `smokescreen` egress proxy.
 
-## How It Works
+## Quickstart (Local Stack)
 
-```mermaid
-flowchart TD
-  subgraph Discovery
-    A[Public Boards & ATS APIs] --> C[Deduplication & Indexer]
-    B[Careers Pages / Portals] --> C
-  end
+Prerequisites: **Go 1.27+** (`1.27.4` in [go.mod](go.mod)) and **Docker** with Compose v2.
 
-  subgraph Matching
-    C --> D[Matching Engine]
-    P[(Candidate Profile)] --> D
-    D --> E{Autonomy Level}
-  end
-
-  subgraph Execution
-    E -- suggest --> F[Job List]
-    E -- approve / rule fail --> G[Approval Queue /approvals]
-    E -- autonomous green rule --> H[Runner Gateway]
-    G -- User Approves --> H
-    H --> I[Sandboxed Chromium Runner]
-    I -. CAPTCHA / 2FA .-> J((Interactive Remote Browser))
-    J -. Human Solves .-> I
-    I --> K[Submit Register Check]
-    K --> L[Submit & Capture Evidence]
-  end
-
-  subgraph Feedback
-    L --> M[IMAP Tracker & Webhooks]
-    M --> N[Status Dashboard & Notifications]
-  end
-```
-
-### Binary Architecture
-`getafjob` compiles into a single static Go binary with subcommands:
-- `serve`: Web interface, HTTP API, and gRPC runner gateway.
-- `worker`: Background River job queue processing crawls, matching passes, IMAP tracking, and retention cleanups.
-- `runner`: Outbound-only browser execution agent driving headless Chromium. Operates with zero database access.
-- `migrate`: Database schema migration tool (runs with database owner privileges).
-- `admin`: Operational CLI for user invitations, demo seeding, load testing, and maintenance.
-
-### Network Topology
-```mermaid
-flowchart LR
-  User([User / Browser]) -->|HTTPS:8443| Caddy[Caddy Reverse Proxy]
-  Caddy -->|HTTP| Serve[getafjob serve]
-  Serve -->|TCP:5432 / RLS| DB[(PostgreSQL 18)]
-  Worker[getafjob worker] -->|TCP:5432| DB
-  Serve <-->|gRPC:50051| Runner[getafjob runner]
-  Runner -->|HTTP/HTTPS Proxy| Egress[getafjob-egress proxy]
-  Worker -->|HTTP/HTTPS Proxy| Egress
-  Egress -->|Filtered WAN| Internet((Public Internet))
-```
-
----
-
-## Quickstart
-
-### Prerequisites
-- **Go 1.27.3+**
-- **Docker** with **Docker Compose v2**
-- All development and build tools are pinned in `go.mod` and run via `go tool task`.
-
-### 1. Clone & Start Local Development Stack
 ```bash
 git clone https://github.com/1xxn/getafjob.git
 cd getafjob
 
-# Creates dev secrets, builds container images, and starts all services
+# Generate local secrets, build images, start all services, and wait until healthy
 go tool task dev:up
-
-# Verify health endpoint
-curl -k https://localhost:8443/healthz
 ```
 
-### 2. Create Initial Admin Account
-All local development emails are captured by the built-in Mailpit instance (`http://127.0.0.1:8025`).
+Load invented demo data (or create an admin invite link) against the running stack:
+
 ```bash
-docker compose -f deploy/compose.yaml exec serve \
-  getafjob admin invite -email max.mustermann@example.com -role admin -send
-```
-Open Mailpit in your browser, click the invitation link, choose your display name, and register your passkey.
+# Optional: seed invented users, profile data, and 2,000 postings
+docker compose -f deploy/compose.yaml -f deploy/compose.dev.yaml exec -T serve \
+  /usr/local/bin/getafjob admin demo -fixtures http://fixtures:8080
 
-### 3. Seed Synthetic Demo Data
-To explore the complete UI immediately without waiting for background crawls:
-```bash
-docker compose -f deploy/compose.yaml exec serve \
-  getafjob admin demo -jobs 2000
-```
-This populates the database with 2,000 synthetic job listings and matches them against demo candidate profiles.
-
-### Production server
-To run getafjob on your own server (DNS, mail, hardening, signed images, backups), follow
-[`docs/runbooks/install.md`](docs/runbooks/install.md).
-Add `-fixtures http://fixtures:8080` to point the postings at the local fixture site: in the development stack the
-runner has its own egress proxy that reaches only that site, so runs can be watched end to end without touching a
-real job site.
-
-### 4. Trigger Discovery Crawl
-```bash
-# Import the built-in tech employer catalog
-docker compose -f deploy/compose.yaml exec worker getafjob admin boards import
-
-# Trigger an immediate crawl run
-docker compose -f deploy/compose.yaml exec worker getafjob admin crawl
+# Or create a one-time invitation link for a new admin account
+docker compose -f deploy/compose.yaml -f deploy/compose.dev.yaml exec -T serve \
+  /usr/local/bin/getafjob admin invite -email max.mustermann@example.com -role admin
 ```
 
-To stop the development environment:
+Local endpoints:
+
+| Service | URL | Notes |
+|---|---|---|
+| Web UI & API | `https://localhost:8443` | Reverse-proxied via Caddy (local internal TLS CA) |
+| Mailpit UI | `http://127.0.0.1:8025` | Captures outgoing invitations, magic links, and alerts |
+
+To stop the stack:
+
 ```bash
 go tool task dev:down
 ```
 
----
+## Binary Roles & Services
 
-## Administration CLI
+`cmd/getafjob` compiles to a single static binary (`CGO_ENABLED=0`) invoked by subcommand:
 
-The binary includes administrative commands for cluster and operational maintenance:
+| Role / Command | Purpose |
+|---|---|
+| `serve` | Serves the HTMX/templ web UI, JSON API (`v1`), SSE updates, and the Connect RPC runner gateway |
+| `worker` | Runs River background queues: board crawls, matching, inbox rules, notifications, cleanup, and planning |
+| `runner` | Drives sandboxed headless Chromium via `go-rod`; leases jobs from `serve` over Connect RPC with zero DB access |
+| `migrate` | Applies PostgreSQL (`goose`) and River schema migrations and exits |
+| `admin` | Operator CLI (`getafjob admin help`) |
+| `healthcheck` | Minimal HTTP/TCP probe (`http://...` or `tcp://...`) for distroless container health checks |
+| `version` | Prints build version, commit, and timestamp |
 
-```bash
-# Seed development data with synthetic profiles
-getafjob admin demo [-jobs 2000] [-seed 1]
+For container networking, package boundaries, and the security model, see [docs/architecture.md](docs/architecture.md).
 
-# Issue account invitations
-getafjob admin invite -email <addr> -role <admin|user> [-send]
+## Admin CLI
 
-# Import or sync company boards
-getafjob admin boards import
-getafjob admin crawl [-sources greenhouse,ashby,lever]
+Run commands inside the `serve` (or `migrate` when owner DB privileges are needed) container, or locally with `GETAFJOB_*` configured:
 
-# User privacy & GDPR operations
-getafjob admin export-user -email <addr> -out <export.zip>
-getafjob admin delete-user -email <addr>
+```text
+getafjob admin <command>
 
-# System maintenance & retention pruning
-getafjob admin cleanup
-
-# Load testing against SLOs
-getafjob admin load-test -url https://localhost:8443 -users 10 -duration 30s
+  boards <import|list>      Import built-in company board catalog or list enabled boards
+  crawl                     Enqueue a crawl job immediately
+  plan                      Enqueue application planning immediately
+  inbox                     Enqueue an IMAP inbox check immediately
+  notify summary            Enqueue daily summary notifications
+  cleanup                   Run expired token and artifact retention cleanup
+  invite                    Create a one-time invitation link (-email, [-role user|admin], [-send], [-locale en|de])
+  disable / enable          Disable or re-enable an account (-email)
+  sign-out                  Revoke all active sessions for a user (-email)
+  export-user               Export a user's personal data to a ZIP file (-email, -out)
+  delete-user               Delete a user account and crypto-shred its data key (-email)
+  rotate-master-key         Re-wrap all user data keys with GETAFJOB_MASTER_KEY (reads GETAFJOB_MASTER_KEY_OLD)
+  maintenance               Manage maintenance mode (on [-message ...] | off | status)
+  backup-done               Record a completed backup size (-bytes N)
+  env / check-config        List known GETAFJOB_* variables or validate the current environment
+  gen-secret                Generate 32 base64url-encoded random bytes
+  gen-vapid-key             Generate a Web Push P-256 VAPID key pair
+  demo                      Seed local development fixture data
+  load-test                 Run concurrent HTTP load tests against a target URL
 ```
-
----
-
-## Operations
-
-### Observability
-The stack provides an integrated Prometheus, Grafana, Loki, and Tempo profile for distributed tracing and performance metrics:
-
-```bash
-# Launch the observability profile (Grafana on http://localhost:3000)
-go tool task obs:up
-
-# Generate concurrent synthetic load to verify dashboard SLOs
-go tool task obs:load
-
-# View service logs
-go tool task obs:logs
-```
-
-Key monitored metrics include:
-- `getafjob.run.step.duration`: Step latency histogram partitioned by ATS adapter and step (`prepare`, `extract`, `plan`, `execute`, `verify`, `submit`).
-- `getafjob.ats.maturity`: Adapter success rate and readiness tracker.
-- `getafjob.http.server.duration`: Endpoint latency tracking the p95 < 200 ms dashboard SLO.
-
-### Backups & Disaster Recovery
-Automated client-side encrypted backups using `restic`:
-```bash
-# Create an encrypted snapshot of PostgreSQL and blob store volumes
-go tool task backup
-
-# Rehearse recovery drill against a throwaway container
-go tool task test:restore
-```
-Runbook available at [`docs/runbooks/backup-restore.md`](docs/runbooks/backup-restore.md).
-
----
-
-## Security & Privacy
-
-- **OWASP ASVS Verification:** Fully audited against OWASP ASVS 4.0/5.0 Level 2 in [`docs/security.md`](docs/security.md).
-- **Tenant Isolation:** Enforced via PostgreSQL Row-Level Security (`current_setting('app.current_user_id')`) and tested in CI via [`internal/archtest`](internal/archtest).
-- **Cryptographic Erasure (GDPR Art. 17):** Account deletion zeros and destroys the user's master key envelope (`crypto.Envelope.Forget`), rendering all historical backups mathematically unreadable.
-- **SSRF Defense:** All external crawls and browser runner traffic are mediated by `netguard` and `getafjob-egress`, strictly blocking loopback (`127.0.0.1`), RFC 1918 private subnets, and cloud metadata endpoints (`169.254.169.254`).
-- **Chromium Sandboxing:** Runner containers drop all Linux capabilities (`cap_drop: [ALL]`), enforce `no-new-privileges`, and run with a custom seccomp profile (`deploy/seccomp/chromium.json`).
-
-Please report security issues responsibly per [`SECURITY.md`](SECURITY.md).
-
----
-
-## Roadmap
-
-All planned milestone phases have been completed and verified:
-
-| Phase | Milestone | Scope | Status |
-|---|---|---|---|
-| [Phase 0](https://github.com/1xxn/getafjob/milestone/1) | **Foundation** | Single binary, Compose stack, CI/CD, threat model, go-rod spike | ✅ Done |
-| [Phase 1](https://github.com/1xxn/getafjob/milestone/2) | **Users, Profile, Jobs** | Passkeys, magic links, RLS, discovery index, deterministic matching, web UI | ✅ Done |
-| [Phase 2](https://github.com/1xxn/getafjob/milestone/3) | **Applying** | State machine, submit register, 8 primary ATS adapters, Chromium runner | ✅ Done |
-| [Phase 3](https://github.com/1xxn/getafjob/milestone/4) | **Autonomy** | Autonomy tiers, pacing, approval queue, IMAP tracking, notifications, MV3 extension | ✅ Done |
-| [Phase 4](https://github.com/1xxn/getafjob/milestone/5) | **Portals & Hardening** | Easy Apply, optional AI helper, ASVS L2, load testing, encrypted backups, deploy pipeline | ✅ Done |
-| [Phase 5](https://github.com/1xxn/getafjob/milestone/6) | **Live Test & Dry Runs** | 22 browser dry runs across all ATS adapters, 0 leaks, comprehensive report | ✅ Done |
-
-See [`docs/reports/phase-5-live-test.md`](docs/reports/phase-5-live-test.md) for the live testing report.
-
----
 
 ## Development
 
-All standard tasks are orchestrated through `Taskfile.yml`:
+All tasks are defined in [Taskfile.yml](Taskfile.yml):
 
 ```bash
-go tool task check          # fmt, vet, golangci-lint, tests with -race, govulncheck, diff
-go tool task test:short     # Fast unit test pass
-go tool task test:browser   # Browser test suite inside runner image with seccomp sandbox
-go tool task generate       # Re-run buf, oapi-codegen, templ, and sqlc generators
+go tool task check          # fmt check, mod tidy diff, go vet, golangci-lint, go test -race, govulncheck, generate check
+go tool task test:short     # unit tests only (no Docker required)
+go tool task test           # unit + PostgreSQL integration tests (requires Docker)
+go tool task test:browser   # Chromium fixture suite inside the runner image
+go tool task test:e2e       # full end-to-end suite against the running dev stack
+go tool task generate       # regenerate buf protobufs, oapi-codegen, templ views, and sqlc queries
+go tool task lint           # run pinned golangci-lint in Docker (--build-tags browser,e2e)
 ```
 
-Contributions must follow the rules in [`CONTRIBUTING.md`](CONTRIBUTING.md): fictional candidate data only, Conventional Commits, and verified quality gates.
+## Documentation
 
----
+- [Configuration Reference](docs/configuration.md) — All `GETAFJOB_*` environment variables and `_FILE` secret handling
+- [Architecture & Security Model](docs/architecture.md) — Service topology, module boundaries, runtime flows, and threat controls
+- [Production Deployment & Operations](docs/deployment.md) — Production Compose overlay, signed image deploys/rollbacks, restic backups, key rotation, and observability
+- [Security Policy](SECURITY.md) — Vulnerability disclosure guidelines
+- [Contributing](CONTRIBUTING.md) — Development rules, testing suites, and PR expectations
 
 ## License
 
-[MIT](LICENSE). Third-party software notices are cataloged in [THIRD_PARTY_NOTICES](THIRD_PARTY_NOTICES).
+[MIT](LICENSE)

@@ -16,4 +16,4 @@ go run deploy/seccomp/gen.go path/to/default.json > deploy/seccomp/chromium.json
 ```
 
 Hosts with AppArmor restrictions for unprivileged user namespaces (Ubuntu 23.10+) additionally need an AppArmor
-profile that allows `userns` for the runner container, see `docs/runbooks/deploy.md`.
+profile that allows `userns` for the runner container, see `docs/deployment.md`.

@@ -7,8 +7,8 @@
 - **English everywhere** in code, comments, commits, docs and issues. The UI ships English and German; every text
   shown to people comes from the message catalogs, backend texts reach the UI as a code plus parameters.
 - **Guard rails are not negotiable** in a pull request: no stealth or fingerprint tricks, no CAPTCHA solving, the
-  browser sandbox stays on, no submit without a registered attempt, no form value without provenance. Changing one
-  needs an ADR and the maintainer's approval first.
+  browser sandbox stays on, no submit without a registered attempt, no form value without provenance. See
+  [docs/architecture.md](docs/architecture.md#security-model).
 
 ## Setup
 

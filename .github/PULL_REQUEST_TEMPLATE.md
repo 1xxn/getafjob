@@ -6,19 +6,15 @@ Closes #
 
 ## Solution
 
-<!-- What this change does and why this way. Decisions worth keeping go into an ADR (docs/adr). -->
+<!-- What this change does and why this approach was chosen. -->
 
 ## Tests
 
-<!-- New/changed tests; how you checked it (go tool task check, browser suite, Compose stack). -->
-
-## Performance
-
-<!-- Hot path touched? Add `benchstat` against main (a slowdown > 10 % needs a reason). Otherwise: n/a. -->
+<!-- New or updated tests and how you verified them (e.g. go tool task check). -->
 
 ## Checklist
 
-- [ ] Fictional data only (no real names, mails, CVs, paths or screenshots)
-- [ ] Guard rails unchanged (sandbox, provenance, single submit path, human-only checks), or an approved ADR
-- [ ] UI texts in the English and German catalogs; backend texts as code + params
-- [ ] Docs updated (architecture, security, runbooks, ADR) where behaviour changed
+- [ ] Fictional data only (no real names, mails, CVs, paths, or screenshots)
+- [ ] Guard rails preserved (browser sandbox, field provenance, single submit register, human-only checks)
+- [ ] UI strings added to both English and German catalogs (`en.json`, `de.json`), backend errors use codes + params
+- [ ] Tests, linters, and documentation (`README.md`, `docs/`) updated where behaviour changed

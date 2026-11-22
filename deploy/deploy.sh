@@ -310,7 +310,7 @@ if [ "$VERIFY_COSIGN" != "false" ]; then
     done
   elif [ "$VERIFY_COSIGN" = "true" ]; then
     echo "ERROR: image signatures must be verified ($ENV_NAME) but cosign is not on PATH." >&2
-    echo "Install cosign (docs/runbooks/deploy.md) or pass --skip-cosign to deploy unverified images on purpose." >&2
+    echo "Install cosign (docs/deployment.md) or pass --skip-cosign to deploy unverified images on purpose." >&2
     exit 1
   fi
 fi
