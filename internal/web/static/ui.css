@@ -515,7 +515,9 @@
     cursor: not-allowed;
   }
 
-  .ui-input[aria-invalid="true"] {
+  /* :user-invalid also marks what the browser finds wrong (e-mail, web address) while a form saves itself. */
+  .ui-input[aria-invalid="true"],
+  .ui-input:user-invalid {
     border-color: var(--danger);
     border-width: 2px;
   }

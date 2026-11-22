@@ -41,7 +41,7 @@ func TestProfileAutosaveAndOrder(t *testing.T) {
 	form.Set("email", "not an address")
 	rec = a.do(http.MethodPost, "/profile/autosave", form, session, hx)
 	if body := rec.Body.String(); rec.Code != http.StatusUnprocessableEntity || !strings.Contains(body, `data-save-state="invalid"`) ||
-		!strings.Contains(body, "check:") {
+		!strings.Contains(body, "E-mail address for applications: Enter a plain e-mail address") {
 		t.Fatalf("invalid email %d: %s", rec.Code, body)
 	}
 	// Another window saved meanwhile: the old version is refused.

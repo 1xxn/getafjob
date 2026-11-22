@@ -911,12 +911,12 @@ func (s *Server) saveState(w http.ResponseWriter, r *http.Request, id string, er
 		st.State, st.Text = "saved", views.T(r.Context(), "profile.autosave.saved")
 	case errors.Is(err, profile.ErrInvalid):
 		status, st.State = http.StatusUnprocessableEntity, "invalid"
-		var names []string
-		for field := range fieldErrors(r, err) {
-			names = append(names, views.T(r.Context(), "profile.field."+field))
+		var problems []string
+		for field, reason := range fieldErrors(r, err) {
+			problems = append(problems, views.T(r.Context(), "profile.field."+field)+": "+reason)
 		}
-		slices.Sort(names)
-		st.Text = views.T(r.Context(), "profile.autosave.invalid", "fields", strings.Join(names, ", "))
+		slices.Sort(problems)
+		st.Text = views.T(r.Context(), "profile.autosave.invalid", "fields", strings.Join(problems, " "))
 	case errors.Is(err, profile.ErrConflict):
 		status, st.State, st.Text = http.StatusConflict, "conflict", views.T(r.Context(), "profile.autosave.conflict")
 	case errors.Is(err, profile.ErrStationNotFound):
