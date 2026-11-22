@@ -273,6 +273,25 @@ func TestSkillsFor(t *testing.T) {
 	}
 }
 
+func TestIsKnownRoleAndKnownSkills(t *testing.T) {
+	for _, role := range []string{"Senior Platform Engineer", "Softwareentwicklerin (m/w/d)", "Backend Developer", "Scrum Master", "Data Analyst"} {
+		if !IsKnownRole(role) {
+			t.Errorf("IsKnownRole(%q) = false, want true", role)
+		}
+	}
+	for _, nonRole := range []string{"", "Muster Cloud GmbH", "Beispiel AG", "Acme Inc.", "TU Berlin University", "Cloud Solutions"} {
+		if IsKnownRole(nonRole) {
+			t.Errorf("IsKnownRole(%q) = true, want false", nonRole)
+		}
+	}
+	gotSkills := KnownSkills("Cloud: AWS, Docker, Kubernetes & PostgreSQL (not a known thing)")
+	for _, want := range []string{"AWS", "Docker", "Kubernetes", "PostgreSQL"} {
+		if !slices.Contains(gotSkills, want) {
+			t.Errorf("KnownSkills missing %q in %v", want, gotSkills)
+		}
+	}
+}
+
 func FuzzEvaluate(f *testing.F) {
 	f.Add("Senior Go Developer", "Remote - Germany", "Go, 80.000 €")
 	m := NewMatcher(Criteria{Titles: []string{"go developer"}, Remote: true, RemoteRegions: []string{"eu"},

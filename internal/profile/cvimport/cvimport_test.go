@@ -351,3 +351,125 @@ func TestLinksNeedTheirHost(t *testing.T) {
 		t.Errorf("look-alike host taken: %q", p.Personal.LinkedIn)
 	}
 }
+
+// buildLaTeXLikePDF builds a minimal PDF modeled on pdfTeX output: /Encoding /Differences alongside a
+// /ToUnicode CMap, TJ kerning arrays, a CMSY symbol font, and /Widths on the fonts (#506).
+func buildLaTeXLikePDF() []byte {
+	toUni := `/CIDInit /ProcSet findresource begin
+12 dict begin
+begincmap
+/CIDSystemInfo << /Registry (Adobe) /Ordering (UCS) /Supplement 0 >> def
+/CMapName /Adobe-Identity-UCS def
+/CMapType 2 def
+1 begincodespacerange
+<00> <FF>
+endcodespacerange
+4 beginbfchar
+<1C> <00660069>
+<1D> <00FC>
+<1E> <00E4>
+<1F> <00B7>
+endbfchar
+1 beginbfrange
+<20> <7E> <0020>
+endbfrange
+endcmap
+CMapName currentdict /CMap defineresource pop
+end
+end`
+
+	symUni := `/CIDInit /ProcSet findresource begin
+12 dict begin
+begincmap
+1 begincodespacerange
+<00> <FF>
+endcodespacerange
+1 beginbfchar
+<02> <2297>
+endbfchar
+endcmap
+end`
+
+	widths := make([]string, 256)
+	for i := range widths {
+		widths[i] = "500"
+	}
+	widthArray := "[" + strings.Join(widths, " ") + "]"
+
+	// Uses TJ arrays with kerning numbers, ligature <1C> -> "fi", <1D> -> "ü", and symbol bullet <02> -> "⊗".
+	stream := strings.Join([]string{
+		"BT",
+		"/F1 10 Tf 1 0 0 1 50 760 Tm [(Max Mustermann)] TJ",
+		"/F1 10 Tf 1 0 0 1 50 746 Tm [(10115 Berlin | max.mustermann@example.org | +49 30 1234567)] TJ",
+		"/F1 10 Tf 1 0 0 1 50 720 Tm [(Berufserfahrung)] TJ",
+		"/F1 10 Tf 1 0 0 1 50 704 Tm [(Muster Cloud GmbH \x1F Senior Platform Engineer)] TJ",
+		"/F1 10 Tf 1 0 0 1 400 704 Tm [(Berlin, Germany  01/2021 - heute)] TJ",
+		"/F2 10 Tf 1 0 0 1 50 690 Tm <02> Tj /F1 10 Tf 1 0 0 1 62 690 Tm [(Leitung von 2.000 Mitarbeitenden im Plattformbetrieb)] TJ",
+		"/F2 10 Tf 1 0 0 1 50 676 Tm <02> Tj /F1 10 Tf 1 0 0 1 62 676 Tm [(Spezi) 15 <1C> -10 (kation der Cloud-)] TJ",
+		"/F1 10 Tf 1 0 0 1 62 664 Tm [(dienste f) -5 <1D> (r moderne Cluster)] TJ",
+		"/F1 10 Tf 1 0 0 1 50 640 Tm [(IT-Kenntnisse)] TJ",
+		"/F1 10 Tf 1 0 0 1 50 626 Tm [(Cloud: AWS, Docker, Kubernetes)] TJ",
+		"ET",
+	}, "\n")
+
+	objs := []string{
+		"<< /Type /Catalog /Pages 2 0 R >>",
+		"<< /Type /Pages /Kids [3 0 R] /Count 1 >>",
+		"<< /Type /Page /Parent 2 0 R /MediaBox [0 0 595 842] /Contents 4 0 R /Resources << /Font << /F1 5 0 R /F2 8 0 R >> >> >>",
+		fmt.Sprintf("<< /Length %d >>\nstream\n%s\nendstream", len(stream), stream),
+		"<< /Type /Font /Subtype /Type1 /BaseFont /Lato-Regular /FirstChar 0 /LastChar 255 /Widths " + widthArray + " /Encoding 6 0 R /ToUnicode 7 0 R >>",
+		"<< /Type /Encoding /Differences [28 /fi 29 /udieresis 30 /adieresis] >>",
+		fmt.Sprintf("<< /Length %d >>\nstream\n%s\nendstream", len(toUni), toUni),
+		"<< /Type /Font /Subtype /Type1 /BaseFont /CMSY10 /FirstChar 0 /LastChar 255 /Widths " + widthArray + " /Encoding 9 0 R /ToUnicode 10 0 R >>",
+		"<< /Type /Encoding /Differences [2 /circlemultiply] >>",
+		fmt.Sprintf("<< /Length %d >>\nstream\n%s\nendstream", len(symUni), symUni),
+	}
+	var b bytes.Buffer
+	b.WriteString("%PDF-1.4\n")
+	offsets := make([]int, len(objs))
+	for i, o := range objs {
+		offsets[i] = b.Len()
+		fmt.Fprintf(&b, "%d 0 obj\n%s\nendobj\n", i+1, o)
+	}
+	xref := b.Len()
+	fmt.Fprintf(&b, "xref\n0 %d\n0000000000 65535 f \n", len(objs)+1)
+	for _, o := range offsets {
+		fmt.Fprintf(&b, "%010d 00000 n \n", o)
+	}
+	fmt.Fprintf(&b, "trailer\n<< /Size %d /Root 1 0 R >>\nstartxref\n%d\n%%%%EOF\n", len(objs)+1, xref)
+	return b.Bytes()
+}
+
+func TestLaTeXPDFToUnicodeAndStations(t *testing.T) {
+	txt, err := Text(profile.MimePDF, buildLaTeXLikePDF())
+	if err != nil {
+		t.Fatalf("Text(latex pdf): %v", err)
+	}
+	for _, want := range []string{"Spezifikation", "für", "2.000 Mitarbeitenden"} {
+		if !strings.Contains(txt, want) {
+			t.Errorf("extracted text missing %q:\n%s", want, txt)
+		}
+	}
+	if strings.Contains(txt, "\u2297") {
+		t.Errorf("symbol bullet not normalized:\n%s", txt)
+	}
+
+	parsed := ParseAll(txt)
+	if len(parsed.Experiences) != 1 {
+		t.Fatalf("experiences = %d, want 1: %+v", len(parsed.Experiences), parsed.Experiences)
+	}
+	ex := parsed.Experiences[0]
+	if ex.Company != "Muster Cloud GmbH" || ex.Title != "Senior Platform Engineer" || ex.Location != "Berlin, Germany" || !ex.IsCurrent {
+		t.Errorf("experience mismatch: %+v", ex)
+	}
+	if len(ex.DescriptionBullets) != 2 ||
+		ex.DescriptionBullets[0] != "Leitung von 2.000 Mitarbeitenden im Plattformbetrieb" ||
+		ex.DescriptionBullets[1] != "Spezifikation der Clouddienste für moderne Cluster" {
+		t.Errorf("bullets = %q", ex.DescriptionBullets)
+	}
+	for _, sk := range []string{"AWS", "Docker", "Kubernetes"} {
+		if !slices.Contains(parsed.Profile.Skills, sk) {
+			t.Errorf("skills = %v, want %q", parsed.Profile.Skills, sk)
+		}
+	}
+}

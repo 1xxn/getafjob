@@ -136,7 +136,7 @@ func pdfText(b []byte) (s string, err error) {
 	var out strings.Builder
 	for i := 1; i <= r.NumPage() && out.Len() < 4*MaxText; i++ {
 		if p := r.Page(i); !p.V.IsNull() {
-			pageLines(&out, p.Content().Text)
+			pageLines(&out, extractPDFPage(p))
 			out.WriteString("\n\n")
 		}
 	}
@@ -156,6 +156,8 @@ func pageLines(out *strings.Builder, glyphs []pdf.Text) {
 				out.WriteString("\n\n")
 			case dy > size/2 || dy < -size/2:
 				out.WriteByte('\n')
+			case prev.W > 0 && g.X-(prev.X+prev.W) > 1.5*size && prev.S != " " && g.S != " ":
+				out.WriteString("  ")
 			case g.X-(prev.X+prev.W) > size/5 && prev.S != " " && g.S != " ":
 				out.WriteByte(' ')
 			}
@@ -169,11 +171,24 @@ var (
 	spaceRx  = regexp.MustCompile(`[ \t\x{00a0}]{3,}`)
 	blankRx  = regexp.MustCompile(`\n{3,}`)
 	umlauts  = map[string]string{"a": "ä", "o": "ö", "u": "ü", "A": "Ä", "O": "Ö", "U": "Ü", "e": "ë", "i": "ï"}
+	symRepl  = strings.NewReplacer(
+		"\u2297", "•", // CMSY bullet ⊗
+		"\u2219", "•",
+		"\u25e6", "•",
+		"\u25aa", "•",
+		"\u25cf", "•",
+		"\u2023", "•",
+		"\u25b8", "•",
+		"\u27a2", "•",
+		"\u27a4", "•",
+	)
 )
 
-// Clean smooths typical PDF artifacts: split umlauts, ligatures, column gaps, empty lines.
+// Clean smooths typical PDF artifacts: split umlauts, ligatures, symbol bullets, PUA icons, control chars, column gaps, empty lines.
 func Clean(s string) string {
 	s = strings.ToValidUTF8(s, "")
+	s = symRepl.Replace(s)
+	s = cleanRunes(s)
 	s = umlautRx.ReplaceAllStringFunc(s, func(m string) string { return umlauts[m[len(m)-1:]] })
 	s = norm.NFKC.String(s)
 	lines := strings.Split(strings.ReplaceAll(s, "\r\n", "\n"), "\n")
@@ -181,4 +196,23 @@ func Clean(s string) string {
 		lines[i] = spaceRx.ReplaceAllString(strings.TrimSpace(l), "  ")
 	}
 	return strings.TrimSpace(blankRx.ReplaceAllString(strings.Join(lines, "\n"), "\n\n"))
+}
+
+func cleanRunes(s string) string {
+	var b strings.Builder
+	b.Grow(len(s))
+	for _, r := range s {
+		switch {
+		case r == '\uFFFD':
+			continue
+		case r >= 0xE000 && r <= 0xF8FF:
+			// FontAwesome and other icon fonts live in BMP Private Use Area.
+			b.WriteByte(' ')
+		case (r < 0x20 && r != '\n' && r != '\r' && r != '\t') || r == 0x7f || (r >= 0x80 && r <= 0x9f):
+			continue
+		default:
+			b.WriteRune(r)
+		}
+	}
+	return b.String()
 }

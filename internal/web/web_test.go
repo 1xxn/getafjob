@@ -1390,3 +1390,32 @@ func TestRequestLogOmitsTokens(t *testing.T) {
 		}
 	}
 }
+
+func TestSetupSearchDoesNotProposeCompanyName(t *testing.T) {
+	a := newApp(t)
+	session := signedIn(t, a)
+	page := a.do(http.MethodGet, "/setup/profile", nil, session, nil).Body.String()
+	_, rest, ok := strings.Cut(page, `name="version" value="`)
+	if !ok {
+		t.Fatalf("missing version field: %s", page)
+	}
+	ver, _, _ := strings.Cut(rest, `"`)
+	form := url.Values{
+		"version":       {ver},
+		"first_name":    {"Max"},
+		"last_name":     {"Mustermann"},
+		"email":         {"max@example.org"},
+		"city":          {"Berlin"},
+		"current_title": {"Muster Cloud GmbH"},
+	}
+	if rec := a.do(http.MethodPost, "/setup/profile", form, session, nil); rec.Header().Get("Location") != "/setup/search" {
+		t.Fatalf("profile save %d: %s", rec.Code, rec.Body.String())
+	}
+	searchBody := a.do(http.MethodGet, "/setup/search", nil, session, nil).Body.String()
+	if strings.Contains(searchBody, "Muster Cloud GmbH</textarea>") {
+		t.Fatalf("setup/search proposed company name as job title:\n%s", searchBody)
+	}
+	if !strings.Contains(searchBody, "Berlin</textarea>") {
+		t.Fatalf("setup/search missing city:\n%s", searchBody)
+	}
+}

@@ -1,5 +1,7 @@
 package matching
 
+import "strings"
+
 // roleGroups are job titles that mean the same role, in English and German. A wanted title that names one of
 // them makes the others count as synonyms.
 var roleGroups = [][]string{
@@ -63,3 +65,78 @@ var generic = map[string]bool{"engineer": true, "developer": true, "entwickler":
 	"und": true, "the": true, "for": true, "fuer": true, "with": true, "mit": true, "senior": true, "junior": true,
 	"lead": true, "staff": true, "principal": true, "head": true, "intern": true, "werkstudent": true,
 	"praktikant": true, "remote": true}
+
+var companyMarkers = map[string]bool{
+	"gmbh": true, "ag": true, "se": true, "kg": true, "ug": true, "ohg": true, "mbh": true,
+	"inc": true, "ltd": true, "llc": true, "corp": true, "gbr": true, "partg": true,
+	"university": true, "universitaet": true, "hochschule": true,
+}
+
+var roleNouns = map[string]bool{
+	"engineer": true, "developer": true, "entwickler": true, "entwicklerin": true,
+	"architect": true, "architekt": true, "architektin": true,
+	"administrator": true, "sysadmin": true, "devops": true, "sre": true,
+	"analyst": true, "analystin": true, "scientist": true,
+	"manager": true, "managerin": true, "consultant": true, "berater": true, "beraterin": true,
+	"specialist": true, "spezialist": true, "spezialistin": true,
+	"designer": true, "tester": true, "testerin": true, "techniker": true, "technikerin": true,
+	"director": true, "coordinator": true, "koordinator": true, "koordinatorin": true,
+	"fachinformatiker": true, "fachinformatikerin": true, "systembetreuer": true,
+	"projektleiter": true, "projektleiterin": true, "produktmanager": true,
+	"werkstudent": true, "werkstudentin": true, "praktikant": true, "praktikantin": true,
+	"intern": true, "trainee": true, "azubi": true, "auszubildender": true, "auszubildende": true,
+	"programmer": true, "programmierer": true, "programmiererin": true,
+	"ingenieur": true, "ingenieurin": true, "researcher": true,
+	"teamleiter": true, "teamleiterin": true,
+}
+
+// IsKnownRole reports whether title names an occupational role rather than an organization or blank value (#506).
+func IsKnownRole(title string) bool {
+	norm := normalize(title)
+	words := strings.Fields(norm)
+	if len(words) == 0 {
+		return false
+	}
+	for _, w := range words {
+		if companyMarkers[w] {
+			return false
+		}
+	}
+	for _, grp := range roleGroups {
+		for _, alias := range grp {
+			if strings.Contains(norm, " "+alias+" ") {
+				return true
+			}
+		}
+	}
+	for _, w := range words {
+		if roleNouns[w] || hasRoleSuffix(w) {
+			return true
+		}
+	}
+	return false
+}
+
+var roleSuffixes = []string{
+	"entwickler", "entwicklerin", "engineer", "developer",
+	"architekt", "architektin", "architect",
+	"administrator", "administratorin",
+	"ingenieur", "ingenieurin",
+	"berater", "beraterin", "consultant",
+	"spezialist", "spezialistin",
+	"techniker", "technikerin",
+	"programmierer", "programmiererin",
+	"manager", "managerin", "analyst", "analystin",
+}
+
+func hasRoleSuffix(w string) bool {
+	if len(w) <= 6 {
+		return false
+	}
+	for _, suf := range roleSuffixes {
+		if strings.HasSuffix(w, suf) {
+			return true
+		}
+	}
+	return false
+}
