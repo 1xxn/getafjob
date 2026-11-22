@@ -520,11 +520,17 @@ func (q *Queries) InsertPasskey(ctx context.Context, arg InsertPasskeyParams) er
 const listUsers = `-- name: ListUsers :many
 SELECT u.id, u.email, u.display_name, u.role, u.locale, u.created_at, u.disabled_at,
   COALESCE(u.last_seen_at, u.created_at)::timestamptz AS last_seen,
-  (SELECT count(*) FROM sessions s WHERE s.user_id = u.id AND s.expires_at > $1)::bigint AS sessions,
+  (SELECT count(*) FROM sessions s WHERE s.user_id = u.id AND s.replaced_at IS NULL AND s.expires_at > $1
+     AND s.last_seen_at > $2)::bigint AS sessions,
   EXISTS (SELECT 1 FROM passkeys p WHERE p.user_id = u.id) AS has_passkey
 FROM users u
 ORDER BY u.created_at, u.id
 `
+
+type ListUsersParams struct {
+	Now       time.Time
+	IdleSince time.Time
+}
 
 type ListUsersRow struct {
 	ID          uuid.UUID
@@ -539,8 +545,8 @@ type ListUsersRow struct {
 	HasPasskey  bool
 }
 
-func (q *Queries) ListUsers(ctx context.Context, now time.Time) ([]ListUsersRow, error) {
-	rows, err := q.db.Query(ctx, listUsers, now)
+func (q *Queries) ListUsers(ctx context.Context, arg ListUsersParams) ([]ListUsersRow, error) {
+	rows, err := q.db.Query(ctx, listUsers, arg.Now, arg.IdleSince)
 	if err != nil {
 		return nil, err
 	}

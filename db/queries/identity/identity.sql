@@ -135,7 +135,8 @@ UPDATE users SET locale = $2 WHERE id = $1;
 -- name: ListUsers :many
 SELECT u.id, u.email, u.display_name, u.role, u.locale, u.created_at, u.disabled_at,
   COALESCE(u.last_seen_at, u.created_at)::timestamptz AS last_seen,
-  (SELECT count(*) FROM sessions s WHERE s.user_id = u.id AND s.expires_at > sqlc.arg(now))::bigint AS sessions,
+  (SELECT count(*) FROM sessions s WHERE s.user_id = u.id AND s.replaced_at IS NULL AND s.expires_at > sqlc.arg(now)
+     AND s.last_seen_at > sqlc.arg(idle_since))::bigint AS sessions,
   EXISTS (SELECT 1 FROM passkeys p WHERE p.user_id = u.id) AS has_passkey
 FROM users u
 ORDER BY u.created_at, u.id;
