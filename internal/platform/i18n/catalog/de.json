@@ -110,6 +110,7 @@
   "jobs.blocklist_title": "Arbeitgeber- & Keyword-Blockliste",
   "jobs.board_add_button": "Seite hinzufügen",
   "jobs.board_add_error": "Kein unterstütztes Job-Board unter dieser URL erkannt.",
+  "jobs.board_add_error.invalid": "Das ist keine öffentliche Webadresse. Füge den vollständigen Link der Karriereseite ein, beginnend mit https://.",
   "jobs.board_add_success": "Karriereseite hinzugefügt: {company} ({ats})",
   "jobs.board_add_title": "Karriereseite hinzufügen",
   "jobs.closed": "Diese Anzeige ist geschlossen.",

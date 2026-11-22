@@ -345,6 +345,12 @@ func TestJobIngestionAndCrawlControls(t *testing.T) {
 	if !strings.Contains(boardBody, "Syntheticcorp") || !strings.Contains(boardBody, "lever") {
 		t.Errorf("add board response missing company or ats: %s", boardBody)
 	}
+	// A link that cannot be loaded gets its own reason, not "no board found" (the test app allows private addresses,
+	// so it fails at loading).
+	badRec := a.do(http.MethodPost, "/jobs/boards", url.Values{"url": {"not a url"}}, session, map[string]string{"HX-Request": "true"})
+	if body := badRec.Body.String(); badRec.Code != http.StatusOK || !strings.Contains(body, "could not be loaded") {
+		t.Errorf("add board with an invalid link: %d %s", badRec.Code, body)
+	}
 }
 
 func TestFitInspectorAndCVVariantSwitcher(t *testing.T) {
