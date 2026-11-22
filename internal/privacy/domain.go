@@ -12,19 +12,21 @@ import (
 
 // ExportData is the complete portable data dump of a user.
 type ExportData struct {
-	ExportedAt   time.Time            `json:"exported_at"`
-	User         UserSummary          `json:"user"`
-	Passkeys     []PasskeySummary     `json:"passkeys,omitempty"`
-	Sessions     []SessionSummary     `json:"sessions,omitempty"`
-	Profile      any                  `json:"profile,omitempty"`
-	Preferences  any                  `json:"preferences,omitempty"`
-	Answers      []AnswerSummary      `json:"answers,omitempty"`
-	Texts        []TextSummary        `json:"texts,omitempty"`
-	Documents    []DocumentSummary    `json:"documents,omitempty"`
-	Matches      []MatchSummary       `json:"matches,omitempty"`
-	Applications []ApplicationSummary `json:"applications,omitempty"`
-	Settings     SettingsSummary      `json:"settings,omitempty"`
-	AuditEvents  []AuditSummary       `json:"audit_events,omitempty"`
+	ExportedAt      time.Time            `json:"exported_at"`
+	User            UserSummary          `json:"user"`
+	Passkeys        []PasskeySummary     `json:"passkeys,omitempty"`
+	Sessions        []SessionSummary     `json:"sessions,omitempty"`
+	Profile         any                  `json:"profile,omitempty"`
+	Preferences     any                  `json:"preferences,omitempty"`
+	WorkExperiences any                  `json:"work_experiences,omitempty"`
+	Educations      any                  `json:"educations,omitempty"`
+	Answers         []AnswerSummary      `json:"answers,omitempty"`
+	Texts           []TextSummary        `json:"texts,omitempty"`
+	Documents       []DocumentSummary    `json:"documents,omitempty"`
+	Matches         []MatchSummary       `json:"matches,omitempty"`
+	Applications    []ApplicationSummary `json:"applications,omitempty"`
+	Settings        SettingsSummary      `json:"settings,omitempty"`
+	AuditEvents     []AuditSummary       `json:"audit_events,omitempty"`
 }
 
 // UserSummary holds user account basics.
@@ -151,12 +153,14 @@ func WriteArchive(w io.Writer, data ExportData, files map[string][]byte) error {
 	}
 
 	if err := writeJSON("profile.json", map[string]any{
-		"user":        data.User,
-		"profile":     data.Profile,
-		"preferences": data.Preferences,
-		"answers":     data.Answers,
-		"texts":       data.Texts,
-		"documents":   data.Documents,
+		"user":             data.User,
+		"profile":          data.Profile,
+		"preferences":      data.Preferences,
+		"work_experiences": data.WorkExperiences,
+		"educations":       data.Educations,
+		"answers":          data.Answers,
+		"texts":            data.Texts,
+		"documents":        data.Documents,
 	}); err != nil {
 		return err
 	}

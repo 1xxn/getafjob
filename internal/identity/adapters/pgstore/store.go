@@ -475,25 +475,25 @@ func (s *Store) DeleteUser(ctx context.Context, userID uuid.UUID) error {
 }
 
 // AuditEvents returns audit log entries for the given user.
-func (s *Store) AuditEvents(ctx context.Context, userID uuid.UUID) ([]identity.AuditEvent, error) {
-	var list []identity.AuditEvent
+func (s *Store) AuditEvents(ctx context.Context, userID uuid.UUID) ([]identity.AuditEntry, error) {
+	var list []identity.AuditEntry
 	err := s.user(ctx, userID, func(qs *q.Queries) error {
 		rows, err := qs.UserAuditEvents(ctx, &userID)
 		if err != nil {
 			return err
 		}
-		list = make([]identity.AuditEvent, len(rows))
+		list = make([]identity.AuditEntry, len(rows))
 		for i, r := range rows {
 			var params map[string]any
 			if len(r.Params) > 0 {
 				_ = json.Unmarshal(r.Params, &params)
 			}
-			list[i] = identity.AuditEvent{
+			list[i] = identity.AuditEntry{At: r.CreatedAt, AuditEvent: identity.AuditEvent{
 				UserID: &userID,
 				Actor:  r.Actor,
 				Code:   r.Code,
 				Params: params,
-			}
+			}}
 		}
 		return nil
 	})

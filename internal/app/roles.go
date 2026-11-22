@@ -145,8 +145,8 @@ func serve(ctx context.Context, cfg config.Config, logger *slog.Logger) error {
 	dstore := discoverystore.New(pool)
 	mstore := matchingstore.New(pool)
 	listings := matching.NewListings(mstore)
-	privacySvc := privacy.NewService(ids, profiles, items, docs, apps, listings, env, sealedFiles)
 	stations := profile.NewStations(pstore, env)
+	privacySvc := privacy.NewService(ids, profiles, items, docs, apps, listings, env, sealedFiles).WithStations(stations)
 	crawlQueue := NewCrawlQueue(inserter, pool)
 	evaluator := NewMatchEvaluator(profileCriteria{svc: profiles, store: pstore}, mstore)
 	discoverySvc := urlimport.NewService(urlimport.Options{

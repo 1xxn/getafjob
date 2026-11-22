@@ -272,10 +272,12 @@ func (s *Server) accountExport(w http.ResponseWriter, r *http.Request, u *identi
 		return
 	}
 	filename := fmt.Sprintf("getafjob-export-%s-%s.zip", u.ID.String()[:8], time.Now().UTC().Format("20060102150405"))
-	w.Header().Set("Content-Type", "application/zip")
-	w.Header().Set("Content-Disposition", fmt.Sprintf("attachment; filename=%q", filename))
-	if err := s.Privacy.Export(r.Context(), u.ID, w); err != nil {
+	zw := &exportWriter{w: w, filename: filename}
+	if err := s.Privacy.Export(r.Context(), u.ID, zw); err != nil {
 		s.Logger.ErrorContext(r.Context(), "data export failed", "err", err, "user", u.ID)
+		if !zw.started { // nothing sent yet: an error page instead of a broken zip
+			s.failed(w, r, u, err)
+		}
 	}
 }
 
@@ -306,4 +308,21 @@ func (s *Server) accountDelete(w http.ResponseWriter, r *http.Request, u *identi
 	}
 	clearSession(w)
 	http.Redirect(w, r, "/login?deleted=1", http.StatusSeeOther)
+}
+
+// exportWriter sends the zip headers with the first byte of the archive, so a failed export can still answer with
+// an error page.
+type exportWriter struct {
+	w        http.ResponseWriter
+	filename string
+	started  bool
+}
+
+func (e *exportWriter) Write(p []byte) (int, error) {
+	if !e.started {
+		e.started = true
+		e.w.Header().Set("Content-Type", "application/zip")
+		e.w.Header().Set("Content-Disposition", fmt.Sprintf("attachment; filename=%q", e.filename))
+	}
+	return e.w.Write(p)
 }

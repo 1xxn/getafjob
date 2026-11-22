@@ -21,6 +21,7 @@ type Service struct {
 	docs     DocumentService
 	apps     ApplicationService
 	matching MatchingService
+	stations StationService // nil: no work history in the export
 	keys     KeyManager
 	blobs    BlobStore
 	now      func() time.Time
@@ -56,177 +57,152 @@ func (s *Service) WithClock(now func() time.Time) *Service {
 	return s
 }
 
-// Export bundles all personal data, history, and uploaded files into a portable ZIP archive.
+// WithStations adds the work history and education to the export.
+func (s *Service) WithStations(st StationService) *Service {
+	s.stations = st
+	return s
+}
+
+// Export writes a zip with everything stored about the user: account, profile, work history, answers, texts,
+// documents, matches, applications, settings and the audit log. It reads everything before it writes; when a part
+// cannot be read it fails instead of handing out an incomplete export.
 func (s *Service) Export(ctx context.Context, userID uuid.UUID, w io.Writer) error {
-	data := ExportData{
-		ExportedAt: s.now(),
+	data, files, err := s.collect(ctx, userID)
+	if err != nil {
+		return err
+	}
+	return WriteArchive(w, data, files)
+}
+
+// collect gathers the export; the first failed read ends it.
+func (s *Service) collect(ctx context.Context, userID uuid.UUID) (ExportData, map[string][]byte, error) {
+	data := ExportData{ExportedAt: s.now()}
+	fail := func(part string, err error) (ExportData, map[string][]byte, error) {
+		return ExportData{}, nil, fmt.Errorf("export %s: %w", part, err)
 	}
 
-	// 1. Identity
 	u, err := s.identity.UserByID(ctx, userID)
 	if err != nil {
-		return fmt.Errorf("export identity: %w", err)
+		return fail("account", err)
 	}
-	data.User = UserSummary{
-		ID:          u.ID,
-		Email:       u.Email,
-		DisplayName: u.DisplayName,
-		Role:        string(u.Role),
-		Locale:      string(u.Locale),
-	}
+	data.User = UserSummary{ID: u.ID, Email: u.Email, DisplayName: u.DisplayName, Role: string(u.Role), Locale: string(u.Locale)}
 	passkeys, err := s.identity.Passkeys(ctx, userID)
-	if err == nil {
-		for _, pk := range passkeys {
-			data.Passkeys = append(data.Passkeys, PasskeySummary{
-				Name:       pk.Name,
-				CreatedAt:  pk.CreatedAt,
-				LastUsedAt: pk.LastUsed,
-			})
-		}
+	if err != nil {
+		return fail("passkeys", err)
+	}
+	for _, pk := range passkeys {
+		data.Passkeys = append(data.Passkeys, PasskeySummary{Name: pk.Name, CreatedAt: pk.CreatedAt, LastUsedAt: pk.LastUsed})
 	}
 	sessions, err := s.identity.Sessions(ctx, userID, "")
-	if err == nil {
-		for _, sess := range sessions {
-			data.Sessions = append(data.Sessions, SessionSummary{
-				Method:     string(sess.Method),
-				CreatedAt:  sess.CreatedAt,
-				LastSeenAt: sess.LastSeen,
-			})
-		}
+	if err != nil {
+		return fail("sessions", err)
+	}
+	for _, sess := range sessions {
+		data.Sessions = append(data.Sessions, SessionSummary{Method: string(sess.Method), CreatedAt: sess.CreatedAt, LastSeenAt: sess.LastSeen})
 	}
 
-	// 2. Profile & Preferences
 	if s.profile != nil {
 		snap, err := s.profile.Get(ctx, userID)
-		if err == nil {
-			data.Profile = snap.Profile
-			data.Preferences = snap.Preferences
+		if err != nil {
+			return fail("profile", err)
 		}
+		data.Profile, data.Preferences = snap.Profile, snap.Preferences
+	}
+	if s.stations != nil {
+		works, err := s.stations.WorkExperiences(ctx, userID)
+		if err != nil {
+			return fail("work history", err)
+		}
+		edus, err := s.stations.Educations(ctx, userID)
+		if err != nil {
+			return fail("education", err)
+		}
+		data.WorkExperiences, data.Educations = works, edus
 	}
 
-	// 3. Answers & Texts
 	if s.items != nil {
 		answers, err := s.items.Answers(ctx, userID)
-		if err == nil {
-			for _, a := range answers {
-				data.Answers = append(data.Answers, AnswerSummary{
-					Question: a.Question,
-					Answer:   a.Answer,
-				})
-			}
+		if err != nil {
+			return fail("answers", err)
+		}
+		for _, a := range answers {
+			data.Answers = append(data.Answers, AnswerSummary{Question: a.Question, Answer: a.Answer})
 		}
 		texts, err := s.items.TextBlocks(ctx, userID)
-		if err == nil {
-			for _, t := range texts {
-				data.Texts = append(data.Texts, TextSummary{
-					Name:     t.Name,
-					Language: t.Language,
-					Body:     t.Body,
-				})
-			}
+		if err != nil {
+			return fail("texts", err)
+		}
+		for _, t := range texts {
+			data.Texts = append(data.Texts, TextSummary{Name: t.Name, Language: t.Language, Body: t.Body})
 		}
 	}
 
-	// 4. Documents
 	files := make(map[string][]byte)
 	if s.docs != nil {
 		docs, err := s.docs.List(ctx, userID)
-		if err == nil {
-			for _, d := range docs {
-				data.Documents = append(data.Documents, DocumentSummary{
-					ID:        d.ID,
-					Kind:      d.Kind,
-					Name:      d.Name,
-					Mime:      d.Mime,
-					Size:      d.Size,
-					CreatedAt: d.CreatedAt,
-				})
-				_, content, err := s.docs.Read(ctx, userID, d.ID)
-				if err == nil {
-					name := d.Name
-					if _, exists := files[name]; exists {
-						name = fmt.Sprintf("%s_%s", d.ID.String()[:8], d.Name)
-					}
-					files[name] = content
-				}
+		if err != nil {
+			return fail("documents", err)
+		}
+		for _, d := range docs {
+			data.Documents = append(data.Documents, DocumentSummary{ID: d.ID, Kind: d.Kind, Name: d.Name, Mime: d.Mime,
+				Size: d.Size, CreatedAt: d.CreatedAt})
+			_, content, err := s.docs.Read(ctx, userID, d.ID)
+			if err != nil {
+				return fail("document "+d.ID.String(), err)
 			}
+			name := d.Name
+			if _, exists := files[name]; exists {
+				name = fmt.Sprintf("%s_%s", d.ID.String()[:8], d.Name)
+			}
+			files[name] = content
 		}
 	}
 
-	// 5. Matches
 	if s.matching != nil {
 		matches, err := s.matching.UserMatches(ctx, userID)
-		if err == nil {
-			for _, m := range matches {
-				data.Matches = append(data.Matches, MatchSummary{
-					JobID:      m.JobID,
-					Title:      m.Title,
-					Company:    m.Company,
-					Location:   m.Location,
-					Workplace:  m.Workplace,
-					Score:      m.Score,
-					Decision:   string(m.Decision),
-					Reasons:    m.Reasons,
-					ComputedAt: m.ComputedAt,
-				})
-			}
+		if err != nil {
+			return fail("matches", err)
+		}
+		for _, m := range matches {
+			data.Matches = append(data.Matches, MatchSummary{JobID: m.JobID, Title: m.Title, Company: m.Company,
+				Location: m.Location, Workplace: m.Workplace, Score: m.Score, Decision: string(m.Decision),
+				Reasons: m.Reasons, ComputedAt: m.ComputedAt})
 		}
 	}
 
-	// 6. Applications
 	if s.apps != nil {
 		apps, err := s.apps.UserApplications(ctx, userID)
-		if err == nil {
-			for _, a := range apps {
-				var evs []EventSummary
-				for _, e := range a.Events {
-					evs = append(evs, EventSummary{
-						Event: string(e.Event),
-						From:  string(e.From),
-						To:    string(e.To),
-						Actor: string(e.Actor),
-						At:    e.At,
-						Data:  e.Detail,
-					})
-				}
-				data.Applications = append(data.Applications, ApplicationSummary{
-					ID:        a.ID,
-					JobID:     a.JobID,
-					State:     string(a.State),
-					Company:   a.Company,
-					Title:     a.Title,
-					Location:  a.Location,
-					URL:       a.URL,
-					CreatedAt: a.CreatedAt,
-					UpdatedAt: a.UpdatedAt,
-					Events:    evs,
-				})
+		if err != nil {
+			return fail("applications", err)
+		}
+		for _, a := range apps {
+			var evs []EventSummary
+			for _, e := range a.Events {
+				evs = append(evs, EventSummary{Event: string(e.Event), From: string(e.From), To: string(e.To),
+					Actor: string(e.Actor), At: e.At, Data: e.Detail})
 			}
+			data.Applications = append(data.Applications, ApplicationSummary{ID: a.ID, JobID: a.JobID,
+				State: string(a.State), Company: a.Company, Title: a.Title, Location: a.Location, URL: a.URL,
+				CreatedAt: a.CreatedAt, UpdatedAt: a.UpdatedAt, Events: evs})
 		}
-
 		st, err := s.apps.Settings(ctx, userID)
-		if err == nil {
-			data.Settings.AutonomyLevel = string(st.Level)
-			data.Settings.DailyLimit = st.DailyLimit
-			data.Settings.RunnerChoice = string(st.RunnerChoice)
-			data.Settings.EasyApplyEnabled = st.EasyApplyEnabled
+		if err != nil {
+			return fail("settings", err)
 		}
+		data.Settings.AutonomyLevel = string(st.Level)
+		data.Settings.DailyLimit = st.DailyLimit
+		data.Settings.RunnerChoice = string(st.RunnerChoice)
+		data.Settings.EasyApplyEnabled = st.EasyApplyEnabled
 	}
 
-	// 7. Audit Events
 	events, err := s.identity.AuditEvents(ctx, userID)
-	if err == nil {
-		for _, e := range events {
-			data.AuditEvents = append(data.AuditEvents, AuditSummary{
-				Actor:     e.Actor,
-				Code:      e.Code,
-				Params:    e.Params,
-				CreatedAt: s.now(), // or event timestamp
-			})
-		}
+	if err != nil {
+		return fail("audit log", err)
 	}
-
-	return WriteArchive(w, data, files)
+	for _, e := range events {
+		data.AuditEvents = append(data.AuditEvents, AuditSummary{Actor: e.Actor, Code: e.Code, Params: e.Params, CreatedAt: e.At})
+	}
+	return data, files, nil
 }
 
 // DeleteAccount permanently deletes the user's data from PostgreSQL, deletes all
