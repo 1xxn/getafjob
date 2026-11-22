@@ -316,16 +316,18 @@ func (s *Server) documentReviewSave(w http.ResponseWriter, r *http.Request, u *i
 	}
 
 	if r.PostFormValue("include_profile") != "" {
-		var importedProf profile.Profile
-		if r.PostFormValue("prof_present") != "" {
-			importedProf = readReviewedProfile(r)
-		} else {
-			parsed, err := s.Importer.Extract(r.Context(), u.ID, id)
-			if err != nil {
-				s.failed(w, r, u, err)
-				return
-			}
-			importedProf = parsed.Profile
+		parsed, err := s.Importer.Extract(r.Context(), u.ID, id)
+		reviewedForm := r.PostFormValue("prof_present") != ""
+		if err != nil && !reviewedForm {
+			s.failed(w, r, u, err)
+			return
+		}
+		importedProf := parsed.Profile
+		if reviewedForm {
+			// The review form shows the contact, work, skill and language fields; the rest comes from the CV.
+			reviewed := readReviewedProfile(r)
+			reviewed.Summary, reviewed.Certifications = parsed.Profile.Summary, parsed.Profile.Certifications
+			importedProf = reviewed
 		}
 		snap, err := s.Profile.Get(r.Context(), u.ID)
 		if err != nil {
