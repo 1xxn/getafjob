@@ -3877,10 +3877,11 @@
     list-style: none;
   }
 
+  /* Below the side column the links wrap, so the current one is always in view. */
   @media (max-width: 63.99rem) {
     .set-nav ul {
       display: flex;
-      overflow-x: auto;
+      flex-wrap: wrap;
     }
 
     .set-nav .shell-link {
