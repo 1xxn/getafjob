@@ -73,8 +73,9 @@ INSERT INTO work_experiences (id, user_id, company, title, location, workplace_t
 VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13);
 
 -- name: UpdateWorkExperience :execrows
+-- Keeps sort_order: only UpdateWorkExperienceOrder moves an entry.
 UPDATE work_experiences
-SET company = $3, title = $4, location = $5, workplace_type = $6, start_date = $7, end_date = $8, is_current = $9, sealed_bullets = $10, sort_order = $11, updated_at = $12
+SET company = $3, title = $4, location = $5, workplace_type = $6, start_date = $7, end_date = $8, is_current = $9, sealed_bullets = $10, updated_at = $11
 WHERE id = $1 AND user_id = $2;
 
 -- name: UpdateWorkExperienceOrder :execrows
@@ -105,8 +106,9 @@ INSERT INTO educations (id, user_id, institution, degree, field_of_study, start_
 VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12);
 
 -- name: UpdateEducation :execrows
+-- Keeps sort_order: only UpdateEducationOrder moves an entry.
 UPDATE educations
-SET institution = $3, degree = $4, field_of_study = $5, start_date = $6, end_date = $7, is_current = $8, grade = $9, sort_order = $10, updated_at = $11
+SET institution = $3, degree = $4, field_of_study = $5, start_date = $6, end_date = $7, is_current = $8, grade = $9, updated_at = $10
 WHERE id = $1 AND user_id = $2;
 
 -- name: UpdateEducationOrder :execrows
