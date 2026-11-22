@@ -5,6 +5,7 @@ package applymode
 
 import (
 	"net/url"
+	"slices"
 	"strings"
 )
 
@@ -30,6 +31,9 @@ var portals = []string{
 
 // Of returns the mode of a posting from its page URL and its application URL (may be empty). An application URL
 // that leaves the portal counts as a form.
+// Portals returns the job board hosts whose pages are not application forms.
+func Portals() []string { return slices.Clone(portals) }
+
 func Of(pageURL, applyURL string) Mode {
 	if strings.HasPrefix(strings.ToLower(strings.TrimSpace(applyURL)), "mailto:") {
 		return Email

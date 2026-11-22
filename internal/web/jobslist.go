@@ -92,7 +92,8 @@ func parseListQuery(v url.Values) listQuery {
 // filter turns the URL state into the matching filter (cleaned there).
 func (q listQuery) filter() matching.Filter {
 	f := matching.Filter{Query: q.Query, Workplace: q.Workplace, Location: q.Location, Source: q.Source,
-		MinSalary: q.MinSalary, FreshnessDays: freshnessDays[q.Freshness], Sort: q.Sort, Page: max(q.Page, 1)}
+		MinSalary: q.MinSalary, FreshnessDays: freshnessDays[q.Freshness], Sort: q.Sort, Page: max(q.Page, 1),
+		FormOnly: q.Mode == "form"}
 	switch q.Decision {
 	case "relevant":
 		f.Decisions = []matching.Decision{matching.Match, matching.Maybe}
@@ -195,18 +196,11 @@ func (s *Server) jobsPage(w http.ResponseWriter, r *http.Request, u *identity.Us
 	now := time.Now()
 	for _, it := range l.Items {
 		row := jobRow(r.Context(), it, now)
-		if lq.Mode == "form" && row.ApplyMode != "form" {
-			continue
-		}
 		row.State = stateKey(states[it.JobID], row.Age)
 		row.PanelURL = lq.with(func(q *listQuery) { q.Job = it.JobID })
 		row.PanelGet = "/jobs/" + strconv.FormatInt(it.JobID, 10) + "/panel" + query(lq.with(func(q *listQuery) { q.Job = it.JobID }))
 		row.Current = it.JobID == lq.Job
 		d.Rows = append(d.Rows, row)
-	}
-	if lq.Mode == "form" && d.Total > len(d.Rows) {
-		d.Total = len(d.Rows)
-		d.Pages = (d.Total + matching.PageSize - 1) / matching.PageSize
 	}
 	d.Chips = chips(r.Context(), lq)
 	d.PageLinks, d.PrevURL, d.NextURL = pageLinks(lq, d.Pages)
