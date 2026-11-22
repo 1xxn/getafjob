@@ -268,6 +268,7 @@ func (s *Server) Register(mux *http.ServeMux) {
 	mux.Handle("POST /account/passkeys/options", s.page(s.passkeyAddOptions))
 	mux.Handle("POST /account/passkeys", s.page(s.passkeyAdd))
 	mux.Handle("POST /account/passkeys/{id}/delete", s.page(s.passkeyDelete))
+	mux.Handle("POST /account/passkeys/nudge/dismiss", s.page(s.dismissPasskeyNudge))
 	mux.Handle("POST /account/recovery/cancel", s.page(s.cancelRecovery))
 	mux.Handle("GET /account/export", s.page(s.accountExport))
 	mux.Handle("POST /account/delete", s.page(s.accountDelete))

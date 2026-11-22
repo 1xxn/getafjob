@@ -15,13 +15,41 @@ import (
 // maxParked is how many parked applications the action list shows; the rest are in the tracker.
 const maxParked = 5
 
+const passkeyNudgeCookie = "getafjob_passkey_nudge"
+
+func nudgeDismissed(r *http.Request) bool {
+	c, err := r.Cookie(passkeyNudgeCookie)
+	return err == nil && c.Value == "1"
+}
+
+func (s *Server) dismissPasskeyNudge(w http.ResponseWriter, r *http.Request, u *identity.User) {
+	if u == nil {
+		http.Redirect(w, r, "/login", http.StatusSeeOther)
+		return
+	}
+	http.SetCookie(w, &http.Cookie{
+		Name:     passkeyNudgeCookie,
+		Value:    "1",
+		Path:     "/",
+		MaxAge:   oneYearSecond,
+		HttpOnly: true,
+		Secure:   true,
+		SameSite: http.SameSiteLaxMode,
+	})
+	if partial(r) {
+		w.WriteHeader(http.StatusOK)
+		return
+	}
+	http.Redirect(w, r, "/", http.StatusSeeOther)
+}
+
 // home renders the dashboard; it is the start page of signed-in users.
 func (s *Server) home(w http.ResponseWriter, r *http.Request, u *identity.User) {
 	if u == nil {
 		http.Redirect(w, r, "/login", http.StatusSeeOther)
 		return
 	}
-	d, err := s.dashboard(r.Context(), u)
+	d, err := s.dashboard(r.Context(), u, nudgeDismissed(r))
 	if err != nil {
 		s.failed(w, r, u, err)
 		return
@@ -35,7 +63,7 @@ func (s *Server) dashboardBody(w http.ResponseWriter, r *http.Request, u *identi
 		w.WriteHeader(http.StatusUnauthorized)
 		return
 	}
-	d, err := s.dashboard(r.Context(), u)
+	d, err := s.dashboard(r.Context(), u, nudgeDismissed(r))
 	if err != nil {
 		s.failed(w, r, u, err)
 		return
@@ -43,10 +71,10 @@ func (s *Server) dashboardBody(w http.ResponseWriter, r *http.Request, u *identi
 	s.render(w, r, http.StatusOK, views.DashboardBody(d))
 }
 
-// dashboard shapes the start page: what needs the user, what runs, what is new, how the search goes.
-func (s *Server) dashboard(ctx context.Context, u *identity.User) (views.DashboardData, error) {
+// dashboard shapes the start page: what needs the user, what runs, what is best, how the search goes.
+func (s *Server) dashboard(ctx context.Context, u *identity.User, nudgeOff bool) (views.DashboardData, error) {
 	d := views.DashboardData{Name: u.DisplayName}
-	if s.Identity.PasskeysEnabled() {
+	if s.Identity.PasskeysEnabled() && !nudgeOff {
 		keys, err := s.Identity.Passkeys(ctx, u.ID)
 		if err != nil {
 			return d, err
@@ -68,17 +96,25 @@ func (s *Server) dashboard(ctx context.Context, u *identity.User) (views.Dashboa
 		d.Running = s.liveRuns(ctx, u.ID)
 	}
 	if s.Jobs != nil {
-		list, err := s.Jobs.List(ctx, u.ID, matching.Filter{Decisions: []matching.Decision{matching.Match, matching.Maybe},
-			FreshnessDays: 7, Sort: "newest", Page: 1})
+		list, err := s.Jobs.List(ctx, u.ID, matching.Filter{Decisions: []matching.Decision{matching.Match},
+			Sort: "match", Page: 1})
 		if err != nil {
 			return d, err
+		}
+		if list.Total == 0 {
+			list, err = s.Jobs.List(ctx, u.ID, matching.Filter{Decisions: []matching.Decision{matching.Match, matching.Maybe},
+				Sort: "match", Page: 1})
+			if err != nil {
+				return d, err
+			}
 		}
 		d.NewMatches = list.Total
 		for i, it := range list.Items {
 			if i == 3 {
 				break
 			}
-			d.TopMatches = append(d.TopMatches, views.DashJob{ID: it.JobID, Title: it.Title, Company: it.Company, Score: it.Score})
+			d.TopMatches = append(d.TopMatches, views.DashJob{ID: it.JobID, Title: it.Title, Company: it.Company,
+				Score: it.Score, Decision: string(it.Decision)})
 		}
 	}
 	if s.Discovery != nil {
@@ -87,9 +123,13 @@ func (s *Server) dashboard(ctx context.Context, u *identity.User) (views.Dashboa
 		}
 	}
 	if d.ProfileMissing > 0 {
-		d.Actions = append(d.Actions, views.DashAction{Kind: "profile", Href: "/setup", Count: d.ProfileMissing})
+		d.Actions = append(d.Actions, views.DashAction{Kind: "profile", Href: "/setup", VerbKey: "dash.act.profile",
+			Count: d.ProfileMissing})
 	}
-	d.NeedsYou = d.Answers + d.Approvals
+	d.NeedsYou = d.Answers + d.Approvals + d.Parked
+	if d.NeedsYou == 0 && d.ProfileMissing > 0 {
+		d.NeedsYou = 1
+	}
 	return d, nil
 }
 
@@ -103,14 +143,15 @@ func fillApplications(d *views.DashboardData, ov application.Overview) {
 		case a.ApprovalAskedAt != nil && a.ApprovedAt == nil &&
 			(a.State == application.NeedsInput || a.State == application.Parked):
 			d.Approvals++
-			item.Kind, item.Href = "approve", "/approvals"
+			item.Kind, item.Href, item.VerbKey = "approve", "/approvals", "dash.act.approve"
 			d.Actions = append(d.Actions, item)
 		case a.State == application.NeedsInput:
 			d.Answers++
-			item.Kind = "answer"
+			item.Kind, item.VerbKey = "answer", "dash.act.answer"
 			d.Actions = append(d.Actions, item)
 		case a.State == application.Parked:
 			item.Kind, item.ReasonKey = "parked", parkReasonKey(ov.ParkReasons[a.ID])
+			item.VerbKey = parkVerbKey(item.ReasonKey)
 			parked = append(parked, item)
 		case a.State == application.Queued:
 			d.Queued++
@@ -172,7 +213,24 @@ func parkReasonKey(reason string) string {
 		return "dash.park.duplicate"
 	case r == strings.ToLower(application.ErrCompanyWindow.Error()):
 		return "dash.park.company"
+	case strings.HasPrefix(r, "external: apply by email"):
+		return "dash.park.email"
+	case strings.HasPrefix(r, "external:"), strings.Contains(r, "no application form"):
+		return "dash.park.external"
 	default:
 		return "dash.park.other"
+	}
+}
+
+func parkVerbKey(reasonKey string) string {
+	switch reasonKey {
+	case "dash.park.answers", "dash.park.check":
+		return "dash.act.answer"
+	case "dash.park.approval":
+		return "dash.act.approve"
+	case "dash.park.excluded", "dash.park.duplicate", "dash.park.company":
+		return "dash.act.discard"
+	default:
+		return "dash.act.apply_self"
 	}
 }

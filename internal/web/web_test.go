@@ -526,6 +526,24 @@ func TestPasskeyNudgeAndRecovery(t *testing.T) {
 	if home := a.do(http.MethodGet, "/", nil, session, nil).Body.String(); !strings.Contains(home, "Add a passkey now") {
 		t.Fatalf("no nudge without passkey: %s", home)
 	}
+	recDismiss := a.do(http.MethodPost, "/account/passkeys/nudge/dismiss", nil, session, nil)
+	if recDismiss.Code != http.StatusSeeOther {
+		t.Fatalf("dismiss nudge %d", recDismiss.Code)
+	}
+	var dismissedCookie *http.Cookie
+	for _, c := range recDismiss.Result().Cookies() {
+		if c.Name == "getafjob_passkey_nudge" {
+			dismissedCookie = c
+		}
+	}
+	if dismissedCookie == nil || dismissedCookie.Value != "1" || !dismissedCookie.HttpOnly || !dismissedCookie.Secure || dismissedCookie.SameSite != http.SameSiteLaxMode {
+		t.Fatalf("unexpected nudge cookie: %+v", dismissedCookie)
+	}
+	if home := a.do(http.MethodGet, "/", nil, "", map[string]string{
+		"Cookie": web.SessionCookie + "=" + session + "; getafjob_passkey_nudge=1",
+	}).Body.String(); strings.Contains(home, "Add a passkey now") {
+		t.Errorf("nudge still shown after dismiss: %s", home)
+	}
 	key := softauthn.New("jobs.example.org", "https://jobs.example.org")
 	o := options(t, a.json("/account/passkeys/options", map[string]any{}, session))
 	cred, _ := key.Create(o.Options)
@@ -1417,5 +1435,69 @@ func TestSetupSearchDoesNotProposeCompanyName(t *testing.T) {
 	}
 	if !strings.Contains(searchBody, "Berlin</textarea>") {
 		t.Fatalf("setup/search missing city:\n%s", searchBody)
+	}
+}
+
+func TestDashboardCalmStartPage(t *testing.T) {
+	a := newApp(t)
+	ctx := t.Context()
+	session := signedIn(t, a)
+	u, err := a.ids.UserByEmail(ctx, "max.mustermann@example.com")
+	if err != nil {
+		t.Fatal(err)
+	}
+	now := time.Now()
+	ds := discoverystore.New(a.pool)
+	idHigh, _, err := ds.UpsertPosting(ctx, discovery.Posting{
+		Source:      "greenhouse:alpha",
+		ExternalID:  "job-high",
+		Company:     "Alpha AG",
+		Title:       "Principal Go Architect",
+		URL:         "https://boards.greenhouse.io/alpha/jobs/1",
+		Description: "Go and PostgreSQL",
+	}, now.Add(-48*time.Hour))
+	if err != nil {
+		t.Fatal(err)
+	}
+	idMid, _, err := ds.UpsertPosting(ctx, discovery.Posting{
+		Source:      "greenhouse:beta",
+		ExternalID:  "job-mid",
+		Company:     "Beta GmbH",
+		Title:       "Senior Platform Engineer",
+		URL:         "https://boards.greenhouse.io/beta/jobs/2",
+		Description: "Kubernetes",
+	}, now)
+	if err != nil {
+		t.Fatal(err)
+	}
+	ms := matchingstore.New(a.pool)
+	if err := ms.SaveMatches(ctx, u.ID, []matching.Result{
+		{JobID: idHigh, Score: 88, Decision: matching.Match},
+		{JobID: idMid, Score: 65, Decision: matching.Match},
+	}, now); err != nil {
+		t.Fatal(err)
+	}
+
+	home := a.do(http.MethodGet, "/", nil, session, nil).Body.String()
+	for _, want := range []string{
+		`id="dash-status"`,
+		"1 application waits for you.",
+		"Complete profile",
+		"Principal Go Architect",
+		"Very good · 88",
+		"Senior Platform Engineer",
+		"Good · 65",
+	} {
+		if !strings.Contains(home, want) {
+			t.Errorf("dashboard missing %q in:\n%s", want, home)
+		}
+	}
+	for _, unwanted := range []string{`id="dash-pipeline"`, "dash-kpis"} {
+		if strings.Contains(home, unwanted) {
+			t.Errorf("dashboard unexpectedly contains %q", unwanted)
+		}
+	}
+	if strings.Index(home, "Principal Go Architect") >= strings.Index(home, "Senior Platform Engineer") {
+		t.Errorf("expected highest score match first on start page")
 	}
 }

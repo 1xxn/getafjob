@@ -23,8 +23,8 @@ func TestDashboard(t *testing.T) {
 		t.Run(v.name, func(t *testing.T) {
 			tab := OpenIn(t, Demo(t), v.width, v.height, v.scheme)
 			tab.Go("/")
-			tab.El("#dashboard .dash-kpis .ui-kpi")
-			tab.El("#dashboard .dash-trend svg rect")
+			tab.El("#dashboard #dash-status")
+			tab.El("#dashboard #dash-new")
 			tab.NoOverflow("page")
 			tab.Shot("demo")
 
