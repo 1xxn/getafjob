@@ -93,3 +93,16 @@ func TestUploadThroughDropZoneInOutOfProcessIframe(t *testing.T) {
 		t.Fatalf("zone label in iframe = %q, %v", v.Str(), err)
 	}
 }
+
+// A field that keeps its element but gets a new question shows the new label, so a stale plan fails the label check.
+func TestExtractReadsTheCurrentLabel(t *testing.T) {
+	s := newSpike(t, "upload.html")
+	before := s.field(s.extract(), "", "City")
+	if _, err := s.page.Eval(`() => { const l = document.getElementById("city").parentElement; l.firstChild.textContent = "Postcode "; }`); err != nil {
+		t.Fatal(err)
+	}
+	after := s.field(s.extract(), "", "Postcode")
+	if after.ID != before.ID {
+		t.Fatalf("id changed: %s -> %s", before.ID, after.ID)
+	}
+}
