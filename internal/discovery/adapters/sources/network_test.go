@@ -32,7 +32,13 @@ func TestNetwork(t *testing.T) {
 		"workday": func(t *testing.T) discovery.Source {
 			return board(t, c, "workday", "nvidia", "NVIDIA", `{"host":"nvidia.wd5.myworkdayjobs.com","site":"NVIDIAExternalCareerSite","max":40}`)
 		},
-		"arbeitnow": func(*testing.T) discovery.Source { return sources.NewArbeitnow(c, 1) },
+		"arbeitnow":         func(*testing.T) discovery.Source { return sources.NewArbeitnow(c, 1) },
+		"berlinstartupjobs": func(*testing.T) discovery.Source { return sources.NewBerlinStartupJobs(c) },
+		"softgarden":        func(t *testing.T) discovery.Source { return board(t, c, "softgarden", "jambit", "", "") },
+		"join":              func(t *testing.T) discovery.Source { return board(t, c, "join", "join", "", "") },
+		"successfactors": func(t *testing.T) discovery.Source {
+			return board(t, c, "successfactors", "rwe", "RWE", `{"host":"jobs.rwe.com","location":"Germany","max":25}`)
+		},
 		"himalayas": func(*testing.T) discovery.Source {
 			s := sources.NewHimalayas(c, []string{"golang"}, "Germany")
 			s.MaxPages = 1

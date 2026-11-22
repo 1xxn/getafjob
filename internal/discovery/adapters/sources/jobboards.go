@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/base64"
 	"encoding/json"
+	"encoding/xml"
 	"net/http"
 	"net/url"
 	"regexp"
@@ -326,4 +327,87 @@ func (s *Arbeitsagentur) Details(ctx context.Context, p *discovery.Posting) erro
 		p.Workplace = discovery.WorkplaceHybrid
 	}
 	return nil
+}
+
+// BerlinStartupJobs reads the official engineering RSS feed of berlinstartupjobs.com.
+type BerlinStartupJobs struct {
+	c *Client
+	conditional
+}
+
+var _ discovery.Conditional = (*BerlinStartupJobs)(nil)
+
+// NewBerlinStartupJobs returns the BerlinStartupJobs RSS source.
+func NewBerlinStartupJobs(c *Client) *BerlinStartupJobs { return &BerlinStartupJobs{c: c} }
+
+// Name implements discovery.Source.
+func (s *BerlinStartupJobs) Name() string { return "berlinstartupjobs" }
+
+func rfcDay(s string) string {
+	s = strings.TrimSpace(s)
+	for _, layout := range []string{time.RFC1123Z, time.RFC1123, time.RFC822Z, time.RFC822} {
+		if t, err := time.Parse(layout, s); err == nil {
+			return t.UTC().Format(time.DateOnly)
+		}
+	}
+	return ""
+}
+
+func queryParam(rawURL, key string) string {
+	u, err := url.Parse(strings.TrimSpace(rawURL))
+	if err != nil {
+		return ""
+	}
+	return strings.TrimSpace(u.Query().Get(key))
+}
+
+// Fetch implements discovery.Source.
+func (s *BerlinStartupJobs) Fetch(ctx context.Context) (discovery.Batch, error) {
+	b, v, unchanged, err := s.c.GetConditional(ctx, s.Name(), "https://berlinstartupjobs.com/engineering/feed/",
+		nil, "application/rss+xml, application/xml, text/xml", s.since)
+	if err != nil || unchanged {
+		return discovery.Batch{NotModified: unchanged, Validators: v}, err
+	}
+	var rss struct {
+		Channel struct {
+			Items []struct {
+				Title       string `xml:"title"`
+				Link        string `xml:"link"`
+				GUID        string `xml:"guid"`
+				PubDate     string `xml:"pubDate"`
+				Description string `xml:"description"`
+				Encoded     string `xml:"http://purl.org/rss/1.0/modules/content/ encoded"`
+				PostID      string `xml:"post-id"`
+			} `xml:"item"`
+		} `xml:"channel"`
+	}
+	if err := xml.Unmarshal(b, &rss); err != nil {
+		return discovery.Batch{}, &discovery.SourceError{Source: s.Name(), Code: "decode"}
+	}
+	const maxItems = 1000
+	items := rss.Channel.Items
+	if len(items) > maxItems {
+		items = items[:maxItems]
+	}
+	out := make([]discovery.Posting, 0, len(items))
+	seen := map[string]bool{}
+	for _, it := range items {
+		ext := or(strings.TrimSpace(it.PostID), or(queryParam(it.GUID, "p"), or(strings.TrimSpace(it.GUID), strings.TrimSpace(it.Link))))
+		if ext == "" || seen[ext] {
+			continue
+		}
+		seen[ext] = true
+		title := strings.TrimSpace(it.Title)
+		company := "Berlin Startup"
+		if left, right, ok := strings.Cut(title, " // "); ok && strings.TrimSpace(left) != "" && strings.TrimSpace(right) != "" {
+			title = strings.TrimSpace(left)
+			company = strings.TrimSpace(right)
+		}
+		out = append(out, discovery.Posting{
+			Source: s.Name(), ExternalID: ext, Company: company, Title: title,
+			Location: "Berlin, Germany", URL: strings.TrimSpace(it.Link),
+			Description: htmltext.Text(or(it.Encoded, it.Description)), Posted: rfcDay(it.PubDate),
+		})
+	}
+	return discovery.Batch{Postings: out, Validators: v}, nil
 }

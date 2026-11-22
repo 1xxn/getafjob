@@ -1,13 +1,18 @@
 package sources
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"encoding/xml"
 	"net/http"
 	"net/url"
+	"regexp"
 	"strconv"
 	"strings"
+	"time"
+
+	xhtml "golang.org/x/net/html"
 
 	"github.com/1xxn/getafjob/internal/discovery"
 	"github.com/1xxn/getafjob/internal/platform/htmltext"
@@ -24,6 +29,10 @@ var (
 	_ discovery.Conditional = (*Ashby)(nil)
 	_ discovery.Conditional = (*Lever)(nil)
 	_ discovery.Conditional = (*Personio)(nil)
+
+	_ discovery.Detailer = (*Softgarden)(nil)
+	_ discovery.Detailer = (*Join)(nil)
+	_ discovery.Detailer = (*SuccessFactors)(nil)
 )
 
 // Greenhouse reads boards-api.greenhouse.io.
@@ -563,4 +572,571 @@ func (s *Workday) Details(ctx context.Context, p *discovery.Posting) error {
 		p.Workplace = discovery.WorkplaceHybrid
 	}
 	return nil
+}
+
+// Softgarden reads the public vacancy list of a <slug>.softgarden.io site; descriptions come per job JSON-LD.
+type Softgarden struct {
+	c             *Client
+	slug, company string
+}
+
+// Name implements discovery.Source.
+func (s *Softgarden) Name() string { return "softgarden:" + s.slug }
+
+var softgardenJobLink = regexp.MustCompile(`/job/([0-9]+)/([^/?#]+)`)
+
+func dotDay(s string) string {
+	s = strings.TrimSpace(s)
+	for _, layout := range []string{"02.01.06", "02.01.2006"} {
+		if t, err := time.Parse(layout, s); err == nil {
+			return t.Format(time.DateOnly)
+		}
+	}
+	return ""
+}
+
+func hasToken(attrVal, want string) bool {
+	for tok := range strings.FieldsSeq(attrVal) {
+		if tok == want {
+			return true
+		}
+	}
+	return false
+}
+
+func attrMap(z *xhtml.Tokenizer, hasAttr bool) map[string]string {
+	if !hasAttr {
+		return nil
+	}
+	attrs := map[string]string{}
+	for hasAttr {
+		var k, v []byte
+		k, v, hasAttr = z.TagAttr()
+		attrs[string(k)] = string(v)
+	}
+	return attrs
+}
+
+// Fetch implements discovery.Source.
+func (s *Softgarden) Fetch(ctx context.Context) (discovery.Batch, error) {
+	host := "https://" + s.slug + ".softgarden.io"
+	b, err := s.c.GetBytes(ctx, s.Name(), host+"/de/vacancies", nil, "text/html")
+	if err != nil {
+		return discovery.Batch{}, err
+	}
+	out := parseSoftgardenVacancies(b, s.Name(), host, or(s.company, pretty(s.slug)))
+	return discovery.Batch{Postings: out, Complete: true}, nil
+}
+
+func parseSoftgardenVacancies(b []byte, source, host, company string) []discovery.Posting {
+	const maxRows = 2000
+	if len(b) > MaxBody {
+		b = b[:MaxBody]
+	}
+	z := xhtml.NewTokenizer(bytes.NewReader(b))
+	var out []discovery.Posting
+	seen := map[string]bool{}
+	var cur *discovery.Posting
+	var locs []string
+	var jobSlug string
+	inTitle, inDate, inLoc := false, false, false
+	var titleBuf, dateBuf, locBuf strings.Builder
+
+	flush := func() {
+		if cur == nil {
+			return
+		}
+		if cur.ExternalID != "" && !seen[cur.ExternalID] && cur.Title != "" {
+			seen[cur.ExternalID] = true
+			if cur.URL == "" {
+				cur.URL = host + "/job/" + url.PathEscape(cur.ExternalID)
+				if jobSlug != "" {
+					cur.URL += "/" + url.PathEscape(jobSlug)
+				}
+			}
+			cur.Location = join("; ", locs...)
+			out = append(out, *cur)
+		}
+		cur, locs, jobSlug = nil, nil, ""
+		inTitle, inDate, inLoc = false, false, false
+		titleBuf.Reset()
+		dateBuf.Reset()
+		locBuf.Reset()
+	}
+
+	for len(out) < maxRows {
+		switch z.Next() {
+		case xhtml.ErrorToken:
+			flush()
+			return out
+		case xhtml.StartTagToken:
+			name, hasAttr := z.TagName()
+			attrs := attrMap(z, hasAttr)
+			tag := string(name)
+			if idVal := attrs["id"]; strings.HasPrefix(idVal, "job_id_") {
+				flush()
+				ext := strings.TrimPrefix(idVal, "job_id_")
+				cur = &discovery.Posting{Source: source, ExternalID: ext, Company: company}
+				continue
+			}
+			if cur == nil {
+				continue
+			}
+			switch {
+			case tag == "a":
+				if m := softgardenJobLink.FindStringSubmatch(attrs["href"]); m != nil {
+					if m[1] != "" {
+						cur.ExternalID = m[1]
+					}
+					jobSlug = m[2]
+					inTitle = true
+					titleBuf.Reset()
+				}
+			case hasToken(attrs["class"], "date") && hasToken(attrs["class"], "matchValue"):
+				inDate = true
+				dateBuf.Reset()
+			case hasToken(attrs["class"], "location-view-item"):
+				inLoc = true
+				locBuf.Reset()
+			}
+		case xhtml.TextToken:
+			if cur == nil {
+				continue
+			}
+			txt := string(z.Text())
+			if inTitle {
+				titleBuf.WriteString(txt)
+			}
+			if inDate {
+				dateBuf.WriteString(txt)
+			}
+			if inLoc {
+				locBuf.WriteString(txt)
+			}
+		case xhtml.EndTagToken:
+			if cur == nil {
+				continue
+			}
+			name, _ := z.TagName()
+			switch string(name) {
+			case "a":
+				if inTitle {
+					cur.Title = strings.Join(strings.Fields(titleBuf.String()), " ")
+					inTitle = false
+				}
+			case "div":
+				if inDate {
+					if d := dotDay(dateBuf.String()); d != "" {
+						cur.Posted = d
+					}
+					inDate = false
+				}
+			case "span":
+				if inLoc {
+					if l := strings.Join(strings.Fields(locBuf.String()), " "); l != "" {
+						locs = append(locs, l)
+					}
+					inLoc = false
+				}
+			}
+		case xhtml.SelfClosingTagToken, xhtml.CommentToken, xhtml.DoctypeToken:
+		}
+	}
+	flush()
+	return out
+}
+
+// Details implements discovery.Detailer.
+func (s *Softgarden) Details(ctx context.Context, p *discovery.Posting) error {
+	b, err := s.c.GetBytes(ctx, s.Name(), p.URL, nil, "text/html")
+	if err != nil {
+		return err
+	}
+	jobs := JobPostings(b)
+	if len(jobs) == 0 {
+		return &discovery.SourceError{Source: s.Name(), Code: "no_jobposting"}
+	}
+	j := jobs[0]
+	p.Description = j.Description
+	p.Posted = or(p.Posted, j.Posted)
+	if p.Location == "" {
+		p.Location = join("; ", j.Locations...)
+	}
+	if j.Remote {
+		p.Workplace = discovery.WorkplaceRemote
+	}
+	return nil
+}
+
+// Join reads the public company job page on join.com (__NEXT_DATA__ SSR state); descriptions come from JSON-LD.
+type Join struct {
+	c             *Client
+	slug, company string
+}
+
+const joinMaxPages = 10
+
+// Name implements discovery.Source.
+func (s *Join) Name() string { return "join:" + s.slug }
+
+func nextDataJSON(page []byte) []byte {
+	if len(page) > MaxBody {
+		page = page[:MaxBody]
+	}
+	z := xhtml.NewTokenizer(bytes.NewReader(page))
+	inNext := false
+	for {
+		switch z.Next() {
+		case xhtml.ErrorToken:
+			return nil
+		case xhtml.StartTagToken:
+			name, hasAttr := z.TagName()
+			attrs := attrMap(z, hasAttr)
+			inNext = string(name) == "script" && attrs["id"] == "__NEXT_DATA__"
+		case xhtml.TextToken:
+			if inNext {
+				return bytes.Clone(z.Text())
+			}
+		case xhtml.EndTagToken, xhtml.SelfClosingTagToken, xhtml.CommentToken, xhtml.DoctypeToken:
+			inNext = false
+		}
+	}
+}
+
+// Fetch implements discovery.Source.
+func (s *Join) Fetch(ctx context.Context) (discovery.Batch, error) {
+	base := "https://join.com/companies/" + url.PathEscape(s.slug)
+	var out []discovery.Posting
+	seen := map[string]bool{}
+	pageCount := 1
+	for page := 1; page <= joinMaxPages && page <= pageCount; page++ {
+		var vals url.Values
+		if page > 1 {
+			vals = url.Values{"page": {strconv.Itoa(page)}}
+		}
+		b, err := s.c.GetBytes(ctx, s.Name(), base, vals, "text/html")
+		if err != nil {
+			return discovery.Batch{}, err
+		}
+		raw := nextDataJSON(b)
+		if len(raw) == 0 {
+			return discovery.Batch{}, &discovery.SourceError{Source: s.Name(), Code: "decode"}
+		}
+		var data struct {
+			Props struct {
+				PageProps struct {
+					PageData struct {
+						Company struct {
+							Name string `json:"name"`
+						} `json:"company"`
+						Jobs struct {
+							Items []struct {
+								ID            json.RawMessage `json:"id"`
+								IDParam       string          `json:"idParam"`
+								Title         string          `json:"title"`
+								CreatedAt     string          `json:"createdAt"`
+								WorkplaceType string          `json:"workplaceType"`
+								RemoteType    string          `json:"remoteType"`
+								City          struct {
+									CityName    string `json:"cityName"`
+									CountryName string `json:"countryName"`
+								} `json:"city"`
+							} `json:"items"`
+							Pagination struct {
+								PageCount int `json:"pageCount"`
+							} `json:"pagination"`
+						} `json:"jobs"`
+					} `json:"pageData"`
+				} `json:"pageProps"`
+			} `json:"props"`
+		}
+		if err := json.Unmarshal(raw, &data); err != nil {
+			return discovery.Batch{}, &discovery.SourceError{Source: s.Name(), Code: "decode"}
+		}
+		pd := data.Props.PageProps.PageData
+		if pd.Jobs.Pagination.PageCount > 0 {
+			pageCount = pd.Jobs.Pagination.PageCount
+		}
+		comp := boardCompany(s.company, pd.Company.Name, s.slug, pretty(s.slug))
+		added := 0
+		for _, j := range pd.Jobs.Items {
+			ext := or(j.IDParam, id(j.ID))
+			if ext == "" || seen[ext] {
+				continue
+			}
+			seen[ext] = true
+			wp := workplace(j.WorkplaceType)
+			if wp == discovery.WorkplaceUnknown {
+				wp = workplace(j.RemoteType)
+			}
+			out = append(out, discovery.Posting{
+				Source: s.Name(), ExternalID: ext, Company: comp, Title: strings.TrimSpace(j.Title),
+				Location: join(", ", j.City.CityName, j.City.CountryName), URL: base + "/" + url.PathEscape(ext),
+				Posted: day(j.CreatedAt), Workplace: wp,
+			})
+			added++
+		}
+		if added == 0 {
+			break
+		}
+	}
+	return discovery.Batch{Postings: out, Complete: pageCount <= joinMaxPages}, nil
+}
+
+// Details implements discovery.Detailer.
+func (s *Join) Details(ctx context.Context, p *discovery.Posting) error {
+	b, err := s.c.GetBytes(ctx, s.Name(), p.URL, nil, "text/html")
+	if err != nil {
+		return err
+	}
+	jobs := JobPostings(b)
+	if len(jobs) == 0 {
+		return &discovery.SourceError{Source: s.Name(), Code: "no_jobposting"}
+	}
+	p.Description = jobs[0].Description
+	p.Posted = or(p.Posted, jobs[0].Posted)
+	return nil
+}
+
+// SuccessFactors reads SAP SuccessFactors Career Site Builder /search/ listings; descriptions come from item details.
+type SuccessFactors struct {
+	c                   *Client
+	host, slug, company string
+	location, search    string
+	max                 int
+}
+
+const sfDefaultMax = 100
+
+var sfJobPathID = regexp.MustCompile(`/job/[^?#]*/([0-9]+)/?(?:[?#].*)?$`)
+
+// Name implements discovery.Source.
+func (s *SuccessFactors) Name() string { return "successfactors:" + s.slug }
+
+func sfDate(s string) string {
+	s = strings.TrimSpace(s)
+	if d := day(s); d != "" {
+		return d
+	}
+	for _, layout := range []string{time.UnixDate, time.RFC1123, time.RFC1123Z, "Mon Jan 2 15:04:05 MST 2006"} {
+		if t, err := time.Parse(layout, s); err == nil {
+			return t.Format(time.DateOnly)
+		}
+	}
+	return ""
+}
+
+// Fetch implements discovery.Source.
+func (s *SuccessFactors) Fetch(ctx context.Context) (discovery.Batch, error) {
+	limit := s.max
+	if limit <= 0 {
+		limit = sfDefaultMax
+	}
+	var out []discovery.Posting
+	seen := map[string]bool{}
+	for start := 0; len(out) < limit; start += 25 {
+		vals := url.Values{
+			"q":              {s.search},
+			"locationsearch": {s.location},
+			"startrow":       {strconv.Itoa(start)},
+		}
+		b, err := s.c.GetBytes(ctx, s.Name(), "https://"+s.host+"/search/", vals, "text/html")
+		if err != nil {
+			return discovery.Batch{}, err
+		}
+		rows := parseSFSearch(b)
+		added := 0
+		for _, r := range rows {
+			if seen[r.extID] {
+				continue
+			}
+			seen[r.extID] = true
+			out = append(out, discovery.Posting{
+				Source: s.Name(), ExternalID: r.extID, Company: s.company, Title: r.title,
+				Location: or(r.location, s.location), URL: "https://" + s.host + r.path,
+				Extra: map[string]string{"path": r.path},
+			})
+			added++
+			if len(out) >= limit {
+				return discovery.Batch{Postings: out, Complete: false}, nil
+			}
+		}
+		if added == 0 {
+			return discovery.Batch{Postings: out, Complete: true}, nil
+		}
+	}
+	return discovery.Batch{Postings: out, Complete: len(out) < limit}, nil
+}
+
+type sfRow struct {
+	extID, path, title, location string
+}
+
+func parseSFSearch(b []byte) []sfRow {
+	if len(b) > MaxBody {
+		b = b[:MaxBody]
+	}
+	z := xhtml.NewTokenizer(bytes.NewReader(b))
+	var rows []sfRow
+	var cur *sfRow
+	inTitle, inLoc := false, false
+	locDepth := 0
+	var titleBuf, locBuf strings.Builder
+
+	flush := func() {
+		if cur != nil && cur.extID != "" && cur.title != "" {
+			rows = append(rows, *cur)
+		}
+		cur = nil
+		inTitle, inLoc = false, false
+		locDepth = 0
+		titleBuf.Reset()
+		locBuf.Reset()
+	}
+
+	for len(rows) < 200 {
+		switch z.Next() {
+		case xhtml.ErrorToken:
+			flush()
+			return rows
+		case xhtml.StartTagToken:
+			name, hasAttr := z.TagName()
+			attrs := attrMap(z, hasAttr)
+			tag := string(name)
+			cls := attrs["class"]
+			if tag == "a" && hasToken(cls, "jobTitle-link") {
+				if m := sfJobPathID.FindStringSubmatch(attrs["href"]); m != nil {
+					cleanPath := strings.SplitN(attrs["href"], "?", 2)[0]
+					cleanPath = strings.SplitN(cleanPath, "#", 2)[0]
+					if strings.HasPrefix(cleanPath, "/") {
+						flush()
+						cur = &sfRow{extID: m[1], path: cleanPath}
+						inTitle = true
+						titleBuf.Reset()
+						continue
+					}
+				}
+			}
+			if cur != nil && !inLoc && cur.location == "" {
+				if (hasToken(cls, "jobLocation") && !hasToken(cls, "sort")) || strings.HasSuffix(attrs["id"], "-section-city-value") {
+					inLoc = true
+					locDepth = 1
+					locBuf.Reset()
+					continue
+				}
+			}
+			if inLoc {
+				locDepth++
+			}
+		case xhtml.TextToken:
+			if inTitle {
+				titleBuf.Write(z.Text())
+			} else if inLoc {
+				locBuf.Write(z.Text())
+			}
+		case xhtml.EndTagToken:
+			name, _ := z.TagName()
+			if inTitle && string(name) == "a" && cur != nil {
+				cur.title = strings.Join(strings.Fields(titleBuf.String()), " ")
+				inTitle = false
+			}
+			if inLoc {
+				locDepth--
+				if locDepth <= 0 {
+					if cur != nil {
+						cur.location = strings.Join(strings.Fields(locBuf.String()), " ")
+					}
+					inLoc = false
+				}
+			}
+		case xhtml.SelfClosingTagToken, xhtml.CommentToken, xhtml.DoctypeToken:
+		}
+	}
+	flush()
+	return rows
+}
+
+// Details implements discovery.Detailer.
+func (s *SuccessFactors) Details(ctx context.Context, p *discovery.Posting) error {
+	path := p.Extra["path"]
+	if !strings.HasPrefix(path, "/") || strings.Contains(path, "..") {
+		return &discovery.SourceError{Source: s.Name(), Code: "path"}
+	}
+	b, err := s.c.GetBytes(ctx, s.Name(), "https://"+s.host+path, nil, "text/html")
+	if err != nil {
+		return err
+	}
+	if jobs := JobPostings(b); len(jobs) > 0 && jobs[0].Description != "" {
+		p.Description = jobs[0].Description
+		p.Posted = or(p.Posted, jobs[0].Posted)
+		return nil
+	}
+	desc, posted := parseSFDetail(b)
+	if desc == "" {
+		return &discovery.SourceError{Source: s.Name(), Code: "no_jobposting"}
+	}
+	p.Description = desc
+	p.Posted = or(p.Posted, posted)
+	return nil
+}
+
+func parseSFDetail(b []byte) (desc, posted string) {
+	if len(b) > MaxBody {
+		b = b[:MaxBody]
+	}
+	z := xhtml.NewTokenizer(bytes.NewReader(b))
+	descDepth := 0
+	var raw strings.Builder
+	for {
+		switch z.Next() {
+		case xhtml.ErrorToken:
+			return htmltext.Text(raw.String()), posted
+		case xhtml.StartTagToken:
+			name, hasAttr := z.TagName()
+			attrs := attrMap(z, hasAttr)
+			tag := string(name)
+			if attrs["itemprop"] == "datePosted" && posted == "" {
+				posted = sfDate(attrs["content"])
+			}
+			if descDepth == 0 && attrs["itemprop"] == "description" {
+				if tag == "meta" {
+					raw.WriteString(attrs["content"])
+					continue
+				}
+				descDepth = 1
+				continue
+			}
+			if descDepth > 0 {
+				if tag != "meta" && tag != "br" && tag != "hr" && tag != "img" && tag != "input" {
+					descDepth++
+				}
+				raw.Write(z.Raw())
+			}
+		case xhtml.SelfClosingTagToken:
+			_, hasAttr := z.TagName()
+			attrs := attrMap(z, hasAttr)
+			if attrs["itemprop"] == "datePosted" && posted == "" {
+				posted = sfDate(attrs["content"])
+			}
+			if descDepth == 0 && attrs["itemprop"] == "description" {
+				raw.WriteString(attrs["content"])
+			} else if descDepth > 0 {
+				raw.Write(z.Raw())
+			}
+		case xhtml.TextToken:
+			if descDepth > 0 {
+				raw.Write(z.Raw())
+			}
+		case xhtml.EndTagToken:
+			if descDepth > 0 {
+				descDepth--
+				if descDepth > 0 {
+					raw.Write(z.Raw())
+				} else if desc == "" {
+					desc = htmltext.Text(raw.String())
+				}
+			}
+		case xhtml.CommentToken, xhtml.DoctypeToken:
+		}
+	}
 }

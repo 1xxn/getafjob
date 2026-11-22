@@ -1,0 +1,31 @@
+{
+  "complete": true,
+  "postings": [
+    {
+      "Source": "join:beispielwerk",
+      "ExternalID": "1690001-senior-go-developer",
+      "Company": "Beispielwerk GmbH",
+      "Title": "Senior Go Developer",
+      "Location": "Berlin, Germany",
+      "URL": "https://join.com/companies/beispielwerk/1690001-senior-go-developer",
+      "ApplyURL": "",
+      "Description": "Design reliable APIs in Go and PostgreSQL.",
+      "Posted": "2026-11-10",
+      "Workplace": "hybrid",
+      "Extra": null
+    },
+    {
+      "Source": "join:beispielwerk",
+      "ExternalID": "1690002-platform-engineer",
+      "Company": "Beispielwerk GmbH",
+      "Title": "Platform Engineer (m/f/d)",
+      "Location": "Munich, Germany",
+      "URL": "https://join.com/companies/beispielwerk/1690002-platform-engineer",
+      "ApplyURL": "",
+      "Description": "Operate Kubernetes clusters and observability stacks.",
+      "Posted": "2026-11-12",
+      "Workplace": "remote",
+      "Extra": null
+    }
+  ]
+}

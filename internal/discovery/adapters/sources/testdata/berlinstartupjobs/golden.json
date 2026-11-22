@@ -1,0 +1,31 @@
+{
+  "complete": false,
+  "postings": [
+    {
+      "Source": "berlinstartupjobs",
+      "ExternalID": "450001",
+      "Company": "Beispielwerk",
+      "Title": "Senior Go Developer",
+      "Location": "Berlin, Germany",
+      "URL": "https://berlinstartupjobs.com/engineering/senior-go-developer-beispielwerk/",
+      "ApplyURL": "",
+      "Description": "Build backend systems with Go and PostgreSQL.",
+      "Posted": "2026-11-17",
+      "Workplace": "",
+      "Extra": null
+    },
+    {
+      "Source": "berlinstartupjobs",
+      "ExternalID": "450002",
+      "Company": "Berlin Startup",
+      "Title": "Platform Engineer",
+      "Location": "Berlin, Germany",
+      "URL": "https://berlinstartupjobs.com/engineering/platform-engineer/",
+      "ApplyURL": "",
+      "Description": "Kubernetes and Terraform infrastructure.",
+      "Posted": "2026-11-16",
+      "Workplace": "",
+      "Extra": null
+    }
+  ]
+}

@@ -160,7 +160,8 @@ func (w *boardDiscoveryWorker) Work(ctx context.Context, _ *river.Job[BoardDisco
 func crawlSources(ctx context.Context, c *sources.Client, boards discovery.Boards, terms searchTerms, logger *slog.Logger) (
 	out []discovery.Source, ids map[string]int64, err error,
 ) {
-	out = []discovery.Source{sources.NewGoogle(c), sources.NewApple(c, "germany-DEU"), sources.NewArbeitnow(c, 10)}
+	out = []discovery.Source{sources.NewGoogle(c), sources.NewApple(c, "germany-DEU"), sources.NewArbeitnow(c, 10),
+		sources.NewBerlinStartupJobs(c)}
 	if len(terms.Queries) > 0 {
 		out = append(out, sources.NewHimalayas(c, terms.Queries, "Germany"), sources.NewAmazon(c, terms.Queries, "DEU"))
 		if len(terms.Cities) > 0 {

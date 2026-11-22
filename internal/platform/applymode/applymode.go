@@ -25,7 +25,7 @@ var portals = []string{
 	"arbeitnow.de", "himalayas.app", "stepstone.de", "stepstone.at", "stepstone.com", "xing.com", "monster.de",
 	"monster.com", "jobware.de", "stellenanzeigen.de", "jobexport.de", "germantechjobs.de", "gute-jobs.de",
 	"get-in-it.de", "stellenonline.de", "jobvector.de", "meinestadt.de", "kimeta.de", "jobs.de", "heyjobs.co",
-	"glassdoor.com", "glassdoor.de", "kununu.com", "empfehlungsbund.de", "finest-jobs.com",
+	"berlinstartupjobs.com", "glassdoor.com", "glassdoor.de", "kununu.com", "empfehlungsbund.de", "finest-jobs.com",
 }
 
 // Of returns the mode of a posting from its page URL and its application URL (may be empty). An application URL

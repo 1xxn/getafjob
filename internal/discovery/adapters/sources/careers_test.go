@@ -71,6 +71,8 @@ func TestBoardFromURL(t *testing.T) {
 		"https://jobs.smartrecruiters.com/Musterwerk/744000000000001":            "smartrecruiters:Musterwerk",
 		"https://musterhaus.jobs.personio.de/job/1200001":                        "personio:musterhaus",
 		"https://beispielbau.recruitee.com/o/bauleiter":                          "recruitee:beispielbau",
+		"https://musterhaus.softgarden.io/de/vacancies":                          "softgarden:musterhaus",
+		"https://join.com/companies/beispielwerk/1690001-senior-go":              "join:beispielwerk",
 		"https://apply.workable.com/musterlabs/j/A1B2C3":                         "workable:musterlabs",
 		"https://muster.wd3.myworkdayjobs.com/en-US/External/job/Berlin/Dev_R-1": "workday:muster",
 		"https://apply.workable.com/j/A1B2C3":                                    "",
@@ -103,13 +105,15 @@ func TestDetectBoards(t *testing.T) {
 		<a href="https://boards.greenhouse.io/acme/jobs/1">Job</a>
 		<iframe src="https://jobs.ashbyhq.com/acme/embed"></iframe>
 		<script>var board = "https://acme.recruitee.com/api/offers/";</script>
+		<a href="https://acme.softgarden.io/de/vacancies">Softgarden</a>
+		<a href="https://join.com/companies/acme">JOIN</a>
 		<a href="https://example.org/careers">Other</a>
 	</body></html>`
 	var got []string
 	for _, b := range sources.DetectBoards([]byte(html)) {
 		got = append(got, b.ATS+":"+b.Slug)
 	}
-	if strings.Join(got, " ") != "greenhouse:acme ashby:acme recruitee:acme" {
+	if strings.Join(got, " ") != "greenhouse:acme ashby:acme recruitee:acme softgarden:acme join:acme" {
 		t.Fatalf("boards = %v", got)
 	}
 }
