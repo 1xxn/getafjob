@@ -102,9 +102,7 @@ func RequestLog(next http.Handler, logger *slog.Logger) http.Handler {
 		next.ServeHTTP(rec, r)
 		route := cmp.Or(slot.pattern, r.Pattern, r.Method)
 		level := slog.LevelInfo
-		if route == "GET /healthz" || route == "GET /readyz" || strings.HasPrefix(route, "GET /static/") ||
-			route == "/healthz" || route == "/readyz" || strings.HasPrefix(route, "/static/") ||
-			r.URL.Path == "/healthz" || r.URL.Path == "/readyz" || strings.HasPrefix(r.URL.Path, "/static/") {
+		if p := r.URL.Path; p == "/healthz" || p == "/readyz" || strings.HasPrefix(p, "/static/") {
 			level = slog.LevelDebug
 		}
 		logger.Log(ctx, level, "http request", "route", route, "status", rec.status,

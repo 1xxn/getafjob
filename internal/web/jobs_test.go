@@ -761,6 +761,30 @@ func TestJobApply_PreviewAndSubmit(t *testing.T) {
 		t.Errorf("application cv_document_id = %v, want %s", appCvID, cvDocID)
 	}
 
+	// The live focus follows the application state after the run ended (#510): the htmx refresh shows the state,
+	// a full load goes to the application page.
+	if err := db.InSystemTx(ctx, a.pool, func(tx pgx.Tx) error {
+		_, err := tx.Exec(ctx, "UPDATE applications SET state = 'parked' WHERE id = $1", appID)
+		return err
+	}); err != nil {
+		t.Fatal(err)
+	}
+	meta := a.do(http.MethodGet, loc, nil, session, map[string]string{"HX-Request": "true"})
+	if body := meta.Body.String(); meta.Code != http.StatusOK || !strings.Contains(body, `id="live-focus-meta"`) ||
+		!strings.Contains(body, " Parked</span>") || strings.Contains(body, "Running") {
+		t.Fatalf("live focus meta of a parked run: %d %s", meta.Code, body)
+	}
+	if full := a.do(http.MethodGet, loc, nil, session, nil); full.Code != http.StatusSeeOther ||
+		full.Header().Get("Location") != "/applications/"+appIDStr {
+		t.Fatalf("live page of a parked run: %d %q", full.Code, full.Header().Get("Location"))
+	}
+	if err := db.InSystemTx(ctx, a.pool, func(tx pgx.Tx) error {
+		_, err := tx.Exec(ctx, "UPDATE applications SET state = 'queued' WHERE id = $1", appID)
+		return err
+	}); err != nil {
+		t.Fatal(err)
+	}
+
 	// 8. Safety Guard: Duplicate Prevention on Preview & Submit
 	// GET /jobs/{id}/apply now indicates blocked
 	dupPreviewRec := a.do(http.MethodGet, jobApplyPath, nil, session, nil)
