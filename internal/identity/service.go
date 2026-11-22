@@ -265,7 +265,8 @@ func (s *Service) Authenticate(ctx context.Context, token string) (u User, next 
 // Sessions lists the user's sessions; the one of token is marked current.
 func (s *Service) Sessions(ctx context.Context, userID uuid.UUID, token string) ([]SessionInfo, error) {
 	h, _ := ParseToken(token)
-	rows, err := s.store.Sessions(ctx, userID)
+	now := s.now()
+	rows, err := s.store.Sessions(ctx, userID, now, now.Add(-SessionIdle))
 	if err != nil {
 		return nil, err
 	}
@@ -328,8 +329,11 @@ func (s *Service) SignOut(ctx context.Context, token string, userID uuid.UUID) e
 	return s.store.DeleteSession(ctx, h, AuditEvent{UserID: &userID, Actor: "user", Code: "identity.signed_out"})
 }
 
-// Cleanup removes expired sessions, links and challenges (worker job).
-func (s *Service) Cleanup(ctx context.Context) error { return s.store.DeleteExpired(ctx, s.now()) }
+// Cleanup removes expired and idle sessions, links and challenges (worker job).
+func (s *Service) Cleanup(ctx context.Context) error {
+	now := s.now()
+	return s.store.DeleteExpired(ctx, now, now.Add(-SessionIdle))
+}
 
 // WithClock replaces the clock (tests).
 func (s *Service) WithClock(now func() time.Time) *Service { s.now = now; return s }

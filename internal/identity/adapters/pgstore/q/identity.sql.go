@@ -233,15 +233,22 @@ func (q *Queries) CreateUser(ctx context.Context, arg CreateUserParams) (CreateU
 }
 
 const deleteExpired = `-- name: DeleteExpired :exec
-WITH s AS (DELETE FROM sessions WHERE sessions.expires_at < $1 OR sessions.replaced_at < $1 - interval '5 minutes'),
+WITH s AS (DELETE FROM sessions WHERE sessions.expires_at < $1 OR sessions.last_seen_at < $2
+             OR sessions.replaced_at < $1 - interval '5 minutes'),
      m AS (DELETE FROM magic_links WHERE magic_links.expires_at < $1),
      r AS (DELETE FROM recoveries WHERE recoveries.expires_at < $1),
      i AS (DELETE FROM invitations WHERE invitations.expires_at < $1 AND invitations.accepted_at IS NULL)
 DELETE FROM webauthn_challenges WHERE webauthn_challenges.expires_at < $1
 `
 
-func (q *Queries) DeleteExpired(ctx context.Context, expiresAt time.Time) error {
-	_, err := q.db.Exec(ctx, deleteExpired, expiresAt)
+type DeleteExpiredParams struct {
+	Now       time.Time
+	IdleSince time.Time
+}
+
+// Sessions go at the absolute limit, after idle_since without activity, or as replaced tokens past their grace.
+func (q *Queries) DeleteExpired(ctx context.Context, arg DeleteExpiredParams) error {
+	_, err := q.db.Exec(ctx, deleteExpired, arg.Now, arg.IdleSince)
 	return err
 }
 
@@ -965,8 +972,15 @@ func (q *Queries) UserPasskeys(ctx context.Context, userID uuid.UUID) ([]UserPas
 
 const userSessions = `-- name: UserSessions :many
 SELECT token_hash, method, created_at, last_seen_at, expires_at FROM sessions
-WHERE user_id = $1 AND replaced_at IS NULL ORDER BY last_seen_at DESC LIMIT 100
+WHERE user_id = $1 AND replaced_at IS NULL AND expires_at > $2 AND last_seen_at > $3
+ORDER BY last_seen_at DESC LIMIT 100
 `
+
+type UserSessionsParams struct {
+	UserID    uuid.UUID
+	Now       time.Time
+	IdleSince time.Time
+}
 
 type UserSessionsRow struct {
 	TokenHash  []byte
@@ -976,8 +990,9 @@ type UserSessionsRow struct {
 	ExpiresAt  time.Time
 }
 
-func (q *Queries) UserSessions(ctx context.Context, userID uuid.UUID) ([]UserSessionsRow, error) {
-	rows, err := q.db.Query(ctx, userSessions, userID)
+// Only sessions that still work: current token, before the absolute limit, active since idle_since.
+func (q *Queries) UserSessions(ctx context.Context, arg UserSessionsParams) ([]UserSessionsRow, error) {
+	rows, err := q.db.Query(ctx, userSessions, arg.UserID, arg.Now, arg.IdleSince)
 	if err != nil {
 		return nil, err
 	}

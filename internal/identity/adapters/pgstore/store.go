@@ -277,9 +277,11 @@ func (s *Store) DeleteSession(ctx context.Context, h identity.Hash, e identity.A
 	})
 }
 
-// DeleteExpired removes expired sessions, links and challenges.
-func (s *Store) DeleteExpired(ctx context.Context, before time.Time) error {
-	return s.system(ctx, func(qs *q.Queries) error { return qs.DeleteExpired(ctx, before) })
+// DeleteExpired removes expired and idle sessions, links and challenges.
+func (s *Store) DeleteExpired(ctx context.Context, now, idleSince time.Time) error {
+	return s.system(ctx, func(qs *q.Queries) error {
+		return qs.DeleteExpired(ctx, q.DeleteExpiredParams{Now: now, IdleSince: idleSince})
+	})
 }
 
 func deref(t *time.Time) time.Time {
@@ -310,10 +312,10 @@ func (s *Store) RotateSession(ctx context.Context, old, next identity.Hash, at t
 	return rotated, err
 }
 
-// Sessions lists the user's current sessions (user context, row-level security).
-func (s *Store) Sessions(ctx context.Context, userID uuid.UUID) (out []identity.StoredSession, err error) {
+// Sessions lists the user's sessions that still work (user context, row-level security).
+func (s *Store) Sessions(ctx context.Context, userID uuid.UUID, now, idleSince time.Time) (out []identity.StoredSession, err error) {
 	err = s.user(ctx, userID, func(qs *q.Queries) error {
-		rows, err := qs.UserSessions(ctx, userID)
+		rows, err := qs.UserSessions(ctx, q.UserSessionsParams{UserID: userID, Now: now, IdleSince: idleSince})
 		for _, r := range rows {
 			var h identity.Hash
 			copy(h[:], r.TokenHash)
