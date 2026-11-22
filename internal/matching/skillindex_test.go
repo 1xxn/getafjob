@@ -10,7 +10,7 @@ func TestSkillIndex(t *testing.T) {
 		var out []string
 		for i, c := range skillCounts(normalize(text)) {
 			if c > 0 {
-				out = append(out, skills[i].name)
+				out = append(out, skills[i].Name)
 			}
 		}
 		return out
@@ -29,9 +29,9 @@ func TestSkillIndex(t *testing.T) {
 	}
 	// Every alias of the dictionary is found by the index.
 	for i, k := range skills {
-		for _, a := range k.aliases {
+		for _, a := range k.Aliases {
 			if c := skillCounts(" " + string(newTerm(a)) + " "); c[i] == 0 {
-				t.Errorf("alias %q of %s not found", a, k.name)
+				t.Errorf("alias %q of %s not found", a, k.Name)
 			}
 		}
 	}
@@ -49,7 +49,7 @@ func TestImpliedSkills(t *testing.T) {
 	}
 	for name, list := range implied {
 		for _, n := range append(list, name) {
-			if !slices.ContainsFunc(skills, func(s skill) bool { return s.name == n }) {
+			if !slices.ContainsFunc(skills, func(s skill) bool { return s.Name == n }) {
 				t.Errorf("implied names unknown skill %q", n)
 			}
 		}

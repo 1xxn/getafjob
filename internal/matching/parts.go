@@ -59,7 +59,7 @@ type userSkill struct {
 var skillTerms = func() [][]term {
 	out := make([][]term, len(skills))
 	for i, k := range skills {
-		out[i] = append(terms(k.aliases), newTerm(k.name))
+		out[i] = append(terms(k.Aliases), newTerm(k.Name))
 	}
 	return out
 }()
@@ -75,9 +75,9 @@ func userSkills(list []string) []userSkill {
 		}
 		us := userSkill{name: strings.TrimSpace(s), idx: -1, terms: []term{t}}
 		if i := slices.IndexFunc(skillTerms, func(ts []term) bool { return slices.Contains(ts, t) }); i >= 0 {
-			us = userSkill{name: skills[i].name, idx: i, terms: skillTerms[i]}
+			us = userSkill{name: skills[i].Name, idx: i, terms: skillTerms[i]}
 		} else if i := slices.IndexFunc(skillTerms, func(ts []term) bool { _, ok := anyIn(ts, pad(t)); return ok }); i >= 0 {
-			us = userSkill{name: skills[i].name, idx: i, terms: skillTerms[i]}
+			us = userSkill{name: skills[i].Name, idx: i, terms: skillTerms[i]}
 		}
 		out = addSkill(out, us)
 	}
@@ -85,7 +85,7 @@ func userSkills(list []string) []userSkill {
 	// not count it as missing.
 	for i := 0; i < len(out); i++ {
 		for _, name := range implied[out[i].name] {
-			if k := slices.IndexFunc(skills, func(s skill) bool { return s.name == name }); k >= 0 {
+			if k := slices.IndexFunc(skills, func(s skill) bool { return s.Name == name }); k >= 0 {
 				out = addSkill(out, userSkill{name: name, idx: k, terms: skillTerms[k]})
 			}
 		}

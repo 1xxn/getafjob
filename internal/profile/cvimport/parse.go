@@ -6,7 +6,7 @@ import (
 	"unicode"
 	"unicode/utf8"
 
-	"github.com/1xxn/getafjob/internal/matching"
+	"github.com/1xxn/getafjob/internal/platform/vocab"
 	"github.com/1xxn/getafjob/internal/profile"
 )
 
@@ -95,7 +95,7 @@ func Parse(text string) profile.Profile {
 	if r := []rune(p.Summary); len(r) > 1500 {
 		p.Summary = string(r[:1500])
 	}
-	p.Skills = mergeSkills(skillItems(parts["skills"], 60, 80), matching.KnownSkills(strings.Join(parts["skills"], "\n")), 80)
+	p.Skills = mergeSkills(skillItems(parts["skills"], 60, 80), vocab.KnownSkills(strings.Join(parts["skills"], "\n")), 80)
 	p.Certifications = items(parts["certifications"], 120, 40)
 	p.Languages = languages(parts["languages"])
 	return p
@@ -335,7 +335,7 @@ func looksLikeCompany(s string) bool {
 }
 
 func chooseRoleAndCompany(a, b string) (title, company string) {
-	if (looksLikeCompany(a) && !looksLikeCompany(b)) || (!matching.IsKnownRole(a) && matching.IsKnownRole(b)) {
+	if (looksLikeCompany(a) && !looksLikeCompany(b)) || (!vocab.IsKnownRole(a) && vocab.IsKnownRole(b)) {
 		return cut(b, 200), cut(a, 200)
 	}
 	return cut(a, 200), cut(b, 200)
@@ -352,7 +352,7 @@ func parseTitleCompanyLocation(raw string) (title, company, location string) {
 		right := strings.Join(strings.Fields(trimmed[last[1]:]), " ")
 		if right != "" && utf8.RuneCountInString(right) <= 60 && !strings.ContainsAny(right, "·|") &&
 			!strings.Contains(right, " at ") && !strings.Contains(right, " bei ") &&
-			!matching.IsKnownRole(right) && !looksLikeCompany(right) &&
+			!vocab.IsKnownRole(right) && !looksLikeCompany(right) &&
 			(strings.ContainsAny(left, "·|,-:"+enDash) || strings.Contains(left, " at ") || strings.Contains(left, " bei ")) {
 			locCol = cut(right, 200)
 			raw = left
