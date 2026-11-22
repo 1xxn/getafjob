@@ -81,8 +81,35 @@ jobs:
         env:
           IMAGE: ${{ matrix.image }}
           DIGEST: ${{ steps.build.outputs.digest }}
-        run: cosign sign --yes "${IMAGE}@${DIGEST}"
-      - uses: actions/attest-build-provenance@4d101475d8b20a2381f78447822ac1eab6504dd8 # v4.2.2
+        run: |
+          for attempt in 1 2 3; do
+            cosign sign --yes "${IMAGE}@${DIGEST}" && exit 0
+            [ "$attempt" -lt 3 ] && sleep $((attempt * 5))
+          done
+          exit 1
+      - id: attest1
+        continue-on-error: true
+        uses: actions/attest-build-provenance@4d101475d8b20a2381f78447822ac1eab6504dd8 # v4.2.2
+        with:
+          subject-name: ${{ matrix.image }}
+          subject-digest: ${{ steps.build.outputs.digest }}
+          push-to-registry: true
+      - name: wait before provenance retry
+        if: steps.attest1.outcome == 'failure'
+        run: sleep 10
+      - id: attest2
+        if: steps.attest1.outcome == 'failure'
+        continue-on-error: true
+        uses: actions/attest-build-provenance@4d101475d8b20a2381f78447822ac1eab6504dd8 # v4.2.2
+        with:
+          subject-name: ${{ matrix.image }}
+          subject-digest: ${{ steps.build.outputs.digest }}
+          push-to-registry: true
+      - name: wait before final provenance retry
+        if: steps.attest1.outcome == 'failure' && steps.attest2.outcome == 'failure'
+        run: sleep 20
+      - if: steps.attest1.outcome == 'failure' && steps.attest2.outcome == 'failure'
+        uses: actions/attest-build-provenance@4d101475d8b20a2381f78447822ac1eab6504dd8 # v4.2.2
         with:
           subject-name: ${{ matrix.image }}
           subject-digest: ${{ steps.build.outputs.digest }}
