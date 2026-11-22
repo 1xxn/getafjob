@@ -18,7 +18,7 @@ var _ identity.AdminStore = (*Store)(nil)
 func (s *Store) Users(ctx context.Context, now time.Time) ([]identity.UserSummary, error) {
 	var out []identity.UserSummary
 	err := s.system(ctx, func(qs *q.Queries) error {
-		rows, err := qs.ListUsers(ctx, now)
+		rows, err := qs.ListUsers(ctx, q.ListUsersParams{Now: now, IdleSince: now.Add(-identity.SessionIdle)})
 		for _, r := range rows {
 			out = append(out, identity.UserSummary{User: toUser(r.ID, r.Email, r.DisplayName, r.Role, r.Locale, r.DisabledAt),
 				CreatedAt: r.CreatedAt, LastSeen: r.LastSeen, Sessions: int(r.Sessions), Passkey: r.HasPasskey})

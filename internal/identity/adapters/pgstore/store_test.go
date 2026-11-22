@@ -328,7 +328,7 @@ func TestCleanupRemovesExpired(t *testing.T) {
 }
 
 // TestIdleSessionsLeaveListAndCleanup: a session without activity for SessionIdle no longer shows on the account
-// page and the cleanup removes it, long before the absolute limit.
+// page or in the admin count, and the cleanup removes it, long before the absolute limit.
 func TestIdleSessionsLeaveListAndCleanup(t *testing.T) {
 	e := newEnv(t)
 	ctx := t.Context()
@@ -337,9 +337,15 @@ func TestIdleSessionsLeaveListAndCleanup(t *testing.T) {
 	if list, err := e.svc.Sessions(ctx, u.ID, string(idle)); err != nil || len(list) != 1 {
 		t.Fatalf("before the idle limit: %v, %v", list, err)
 	}
+	if users, err := e.svc.Users(ctx); err != nil || users[0].Sessions != 1 {
+		t.Fatalf("admin list before the idle limit: %v, %v", users, err)
+	}
 	e.now = e.now.Add(2 * time.Hour)
 	if list, err := e.svc.Sessions(ctx, u.ID, string(idle)); err != nil || len(list) != 0 {
 		t.Fatalf("idle session listed: %v, %v", list, err)
+	}
+	if users, err := e.svc.Users(ctx); err != nil || users[0].Sessions != 0 {
+		t.Fatalf("admin list counts the idle session: %v, %v", users, err)
 	}
 	if err := e.svc.Cleanup(ctx); err != nil {
 		t.Fatal(err)
