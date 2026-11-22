@@ -20,6 +20,20 @@
       "groupName": "go modules"
     },
     {
+      "description": "Code generators need go generate after an update; keep them out of the weekly go modules batch",
+      "matchManagers": ["gomod"],
+      "matchUpdateTypes": ["minor", "patch", "digest"],
+      "matchPackageNames": [
+        "github.com/a-h/templ",
+        "github.com/sqlc-dev/sqlc",
+        "github.com/oapi-codegen/oapi-codegen/v2",
+        "github.com/bufbuild/buf",
+        "connectrpc.com/connect/v2",
+        "google.golang.org/protobuf"
+      ],
+      "groupName": "go codegen tools"
+    },
+    {
       "description": "Go toolchain stays on the pinned line until updated on purpose",
       "matchManagers": ["gomod"],
       "matchDepTypes": ["golang", "toolchain"],
