@@ -44,7 +44,7 @@ LIMIT 200;
 SELECT score FROM matches WHERE user_id = $1 AND job_id = $2;
 
 -- name: RunCheckpoints :many
-SELECT step, page, data FROM run_checkpoints WHERE run_id = $1 AND user_id = $2 ORDER BY id;
+SELECT step, page, url, data FROM run_checkpoints WHERE run_id = $1 AND user_id = $2 ORDER BY id;
 
 -- name: SubmitsSince :one
 SELECT count(*) FROM submit_attempts WHERE user_id = $1 AND started_at >= $2;

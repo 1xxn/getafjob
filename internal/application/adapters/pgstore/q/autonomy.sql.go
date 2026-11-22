@@ -224,7 +224,7 @@ func (q *Queries) RunAdapter(ctx context.Context, arg RunAdapterParams) (string,
 }
 
 const runCheckpoints = `-- name: RunCheckpoints :many
-SELECT step, page, data FROM run_checkpoints WHERE run_id = $1 AND user_id = $2 ORDER BY id
+SELECT step, page, url, data FROM run_checkpoints WHERE run_id = $1 AND user_id = $2 ORDER BY id
 `
 
 type RunCheckpointsParams struct {
@@ -235,6 +235,7 @@ type RunCheckpointsParams struct {
 type RunCheckpointsRow struct {
 	Step string
 	Page int32
+	Url  string
 	Data []byte
 }
 
@@ -247,7 +248,12 @@ func (q *Queries) RunCheckpoints(ctx context.Context, arg RunCheckpointsParams) 
 	items := []RunCheckpointsRow{}
 	for rows.Next() {
 		var i RunCheckpointsRow
-		if err := rows.Scan(&i.Step, &i.Page, &i.Data); err != nil {
+		if err := rows.Scan(
+			&i.Step,
+			&i.Page,
+			&i.Url,
+			&i.Data,
+		); err != nil {
 			return nil, err
 		}
 		items = append(items, i)

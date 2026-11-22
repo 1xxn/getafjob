@@ -125,11 +125,13 @@ func serve(ctx context.Context, cfg config.Config, logger *slog.Logger) error {
 		if err != nil {
 			return err
 		}
+		data := runData{profiles: profiles, items: profile.NewItems(pstore, env), docs: docs, stations: profile.NewStations(pstore, env), jobs: astore, apps: astore, portals: portalsSvc, now: time.Now,
+			fixture: devFixtureHost(cfg, logger)}
+		apps.WithOriginCheck(data.VettedOrigin)
 		gw = &gateway.Server{Runs: application.NewRuns(apps, astore), Apps: apps, Shots: sealedFiles,
 			Secret: cfg.RunnerSecret.Reveal(), Logger: logger, Notify: appNotifier.YourTurn, NotifyApproval: appNotifier.ApprovalAsked, ATSMetrics: atsMetrics,
 			Portals: portalsSvc, Paused: paused(maint),
-			Data: runData{profiles: profiles, items: profile.NewItems(pstore, env), docs: docs, stations: profile.NewStations(pstore, env), jobs: astore, apps: astore, portals: portalsSvc, now: time.Now,
-				fixture: devFixtureHost(cfg, logger)}}
+			Data: data}
 		go gw.ReapLost(ctx)
 	}
 

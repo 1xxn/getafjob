@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"net/url"
+	"slices"
 	"strings"
 	"time"
 
@@ -222,6 +223,19 @@ func placeholders(p profile.Profile, job application.Job, lang string, now time.
 		"notice_period": p.Work.NoticePeriod, "earliest_start": p.Work.EarliestStart, "company": job.Company,
 		"job_title": job.Title, "job_location": job.Location, "date": date,
 	}
+}
+
+// VettedOrigin reports whether a form origin belongs to the job: one of its own origins or a known ATS host. Any
+// other site was reached by following links, and a submit there needs the user's approval (#545).
+func (d runData) VettedOrigin(ctx context.Context, jobID int64, origin string) bool {
+	if ats.IsKnownOrigin(origin) {
+		return true
+	}
+	job, err := d.jobs.Job(ctx, jobID)
+	if err != nil {
+		return false
+	}
+	return slices.Contains(d.origins(job), origin)
 }
 
 // origins are the origins the run's values may go to: the posting, the application page and the ATS's own form
