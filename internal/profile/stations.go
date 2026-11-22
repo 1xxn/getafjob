@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"regexp"
+	"slices"
 	"strconv"
 	"strings"
 	"time"
@@ -119,7 +120,8 @@ func (e EducationStation) Validate() []FieldError {
 	return c.errs
 }
 
-// Stations manages work experiences and educations with envelope encryption.
+// Stations manages work experiences and educations. Each entry is sealed as a whole with the user's data key; only
+// its place in the list is readable.
 type Stations struct {
 	store  StationStore
 	sealer Sealer
@@ -131,7 +133,62 @@ func NewStations(store StationStore, sealer Sealer) *Stations {
 	return &Stations{store: store, sealer: sealer, now: time.Now}
 }
 
+func workPurpose(id uuid.UUID) string      { return "station:work-entry:" + id.String() }
+func educationPurpose(id uuid.UUID) string { return "station:education:" + id.String() }
+
+// workBulletPurpose sealed the bullets of a row from before sealing (#559).
 func workBulletPurpose(id uuid.UUID) string { return "station:work:" + id.String() }
+
+func (s *Stations) seal(ctx context.Context, userID uuid.UUID, purpose string, v any) ([]byte, error) {
+	plain, err := json.Marshal(v)
+	if err != nil {
+		return nil, err
+	}
+	return s.sealer.Seal(ctx, userID, purpose, plain)
+}
+
+func (s *Stations) open(ctx context.Context, userID uuid.UUID, purpose string, sealed []byte, v any) error {
+	plain, err := s.sealer.Open(ctx, userID, purpose, sealed)
+	if err != nil {
+		return err
+	}
+	return json.Unmarshal(plain, v)
+}
+
+// work turns a row into an entry; a row from before sealing is read from its plain columns.
+func (s *Stations) work(ctx context.Context, userID uuid.UUID, r StoredWorkExperience) (WorkExperience, error) {
+	var w WorkExperience
+	if r.Sealed != nil {
+		if err := s.open(ctx, userID, workPurpose(r.ID), r.Sealed, &w); err != nil {
+			return WorkExperience{}, err
+		}
+	} else {
+		w = WorkExperience{Company: r.Company, Title: r.Title, Location: r.Location, WorkplaceType: r.WorkplaceType,
+			StartDate: r.StartDate, EndDate: r.EndDate, IsCurrent: r.IsCurrent}
+		if len(r.SealedBullets) > 0 {
+			if err := s.open(ctx, userID, workBulletPurpose(r.ID), r.SealedBullets, &w.DescriptionBullets); err != nil {
+				return WorkExperience{}, err
+			}
+		}
+	}
+	w.ID, w.SortOrder = r.ID, r.SortOrder
+	return w, nil
+}
+
+// education turns a row into an entry; a row from before sealing is read from its plain columns.
+func (s *Stations) education(ctx context.Context, userID uuid.UUID, r StoredEducation) (EducationStation, error) {
+	var e EducationStation
+	if r.Sealed != nil {
+		if err := s.open(ctx, userID, educationPurpose(r.ID), r.Sealed, &e); err != nil {
+			return EducationStation{}, err
+		}
+	} else {
+		e = EducationStation{Institution: r.Institution, Degree: r.Degree, FieldOfStudy: r.FieldOfStudy,
+			StartDate: r.StartDate, EndDate: r.EndDate, IsCurrent: r.IsCurrent, Grade: r.Grade}
+	}
+	e.ID, e.SortOrder = r.ID, r.SortOrder
+	return e, nil
+}
 
 // WorkExperiences lists the user's work experiences in sort order.
 func (s *Stations) WorkExperiences(ctx context.Context, userID uuid.UUID) ([]WorkExperience, error) {
@@ -141,29 +198,11 @@ func (s *Stations) WorkExperiences(ctx context.Context, userID uuid.UUID) ([]Wor
 	}
 	out := make([]WorkExperience, 0, len(rows))
 	for _, r := range rows {
-		we := WorkExperience{
-			ID:            r.ID,
-			Company:       r.Company,
-			Title:         r.Title,
-			Location:      r.Location,
-			WorkplaceType: r.WorkplaceType,
-			StartDate:     r.StartDate,
-			EndDate:       r.EndDate,
-			IsCurrent:     r.IsCurrent,
-			SortOrder:     r.SortOrder,
+		w, err := s.work(ctx, userID, r)
+		if err != nil {
+			return nil, err
 		}
-		if len(r.SealedBullets) > 0 {
-			if s.sealer != nil {
-				plain, err := s.sealer.Open(ctx, userID, workBulletPurpose(r.ID), r.SealedBullets)
-				if err != nil {
-					return nil, err
-				}
-				_ = json.Unmarshal(plain, &we.DescriptionBullets)
-			} else {
-				_ = json.Unmarshal(r.SealedBullets, &we.DescriptionBullets)
-			}
-		}
-		out = append(out, we)
+		out = append(out, w)
 	}
 	return out, nil
 }
@@ -171,35 +210,13 @@ func (s *Stations) WorkExperiences(ctx context.Context, userID uuid.UUID) ([]Wor
 // GetWorkExperience returns one work experience by ID.
 func (s *Stations) GetWorkExperience(ctx context.Context, userID, id uuid.UUID) (WorkExperience, error) {
 	r, err := s.store.GetWorkExperience(ctx, userID, id)
+	if errors.Is(err, ErrNotFound) {
+		return WorkExperience{}, ErrStationNotFound
+	}
 	if err != nil {
-		if errors.Is(err, ErrNotFound) {
-			return WorkExperience{}, ErrStationNotFound
-		}
 		return WorkExperience{}, err
 	}
-	we := WorkExperience{
-		ID:            r.ID,
-		Company:       r.Company,
-		Title:         r.Title,
-		Location:      r.Location,
-		WorkplaceType: r.WorkplaceType,
-		StartDate:     r.StartDate,
-		EndDate:       r.EndDate,
-		IsCurrent:     r.IsCurrent,
-		SortOrder:     r.SortOrder,
-	}
-	if len(r.SealedBullets) > 0 {
-		if s.sealer != nil {
-			plain, err := s.sealer.Open(ctx, userID, workBulletPurpose(r.ID), r.SealedBullets)
-			if err != nil {
-				return WorkExperience{}, err
-			}
-			_ = json.Unmarshal(plain, &we.DescriptionBullets)
-		} else {
-			_ = json.Unmarshal(r.SealedBullets, &we.DescriptionBullets)
-		}
-	}
-	return we, nil
+	return s.work(ctx, userID, r)
 }
 
 // SaveWorkExperience creates (ID nil) or updates a work experience.
@@ -215,112 +232,59 @@ func (s *Stations) SaveWorkExperience(ctx context.Context, userID uuid.UUID, w W
 	}
 	insert := w.ID == uuid.Nil
 	if insert {
-		cnt, err := s.store.CountWorkExperiences(ctx, userID)
+		id, order, err := s.newEntry(ctx, userID, s.store.CountWorkExperiences)
 		if err != nil {
 			return uuid.Nil, err
 		}
-		if cnt >= MaxStations {
-			return uuid.Nil, ErrTooManyStations
-		}
-		id, err := uuid.NewV7()
-		if err != nil {
-			return uuid.Nil, err
-		}
-		w.ID = id
-		w.SortOrder = cnt
+		w.ID, w.SortOrder = id, order
 	}
-	var sealedBullets []byte
-	if len(w.DescriptionBullets) > 0 {
-		plain, err := json.Marshal(w.DescriptionBullets)
-		if err != nil {
-			return uuid.Nil, err
-		}
-		if s.sealer != nil {
-			sealedBullets, err = s.sealer.Seal(ctx, userID, workBulletPurpose(w.ID), plain)
-			if err != nil {
-				return uuid.Nil, err
-			}
-		} else {
-			sealedBullets = plain
-		}
+	return w.ID, s.writeWork(ctx, userID, w, insert)
+}
+
+// writeWork seals w and stores it.
+func (s *Stations) writeWork(ctx context.Context, userID uuid.UUID, w WorkExperience, insert bool) error {
+	sealed, err := s.seal(ctx, userID, workPurpose(w.ID), w)
+	if err != nil {
+		return err
 	}
 	now := s.now()
-	st := StoredWorkExperience{
-		ID:            w.ID,
-		UserID:        userID,
-		Company:       w.Company,
-		Title:         w.Title,
-		Location:      w.Location,
-		WorkplaceType: w.WorkplaceType,
-		StartDate:     w.StartDate,
-		EndDate:       w.EndDate,
-		IsCurrent:     w.IsCurrent,
-		SealedBullets: sealedBullets,
-		SortOrder:     w.SortOrder,
-		CreatedAt:     now,
-		UpdatedAt:     now,
-	}
+	st := StoredWorkExperience{ID: w.ID, UserID: userID, Sealed: sealed, SortOrder: w.SortOrder, CreatedAt: now, UpdatedAt: now}
 	if insert {
-		if err := s.store.InsertWorkExperience(ctx, st); err != nil {
-			return uuid.Nil, err
-		}
-		return w.ID, nil
+		return s.store.InsertWorkExperience(ctx, st)
 	}
-	ok, err := s.store.UpdateWorkExperience(ctx, st)
-	if err != nil {
-		return uuid.Nil, err
-	}
-	if !ok {
-		return uuid.Nil, ErrStationNotFound
-	}
-	return w.ID, nil
+	return found(s.store.UpdateWorkExperience(ctx, st))
 }
 
 // DeleteWorkExperience removes a work experience.
 func (s *Stations) DeleteWorkExperience(ctx context.Context, userID, id uuid.UUID) error {
-	ok, err := s.store.DeleteWorkExperience(ctx, userID, id)
-	if err != nil {
-		return err
-	}
-	if !ok {
-		return ErrStationNotFound
-	}
-	return nil
+	return found(s.store.DeleteWorkExperience(ctx, userID, id))
 }
 
-// MoveWorkExperience moves an entry up or down in sort order.
+// MoveWorkExperience moves an entry one place up or down.
 func (s *Stations) MoveWorkExperience(ctx context.Context, userID, id uuid.UUID, direction string) error {
-	all, err := s.WorkExperiences(ctx, userID)
+	ids, err := s.workIDs(ctx, userID)
 	if err != nil {
 		return err
 	}
-	idx := -1
-	for i, item := range all {
-		if item.ID == id {
-			idx = i
-			break
-		}
+	return s.reorder(ctx, userID, ids, moved(ids, id, direction), s.store.UpdateWorkExperienceOrder)
+}
+
+// ReorderWorkExperiences puts the user's positions in the given order; ids must name each of them exactly once.
+func (s *Stations) ReorderWorkExperiences(ctx context.Context, userID uuid.UUID, ids []uuid.UUID) error {
+	have, err := s.workIDs(ctx, userID)
+	if err != nil {
+		return err
 	}
-	if idx == -1 {
-		return ErrStationNotFound
+	return s.reorder(ctx, userID, have, ids, s.store.UpdateWorkExperienceOrder)
+}
+
+func (s *Stations) workIDs(ctx context.Context, userID uuid.UUID) ([]uuid.UUID, error) {
+	rows, err := s.store.ListWorkExperiences(ctx, userID)
+	ids := make([]uuid.UUID, len(rows))
+	for i, r := range rows {
+		ids[i] = r.ID
 	}
-	target := idx
-	if direction == "up" && idx > 0 {
-		target = idx - 1
-	} else if direction == "down" && idx < len(all)-1 {
-		target = idx + 1
-	}
-	if target == idx {
-		return nil
-	}
-	now := s.now()
-	// swap sort orders
-	_, err1 := s.store.UpdateWorkExperienceOrder(ctx, userID, all[idx].ID, target, now)
-	if err1 != nil {
-		return err1
-	}
-	_, err2 := s.store.UpdateWorkExperienceOrder(ctx, userID, all[target].ID, idx, now)
-	return err2
+	return ids, err
 }
 
 // Educations lists the user's education entries in sort order.
@@ -331,17 +295,11 @@ func (s *Stations) Educations(ctx context.Context, userID uuid.UUID) ([]Educatio
 	}
 	out := make([]EducationStation, 0, len(rows))
 	for _, r := range rows {
-		out = append(out, EducationStation{
-			ID:           r.ID,
-			Institution:  r.Institution,
-			Degree:       r.Degree,
-			FieldOfStudy: r.FieldOfStudy,
-			StartDate:    r.StartDate,
-			EndDate:      r.EndDate,
-			IsCurrent:    r.IsCurrent,
-			Grade:        r.Grade,
-			SortOrder:    r.SortOrder,
-		})
+		e, err := s.education(ctx, userID, r)
+		if err != nil {
+			return nil, err
+		}
+		out = append(out, e)
 	}
 	return out, nil
 }
@@ -349,23 +307,13 @@ func (s *Stations) Educations(ctx context.Context, userID uuid.UUID) ([]Educatio
 // GetEducation returns one education entry by ID.
 func (s *Stations) GetEducation(ctx context.Context, userID, id uuid.UUID) (EducationStation, error) {
 	r, err := s.store.GetEducation(ctx, userID, id)
+	if errors.Is(err, ErrNotFound) {
+		return EducationStation{}, ErrStationNotFound
+	}
 	if err != nil {
-		if errors.Is(err, ErrNotFound) {
-			return EducationStation{}, ErrStationNotFound
-		}
 		return EducationStation{}, err
 	}
-	return EducationStation{
-		ID:           r.ID,
-		Institution:  r.Institution,
-		Degree:       r.Degree,
-		FieldOfStudy: r.FieldOfStudy,
-		StartDate:    r.StartDate,
-		EndDate:      r.EndDate,
-		IsCurrent:    r.IsCurrent,
-		Grade:        r.Grade,
-		SortOrder:    r.SortOrder,
-	}, nil
+	return s.education(ctx, userID, r)
 }
 
 // SaveEducation creates (ID nil) or updates an education station.
@@ -381,139 +329,159 @@ func (s *Stations) SaveEducation(ctx context.Context, userID uuid.UUID, e Educat
 	}
 	insert := e.ID == uuid.Nil
 	if insert {
-		cnt, err := s.store.CountEducations(ctx, userID)
+		id, order, err := s.newEntry(ctx, userID, s.store.CountEducations)
 		if err != nil {
 			return uuid.Nil, err
 		}
-		if cnt >= MaxStations {
-			return uuid.Nil, ErrTooManyStations
-		}
-		id, err := uuid.NewV7()
-		if err != nil {
-			return uuid.Nil, err
-		}
-		e.ID = id
-		e.SortOrder = cnt
+		e.ID, e.SortOrder = id, order
+	}
+	return e.ID, s.writeEducation(ctx, userID, e, insert)
+}
+
+// writeEducation seals e and stores it.
+func (s *Stations) writeEducation(ctx context.Context, userID uuid.UUID, e EducationStation, insert bool) error {
+	sealed, err := s.seal(ctx, userID, educationPurpose(e.ID), e)
+	if err != nil {
+		return err
 	}
 	now := s.now()
-	st := StoredEducation{
-		ID:           e.ID,
-		UserID:       userID,
-		Institution:  e.Institution,
-		Degree:       e.Degree,
-		FieldOfStudy: e.FieldOfStudy,
-		StartDate:    e.StartDate,
-		EndDate:      e.EndDate,
-		IsCurrent:    e.IsCurrent,
-		Grade:        e.Grade,
-		SortOrder:    e.SortOrder,
-		CreatedAt:    now,
-		UpdatedAt:    now,
-	}
+	st := StoredEducation{ID: e.ID, UserID: userID, Sealed: sealed, SortOrder: e.SortOrder, CreatedAt: now, UpdatedAt: now}
 	if insert {
-		if err := s.store.InsertEducation(ctx, st); err != nil {
-			return uuid.Nil, err
-		}
-		return e.ID, nil
+		return s.store.InsertEducation(ctx, st)
 	}
-	ok, err := s.store.UpdateEducation(ctx, st)
-	if err != nil {
-		return uuid.Nil, err
-	}
-	if !ok {
-		return uuid.Nil, ErrStationNotFound
-	}
-	return e.ID, nil
+	return found(s.store.UpdateEducation(ctx, st))
 }
 
 // DeleteEducation removes an education entry.
 func (s *Stations) DeleteEducation(ctx context.Context, userID, id uuid.UUID) error {
-	ok, err := s.store.DeleteEducation(ctx, userID, id)
-	if err != nil {
-		return err
-	}
-	if !ok {
-		return ErrStationNotFound
-	}
-	return nil
+	return found(s.store.DeleteEducation(ctx, userID, id))
 }
 
-// MoveEducation moves an education entry up or down in sort order.
+// MoveEducation moves an education entry one place up or down.
 func (s *Stations) MoveEducation(ctx context.Context, userID, id uuid.UUID, direction string) error {
-	all, err := s.Educations(ctx, userID)
+	ids, err := s.educationIDs(ctx, userID)
 	if err != nil {
 		return err
 	}
-	idx := -1
-	for i, item := range all {
-		if item.ID == id {
-			idx = i
-			break
-		}
-	}
-	if idx == -1 {
-		return ErrStationNotFound
-	}
-	target := idx
-	if direction == "up" && idx > 0 {
-		target = idx - 1
-	} else if direction == "down" && idx < len(all)-1 {
-		target = idx + 1
-	}
-	if target == idx {
-		return nil
-	}
-	now := s.now()
-	_, err1 := s.store.UpdateEducationOrder(ctx, userID, all[idx].ID, target, now)
-	if err1 != nil {
-		return err1
-	}
-	_, err2 := s.store.UpdateEducationOrder(ctx, userID, all[target].ID, idx, now)
-	return err2
-}
-
-// ReorderWorkExperiences puts the user's positions in the given order; ids must name each of them exactly once.
-func (s *Stations) ReorderWorkExperiences(ctx context.Context, userID uuid.UUID, ids []uuid.UUID) error {
-	all, err := s.WorkExperiences(ctx, userID)
-	if err != nil {
-		return err
-	}
-	have := make([]uuid.UUID, len(all))
-	for i, w := range all {
-		have[i] = w.ID
-	}
-	if !sameIDs(have, ids) {
-		return ErrStationNotFound
-	}
-	now := s.now()
-	for i, id := range ids {
-		if _, err := s.store.UpdateWorkExperienceOrder(ctx, userID, id, i, now); err != nil {
-			return err
-		}
-	}
-	return nil
+	return s.reorder(ctx, userID, ids, moved(ids, id, direction), s.store.UpdateEducationOrder)
 }
 
 // ReorderEducations puts the user's degrees in the given order; ids must name each of them exactly once.
 func (s *Stations) ReorderEducations(ctx context.Context, userID uuid.UUID, ids []uuid.UUID) error {
-	all, err := s.Educations(ctx, userID)
+	have, err := s.educationIDs(ctx, userID)
 	if err != nil {
 		return err
 	}
-	have := make([]uuid.UUID, len(all))
-	for i, e := range all {
-		have[i] = e.ID
+	return s.reorder(ctx, userID, have, ids, s.store.UpdateEducationOrder)
+}
+
+func (s *Stations) educationIDs(ctx context.Context, userID uuid.UUID) ([]uuid.UUID, error) {
+	rows, err := s.store.ListEducations(ctx, userID)
+	ids := make([]uuid.UUID, len(rows))
+	for i, r := range rows {
+		ids[i] = r.ID
 	}
-	if !sameIDs(have, ids) {
+	return ids, err
+}
+
+// SealUnsealed seals the rows stored before sealing (#559) and blanks their plain columns; it returns how many it
+// sealed. The worker runs it until none are left. Rows are written as they are, without validation, so an old row
+// that the rules would refuse today still gets sealed.
+func (s *Stations) SealUnsealed(ctx context.Context) (int, error) {
+	users, err := s.store.UnsealedStationUsers(ctx)
+	if err != nil {
+		return 0, err
+	}
+	n := 0
+	for _, userID := range users {
+		works, err := s.store.ListWorkExperiences(ctx, userID)
+		if err != nil {
+			return n, err
+		}
+		for _, r := range works {
+			if r.Sealed != nil {
+				continue
+			}
+			w, err := s.work(ctx, userID, r)
+			if err == nil {
+				err = s.writeWork(ctx, userID, w, false)
+			}
+			if err != nil {
+				return n, fmt.Errorf("seal position %s: %w", r.ID, err)
+			}
+			n++
+		}
+		edus, err := s.store.ListEducations(ctx, userID)
+		if err != nil {
+			return n, err
+		}
+		for _, r := range edus {
+			if r.Sealed != nil {
+				continue
+			}
+			e, err := s.education(ctx, userID, r)
+			if err == nil {
+				err = s.writeEducation(ctx, userID, e, false)
+			}
+			if err != nil {
+				return n, fmt.Errorf("seal degree %s: %w", r.ID, err)
+			}
+			n++
+		}
+	}
+	return n, nil
+}
+
+// newEntry returns the ID and list place of a new entry, or ErrTooManyStations.
+func (s *Stations) newEntry(ctx context.Context, userID uuid.UUID, count func(context.Context, uuid.UUID) (int, error)) (uuid.UUID, int, error) {
+	n, err := count(ctx, userID)
+	if err != nil {
+		return uuid.Nil, 0, err
+	}
+	if n >= MaxStations {
+		return uuid.Nil, 0, ErrTooManyStations
+	}
+	id, err := uuid.NewV7()
+	return id, n, err
+}
+
+// reorder stores want as the order of the entries have (both every ID once) and numbers them from 0.
+func (s *Stations) reorder(ctx context.Context, userID uuid.UUID, have, want []uuid.UUID,
+	update func(context.Context, uuid.UUID, uuid.UUID, int, time.Time) (bool, error)) error {
+	if want == nil || !sameIDs(have, want) {
 		return ErrStationNotFound
 	}
 	now := s.now()
-	for i, id := range ids {
-		if _, err := s.store.UpdateEducationOrder(ctx, userID, id, i, now); err != nil {
+	for i, id := range want {
+		if _, err := update(ctx, userID, id, i, now); err != nil {
 			return err
 		}
 	}
 	return nil
+}
+
+// moved returns ids with id one place up or down (unchanged at the edge), or nil if id is not in ids.
+func moved(ids []uuid.UUID, id uuid.UUID, direction string) []uuid.UUID {
+	i := slices.Index(ids, id)
+	if i < 0 {
+		return nil
+	}
+	out := slices.Clone(ids)
+	switch {
+	case direction == "up" && i > 0:
+		out[i-1], out[i] = out[i], out[i-1]
+	case direction == "down" && i < len(out)-1:
+		out[i+1], out[i] = out[i], out[i+1]
+	}
+	return out
+}
+
+// found turns an update or delete that hit no row into ErrStationNotFound.
+func found(ok bool, err error) error {
+	if err == nil && !ok {
+		return ErrStationNotFound
+	}
+	return err
 }
 
 // sameIDs reports whether b holds exactly the IDs of a, each once, in any order.

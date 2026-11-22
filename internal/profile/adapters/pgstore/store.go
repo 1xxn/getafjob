@@ -30,6 +30,11 @@ func (s *Store) user(ctx context.Context, userID uuid.UUID, fn func(*q.Queries) 
 	return db.InUserTx(ctx, s.pool, userID, func(tx pgx.Tx) error { return fn(q.New(tx)) })
 }
 
+// system runs fn across users; only reviewed maintenance paths use it (sealing old stations).
+func (s *Store) system(ctx context.Context, fn func(*q.Queries) error) error {
+	return db.InSystemTx(ctx, s.pool, func(tx pgx.Tx) error { return fn(q.New(tx)) })
+}
+
 // Load returns the stored profile; an empty Stored if there is none.
 func (s *Store) Load(ctx context.Context, userID uuid.UUID) (st profile.Stored, err error) {
 	err = s.user(ctx, userID, func(qs *q.Queries) error {

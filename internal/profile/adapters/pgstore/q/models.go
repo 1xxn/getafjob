@@ -156,6 +156,7 @@ type Education struct {
 	SortOrder    int32
 	CreatedAt    time.Time
 	UpdatedAt    time.Time
+	Sealed       []byte
 }
 
 type Invitation struct {
@@ -468,4 +469,5 @@ type WorkExperience struct {
 	SortOrder     int32
 	CreatedAt     time.Time
 	UpdatedAt     time.Time
+	Sealed        []byte
 }

@@ -69,10 +69,12 @@ type ItemStore interface {
 	DeleteItem(ctx context.Context, userID uuid.UUID, kind string, id uuid.UUID) (bool, error)
 }
 
-// StoredWorkExperience is a work experience database row with sealed bullet points.
+// StoredWorkExperience is a work experience row. Sealed holds the whole entry; the plain fields and SealedBullets
+// are only set on a row from before sealing (#559) until the worker seals it.
 type StoredWorkExperience struct {
 	ID            uuid.UUID
 	UserID        uuid.UUID
+	Sealed        []byte
 	Company       string
 	Title         string
 	Location      string
@@ -86,10 +88,12 @@ type StoredWorkExperience struct {
 	UpdatedAt     time.Time
 }
 
-// StoredEducation is an education database row.
+// StoredEducation is an education row; Sealed holds the whole entry, the plain fields only a row from before
+// sealing.
 type StoredEducation struct {
 	ID           uuid.UUID
 	UserID       uuid.UUID
+	Sealed       []byte
 	Institution  string
 	Degree       string
 	FieldOfStudy string
@@ -119,4 +123,6 @@ type StationStore interface {
 	UpdateEducationOrder(ctx context.Context, userID, id uuid.UUID, sortOrder int, updatedAt time.Time) (bool, error)
 	DeleteEducation(ctx context.Context, userID, id uuid.UUID) (bool, error)
 	CountEducations(ctx context.Context, userID uuid.UUID) (int, error)
+	// UnsealedStationUsers lists the users with rows from before sealing (system context).
+	UnsealedStationUsers(ctx context.Context) ([]uuid.UUID, error)
 }

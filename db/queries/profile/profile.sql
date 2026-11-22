@@ -58,24 +58,26 @@ SELECT p.preferences FROM profiles p JOIN users u ON u.id = p.user_id
 WHERE u.disabled_at IS NULL AND p.preferences IS NOT NULL ORDER BY p.user_id;
 
 -- name: ListWorkExperiences :many
-SELECT id, user_id, company, title, location, workplace_type, start_date, end_date, is_current, sealed_bullets, sort_order, created_at, updated_at
+SELECT id, user_id, company, title, location, workplace_type, start_date, end_date, is_current, sealed_bullets, sort_order, created_at, updated_at, sealed
 FROM work_experiences
 WHERE user_id = $1
 ORDER BY sort_order ASC, created_at ASC;
 
 -- name: GetWorkExperience :one
-SELECT id, user_id, company, title, location, workplace_type, start_date, end_date, is_current, sealed_bullets, sort_order, created_at, updated_at
+SELECT id, user_id, company, title, location, workplace_type, start_date, end_date, is_current, sealed_bullets, sort_order, created_at, updated_at, sealed
 FROM work_experiences
 WHERE id = $1 AND user_id = $2;
 
 -- name: InsertWorkExperience :exec
-INSERT INTO work_experiences (id, user_id, company, title, location, workplace_type, start_date, end_date, is_current, sealed_bullets, sort_order, created_at, updated_at)
-VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13);
+INSERT INTO work_experiences (id, user_id, sealed, sort_order, created_at, updated_at)
+VALUES ($1, $2, $3, $4, $5, $6);
 
 -- name: UpdateWorkExperience :execrows
--- Keeps sort_order: only UpdateWorkExperienceOrder moves an entry.
+-- Writes the sealed record and blanks the plain columns of a row from before sealing; keeps sort_order (only
+-- UpdateWorkExperienceOrder moves an entry).
 UPDATE work_experiences
-SET company = $3, title = $4, location = $5, workplace_type = $6, start_date = $7, end_date = $8, is_current = $9, sealed_bullets = $10, updated_at = $11
+SET sealed = $3, updated_at = $4, company = '', title = '', location = '', workplace_type = '', start_date = '',
+  end_date = '', is_current = false, sealed_bullets = NULL
 WHERE id = $1 AND user_id = $2;
 
 -- name: UpdateWorkExperienceOrder :execrows
@@ -91,24 +93,26 @@ WHERE id = $1 AND user_id = $2;
 SELECT count(*) FROM work_experiences WHERE user_id = $1;
 
 -- name: ListEducations :many
-SELECT id, user_id, institution, degree, field_of_study, start_date, end_date, is_current, grade, sort_order, created_at, updated_at
+SELECT id, user_id, institution, degree, field_of_study, start_date, end_date, is_current, grade, sort_order, created_at, updated_at, sealed
 FROM educations
 WHERE user_id = $1
 ORDER BY sort_order ASC, created_at ASC;
 
 -- name: GetEducation :one
-SELECT id, user_id, institution, degree, field_of_study, start_date, end_date, is_current, grade, sort_order, created_at, updated_at
+SELECT id, user_id, institution, degree, field_of_study, start_date, end_date, is_current, grade, sort_order, created_at, updated_at, sealed
 FROM educations
 WHERE id = $1 AND user_id = $2;
 
 -- name: InsertEducation :exec
-INSERT INTO educations (id, user_id, institution, degree, field_of_study, start_date, end_date, is_current, grade, sort_order, created_at, updated_at)
-VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12);
+INSERT INTO educations (id, user_id, sealed, sort_order, created_at, updated_at)
+VALUES ($1, $2, $3, $4, $5, $6);
 
 -- name: UpdateEducation :execrows
--- Keeps sort_order: only UpdateEducationOrder moves an entry.
+-- Writes the sealed record and blanks the plain columns of a row from before sealing; keeps sort_order (only
+-- UpdateEducationOrder moves an entry).
 UPDATE educations
-SET institution = $3, degree = $4, field_of_study = $5, start_date = $6, end_date = $7, is_current = $8, grade = $9, updated_at = $10
+SET sealed = $3, updated_at = $4, institution = '', degree = '', field_of_study = '', start_date = '', end_date = '',
+  is_current = false, grade = ''
 WHERE id = $1 AND user_id = $2;
 
 -- name: UpdateEducationOrder :execrows
@@ -119,6 +123,12 @@ WHERE id = $1 AND user_id = $2;
 -- name: DeleteEducation :execrows
 DELETE FROM educations
 WHERE id = $1 AND user_id = $2;
+
+-- name: UnsealedStationUsers :many
+-- Users with positions or degrees from before sealing (system context, for the worker).
+SELECT user_id FROM work_experiences WHERE sealed IS NULL
+UNION
+SELECT user_id FROM educations WHERE sealed IS NULL;
 
 -- name: CountEducations :one
 SELECT count(*) FROM educations WHERE user_id = $1;
