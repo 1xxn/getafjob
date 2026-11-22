@@ -53,6 +53,9 @@ func TestNoFormReason(t *testing.T) {
 		"external: www.arbeitsagentur.de shows the posting but no application form; apply there or mark it as applied" {
 		t.Errorf("portal: %q", r)
 	}
+	if r := noFormReason("https://acme.example/careers/1", engine.ErrEmailApply); r != "external: apply by email on acme.example" {
+		t.Errorf("email: %q", r)
+	}
 	if r := noFormReason("https://acme.example/careers/1", engine.ErrNoForm); r != "no application form found on acme.example" {
 		t.Errorf("other: %q", r)
 	}
