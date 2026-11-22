@@ -223,7 +223,7 @@ func (q *Queries) GetDocument(ctx context.Context, arg GetDocumentParams) (GetDo
 }
 
 const getEducation = `-- name: GetEducation :one
-SELECT id, user_id, institution, degree, field_of_study, start_date, end_date, is_current, grade, sort_order, created_at, updated_at
+SELECT id, user_id, institution, degree, field_of_study, start_date, end_date, is_current, grade, sort_order, created_at, updated_at, sealed
 FROM educations
 WHERE id = $1 AND user_id = $2
 `
@@ -249,12 +249,13 @@ func (q *Queries) GetEducation(ctx context.Context, arg GetEducationParams) (Edu
 		&i.SortOrder,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.Sealed,
 	)
 	return i, err
 }
 
 const getWorkExperience = `-- name: GetWorkExperience :one
-SELECT id, user_id, company, title, location, workplace_type, start_date, end_date, is_current, sealed_bullets, sort_order, created_at, updated_at
+SELECT id, user_id, company, title, location, workplace_type, start_date, end_date, is_current, sealed_bullets, sort_order, created_at, updated_at, sealed
 FROM work_experiences
 WHERE id = $1 AND user_id = $2
 `
@@ -281,6 +282,7 @@ func (q *Queries) GetWorkExperience(ctx context.Context, arg GetWorkExperiencePa
 		&i.SortOrder,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.Sealed,
 	)
 	return i, err
 }
@@ -320,36 +322,24 @@ func (q *Queries) InsertDocument(ctx context.Context, arg InsertDocumentParams) 
 }
 
 const insertEducation = `-- name: InsertEducation :exec
-INSERT INTO educations (id, user_id, institution, degree, field_of_study, start_date, end_date, is_current, grade, sort_order, created_at, updated_at)
-VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
+INSERT INTO educations (id, user_id, sealed, sort_order, created_at, updated_at)
+VALUES ($1, $2, $3, $4, $5, $6)
 `
 
 type InsertEducationParams struct {
-	ID           uuid.UUID
-	UserID       uuid.UUID
-	Institution  string
-	Degree       string
-	FieldOfStudy string
-	StartDate    string
-	EndDate      string
-	IsCurrent    bool
-	Grade        string
-	SortOrder    int32
-	CreatedAt    time.Time
-	UpdatedAt    time.Time
+	ID        uuid.UUID
+	UserID    uuid.UUID
+	Sealed    []byte
+	SortOrder int32
+	CreatedAt time.Time
+	UpdatedAt time.Time
 }
 
 func (q *Queries) InsertEducation(ctx context.Context, arg InsertEducationParams) error {
 	_, err := q.db.Exec(ctx, insertEducation,
 		arg.ID,
 		arg.UserID,
-		arg.Institution,
-		arg.Degree,
-		arg.FieldOfStudy,
-		arg.StartDate,
-		arg.EndDate,
-		arg.IsCurrent,
-		arg.Grade,
+		arg.Sealed,
 		arg.SortOrder,
 		arg.CreatedAt,
 		arg.UpdatedAt,
@@ -381,38 +371,24 @@ func (q *Queries) InsertItem(ctx context.Context, arg InsertItemParams) error {
 }
 
 const insertWorkExperience = `-- name: InsertWorkExperience :exec
-INSERT INTO work_experiences (id, user_id, company, title, location, workplace_type, start_date, end_date, is_current, sealed_bullets, sort_order, created_at, updated_at)
-VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)
+INSERT INTO work_experiences (id, user_id, sealed, sort_order, created_at, updated_at)
+VALUES ($1, $2, $3, $4, $5, $6)
 `
 
 type InsertWorkExperienceParams struct {
-	ID            uuid.UUID
-	UserID        uuid.UUID
-	Company       string
-	Title         string
-	Location      string
-	WorkplaceType string
-	StartDate     string
-	EndDate       string
-	IsCurrent     bool
-	SealedBullets []byte
-	SortOrder     int32
-	CreatedAt     time.Time
-	UpdatedAt     time.Time
+	ID        uuid.UUID
+	UserID    uuid.UUID
+	Sealed    []byte
+	SortOrder int32
+	CreatedAt time.Time
+	UpdatedAt time.Time
 }
 
 func (q *Queries) InsertWorkExperience(ctx context.Context, arg InsertWorkExperienceParams) error {
 	_, err := q.db.Exec(ctx, insertWorkExperience,
 		arg.ID,
 		arg.UserID,
-		arg.Company,
-		arg.Title,
-		arg.Location,
-		arg.WorkplaceType,
-		arg.StartDate,
-		arg.EndDate,
-		arg.IsCurrent,
-		arg.SealedBullets,
+		arg.Sealed,
 		arg.SortOrder,
 		arg.CreatedAt,
 		arg.UpdatedAt,
@@ -468,7 +444,7 @@ func (q *Queries) ListDocuments(ctx context.Context, userID uuid.UUID) ([]ListDo
 }
 
 const listEducations = `-- name: ListEducations :many
-SELECT id, user_id, institution, degree, field_of_study, start_date, end_date, is_current, grade, sort_order, created_at, updated_at
+SELECT id, user_id, institution, degree, field_of_study, start_date, end_date, is_current, grade, sort_order, created_at, updated_at, sealed
 FROM educations
 WHERE user_id = $1
 ORDER BY sort_order ASC, created_at ASC
@@ -496,6 +472,7 @@ func (q *Queries) ListEducations(ctx context.Context, userID uuid.UUID) ([]Educa
 			&i.SortOrder,
 			&i.CreatedAt,
 			&i.UpdatedAt,
+			&i.Sealed,
 		); err != nil {
 			return nil, err
 		}
@@ -543,7 +520,7 @@ func (q *Queries) ListItems(ctx context.Context, arg ListItemsParams) ([]ListIte
 }
 
 const listWorkExperiences = `-- name: ListWorkExperiences :many
-SELECT id, user_id, company, title, location, workplace_type, start_date, end_date, is_current, sealed_bullets, sort_order, created_at, updated_at
+SELECT id, user_id, company, title, location, workplace_type, start_date, end_date, is_current, sealed_bullets, sort_order, created_at, updated_at, sealed
 FROM work_experiences
 WHERE user_id = $1
 ORDER BY sort_order ASC, created_at ASC
@@ -572,6 +549,7 @@ func (q *Queries) ListWorkExperiences(ctx context.Context, userID uuid.UUID) ([]
 			&i.SortOrder,
 			&i.CreatedAt,
 			&i.UpdatedAt,
+			&i.Sealed,
 		); err != nil {
 			return nil, err
 		}
@@ -650,37 +628,54 @@ func (q *Queries) SaveProfile(ctx context.Context, arg SaveProfileParams) (int64
 	return result.RowsAffected(), nil
 }
 
+const unsealedStationUsers = `-- name: UnsealedStationUsers :many
+SELECT user_id FROM work_experiences WHERE sealed IS NULL
+UNION
+SELECT user_id FROM educations WHERE sealed IS NULL
+`
+
+// Users with positions or degrees from before sealing (system context, for the worker).
+func (q *Queries) UnsealedStationUsers(ctx context.Context) ([]uuid.UUID, error) {
+	rows, err := q.db.Query(ctx, unsealedStationUsers)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []uuid.UUID{}
+	for rows.Next() {
+		var user_id uuid.UUID
+		if err := rows.Scan(&user_id); err != nil {
+			return nil, err
+		}
+		items = append(items, user_id)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const updateEducation = `-- name: UpdateEducation :execrows
 UPDATE educations
-SET institution = $3, degree = $4, field_of_study = $5, start_date = $6, end_date = $7, is_current = $8, grade = $9, updated_at = $10
+SET sealed = $3, updated_at = $4, institution = '', degree = '', field_of_study = '', start_date = '', end_date = '',
+  is_current = false, grade = ''
 WHERE id = $1 AND user_id = $2
 `
 
 type UpdateEducationParams struct {
-	ID           uuid.UUID
-	UserID       uuid.UUID
-	Institution  string
-	Degree       string
-	FieldOfStudy string
-	StartDate    string
-	EndDate      string
-	IsCurrent    bool
-	Grade        string
-	UpdatedAt    time.Time
+	ID        uuid.UUID
+	UserID    uuid.UUID
+	Sealed    []byte
+	UpdatedAt time.Time
 }
 
-// Keeps sort_order: only UpdateEducationOrder moves an entry.
+// Writes the sealed record and blanks the plain columns of a row from before sealing; keeps sort_order (only
+// UpdateEducationOrder moves an entry).
 func (q *Queries) UpdateEducation(ctx context.Context, arg UpdateEducationParams) (int64, error) {
 	result, err := q.db.Exec(ctx, updateEducation,
 		arg.ID,
 		arg.UserID,
-		arg.Institution,
-		arg.Degree,
-		arg.FieldOfStudy,
-		arg.StartDate,
-		arg.EndDate,
-		arg.IsCurrent,
-		arg.Grade,
+		arg.Sealed,
 		arg.UpdatedAt,
 	)
 	if err != nil {
@@ -769,37 +764,25 @@ func (q *Queries) UpdateVariant(ctx context.Context, arg UpdateVariantParams) (i
 
 const updateWorkExperience = `-- name: UpdateWorkExperience :execrows
 UPDATE work_experiences
-SET company = $3, title = $4, location = $5, workplace_type = $6, start_date = $7, end_date = $8, is_current = $9, sealed_bullets = $10, updated_at = $11
+SET sealed = $3, updated_at = $4, company = '', title = '', location = '', workplace_type = '', start_date = '',
+  end_date = '', is_current = false, sealed_bullets = NULL
 WHERE id = $1 AND user_id = $2
 `
 
 type UpdateWorkExperienceParams struct {
-	ID            uuid.UUID
-	UserID        uuid.UUID
-	Company       string
-	Title         string
-	Location      string
-	WorkplaceType string
-	StartDate     string
-	EndDate       string
-	IsCurrent     bool
-	SealedBullets []byte
-	UpdatedAt     time.Time
+	ID        uuid.UUID
+	UserID    uuid.UUID
+	Sealed    []byte
+	UpdatedAt time.Time
 }
 
-// Keeps sort_order: only UpdateWorkExperienceOrder moves an entry.
+// Writes the sealed record and blanks the plain columns of a row from before sealing; keeps sort_order (only
+// UpdateWorkExperienceOrder moves an entry).
 func (q *Queries) UpdateWorkExperience(ctx context.Context, arg UpdateWorkExperienceParams) (int64, error) {
 	result, err := q.db.Exec(ctx, updateWorkExperience,
 		arg.ID,
 		arg.UserID,
-		arg.Company,
-		arg.Title,
-		arg.Location,
-		arg.WorkplaceType,
-		arg.StartDate,
-		arg.EndDate,
-		arg.IsCurrent,
-		arg.SealedBullets,
+		arg.Sealed,
 		arg.UpdatedAt,
 	)
 	if err != nil {

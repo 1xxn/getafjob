@@ -236,7 +236,7 @@ func worker(ctx context.Context, cfg config.Config, logger *slog.Logger) error {
 	docs := profile.NewDocuments(pstore, sealed, env)
 	items := profile.NewItems(pstore, env)
 	privacySvc := privacy.NewService(ids, profile.NewService(pstore, env), items, docs, apps, nil, env, sealed)
-	river.AddWorker(workers, &cleanupWorker{privacy: privacySvc})
+	river.AddWorker(workers, &cleanupWorker{privacy: privacySvc, stations: profile.NewStations(pstore, env), logger: logger})
 	river.AddWorker(workers, &recoverWorker{svc: apps, logger: logger})
 	notifySvc, _, _ := newNotifyService(pool, cfg, logger)
 	appNotifier := newNotifyAppNotifier(notifySvc, cfg.TimeZone)

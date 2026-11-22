@@ -48,15 +48,16 @@ func TestStationsPostgres(t *testing.T) {
 		t.Fatalf("unexpected work experience: %+v", works[0])
 	}
 
-	// Verify sealed at rest in DB
-	var rawBullets []byte
+	// Sealed at rest: no plain column holds the entry.
+	var sealed []byte
+	var company, title string
 	if err := db.InSystemTx(ctx, pool, func(tx pgx.Tx) error {
-		return tx.QueryRow(ctx, "SELECT sealed_bullets FROM work_experiences WHERE id = $1", wid).Scan(&rawBullets)
+		return tx.QueryRow(ctx, "SELECT sealed, company, title FROM work_experiences WHERE id = $1", wid).Scan(&sealed, &company, &title)
 	}); err != nil {
-		t.Fatalf("read raw bullets: %v", err)
+		t.Fatalf("read raw row: %v", err)
 	}
-	if len(rawBullets) == 0 || bytes.Contains(rawBullets, []byte("streaming pipeline")) {
-		t.Fatalf("bullets not sealed at rest: %q", string(rawBullets))
+	if len(sealed) == 0 || company != "" || title != "" || bytes.Contains(sealed, []byte("Muster Corp")) {
+		t.Fatalf("entry not sealed at rest: company %q, title %q", company, title)
 	}
 
 	// 2. Tenant isolation on work experiences (Erika cannot see or delete Max's entry)
@@ -144,5 +145,65 @@ func TestStationEditKeepsOrder(t *testing.T) {
 	el, err := stations.Educations(ctx, max)
 	if err != nil || len(el) != 2 || el[1].ID != edus[1] {
 		t.Fatalf("education order after edit: %+v, %v", el, err)
+	}
+}
+
+// TestSealUnsealedStations: rows from before sealing (#559) read as before, and the worker seals them and blanks
+// their plain columns.
+func TestSealUnsealedStations(t *testing.T) {
+	if testing.Short() {
+		t.Skip("skipping postgres integration test in short mode")
+	}
+	pool := dbtest.AppPool(t)
+	ctx := t.Context()
+	sl := sealer(t, pool)
+	stations := profile.NewStations(pgstore.New(pool), sl)
+	max := user(t, pool, "max.legacy@example.org")
+
+	wid, eid := uuid.Must(uuid.NewV7()), uuid.Must(uuid.NewV7())
+	bullets, err := sl.Seal(ctx, max, "station:work:"+wid.String(), []byte(`["Ran the platform team"]`))
+	if err != nil {
+		t.Fatal(err)
+	}
+	err = db.InSystemTx(ctx, pool, func(tx pgx.Tx) error {
+		if _, err := tx.Exec(ctx, `INSERT INTO work_experiences (id, user_id, company, title, start_date, sealed_bullets, sort_order, created_at, updated_at)
+			VALUES ($1, $2, 'Muster AG', 'Lead', '2020-01', $3, 0, now(), now())`, wid, max, bullets); err != nil {
+			return err
+		}
+		_, err := tx.Exec(ctx, `INSERT INTO educations (id, user_id, institution, degree, grade, sort_order, created_at, updated_at)
+			VALUES ($1, $2, 'TU Musterstadt', 'M.Sc.', '1.3', 0, now(), now())`, eid, max)
+		return err
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	check := func(when string) {
+		t.Helper()
+		works, err := stations.WorkExperiences(ctx, max)
+		if err != nil || len(works) != 1 || works[0].Company != "Muster AG" || works[0].StartDate != "2020-01" ||
+			len(works[0].DescriptionBullets) != 1 {
+			t.Fatalf("%s: positions %+v, %v", when, works, err)
+		}
+		edus, err := stations.Educations(ctx, max)
+		if err != nil || len(edus) != 1 || edus[0].Institution != "TU Musterstadt" || edus[0].Grade != "1.3" {
+			t.Fatalf("%s: degrees %+v, %v", when, edus, err)
+		}
+	}
+	check("before sealing")
+	if n, err := stations.SealUnsealed(ctx); err != nil || n != 2 {
+		t.Fatalf("sealed %d, %v", n, err)
+	}
+	check("after sealing")
+	var plain string
+	err = db.InSystemTx(ctx, pool, func(tx pgx.Tx) error {
+		return tx.QueryRow(ctx, `SELECT w.company || w.title || w.start_date || coalesce(encode(w.sealed_bullets, 'hex'), '') ||
+			e.institution || e.degree || e.grade FROM work_experiences w, educations e WHERE w.id = $1 AND e.id = $2
+			AND w.sealed IS NOT NULL AND e.sealed IS NOT NULL`, wid, eid).Scan(&plain)
+	})
+	if err != nil || plain != "" {
+		t.Fatalf("plain columns left: %q, %v", plain, err)
+	}
+	if n, err := stations.SealUnsealed(ctx); err != nil || n != 0 {
+		t.Fatalf("second run sealed %d, %v", n, err)
 	}
 }

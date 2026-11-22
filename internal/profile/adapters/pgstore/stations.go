@@ -26,6 +26,7 @@ func toStoredWorkExperience(r q.WorkExperience) profile.StoredWorkExperience {
 		EndDate:       r.EndDate,
 		IsCurrent:     r.IsCurrent,
 		SealedBullets: r.SealedBullets,
+		Sealed:        r.Sealed,
 		SortOrder:     int(r.SortOrder),
 		CreatedAt:     r.CreatedAt,
 		UpdatedAt:     r.UpdatedAt,
@@ -43,6 +44,7 @@ func toStoredEducation(r q.Education) profile.StoredEducation {
 		EndDate:      r.EndDate,
 		IsCurrent:    r.IsCurrent,
 		Grade:        r.Grade,
+		Sealed:       r.Sealed,
 		SortOrder:    int(r.SortOrder),
 		CreatedAt:    r.CreatedAt,
 		UpdatedAt:    r.UpdatedAt,
@@ -77,40 +79,14 @@ func (s *Store) GetWorkExperience(ctx context.Context, userID, id uuid.UUID) (w 
 
 func (s *Store) InsertWorkExperience(ctx context.Context, w profile.StoredWorkExperience) error {
 	return s.user(ctx, w.UserID, func(qs *q.Queries) error {
-		return qs.InsertWorkExperience(ctx, q.InsertWorkExperienceParams{
-			ID:            w.ID,
-			UserID:        w.UserID,
-			Company:       w.Company,
-			Title:         w.Title,
-			Location:      w.Location,
-			WorkplaceType: w.WorkplaceType,
-			StartDate:     w.StartDate,
-			EndDate:       w.EndDate,
-			IsCurrent:     w.IsCurrent,
-			SealedBullets: w.SealedBullets,
-			SortOrder:     int32(w.SortOrder), //nolint:gosec // bounded by MaxStations
-			CreatedAt:     w.CreatedAt,
-			UpdatedAt:     w.UpdatedAt,
-		})
+		return qs.InsertWorkExperience(ctx, q.InsertWorkExperienceParams{ID: w.ID, UserID: w.UserID, Sealed: w.Sealed,
+			SortOrder: int32(w.SortOrder), CreatedAt: w.CreatedAt, UpdatedAt: w.UpdatedAt}) //nolint:gosec // bounded by MaxStations
 	})
 }
 
-func (s *Store) UpdateWorkExperience(ctx context.Context, w profile.StoredWorkExperience) (bool, error) {
-	var ok bool
-	err := s.user(ctx, w.UserID, func(qs *q.Queries) error {
-		n, err := qs.UpdateWorkExperience(ctx, q.UpdateWorkExperienceParams{
-			ID:            w.ID,
-			UserID:        w.UserID,
-			Company:       w.Company,
-			Title:         w.Title,
-			Location:      w.Location,
-			WorkplaceType: w.WorkplaceType,
-			StartDate:     w.StartDate,
-			EndDate:       w.EndDate,
-			IsCurrent:     w.IsCurrent,
-			SealedBullets: w.SealedBullets,
-			UpdatedAt:     w.UpdatedAt,
-		})
+func (s *Store) UpdateWorkExperience(ctx context.Context, w profile.StoredWorkExperience) (ok bool, err error) {
+	err = s.user(ctx, w.UserID, func(qs *q.Queries) error {
+		n, err := qs.UpdateWorkExperience(ctx, q.UpdateWorkExperienceParams{ID: w.ID, UserID: w.UserID, Sealed: w.Sealed, UpdatedAt: w.UpdatedAt})
 		ok = n == 1
 		return err
 	})
@@ -179,38 +155,14 @@ func (s *Store) GetEducation(ctx context.Context, userID, id uuid.UUID) (e profi
 
 func (s *Store) InsertEducation(ctx context.Context, e profile.StoredEducation) error {
 	return s.user(ctx, e.UserID, func(qs *q.Queries) error {
-		return qs.InsertEducation(ctx, q.InsertEducationParams{
-			ID:           e.ID,
-			UserID:       e.UserID,
-			Institution:  e.Institution,
-			Degree:       e.Degree,
-			FieldOfStudy: e.FieldOfStudy,
-			StartDate:    e.StartDate,
-			EndDate:      e.EndDate,
-			IsCurrent:    e.IsCurrent,
-			Grade:        e.Grade,
-			SortOrder:    int32(e.SortOrder), //nolint:gosec // bounded by MaxStations
-			CreatedAt:    e.CreatedAt,
-			UpdatedAt:    e.UpdatedAt,
-		})
+		return qs.InsertEducation(ctx, q.InsertEducationParams{ID: e.ID, UserID: e.UserID, Sealed: e.Sealed,
+			SortOrder: int32(e.SortOrder), CreatedAt: e.CreatedAt, UpdatedAt: e.UpdatedAt}) //nolint:gosec // bounded by MaxStations
 	})
 }
 
-func (s *Store) UpdateEducation(ctx context.Context, e profile.StoredEducation) (bool, error) {
-	var ok bool
-	err := s.user(ctx, e.UserID, func(qs *q.Queries) error {
-		n, err := qs.UpdateEducation(ctx, q.UpdateEducationParams{
-			ID:           e.ID,
-			UserID:       e.UserID,
-			Institution:  e.Institution,
-			Degree:       e.Degree,
-			FieldOfStudy: e.FieldOfStudy,
-			StartDate:    e.StartDate,
-			EndDate:      e.EndDate,
-			IsCurrent:    e.IsCurrent,
-			Grade:        e.Grade,
-			UpdatedAt:    e.UpdatedAt,
-		})
+func (s *Store) UpdateEducation(ctx context.Context, e profile.StoredEducation) (ok bool, err error) {
+	err = s.user(ctx, e.UserID, func(qs *q.Queries) error {
+		n, err := qs.UpdateEducation(ctx, q.UpdateEducationParams{ID: e.ID, UserID: e.UserID, Sealed: e.Sealed, UpdatedAt: e.UpdatedAt})
 		ok = n == 1
 		return err
 	})
@@ -249,4 +201,13 @@ func (s *Store) CountEducations(ctx context.Context, userID uuid.UUID) (n int, e
 		return err
 	})
 	return n, err
+}
+
+// UnsealedStationUsers lists the users with positions or degrees from before sealing.
+func (s *Store) UnsealedStationUsers(ctx context.Context) (ids []uuid.UUID, err error) {
+	err = s.system(ctx, func(qs *q.Queries) error {
+		ids, err = qs.UnsealedStationUsers(ctx)
+		return err
+	})
+	return ids, err
 }

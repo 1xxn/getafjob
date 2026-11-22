@@ -22,6 +22,7 @@ import (
 	"github.com/1xxn/getafjob/internal/platform/netguard"
 	"github.com/1xxn/getafjob/internal/platform/queue"
 	"github.com/1xxn/getafjob/internal/privacy"
+	"github.com/1xxn/getafjob/internal/profile"
 )
 
 // CrawlArgs starts a crawl of all sources. Manual crawls (admin crawl) are unique apart from scheduled ones, so one
@@ -221,7 +222,8 @@ func sourceClient(cfg config.Config) *sources.Client {
 	return sources.NewClient(hc)
 }
 
-// CleanupArgs removes expired sign-in tokens, sessions, invitations, and screenshots past retention.
+// CleanupArgs removes expired sign-in tokens, sessions, invitations, and screenshots past retention, and seals
+// career stations stored before sealing (#559).
 type CleanupArgs struct{}
 
 // Kind implements river.JobArgs.
@@ -229,10 +231,22 @@ func (CleanupArgs) Kind() string { return "identity_cleanup" }
 
 type cleanupWorker struct {
 	river.WorkerDefaults[CleanupArgs]
-	privacy *privacy.Service
+	privacy  *privacy.Service
+	stations *profile.Stations
+	logger   *slog.Logger
 }
 
 func (w *cleanupWorker) Work(ctx context.Context, _ *river.Job[CleanupArgs]) error {
+	if w.stations != nil {
+		// A row that cannot be sealed must not hold up the cleanup; it is logged and tried again next time.
+		n, err := w.stations.SealUnsealed(ctx)
+		if n > 0 {
+			w.logger.InfoContext(ctx, "sealed career stations", "count", n)
+		}
+		if err != nil {
+			w.logger.ErrorContext(ctx, "sealing career stations failed", "err", err)
+		}
+	}
 	if w.privacy != nil {
 		return w.privacy.Cleanup(ctx)
 	}

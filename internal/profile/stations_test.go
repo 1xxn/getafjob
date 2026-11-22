@@ -1,6 +1,7 @@
 package profile
 
 import (
+	"bytes"
 	"context"
 	"errors"
 	"slices"
@@ -149,6 +150,25 @@ func (m *memoryStationStore) CountEducations(ctx context.Context, userID uuid.UU
 	return cnt, nil
 }
 
+func (m *memoryStationStore) UnsealedStationUsers(context.Context) ([]uuid.UUID, error) {
+	return nil, nil
+}
+
+// plainSealer "seals" by prefixing the purpose, so a wrong purpose fails to open like the real one.
+type plainSealer struct{}
+
+func (plainSealer) Seal(_ context.Context, _ uuid.UUID, purpose string, plain []byte) ([]byte, error) {
+	return append([]byte(purpose+"|"), plain...), nil
+}
+
+func (plainSealer) Open(_ context.Context, _ uuid.UUID, purpose string, sealed []byte) ([]byte, error) {
+	rest, ok := bytes.CutPrefix(sealed, []byte(purpose+"|"))
+	if !ok {
+		return nil, errors.New("wrong purpose")
+	}
+	return rest, nil
+}
+
 func TestStationsValidation(t *testing.T) {
 	// Work experience validation
 	badWork := WorkExperience{WorkplaceType: "invalid_type"}
@@ -192,7 +212,7 @@ func TestStationsValidation(t *testing.T) {
 func TestStationsCRUDAndOrdering(t *testing.T) {
 	ctx := context.Background()
 	store := &memoryStationStore{}
-	svc := NewStations(store, nil)
+	svc := NewStations(store, plainSealer{})
 	user := uuid.New()
 
 	// 1. Create work experience
