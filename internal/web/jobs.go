@@ -559,6 +559,7 @@ func jobRow(ctx context.Context, it matching.Item, now time.Time) views.JobRow {
 		Workplace: it.Workplace,
 		Salary:    formatSalary(ctx, it.SalaryMin, it.SalaryMax, it.SalaryCurrency),
 		Source:    it.Source,
+		ApplyMode: string(applymode.Of(it.URL, it.ApplyURL)),
 		Blocked:   it.Blocked,
 		Age:       age,
 		Score:     it.Score,

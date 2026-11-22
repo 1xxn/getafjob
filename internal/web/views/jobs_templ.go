@@ -20,6 +20,7 @@ type JobRow struct {
 	Workplace string // remote, hybrid, onsite or empty
 	Salary    string // formatted string, e.g. "€75,000 – €90,000" or ""
 	Source    string // ATS platform (greenhouse, lever, ashby, workday, personio, etc.)
+	ApplyMode string // form, portal or email
 	Blocked   bool
 	Age       int // days since posted or first seen, -1: unknown
 	Score     int
