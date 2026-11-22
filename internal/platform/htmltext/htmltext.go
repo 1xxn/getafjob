@@ -40,11 +40,24 @@ func Text(raw string) string {
 	z := xhtml.NewTokenizer(strings.NewReader(raw))
 	var b strings.Builder
 	skip := 0
+	openTag := false
+	writeStr := func(s string) {
+		b.WriteString(s)
+		for i := 0; i < len(s); i++ {
+			switch s[i] {
+			case '<':
+				openTag = true
+			case '>', ' ', '\t', '\n':
+				openTag = false
+			}
+		}
+	}
 	for {
 		tt := z.Next()
-		// A dropped tag must not join a "<" before it with the text after it into a new tag ("<<a>script").
-		if tt != xhtml.TextToken && tt != xhtml.ErrorToken && strings.HasSuffix(b.String(), "<") {
+		// A dropped tag must not join an open "<..." before it with the text after it into a new tag ("<<a>script", "&ltscrip<A>t").
+		if tt != xhtml.TextToken && tt != xhtml.ErrorToken && openTag {
 			b.WriteByte(' ')
+			openTag = false
 		}
 		switch tt {
 		case xhtml.ErrorToken:
@@ -63,9 +76,9 @@ func Text(raw string) string {
 					skip++
 				}
 			case tag == "li":
-				b.WriteString("\n• ")
+				writeStr("\n• ")
 			case block[tag]:
-				b.WriteString("\n")
+				writeStr("\n")
 			}
 		case xhtml.EndTagToken:
 			name, _ := z.TagName()
@@ -75,11 +88,20 @@ func Text(raw string) string {
 					skip--
 				}
 			case block[tag] || tag == "li":
-				b.WriteString("\n")
+				writeStr("\n")
 			}
 		case xhtml.TextToken:
 			if skip == 0 {
-				b.Write(z.Text())
+				txt := z.Text()
+				b.Write(txt)
+				for _, c := range txt {
+					switch c {
+					case '<':
+						openTag = true
+					case '>', ' ', '\t', '\n':
+						openTag = false
+					}
+				}
 			}
 		case xhtml.CommentToken, xhtml.DoctypeToken:
 		}

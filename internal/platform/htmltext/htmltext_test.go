@@ -22,6 +22,9 @@ func TestText(t *testing.T) {
 		"&#60;script&#62;x&#60;/script&#62;Shown": "Shown",
 		"&LT;b&GT;Bold&LT;/b&GT;":                 "Bold",
 		"<div>   lots   of\t\tspace   </div>":     "lots of space",
+		"&ltscrip<A>t":                            "<scrip t",
+		"&lt;sc<b>ript":                           "<sc ript",
+		"&lt;s<script>x</script>cript":            "<s cript",
 	}
 	for in, want := range cases {
 		if got := Text(in); got != want {
