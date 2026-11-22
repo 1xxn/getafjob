@@ -110,6 +110,7 @@
   "jobs.blocklist_title": "Employer & keyword blocklist",
   "jobs.board_add_button": "Add site",
   "jobs.board_add_error": "Could not detect a supported job board at this URL.",
+  "jobs.board_add_error.invalid": "This is not a public web address. Paste the full link of the careers page, starting with https://.",
   "jobs.board_add_success": "Career site added: {company} ({ats})",
   "jobs.board_add_title": "Add career site",
   "jobs.closed": "This posting is closed.",

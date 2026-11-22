@@ -705,8 +705,13 @@ func (s *Server) addBoard(w http.ResponseWriter, r *http.Request, u *identity.Us
 	rawURL := strings.TrimSpace(r.FormValue("url"))
 	b, err := s.Discovery.AddBoard(r.Context(), rawURL)
 	if err != nil {
-		s.Logger.WarnContext(r.Context(), "add board failed", "url", rawURL, "err", err)
-		s.render(w, r, http.StatusOK, views.BoardAddError(views.T(r.Context(), "jobs.board_add_error")))
+		key := boardErrorKey(err)
+		if key == "" {
+			s.failed(w, r, u, err)
+			return
+		}
+		s.Logger.InfoContext(r.Context(), "add board refused", "err", err)
+		s.render(w, r, http.StatusOK, views.BoardAddError(views.T(r.Context(), key)))
 		return
 	}
 	s.render(w, r, http.StatusOK, views.BoardAddSuccess(b.Company, b.ATS))
@@ -721,6 +726,20 @@ func toCrawlStatusData(ctx context.Context, st urlimport.CrawlStatus) views.Craw
 		Running: st.Running,
 		Queued:  st.Queued,
 		LastRun: lastRun,
+	}
+}
+
+// boardErrorKey names why a link gave no board; empty for a server error.
+func boardErrorKey(err error) string {
+	switch {
+	case errors.Is(err, urlimport.ErrInvalidURL):
+		return "jobs.board_add_error.invalid"
+	case errors.Is(err, urlimport.ErrFetchFailed):
+		return "jobs.import_error.fetch"
+	case errors.Is(err, urlimport.ErrUnsupportedBoard):
+		return "jobs.board_add_error"
+	default:
+		return ""
 	}
 }
 
