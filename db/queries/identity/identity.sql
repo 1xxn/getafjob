@@ -48,11 +48,13 @@ DELETE FROM sessions s USING sessions t
 WHERE t.token_hash = $1 AND s.family = t.family;
 
 -- name: DeleteExpired :exec
-WITH s AS (DELETE FROM sessions WHERE sessions.expires_at < $1 OR sessions.replaced_at < $1 - interval '5 minutes'),
-     m AS (DELETE FROM magic_links WHERE magic_links.expires_at < $1),
-     r AS (DELETE FROM recoveries WHERE recoveries.expires_at < $1),
-     i AS (DELETE FROM invitations WHERE invitations.expires_at < $1 AND invitations.accepted_at IS NULL)
-DELETE FROM webauthn_challenges WHERE webauthn_challenges.expires_at < $1;
+-- Sessions go at the absolute limit, after idle_since without activity, or as replaced tokens past their grace.
+WITH s AS (DELETE FROM sessions WHERE sessions.expires_at < @now OR sessions.last_seen_at < @idle_since
+             OR sessions.replaced_at < sqlc.arg(now) - interval '5 minutes'),
+     m AS (DELETE FROM magic_links WHERE magic_links.expires_at < @now),
+     r AS (DELETE FROM recoveries WHERE recoveries.expires_at < @now),
+     i AS (DELETE FROM invitations WHERE invitations.expires_at < @now AND invitations.accepted_at IS NULL)
+DELETE FROM webauthn_challenges WHERE webauthn_challenges.expires_at < @now;
 
 -- name: InsertAuditEvent :exec
 INSERT INTO audit_events (user_id, actor, code, params) VALUES ($1, $2, $3, $4);
@@ -71,8 +73,10 @@ INSERT INTO sessions (token_hash, user_id, method, created_at, last_seen_at, exp
 VALUES ($1, $2, $3, $4, $5, $6, $5, $7);
 
 -- name: UserSessions :many
+-- Only sessions that still work: current token, before the absolute limit, active since idle_since.
 SELECT token_hash, method, created_at, last_seen_at, expires_at FROM sessions
-WHERE user_id = $1 AND replaced_at IS NULL ORDER BY last_seen_at DESC LIMIT 100;
+WHERE user_id = @user_id AND replaced_at IS NULL AND expires_at > @now AND last_seen_at > @idle_since
+ORDER BY last_seen_at DESC LIMIT 100;
 
 -- name: DeleteOtherSessions :execrows
 DELETE FROM sessions o WHERE o.user_id = $1

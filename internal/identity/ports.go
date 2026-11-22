@@ -91,8 +91,9 @@ type Store interface {
 	// RotateSession gives the session old the new token next and marks old replaced; false when another request
 	// rotated it first.
 	RotateSession(ctx context.Context, old, next Hash, at time.Time) (bool, error)
-	// Sessions lists the user's current sessions with their token hashes.
-	Sessions(ctx context.Context, userID uuid.UUID) ([]StoredSession, error)
+	// Sessions lists the user's current sessions with their token hashes: before the absolute limit and active
+	// since idleSince.
+	Sessions(ctx context.Context, userID uuid.UUID, now, idleSince time.Time) ([]StoredSession, error)
 	// DeleteOtherSessions ends every session of the user except keep and returns how many ended.
 	DeleteOtherSessions(ctx context.Context, userID uuid.UUID, keep Hash, audit AuditEvent) (int, error)
 	// DeleteUserSessions ends every session of the user.
@@ -110,7 +111,8 @@ type Store interface {
 	SignInWithPasskey(ctx context.Context, userID uuid.UUID, id, credential []byte, s NewSession, at time.Time) (User, error)
 	DeletePasskey(ctx context.Context, userID uuid.UUID, id []byte, audit AuditEvent) (bool, error)
 	DeleteSession(ctx context.Context, h Hash, audit AuditEvent) error
-	DeleteExpired(ctx context.Context, before time.Time) error
+	// DeleteExpired removes what ran out at now, including sessions without activity since idleSince.
+	DeleteExpired(ctx context.Context, now, idleSince time.Time) error
 	// DeleteUser permanently removes a user and their cascading tenant rows.
 	DeleteUser(ctx context.Context, userID uuid.UUID) error
 	// AuditEvents returns all audit log events recorded for a user.

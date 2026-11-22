@@ -327,6 +327,32 @@ func TestCleanupRemovesExpired(t *testing.T) {
 	_ = session
 }
 
+// TestIdleSessionsLeaveListAndCleanup: a session without activity for SessionIdle no longer shows on the account
+// page and the cleanup removes it, long before the absolute limit.
+func TestIdleSessionsLeaveListAndCleanup(t *testing.T) {
+	e := newEnv(t)
+	ctx := t.Context()
+	u, idle := signIn(t, e)
+	e.now = e.now.Add(identity.SessionIdle - time.Hour)
+	if list, err := e.svc.Sessions(ctx, u.ID, string(idle)); err != nil || len(list) != 1 {
+		t.Fatalf("before the idle limit: %v, %v", list, err)
+	}
+	e.now = e.now.Add(2 * time.Hour)
+	if list, err := e.svc.Sessions(ctx, u.ID, string(idle)); err != nil || len(list) != 0 {
+		t.Fatalf("idle session listed: %v, %v", list, err)
+	}
+	if err := e.svc.Cleanup(ctx); err != nil {
+		t.Fatal(err)
+	}
+	var n int
+	err := db.InSystemTx(ctx, e.pool, func(tx pgx.Tx) error {
+		return tx.QueryRow(ctx, "SELECT count(*) FROM sessions").Scan(&n)
+	})
+	if err != nil || n != 0 {
+		t.Fatalf("idle sessions left: %d, %v", n, err)
+	}
+}
+
 // signIn creates Max Mustermann and returns a fresh session token.
 func signIn(t *testing.T, e *env) (identity.User, identity.Token) {
 	t.Helper()
