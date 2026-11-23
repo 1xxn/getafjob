@@ -238,3 +238,20 @@ func TestExtract_JobBoardsGreenhouseURL(t *testing.T) {
 		t.Errorf("Title = %q, want 'Platform Engineer'", job.Title)
 	}
 }
+
+// A pay range in the text keeps its currency; small amounts (a monthly figure, a stray price) are no yearly salary.
+func TestSalaryFromText(t *testing.T) {
+	for text, want := range map[string][3]any{
+		"We pay $100k - $150k plus equity.":      {100000, 150000, "USD"},
+		"Gehalt: EUR 65.000 – 80.000 brutto":     {65000, 80000, "EUR"},
+		"€72,000 per year":                       {72000, 72000, "EUR"},
+		"Monthly €4.500 - €5.500":                {0, 0, ""},
+		"Get a €5 voucher for your first coffee": {0, 0, ""},
+	} {
+		var out ExtractedJob
+		extractSalaryRegex(text, &out)
+		if got := [3]any{out.SalaryMin, out.SalaryMax, out.SalaryCurrency}; got != want {
+			t.Errorf("%q: got %v, want %v", text, got, want)
+		}
+	}
+}

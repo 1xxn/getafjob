@@ -759,6 +759,7 @@ func (s *Softgarden) Details(ctx context.Context, p *discovery.Posting) error {
 	j := jobs[0]
 	p.Description = j.Description
 	p.Posted = or(p.Posted, j.Posted)
+	j.Salary.apply(p)
 	if p.Location == "" {
 		p.Location = join("; ", j.Locations...)
 	}
@@ -895,6 +896,7 @@ func (s *Join) Details(ctx context.Context, p *discovery.Posting) error {
 	}
 	p.Description = jobs[0].Description
 	p.Posted = or(p.Posted, jobs[0].Posted)
+	jobs[0].Salary.apply(p)
 	return nil
 }
 
@@ -1069,6 +1071,7 @@ func (s *SuccessFactors) Details(ctx context.Context, p *discovery.Posting) erro
 	if jobs := JobPostings(b); len(jobs) > 0 && jobs[0].Description != "" {
 		p.Description = jobs[0].Description
 		p.Posted = or(p.Posted, jobs[0].Posted)
+		jobs[0].Salary.apply(p)
 		return nil
 	}
 	desc, posted := parseSFDetail(b)
