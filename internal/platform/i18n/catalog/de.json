@@ -153,7 +153,7 @@
   "jobs.import_title": "Job per URL importieren",
   "jobs.location_label": "Ort",
   "jobs.min_salary.any": "Beliebig",
-  "jobs.min_salary.val": "≥ {val} EUR",
+  "jobs.min_salary.val": "≥ {val} EUR (angegeben)",
   "jobs.min_salary_label": "Mindestgehalt",
   "jobs.next": "Nächste Seite",
   "jobs.none": "Keine Stellen passen zu diesem Filter.",

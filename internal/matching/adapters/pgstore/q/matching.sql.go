@@ -207,7 +207,9 @@ WHERE m.user_id = $1 AND j.status = 'open'
   AND ($3::text = '' OR j.workplace = $3::text)
   AND ($4::text = '' OR j.location ILIKE '%' || $4::text || '%')
   AND ($5::text = '' OR j.source = $5::text)
-  AND ($6::integer = 0 OR coalesce(j.salary_max, j.salary_min, 0) >= $6::integer)
+  -- The minimum salary is in EUR: only jobs that state a salary in EUR pass it.
+  AND ($6::integer = 0 OR (coalesce(j.salary_currency, 'EUR') = 'EUR'
+    AND coalesce(j.salary_max, j.salary_min, 0) >= $6::integer))
   AND ($7::integer = 0 OR coalesce(j.posted::timestamptz, j.first_seen) >= (now() - ($7::text || ' days')::interval))
   AND ($8::timestamptz IS NULL OR j.first_seen > $8::timestamptz)
   AND ($9::timestamptz IS NULL OR j.first_seen <= $9::timestamptz)

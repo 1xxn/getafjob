@@ -2,7 +2,6 @@ package urlimport
 
 import (
 	"bytes"
-	"encoding/json"
 	"net/url"
 	"regexp"
 	"strconv"
@@ -55,8 +54,8 @@ func (e ExtractedJob) ToPosting() discovery.Posting {
 
 var (
 	titleSeparators = []string{" | ", " - ", " — ", " – ", " · ", " : "}
-	salaryRegex     = regexp.MustCompile(`(?i)(?:€|\$|£|EUR|USD|GBP)\s*([0-9]{1,3}(?:[.,][0-9]{3})*k?)\s*(?:-|–|—|to)\s*(?:€|\$|£|EUR|USD|GBP)?\s*([0-9]{1,3}(?:[.,][0-9]{3})*k?)`)
-	singleSalRegex  = regexp.MustCompile(`(?i)(?:€|\$|£|EUR|USD|GBP)\s*([0-9]{1,3}(?:[.,][0-9]{3})*k?)\s*(?:/yr|/year|p\.a\.|per year)?`)
+	salaryRegex     = regexp.MustCompile(`(?i)(€|\$|£|EUR|USD|GBP)\s*([0-9]{1,3}(?:[.,][0-9]{3})*k?)\s*(?:-|–|—|to)\s*(?:€|\$|£|EUR|USD|GBP)?\s*([0-9]{1,3}(?:[.,][0-9]{3})*k?)`)
+	singleSalRegex  = regexp.MustCompile(`(?i)(€|\$|£|EUR|USD|GBP)\s*([0-9]{1,3}(?:[.,][0-9]{3})*k?)\s*(?:/yr|/year|p\.a\.|per year)`)
 	jobIDPattern    = regexp.MustCompile(`/(?:jobs?|positions?|opening|postings?|detail)/([A-Za-z0-9_-]+)`)
 )
 
@@ -134,10 +133,10 @@ func Extract(rawURL string, page []byte) (ExtractedJob, error) {
 		if jp.ID != "" {
 			out.ExternalID = jp.ID
 		}
+		if jp.Salary.Max > 0 {
+			out.SalaryMin, out.SalaryMax, out.SalaryCurrency = jp.Salary.Min, jp.Salary.Max, jp.Salary.Currency
+		}
 	}
-
-	// 3b. Extract salary from JSON-LD if present
-	extractSalaryJSONLD(page, &out)
 
 	// 4. HTML OpenGraph and Meta fallback
 	meta := extractMeta(page)
@@ -281,100 +280,27 @@ func extractMeta(page []byte) metaTags {
 	return m
 }
 
-func extractSalaryJSONLD(page []byte, out *ExtractedJob) {
-	z := xhtml.NewTokenizer(bytes.NewReader(page))
-	inLD := false
-	for {
-		switch z.Next() {
-		case xhtml.ErrorToken:
-			return
-		case xhtml.StartTagToken:
-			name, hasAttr := z.TagName()
-			inLD = false
-			if string(name) != "script" {
-				continue
-			}
-			for hasAttr {
-				var k, v []byte
-				k, v, hasAttr = z.TagAttr()
-				if string(k) == "type" && strings.Contains(strings.ToLower(string(v)), "ld+json") {
-					inLD = true
-				}
-			}
-		case xhtml.TextToken:
-			if inLD {
-				var val any
-				if err := json.Unmarshal(z.Text(), &val); err == nil {
-					findBaseSalary(val, out)
-				}
-				inLD = false
-			}
-		case xhtml.EndTagToken, xhtml.SelfClosingTagToken:
-			inLD = false
-		case xhtml.CommentToken, xhtml.DoctypeToken:
-		}
-	}
-}
-
-func findBaseSalary(v any, out *ExtractedJob) {
-	if out.SalaryMin > 0 || out.SalaryMax > 0 {
-		return
-	}
-	switch x := v.(type) {
-	case []any:
-		for _, e := range x {
-			findBaseSalary(e, out)
-		}
-	case map[string]any:
-		if bs, ok := x["baseSalary"].(map[string]any); ok {
-			if curr, ok := bs["currency"].(string); ok && curr != "" {
-				out.SalaryCurrency = curr
-			}
-			if valObj, ok := bs["value"].(map[string]any); ok {
-				if minV := numVal(valObj["minValue"]); minV > 0 {
-					out.SalaryMin = minV
-				}
-				if maxV := numVal(valObj["maxValue"]); maxV > 0 {
-					out.SalaryMax = maxV
-				}
-				if exactV := numVal(valObj["value"]); exactV > 0 && out.SalaryMin == 0 {
-					out.SalaryMin = exactV
-					out.SalaryMax = exactV
-				}
-			} else if exactV := numVal(bs["value"]); exactV > 0 {
-				out.SalaryMin = exactV
-				out.SalaryMax = exactV
-			}
-			return
-		}
-		for _, val := range x {
-			findBaseSalary(val, out)
-		}
-	}
-}
-
-func numVal(v any) int {
-	switch n := v.(type) {
-	case float64:
-		return int(n)
-	case string:
-		clean := strings.ReplaceAll(strings.ReplaceAll(n, ",", ""), ".", "")
-		val, _ := strconv.Atoi(clean)
-		return val
-	}
-	return 0
-}
-
+// extractSalaryRegex reads a pay range like "€60k – €75k" or "EUR 70,000 p.a." from the text. Only yearly-sized
+// figures count (10,000 and more): a monthly or hourly amount or a stray "€5" is no yearly salary.
 func extractSalaryRegex(text string, out *ExtractedJob) {
-	if m := salaryRegex.FindStringSubmatch(text); len(m) > 2 {
-		out.SalaryMin = parseKVal(m[1])
-		out.SalaryMax = parseKVal(m[2])
+	var cur string
+	var lo, hi int
+	if m := salaryRegex.FindStringSubmatch(text); len(m) > 3 {
+		cur, lo, hi = m[1], parseKVal(m[2]), parseKVal(m[3])
+	} else if m := singleSalRegex.FindStringSubmatch(text); len(m) > 2 {
+		cur, lo = m[1], parseKVal(m[2])
+		hi = lo
+	}
+	if lo > hi {
+		lo, hi = hi, lo
+	}
+	if lo < 10_000 || hi > 10_000_000 {
 		return
 	}
-	if m := singleSalRegex.FindStringSubmatch(text); len(m) > 1 {
-		val := parseKVal(m[1])
-		out.SalaryMin = val
-		out.SalaryMax = val
+	out.SalaryMin, out.SalaryMax = lo, hi
+	out.SalaryCurrency = map[string]string{"€": "EUR", "$": "USD", "£": "GBP"}[cur]
+	if out.SalaryCurrency == "" {
+		out.SalaryCurrency = strings.ToUpper(cur)
 	}
 }
 

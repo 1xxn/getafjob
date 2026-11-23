@@ -29,6 +29,7 @@ type JobPosting struct {
 	Description string
 	Posted      string
 	URL         string
+	Salary      Salary // zero: none stated (or not yearly)
 }
 
 // JobPostings reads the schema.org JobPostings from the JSON-LD blocks of an HTML page: single objects, arrays,
@@ -196,6 +197,7 @@ func jobPosting(m map[string]any) (JobPosting, bool) {
 		Posted:      day(text(m["datePosted"])),
 		URL:         or(text(m["url"]), text(m["sameAs"])),
 	}
+	p.Salary, _ = BaseSalary(m["baseSalary"])
 	for _, l := range list(m["jobLocation"]) {
 		if s := place(l); s != "" {
 			p.Locations = append(p.Locations, s)
@@ -229,6 +231,7 @@ func (j JobPosting) fill(p *discovery.Posting, company string) {
 	p.Location = join("; ", j.Locations...)
 	p.Description = j.Description
 	p.Posted = or(j.Posted, p.Posted)
+	j.Salary.apply(p)
 	if j.Remote {
 		p.Workplace = discovery.WorkplaceRemote
 	}
