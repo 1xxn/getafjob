@@ -16,6 +16,7 @@ type Service struct {
 	jobs     Jobs
 	store    Store
 	emb      Embedder // nil: rules only
+	feedback Feedback // nil: the default weights for everyone
 	now      func() time.Time
 }
 
@@ -26,6 +27,9 @@ func NewService(p Profiles, j Jobs, s Store) *Service {
 
 // WithEmbedder adds the embedding model (ADR 0029); without it the score comes from the rules alone.
 func (s *Service) WithEmbedder(e Embedder) *Service { s.emb = e; return s }
+
+// WithFeedback lets the service learn each user's score weights from their own choices (#502).
+func (s *Service) WithFeedback(f Feedback) *Service { s.feedback = f; return s }
 
 // Embedder returns the model the service matches with, nil if none.
 func (s *Service) Embedder() Embedder { return s.emb }
@@ -50,10 +54,14 @@ func (s *Service) Run(ctx context.Context, users []uuid.UUID) (Stats, error) {
 			return st, err
 		}
 	}
+	now := s.now()
 	matchers := make([]*Matcher, len(users))
 	for i, u := range users {
 		c, err := s.profiles.Criteria(ctx, u)
 		if err != nil {
+			return st, err
+		}
+		if c.Weights, err = s.learn(ctx, u, c, now); err != nil {
 			return st, err
 		}
 		matchers[i] = NewMatcher(c, s.emb)
@@ -62,7 +70,6 @@ func (s *Service) Run(ctx context.Context, users []uuid.UUID) (Stats, error) {
 	if len(users) == 0 {
 		return st, nil
 	}
-	now := s.now()
 	for after := int64(0); ; {
 		jobs, err := s.jobs.OpenJobs(ctx, after, page)
 		if err != nil {
@@ -92,4 +99,24 @@ func (s *Service) Run(ctx context.Context, users []uuid.UUID) (Stats, error) {
 			return st, err
 		}
 	}
+}
+
+// learn returns the user's weights from the jobs they rated, nil while there are too few (or no feedback source).
+func (s *Service) learn(ctx context.Context, u uuid.UUID, c Criteria, now time.Time) (*Weights, error) {
+	if s.feedback == nil {
+		return nil, nil
+	}
+	rated, err := s.feedback.Rated(ctx, u, MaxRated)
+	if err != nil || len(rated) < MinRated {
+		return nil, err
+	}
+	c.Weights = nil // the factors do not depend on the weights; evaluate with the defaults
+	m := NewMatcher(c, s.emb)
+	samples := make([]Sample, 0, len(rated))
+	for _, r := range rated {
+		if f, ok := m.FactorsOf(Prepare(r.Job, s.emb), now); ok {
+			samples = append(samples, Sample{F: f, Liked: r.Liked})
+		}
+	}
+	return LearnWeights(samples), nil
 }

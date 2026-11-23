@@ -42,7 +42,7 @@ Chosen option: 2, with the refinements of 1, and learning to rank once there is 
   title and text.
 - Score: weighted combination of text similarity (cosine of profile and job), title, IDF-weighted skill coverage,
   seniority, place, language and recency; each part is shown as a reason. Weights are fixed at first and later
-  learned per user from likes, skips and applications (logistic regression).
+  learned per user from likes, skips and applications (logistic regression, ADR 0031).
 - One "Why this score" panel; the Fit inspector goes.
 
 Model: `sentence-transformers/static-similarity-mrl-multilingual-v1` (Apache 2.0), cut to 256 of 1024 dimensions

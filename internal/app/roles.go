@@ -230,7 +230,7 @@ func worker(ctx context.Context, cfg config.Config, logger *slog.Logger) error {
 			return run != nil, err
 		}})
 	river.AddWorker(workers, &matchWorker{logger: logger, notify: pageNotifier(pool, logger), svc: matching.NewService(
-		profileCriteria{svc: profile.NewService(pstore, env), store: pstore}, mstore, mstore).WithEmbedder(loadEmbedder(cfg, logger))})
+		profileCriteria{svc: profile.NewService(pstore, env), store: pstore}, mstore, mstore).WithEmbedder(loadEmbedder(cfg, logger)).WithFeedback(mstore)})
 	river.AddWorker(workers, &boardDiscoveryWorker{
 		discovery: discovery.NewBoardDiscovery(store, store, sources.NewFinder(client)), logger: logger, metrics: metrics})
 	apps := newApplications(applicationstore.New(pool), cfg)

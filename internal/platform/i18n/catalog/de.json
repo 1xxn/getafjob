@@ -249,6 +249,7 @@
   "match.reason.title.none": "Der Titel passt zu keinem deiner Wunschtitel.",
   "match.reason.title.partial": "Der Titel enthält das Wort „{term}“.",
   "match.reason.title.synonym": "Der Titel nennt dieselbe Rolle: „{term}“.",
+  "match.reason.weights.learned": "Gewichtet nach deinen eigenen Entscheidungen ({n} bewertete Stellen).",
   "msg.identity.invitation_invalid": "Diese Einladung ist ungültig oder abgelaufen.",
   "msg.identity.magic_link_invalid": "Dieser Anmeldelink ist ungültig oder abgelaufen.",
   "msg.identity.reauth_required": "Bitte melde dich erneut an, um diese Änderung zu bestätigen.",

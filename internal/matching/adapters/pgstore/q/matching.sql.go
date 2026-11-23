@@ -443,6 +443,77 @@ func (q *Queries) OpenJobsPage(ctx context.Context, arg OpenJobsPageParams) ([]O
 	return items, nil
 }
 
+const ratedJobs = `-- name: RatedJobs :many
+SELECT j.id, j.company, j.title, j.location, j.workplace, j.description,
+  coalesce(j.salary_min, 0)::integer AS salary_min,
+  coalesce(j.salary_max, 0)::integer AS salary_max,
+  j.salary_currency, j.posted, j.first_seen, (a.state <> 'skipped')::boolean AS liked
+FROM applications a JOIN jobs j ON j.id = a.job_id
+WHERE a.user_id = $1 AND (
+  (a.state = 'skipped' AND EXISTS (SELECT 1 FROM application_events e WHERE e.application_id = a.id
+    AND e.actor = 'user' AND e.event = 'skip' AND coalesce(e.detail ->> 'reason', '') <> 'assist_rejected'))
+  OR (a.state <> 'skipped' AND (a.state = 'matched' OR EXISTS (SELECT 1 FROM application_events e
+    WHERE e.application_id = a.id AND e.actor = 'user' AND e.event IN ('queue', 'requeue', 'approve', 'submitted')))))
+ORDER BY a.updated_at DESC, a.id
+LIMIT $2
+`
+
+type RatedJobsParams struct {
+	UserID  uuid.UUID
+	MaxRows int32
+}
+
+type RatedJobsRow struct {
+	ID             int64
+	Company        string
+	Title          string
+	Location       string
+	Workplace      string
+	Description    string
+	SalaryMin      int32
+	SalaryMax      int32
+	SalaryCurrency string
+	Posted         pgtype.Date
+	FirstSeen      time.Time
+	Liked          bool
+}
+
+// The jobs the user rated by an own action (#502): skipped (negative), or bookmarked, queued, approved or applied
+// to (positive). Applications the planner queued count only once the user acted on them; skips of a writing
+// suggestion say nothing about the job.
+func (q *Queries) RatedJobs(ctx context.Context, arg RatedJobsParams) ([]RatedJobsRow, error) {
+	rows, err := q.db.Query(ctx, ratedJobs, arg.UserID, arg.MaxRows)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []RatedJobsRow{}
+	for rows.Next() {
+		var i RatedJobsRow
+		if err := rows.Scan(
+			&i.ID,
+			&i.Company,
+			&i.Title,
+			&i.Location,
+			&i.Workplace,
+			&i.Description,
+			&i.SalaryMin,
+			&i.SalaryMax,
+			&i.SalaryCurrency,
+			&i.Posted,
+			&i.FirstSeen,
+			&i.Liked,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const saveMatches = `-- name: SaveMatches :exec
 INSERT INTO matches (user_id, job_id, score, decision, reasons, rules, computed_at)
 SELECT $1::uuid, r.job_id, r.score, r.decision, r.reasons, $2::integer, $3::timestamptz

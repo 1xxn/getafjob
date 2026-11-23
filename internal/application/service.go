@@ -261,8 +261,9 @@ func (s *Service) GenerateHomeRunnerToken(ctx context.Context, userID uuid.UUID)
 	return plain, nil
 }
 
-// Queue queues the user's application for a job, creating it if needed: a new application is queued, a parked or
-// failed one is queued again. Anything else (already queued, in a run, sent or skipped) stays as it is.
+// Queue queues the user's application for a job for the planner, creating it if needed: a new application is
+// queued, a parked or failed one is queued again. Anything else (already queued, in a run, sent or skipped) stays
+// as it is. The events name the worker as actor, so the queue is not read as the user's own choice.
 func (s *Service) Queue(ctx context.Context, userID uuid.UUID, jobID int64) (uuid.UUID, State, error) {
 	id, err := s.Create(ctx, userID, jobID)
 	if err != nil {
@@ -274,10 +275,10 @@ func (s *Service) Queue(ctx context.Context, userID uuid.UUID, jobID int64) (uui
 	}
 	switch app.State {
 	case Matched:
-		st, err := s.apply(ctx, userID, id, EvQueue, ActorUser, nil, false)
+		st, err := s.apply(ctx, userID, id, EvQueue, ActorWorker, nil, false)
 		return id, st, err
 	case Parked, Failed:
-		st, err := s.apply(ctx, userID, id, EvRequeue, ActorUser, nil, false)
+		st, err := s.apply(ctx, userID, id, EvRequeue, ActorWorker, nil, false)
 		return id, st, err
 	default:
 		return id, app.State, nil

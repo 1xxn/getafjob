@@ -198,7 +198,7 @@ func seedDemo(ctx context.Context, pool *pgxpool.Pool, sealer profile.Sealer, pu
 	}
 
 	ms := matchingstore.New(pool)
-	return matching.NewService(profileCriteria{svc: profiles, store: pstore}, ms, ms).WithEmbedder(emb).Run(ctx, users)
+	return matching.NewService(profileCriteria{svc: profiles, store: pstore}, ms, ms).WithEmbedder(emb).WithFeedback(ms).Run(ctx, users)
 }
 
 // demoCV uploads the invented CV of p unless the user has a CV already; without a blob store it does nothing.
