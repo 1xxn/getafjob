@@ -187,6 +187,11 @@ func (s *Service) CheckMailbox(ctx context.Context, userID uuid.UUID) ([]StatusS
 			CurrentState:   matchedApp.CurrentState,
 		}
 
+		sealed, err := s.cipher.SealMail(ctx, userID, sug.ID, MailMeta{MessageID: msg.MessageID, From: msg.From, Subject: msg.Subject})
+		if err != nil {
+			return nil, fmt.Errorf("sealing mail data: %w", err)
+		}
+		sug.SealedMail = sealed
 		if err := s.store.CreateSuggestion(ctx, sug); err != nil {
 			return nil, fmt.Errorf("creating suggestion: %w", err)
 		}
@@ -229,10 +234,10 @@ func (s *Service) AcceptSuggestion(ctx context.Context, userID, suggestionID uui
 	}
 
 	if s.apps != nil {
+		// The mail's sender and IDs stay sealed with the suggestion; the event only names it.
 		if err := s.apps.Transition(ctx, userID, sug.ApplicationID, sug.SuggestedState, map[string]any{
 			"via":        "mail_suggestion",
-			"message_id": sug.MessageID,
-			"from":       sug.MessageFrom,
+			"suggestion": sug.ID.String(),
 		}); err != nil {
 			return fmt.Errorf("transitioning application: %w", err)
 		}
@@ -248,10 +253,54 @@ func (s *Service) DismissSuggestion(ctx context.Context, userID, suggestionID uu
 
 // Suggestions returns suggestions for the user, optionally filtered by status ("pending", "accepted", "dismissed").
 func (s *Service) Suggestions(ctx context.Context, userID uuid.UUID, status string) ([]StatusSuggestion, error) {
-	return s.store.Suggestions(ctx, userID, status)
+	list, err := s.store.Suggestions(ctx, userID, status)
+	if err != nil {
+		return nil, err
+	}
+	return list, s.openAll(ctx, list)
 }
 
 // SuggestionsForApplication returns all suggestions for a specific application.
 func (s *Service) SuggestionsForApplication(ctx context.Context, userID, appID uuid.UUID) ([]StatusSuggestion, error) {
-	return s.store.SuggestionsForApplication(ctx, userID, appID)
+	list, err := s.store.SuggestionsForApplication(ctx, userID, appID)
+	if err != nil {
+		return nil, err
+	}
+	return list, s.openAll(ctx, list)
+}
+
+// openAll fills the mail data of suggestions from their sealed record; rows from before sealing keep their plain
+// columns until the worker seals them.
+func (s *Service) openAll(ctx context.Context, list []StatusSuggestion) error {
+	for i := range list {
+		sg := &list[i]
+		if sg.SealedMail == nil {
+			continue
+		}
+		m, err := s.cipher.OpenMail(ctx, sg.UserID, sg.ID, sg.SealedMail)
+		if err != nil {
+			return fmt.Errorf("opening mail data: %w", err)
+		}
+		sg.MessageID, sg.MessageFrom, sg.MessageSubject = m.MessageID, m.From, m.Subject
+	}
+	return nil
+}
+
+// SealUnsealed seals the mail data of suggestions stored before sealing (#578) and blanks their plain columns; it
+// returns how many it sealed. The worker runs it until none are left.
+func (s *Service) SealUnsealed(ctx context.Context) (int, error) {
+	list, err := s.store.UnsealedSuggestions(ctx)
+	if err != nil {
+		return 0, err
+	}
+	for i, sg := range list {
+		sealed, err := s.cipher.SealMail(ctx, sg.UserID, sg.ID, MailMeta{MessageID: sg.MessageID, From: sg.MessageFrom, Subject: sg.MessageSubject})
+		if err == nil {
+			err = s.store.SealSuggestion(ctx, sg.UserID, sg.ID, sealed)
+		}
+		if err != nil {
+			return i, fmt.Errorf("seal suggestion %s: %w", sg.ID, err)
+		}
+	}
+	return len(list), nil
 }

@@ -1,7 +1,9 @@
 package tracking_test
 
 import (
+	"bytes"
 	"context"
+	"encoding/json"
 	"errors"
 	"slices"
 	"testing"
@@ -62,6 +64,8 @@ func (f *fakeStore) ListActiveApplications(_ context.Context, _ uuid.UUID) ([]tr
 }
 
 func (f *fakeStore) CreateSuggestion(_ context.Context, s tracking.StatusSuggestion) error {
+	// Like the real store: only the sealed record of the mail data is kept.
+	s.MessageID, s.MessageFrom, s.MessageSubject = "", "", ""
 	f.suggestions[s.ID] = s
 	return nil
 }
@@ -120,7 +124,38 @@ func (f *fakeClient) TestConnection(_ context.Context, _ tracking.MailboxAccount
 	return f.testErr
 }
 
+func (f *fakeStore) UnsealedSuggestions(context.Context) ([]tracking.StatusSuggestion, error) {
+	var out []tracking.StatusSuggestion
+	for _, s := range f.suggestions {
+		if s.SealedMail == nil {
+			out = append(out, s)
+		}
+	}
+	return out, nil
+}
+
+func (f *fakeStore) SealSuggestion(_ context.Context, _, id uuid.UUID, sealed []byte) error {
+	s := f.suggestions[id]
+	s.SealedMail, s.MessageID, s.MessageFrom, s.MessageSubject = sealed, "", "", ""
+	f.suggestions[id] = s
+	return nil
+}
+
 type fakeCipher struct{}
+
+func (f *fakeCipher) SealMail(_ context.Context, _, id uuid.UUID, m tracking.MailMeta) ([]byte, error) {
+	b, err := json.Marshal(m)
+	return append([]byte(id.String()+"|"), b...), err
+}
+
+func (f *fakeCipher) OpenMail(_ context.Context, _, id uuid.UUID, sealed []byte) (tracking.MailMeta, error) {
+	var m tracking.MailMeta
+	rest, ok := bytes.CutPrefix(sealed, []byte(id.String()+"|"))
+	if !ok {
+		return m, errors.New("wrong suggestion")
+	}
+	return m, json.Unmarshal(rest, &m)
+}
 
 func (f *fakeCipher) SealPassword(_ context.Context, _ uuid.UUID, password string) ([]byte, error) {
 	return []byte("enc:" + password), nil
@@ -233,6 +268,36 @@ func TestTrackingService(t *testing.T) {
 	}
 	if sug.SuggestedState != tracking.StateInterview {
 		t.Errorf("sug.SuggestedState = %v, want %v", sug.SuggestedState, tracking.StateInterview)
+	}
+
+	// The mail data is stored only sealed and comes back opened (#578).
+	stored := st.suggestions[sug.ID]
+	if stored.SealedMail == nil || stored.MessageFrom != "" || stored.MessageSubject != "" {
+		t.Errorf("stored suggestion holds plain mail data: %+v", stored)
+	}
+	listed, err := svc.Suggestions(ctx, u, tracking.SuggestionPending)
+	if err != nil || len(listed) != 1 || listed[0].MessageFrom != "hiring@acmecloud.example.org" ||
+		listed[0].MessageSubject != "Invitation to interview: Go Engineer" || listed[0].MessageID != "msg-invite" {
+		t.Errorf("listed suggestions = %+v, %v", listed, err)
+	}
+
+	// A suggestion from before sealing is read from its plain fields, then sealed by the worker.
+	legacy := tracking.StatusSuggestion{ID: uuid.New(), UserID: u, ApplicationID: targetAppID, MessageFrom: "old@example.org",
+		MessageSubject: "Old", Status: tracking.SuggestionPending}
+	st.suggestions[legacy.ID] = legacy
+	if n, err := svc.SealUnsealed(ctx); err != nil || n != 1 {
+		t.Fatalf("SealUnsealed = %d, %v", n, err)
+	}
+	if s := st.suggestions[legacy.ID]; s.SealedMail == nil || s.MessageFrom != "" {
+		t.Errorf("legacy suggestion not sealed: %+v", s)
+	}
+	appSugs, _ := svc.SuggestionsForApplication(ctx, u, targetAppID)
+	found := false
+	for _, s := range appSugs {
+		found = found || (s.ID == legacy.ID && s.MessageFrom == "old@example.org" && s.MessageSubject == "Old")
+	}
+	if !found {
+		t.Errorf("sealed legacy suggestion did not open: %+v", appSugs)
 	}
 
 	// Verify cursor updated

@@ -205,20 +205,13 @@ func (s *Store) CreateSuggestion(ctx context.Context, sug tracking.StatusSuggest
 		return fmt.Errorf("marshaling reasons: %w", err)
 	}
 
-	var msgIDPtr *string
-	if sug.MessageID != "" {
-		msgIDPtr = &sug.MessageID
-	}
-
 	return s.user(ctx, sug.UserID, func(qs *q.Queries) error {
 		return qs.CreateSuggestion(ctx, q.CreateSuggestionParams{
 			ID:             sug.ID,
 			UserID:         sug.UserID,
 			ApplicationID:  sug.ApplicationID,
 			MessageUid:     int64(sug.MessageUID),
-			MessageID:      msgIDPtr,
-			MessageFrom:    sug.MessageFrom,
-			MessageSubject: sug.MessageSubject,
+			Sealed:         sug.SealedMail,
 			MessageDate:    sug.MessageDate,
 			Category:       string(sug.Category),
 			SuggestedState: sug.SuggestedState,
@@ -248,7 +241,7 @@ func (s *Store) Suggestions(ctx context.Context, userID uuid.UUID, status string
 		for i, r := range rows {
 			out[i] = mapSuggestionRow(r.ID, r.UserID, r.ApplicationID, r.MessageUid, r.MessageID,
 				r.MessageFrom, r.MessageSubject, r.MessageDate, r.Category, r.SuggestedState,
-				r.Reasons, r.Status, r.CreatedAt, r.UpdatedAt, r.Company, r.Title, r.CurrentState)
+				r.Reasons, r.Status, r.CreatedAt, r.UpdatedAt, r.Company, r.Title, r.CurrentState, r.Sealed)
 		}
 		return nil
 	})
@@ -270,7 +263,7 @@ func (s *Store) SuggestionsForApplication(ctx context.Context, userID, appID uui
 		for i, r := range rows {
 			out[i] = mapSuggestionRow(r.ID, r.UserID, r.ApplicationID, r.MessageUid, r.MessageID,
 				r.MessageFrom, r.MessageSubject, r.MessageDate, r.Category, r.SuggestedState,
-				r.Reasons, r.Status, r.CreatedAt, r.UpdatedAt, r.Company, r.Title, r.CurrentState)
+				r.Reasons, r.Status, r.CreatedAt, r.UpdatedAt, r.Company, r.Title, r.CurrentState, r.Sealed)
 		}
 		return nil
 	})
@@ -290,7 +283,7 @@ func (s *Store) Suggestion(ctx context.Context, userID, id uuid.UUID) (tracking.
 		}
 		sug = mapSuggestionRow(r.ID, r.UserID, r.ApplicationID, r.MessageUid, r.MessageID,
 			r.MessageFrom, r.MessageSubject, r.MessageDate, r.Category, r.SuggestedState,
-			r.Reasons, r.Status, r.CreatedAt, r.UpdatedAt, r.Company, r.Title, r.CurrentState)
+			r.Reasons, r.Status, r.CreatedAt, r.UpdatedAt, r.Company, r.Title, r.CurrentState, r.Sealed)
 		return nil
 	})
 	return sug, err
@@ -319,7 +312,7 @@ func (s *Store) SetSuggestionStatus(ctx context.Context, userID, id uuid.UUID, s
 func mapSuggestionRow(id, userID, appID uuid.UUID, msgUID int64, msgID *string,
 	from, subject string, date time.Time, category, suggestedState string,
 	reasonsRaw []byte, status string, createdAt, updatedAt time.Time,
-	company, title, currentState string) tracking.StatusSuggestion {
+	company, title, currentState string, sealed []byte) tracking.StatusSuggestion {
 
 	uid := uint32(0)
 	if msgUID >= 0 && msgUID <= math.MaxUint32 {
@@ -354,5 +347,33 @@ func mapSuggestionRow(id, userID, appID uuid.UUID, msgUID int64, msgID *string,
 		Company:        company,
 		JobTitle:       title,
 		CurrentState:   currentState,
+		SealedMail:     sealed,
 	}
+}
+
+// UnsealedSuggestions lists suggestions from before sealing.
+func (s *Store) UnsealedSuggestions(ctx context.Context) (out []tracking.StatusSuggestion, err error) {
+	err = s.system(ctx, func(qs *q.Queries) error {
+		rows, err := qs.UnsealedSuggestions(ctx)
+		for _, r := range rows {
+			sug := tracking.StatusSuggestion{ID: r.ID, UserID: r.UserID, MessageFrom: r.MessageFrom, MessageSubject: r.MessageSubject}
+			if r.MessageID != nil {
+				sug.MessageID = *r.MessageID
+			}
+			out = append(out, sug)
+		}
+		return err
+	})
+	return out, err
+}
+
+// SealSuggestion stores the sealed mail data and blanks the plain columns.
+func (s *Store) SealSuggestion(ctx context.Context, userID, id uuid.UUID, sealed []byte) error {
+	return s.user(ctx, userID, func(qs *q.Queries) error {
+		n, err := qs.SealSuggestion(ctx, q.SealSuggestionParams{ID: id, UserID: userID, Sealed: sealed})
+		if err == nil && n == 0 {
+			return tracking.ErrNotFound
+		}
+		return err
+	})
 }

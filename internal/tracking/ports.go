@@ -36,10 +36,20 @@ type MailboxClient interface {
 	TestConnection(ctx context.Context, acc MailboxAccount, password string) error
 }
 
-// PasswordCipher seals and opens user mailbox passwords using envelope encryption.
+// PasswordCipher seals and opens what tracking keeps from the user's mailbox with envelope encryption: the
+// password and the data of the mails behind suggestions.
 type PasswordCipher interface {
 	SealPassword(ctx context.Context, userID uuid.UUID, password string) ([]byte, error)
 	OpenPassword(ctx context.Context, userID uuid.UUID, ciphertext []byte) (string, error)
+	SealMail(ctx context.Context, userID, suggestionID uuid.UUID, m MailMeta) ([]byte, error)
+	OpenMail(ctx context.Context, userID, suggestionID uuid.UUID, sealed []byte) (MailMeta, error)
+}
+
+// MailMeta is what a suggestion keeps of its mail.
+type MailMeta struct {
+	MessageID string `json:"message_id,omitempty"`
+	From      string `json:"from"`
+	Subject   string `json:"subject"`
 }
 
 // ApplicationUpdater executes status transitions on applications when suggestions are accepted.
@@ -61,4 +71,8 @@ type Store interface {
 	SuggestionsForApplication(ctx context.Context, userID uuid.UUID, appID uuid.UUID) ([]StatusSuggestion, error)
 	Suggestion(ctx context.Context, userID uuid.UUID, id uuid.UUID) (StatusSuggestion, error)
 	SetSuggestionStatus(ctx context.Context, userID uuid.UUID, id uuid.UUID, status string) error
+	// UnsealedSuggestions lists suggestions from before sealing with their plain mail data (system context).
+	UnsealedSuggestions(ctx context.Context) ([]StatusSuggestion, error)
+	// SealSuggestion stores the sealed mail data of a suggestion and blanks its plain columns.
+	SealSuggestion(ctx context.Context, userID, id uuid.UUID, sealed []byte) error
 }

@@ -417,6 +417,7 @@ type TrackingSuggestion struct {
 	Status         string
 	CreatedAt      time.Time
 	UpdatedAt      time.Time
+	Sealed         []byte
 }
 
 type User struct {

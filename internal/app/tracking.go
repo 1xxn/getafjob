@@ -104,6 +104,12 @@ func (w *inboxWorker) Work(ctx context.Context, job *river.Job[InboxArgs]) error
 		return nil
 	}
 
+	// Suggestions from before sealing (#578) are sealed first; a failure there must not stop the inbox check.
+	if sealed, err := w.svc.SealUnsealed(ctx); err != nil {
+		w.logger.ErrorContext(ctx, "sealing tracking suggestions failed", "err", err)
+	} else if sealed > 0 {
+		w.logger.InfoContext(ctx, "sealed tracking suggestions", "count", sealed)
+	}
 	n, err := w.svc.CheckAllMailboxes(ctx)
 	if err != nil {
 		return err
