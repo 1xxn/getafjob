@@ -6,6 +6,8 @@ import (
 	"io"
 	"io/fs"
 	"log/slog"
+	"os"
+	"regexp"
 	"strings"
 	"testing"
 	"time"
@@ -234,5 +236,30 @@ func TestTimeZone(t *testing.T) {
 	if _, err := Load(fakeSource(map[string]string{"GETAFJOB_TIMEZONE": "Mars/Base"}, nil)); err == nil ||
 		!strings.Contains(err.Error(), "GETAFJOB_TIMEZONE") {
 		t.Fatalf("invalid time zone: err %v", err)
+	}
+}
+
+// TestConfigDocNamesEveryVariable: docs/configuration.md lists every variable the code reads and none it does not.
+func TestConfigDocNamesEveryVariable(t *testing.T) {
+	doc, err := os.ReadFile("../../../docs/configuration.md")
+	if err != nil {
+		t.Fatal(err)
+	}
+	inDoc := map[string]bool{}
+	for _, n := range regexp.MustCompile(`GETAFJOB_[A-Z0-9_]+`).FindAllString(string(doc), -1) {
+		inDoc[n] = true
+	}
+	known := map[string]bool{}
+	for _, n := range Names() {
+		known[n] = true
+		if !inDoc[n] {
+			t.Errorf("%s is not in docs/configuration.md", n)
+		}
+	}
+	for n := range inDoc {
+		// GETAFJOB_DEV_CRAWL_INTERVAL is read by compose.dev.yaml, not by the code.
+		if !known[n] && !strings.HasSuffix(n, "_FILE") && n != "GETAFJOB_DEV_CRAWL_INTERVAL" {
+			t.Errorf("docs/configuration.md names %s, which the code does not read", n)
+		}
 	}
 }
