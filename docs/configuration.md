@@ -39,6 +39,7 @@ an error. Unknown `GETAFJOB_*` variables are reported as a warning (typos), with
 | `GETAFJOB_TIMEZONE` | `Europe/Berlin` | serve, worker | IANA time zone of daily summaries and quiet hours; the notification settings name it |
 | `GETAFJOB_EMBED_MODEL` | `/usr/share/getafjob/embed` | worker, admin | directory of the static embedding model for matching (shipped in the app image, about 55 MB in memory); empty or missing: matching uses rules alone |
 | `GETAFJOB_CRAWL_INTERVAL` | `6h` | worker | time between two scheduled crawls (30m to 168h); the schedule starts after the first crawl someone starts by hand, never on worker start; `0` schedules none (the development stack's default, `GETAFJOB_DEV_CRAWL_INTERVAL` overrides it) |
+| `GETAFJOB_PORTAL_SEARCHES` | `linkedin` | worker | job portals whose public search the crawl reads, comma separated: `linkedin`, `indeed`, `glassdoor`, or `none`. Indeed and Glassdoor refuse every request that is not a disguised browser (HTTP 403), so they are off unless they answer from your server |
 | `GETAFJOB_EASY_APPLY_ENABLED` | `false` | serve | allows LinkedIn/Indeed Easy Apply with the user's own session cookies (each user still opts in); portal runs go one at a time per user and portal ([architecture.md](architecture.md#security-model)) |
 
 `getafjob admin env` lists all variables; `getafjob admin check-config` validates the current environment without

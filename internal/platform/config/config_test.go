@@ -263,3 +263,18 @@ func TestConfigDocNamesEveryVariable(t *testing.T) {
 		}
 	}
 }
+
+func TestPortalSearches(t *testing.T) {
+	if d, _ := Load(fakeSource(nil, nil)); strings.Join(d.PortalSearches, ",") != "linkedin" {
+		t.Errorf("default = %v", d.PortalSearches)
+	}
+	for v, want := range map[string]string{"linkedin, Indeed,linkedin": "linkedin,indeed", "none": "", "": "", "glassdoor": "glassdoor"} {
+		c, err := Load(fakeSource(map[string]string{"GETAFJOB_PORTAL_SEARCHES": v}, nil))
+		if err != nil || strings.Join(c.PortalSearches, ",") != want {
+			t.Errorf("%q: %v, %v; want %q", v, c.PortalSearches, err, want)
+		}
+	}
+	if _, err := Load(fakeSource(map[string]string{"GETAFJOB_PORTAL_SEARCHES": "xing"}, nil)); err == nil {
+		t.Error("unknown portal accepted")
+	}
+}

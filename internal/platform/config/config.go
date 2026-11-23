@@ -83,6 +83,8 @@ type Config struct {
 	ShutdownTimeout time.Duration
 	// CrawlInterval is the time between two crawls (worker); 0 schedules none.
 	CrawlInterval time.Duration
+	// PortalSearches are the job portals whose public search the crawl reads (linkedin, indeed, glassdoor).
+	PortalSearches []string
 	// EasyApplyEnabled is an operator switch enabling the Easy Apply module (#43). Default: false.
 	EasyApplyEnabled bool
 	// DevFixtureHost is the host:port of the development fixture site whose plain http origin may take form values;
@@ -170,6 +172,7 @@ var specs = []spec{
 	{"VAPID_KEY", "", func(c *Config, v string) error { return setKey(&c.VAPIDKey, v) }},
 	{"VAPID_SUBJECT", "", setVAPIDSubject},
 	{"CRAWL_INTERVAL", "6h", setCrawlInterval},
+	{"PORTAL_SEARCHES", "linkedin", setPortalSearches},
 	{"EASY_APPLY_ENABLED", "false", func(c *Config, v string) error { return setBool(&c.EasyApplyEnabled, v) }},
 	{"DEV_FIXTURE_HOST", "", func(c *Config, v string) error { c.DevFixtureHost = strings.ToLower(strings.TrimSpace(v)); return nil }},
 	{"DEV_STYLEGUIDE", "false", func(c *Config, v string) error { return setBool(&c.DevStyleGuide, v) }},
@@ -487,6 +490,24 @@ func setLimits(c *Config, v string) error {
 		c.Limits = false
 	default:
 		return errors.New("must be on or off")
+	}
+	return nil
+}
+
+// setPortalSearches reads a comma list of job portals to search; "none" or empty searches none. Indeed and Glassdoor
+// answer 403 to every request that is not a disguised browser (#571), so the default is LinkedIn only.
+func setPortalSearches(c *Config, v string) error {
+	c.PortalSearches = nil
+	for _, p := range strings.Split(strings.ToLower(v), ",") {
+		switch p = strings.TrimSpace(p); p {
+		case "", "none":
+		case "linkedin", "indeed", "glassdoor":
+			if !slices.Contains(c.PortalSearches, p) {
+				c.PortalSearches = append(c.PortalSearches, p)
+			}
+		default:
+			return fmt.Errorf("unknown job portal %q (linkedin, indeed, glassdoor or none)", p)
+		}
 	}
 	return nil
 }
