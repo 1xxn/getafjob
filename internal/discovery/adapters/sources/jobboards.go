@@ -152,6 +152,10 @@ func (s *Himalayas) Fetch(ctx context.Context) (discovery.Batch, error) {
 					Description  string      `json:"description"`
 					PubDate      json.Number `json:"pubDate"`
 					Restrictions []string    `json:"locationRestrictions"`
+					MinSalary    json.Number `json:"minSalary"`
+					MaxSalary    json.Number `json:"maxSalary"`
+					Currency     string      `json:"currency"`
+					Period       string      `json:"salaryPeriod"` // annual, monthly, hourly
 				} `json:"jobs"`
 			}
 			err := s.c.GetJSON(ctx, s.Name(), "https://himalayas.app/jobs/api/search",
@@ -169,11 +173,15 @@ func (s *Himalayas) Fetch(ctx context.Context) (discovery.Batch, error) {
 				if len(j.Restrictions) > 0 {
 					region = join(", ", j.Restrictions[:min(6, len(j.Restrictions))]...)
 				}
-				out = append(out, discovery.Posting{
+				p := discovery.Posting{
 					Source: s.Name(), ExternalID: ext, Company: strings.TrimSpace(j.Company),
 					Title: strings.TrimSpace(j.Title), Location: "Remote (" + region + ")", URL: or(j.Link, j.GUID),
 					Description: htmltext.Text(j.Description), Posted: epochDay(j.PubDate), Workplace: discovery.WorkplaceRemote,
-				})
+				}
+				if sal, ok := yearly(amount(j.MinSalary), amount(j.MaxSalary), j.Period, j.Currency); ok {
+					sal.apply(&p)
+				}
+				out = append(out, p)
 			}
 			if len(data.Jobs) < 20 {
 				break
