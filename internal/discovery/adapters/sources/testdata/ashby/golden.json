@@ -12,6 +12,9 @@
       "Description": "Design tools for Max Mustermann and friends.",
       "Posted": "2026-10-28",
       "Workplace": "hybrid",
+      "SalaryMin": 70000,
+      "SalaryMax": 85000,
+      "SalaryCurrency": "EUR",
       "Extra": null
     },
     {

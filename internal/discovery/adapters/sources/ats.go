@@ -67,13 +67,15 @@ func (s *Greenhouse) Fetch(ctx context.Context) (discovery.Batch, error) {
 			Offices []struct {
 				Name string `json:"name"`
 			} `json:"offices"`
-			URL       string `json:"absolute_url"`
-			Content   string `json:"content"`
-			Published string `json:"first_published"`
-			Updated   string `json:"updated_at"`
+			URL       string          `json:"absolute_url"`
+			Content   string          `json:"content"`
+			Published string          `json:"first_published"`
+			Updated   string          `json:"updated_at"`
+			Pay       []greenhousePay `json:"pay_input_ranges"`
 		} `json:"jobs"`
 	}
-	v, unchanged, err := s.c.GetJSONConditional(ctx, s.Name(), base+"/jobs", url.Values{"content": {"true"}}, s.since, &data)
+	v, unchanged, err := s.c.GetJSONConditional(ctx, s.Name(), base+"/jobs",
+		url.Values{"content": {"true"}, "pay_transparency": {"true"}}, s.since, &data)
 	if err != nil || unchanged {
 		return discovery.Batch{NotModified: unchanged, Validators: v}, err
 	}
@@ -87,12 +89,39 @@ func (s *Greenhouse) Fetch(ctx context.Context) (discovery.Batch, error) {
 		if o := join(", ", offices...); o != "" && !strings.Contains(location, o) {
 			location = join("; ", location, o)
 		}
-		out = append(out, discovery.Posting{
+		p := discovery.Posting{
 			Source: s.Name(), ExternalID: id(j.ID), Company: boardCompany(s.company, j.Company, s.board, company), Title: strings.TrimSpace(j.Title),
 			Location: location, URL: j.URL, Description: htmltext.Text(j.Content), Posted: day(or(j.Published, j.Updated)),
-		})
+		}
+		if sal, ok := greenhouseSalary(j.Pay); ok {
+			sal.apply(&p)
+		}
+		out = append(out, p)
 	}
 	return discovery.Batch{Postings: out, Complete: true, Validators: v}, nil
+}
+
+// greenhousePay is a pay range of a Greenhouse posting (pay transparency), one per country or region.
+type greenhousePay struct {
+	MinCents json.Number `json:"min_cents"`
+	MaxCents json.Number `json:"max_cents"`
+	Currency string      `json:"currency_type"`
+}
+
+// greenhouseSalary takes the EUR range if there is one, else the first. Greenhouse names no period; only
+// yearly-sized amounts count (see yearly).
+func greenhouseSalary(ranges []greenhousePay) (Salary, bool) {
+	if len(ranges) == 0 {
+		return Salary{}, false
+	}
+	r := ranges[0]
+	for _, x := range ranges {
+		if strings.EqualFold(x.Currency, "EUR") {
+			r = x
+			break
+		}
+	}
+	return yearly(amount(r.MinCents)/100, amount(r.MaxCents)/100, "", r.Currency)
 }
 
 // Ashby reads the public Ashby job board API.
@@ -114,6 +143,24 @@ func workplace(s string) discovery.Workplace {
 	return workplaces[strings.ToLower(strings.TrimSpace(s))]
 }
 
+// ashbyPay is one part of an Ashby compensation summary, e.g. a salary range per "1 YEAR".
+type ashbyPay struct {
+	Type     string      `json:"compensationType"`
+	Interval string      `json:"interval"`
+	Currency string      `json:"currencyCode"`
+	Min      json.Number `json:"minValue"`
+	Max      json.Number `json:"maxValue"`
+}
+
+// salary returns the yearly salary of a "Salary" part; equity and other parts give none.
+func (c ashbyPay) salary() (Salary, bool) {
+	if !strings.EqualFold(c.Type, "Salary") {
+		return Salary{}, false
+	}
+	unit := strings.TrimSpace(strings.TrimPrefix(strings.TrimSpace(c.Interval), "1 "))
+	return yearly(amount(c.Min), amount(c.Max), unit, c.Currency)
+}
+
 // Fetch implements discovery.Source.
 func (s *Ashby) Fetch(ctx context.Context) (discovery.Batch, error) {
 	var data struct {
@@ -130,10 +177,13 @@ func (s *Ashby) Fetch(ctx context.Context) (discovery.Batch, error) {
 			Plain       string                      `json:"descriptionPlain"`
 			HTML        string                      `json:"descriptionHtml"`
 			PublishedAt string                      `json:"publishedAt"`
+			Pay         struct {
+				Components []ashbyPay `json:"summaryComponents"`
+			} `json:"compensation"`
 		} `json:"jobs"`
 	}
 	u := "https://api.ashbyhq.com/posting-api/job-board/" + url.PathEscape(s.board)
-	v, unchanged, err := s.c.GetJSONConditional(ctx, s.Name(), u, nil, s.since, &data)
+	v, unchanged, err := s.c.GetJSONConditional(ctx, s.Name(), u, url.Values{"includeCompensation": {"true"}}, s.since, &data)
 	if err != nil || unchanged {
 		return discovery.Batch{NotModified: unchanged, Validators: v}, err
 	}
@@ -154,11 +204,18 @@ func (s *Ashby) Fetch(ctx context.Context) (discovery.Batch, error) {
 		if desc == "" {
 			desc = htmltext.Text(j.HTML)
 		}
-		out = append(out, discovery.Posting{
+		p := discovery.Posting{
 			Source: s.Name(), ExternalID: j.ID, Company: s.company, Title: strings.TrimSpace(j.Title),
 			Location: join("; ", locs...), URL: j.URL, ApplyURL: j.ApplyURL, Description: desc,
 			Posted: day(j.PublishedAt), Workplace: wp,
-		})
+		}
+		for _, c := range j.Pay.Components {
+			if sal, ok := c.salary(); ok {
+				sal.apply(&p)
+				break
+			}
+		}
+		out = append(out, p)
 	}
 	return discovery.Batch{Postings: out, Complete: true, Validators: v}, nil
 }

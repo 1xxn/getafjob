@@ -15,7 +15,21 @@
       "absolute_url": "https://job-boards.greenhouse.io/acme/jobs/4000001",
       "content": "&lt;h2&gt;About the role&lt;/h2&gt;&lt;p&gt;Build APIs in Go.&lt;/p&gt;&lt;ul&gt;&lt;li&gt;PostgreSQL&lt;/li&gt;&lt;li&gt;Kubernetes&lt;/li&gt;&lt;/ul&gt;",
       "first_published": "2026-10-20T09:00:00-04:00",
-      "updated_at": "2026-11-01T10:00:00-04:00"
+      "updated_at": "2026-11-01T10:00:00-04:00",
+      "pay_input_ranges": [
+        {
+          "min_cents": 15000000,
+          "max_cents": 19000000,
+          "currency_type": "USD",
+          "title": "US"
+        },
+        {
+          "min_cents": 8000000,
+          "max_cents": 9500000,
+          "currency_type": "EUR",
+          "title": "Germany"
+        }
+      ]
     },
     {
       "id": 4000002,
@@ -33,7 +47,15 @@
       ],
       "absolute_url": "https://job-boards.greenhouse.io/acme/jobs/4000002",
       "content": "<p>Keep things running.</p><script>alert(1)</script>",
-      "updated_at": "2026-11-02T08:00:00Z"
+      "updated_at": "2026-11-02T08:00:00Z",
+      "pay_input_ranges": [
+        {
+          "min_cents": 4000,
+          "max_cents": 5500,
+          "currency_type": "EUR",
+          "title": "Hourly"
+        }
+      ]
     }
   ],
   "meta": {

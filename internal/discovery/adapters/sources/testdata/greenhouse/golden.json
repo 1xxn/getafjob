@@ -12,6 +12,9 @@
       "Description": "About the role\n\nBuild APIs in Go.\n\n• PostgreSQL\n\n• Kubernetes",
       "Posted": "2026-10-20",
       "Workplace": "",
+      "SalaryMin": 80000,
+      "SalaryMax": 95000,
+      "SalaryCurrency": "EUR",
       "Extra": null
     },
     {
