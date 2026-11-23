@@ -445,6 +445,16 @@ templ PreferencesPage(name string, f Form, section string) {
 					@ui.Input(input(ctx, f, "mailbox_port", "number", "", 5))
 					@ui.Input(input(ctx, f, "mailbox_username", "text", "", 254))
 					@ui.Input(secret(ctx, f, "mailbox_password", "new-password", true))
+					switch f.Values["mailbox_state"] {
+						case "waiting":
+							<p class="ui-hint" data-mailbox-state="waiting">{ T(ctx, "profile.mailbox.waiting") }</p>
+						case "ok":
+							<p class="ui-hint" data-mailbox-state="ok">{ T(ctx, "profile.mailbox.ok", "when", f.Values["mailbox_checked"]) }</p>
+						case "failed":
+							<div data-mailbox-state="failed">
+								@ui.Alert(ui.AlertProps{Tone: ui.Danger, Text: T(ctx, "profile.mailbox.failed", "when", f.Values["mailbox_checked"])})
+							</div>
+					}
 					<h2>{ T(ctx, "profile.assist.title") }</h2>
 					<p class="muted">{ T(ctx, "profile.assist.hint") }</p>
 					<button { HX(ctx)... } type="submit" formaction="/preferences/assist/pair" class="ui-btn ui-btn-secondary">{ T(ctx, "profile.assist.generate_code") }</button>
