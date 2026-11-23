@@ -15,6 +15,7 @@ import (
 	"fmt"
 	"net/url"
 	"os"
+	"slices"
 	"strings"
 	"time"
 
@@ -42,6 +43,12 @@ var forbiddenFlags = []flags.Flag{
 	"ignore-certificate-errors", "disable-setuid-sandbox", "single-process", "no-zygote",
 }
 
+// ownFlags are the switches Launch sets itself for isolation and egress; ExtraFlags may not replace them.
+var ownFlags = []flags.Flag{
+	"disable-features", "site-per-process", "force-webrtc-ip-handling-policy", "proxy-server", "proxy-bypass-list",
+	"remote-debugging-address", "remote-debugging-port", "user-data-dir",
+}
+
 // Browser is a running Chromium plus its cleanup.
 type Browser struct {
 	*rod.Browser
@@ -55,10 +62,8 @@ var ErrForbiddenFlag = errors.New("browser flag weakens the sandbox")
 // Launch starts a fresh browser with its own temporary profile.
 func Launch(ctx context.Context, opts Options) (*Browser, error) {
 	for name := range opts.ExtraFlags {
-		for _, f := range forbiddenFlags {
-			if flags.Flag(name) == f {
-				return nil, fmt.Errorf("%w: %s", ErrForbiddenFlag, name)
-			}
+		if slices.Contains(forbiddenFlags, flags.Flag(name)) || slices.Contains(ownFlags, flags.Flag(name)) {
+			return nil, fmt.Errorf("%w: %s", ErrForbiddenFlag, name)
 		}
 	}
 	dataDir, err := os.MkdirTemp("", "getafjob-browser-*")
