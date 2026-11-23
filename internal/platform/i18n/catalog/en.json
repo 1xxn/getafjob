@@ -536,7 +536,7 @@
   "profile.field.notify_ntfy_url": "ntfy server URL",
   "profile.field.notify_ntfy_topic": "ntfy topic",
   "profile.field.notify_ntfy_token": "ntfy access token (optional)",
-  "profile.field.notify_daily_summary_enabled": "Send daily application summary",
+  "profile.field.notify_daily_summary_enabled": "Daily application summary by Web Push and ntfy",
   "profile.field.notify_daily_summary_time": "Summary delivery time (HH:MM)",
   "profile.field.notify_quiet_hours_enabled": "Enable quiet hours (urgent alerts still delivered)",
   "profile.field.notify_quiet_hours_start": "Quiet hours start (HH:MM)",
