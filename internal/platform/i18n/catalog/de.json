@@ -159,7 +159,7 @@
   "jobs.none": "Keine Stellen passen zu diesem Filter.",
   "jobs.open_posting": "Anzeige öffnen",
   "jobs.pages": "Seiten",
-  "jobs.pending": "Noch keine Ergebnisse. Fülle deine Suchwünsche aus; Stellen werden nach dem nächsten Crawl bewertet.",
+  "jobs.pending": "Noch keine Ergebnisse. Fülle deine Suchwünsche aus; getafjob bewertet die offenen Stellen dann sofort und neue nach jedem Crawl.",
   "jobs.pending_action": "Suchwünsche ausfüllen",
   "jobs.prev": "Vorherige Seite",
   "jobs.reason_filter": "Filter",
