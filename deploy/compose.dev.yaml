@@ -5,6 +5,7 @@
 # site. serve and worker keep the normal egress proxy (crawling real sources stays read-only).
 services:
   fixtures:
+    restart: unless-stopped
     image: caddy:2.11.9-alpine@sha256:003a97808e781aa9f7e75cc2f43d34d461099031faf5e20faefb9f61126836f0
     read_only: true
     cap_drop: [ALL]
@@ -25,6 +26,7 @@ services:
       fixtures: { ipv4_address: 172.30.99.10 }
 
   runner-egress:
+    restart: unless-stopped
     image: getafjob-egress:dev
     read_only: true
     cap_drop: [ALL]
