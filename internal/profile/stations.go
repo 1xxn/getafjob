@@ -34,10 +34,24 @@ const (
 // monthDateRx matches the month and year notations CVs use: 04/2021, 4.2021, 04-2021 and 2021/04.
 var monthDateRx = regexp.MustCompile(`^(?:(\d{1,2})[./-](\d{4})|(\d{4})/(\d{1,2}))$`)
 
+// monthNameRx matches a month name and a year as English and German CVs write them: Jan 2021, Jan. 2021,
+// January 2021, März 2021, Sept. 2019.
+var monthNameRx = regexp.MustCompile(`(?i)^([a-zä]{3,9})\.?\s+(\d{4})$`)
+
+// monthNames maps the first letters of a month name (English or German) to its number.
+var monthNames = map[string]int{"jan": 1, "feb": 2, "mar": 3, "mär": 3, "apr": 4, "may": 5, "mai": 5, "jun": 6,
+	"jul": 7, "aug": 8, "sep": 9, "oct": 10, "okt": 10, "nov": 11, "dec": 12, "dez": 12}
+
 // MonthDate cleans a station date and brings month notations to YYYY-MM, the form the planner fills from. Anything
 // else (YYYY-MM, YYYY, free text) stays as written.
 func MonthDate(s string) string {
 	s = cleanLine(s)
+	if n := monthNameRx.FindStringSubmatch(s); n != nil {
+		if month, ok := monthNames[strings.ToLower(string([]rune(n[1])[:3]))]; ok {
+			return fmt.Sprintf("%s-%02d", n[2], month)
+		}
+		return s
+	}
 	m := monthDateRx.FindStringSubmatch(s)
 	if m == nil {
 		return s

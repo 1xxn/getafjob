@@ -1,0 +1,126 @@
+%-------------------------
+% Resume in Latex, layout of Jake Gutierrez's template (MIT), fictional content
+%------------------------
+
+\documentclass[letterpaper,11pt]{article}
+
+\usepackage{latexsym}
+\usepackage[empty]{fullpage}
+\usepackage{titlesec}
+\usepackage{marvosym}
+\usepackage[usenames,dvipsnames]{color}
+\usepackage{verbatim}
+\usepackage{enumitem}
+\usepackage[hidelinks]{hyperref}
+\usepackage{fancyhdr}
+\usepackage[english]{babel}
+\usepackage{tabularx}
+\input{glyphtounicode}
+
+\pagestyle{fancy}
+\fancyhf{}
+\fancyfoot{}
+\renewcommand{\headrulewidth}{0pt}
+\renewcommand{\footrulewidth}{0pt}
+
+\addtolength{\oddsidemargin}{-0.5in}
+\addtolength{\evensidemargin}{-0.5in}
+\addtolength{\textwidth}{1in}
+\addtolength{\topmargin}{-.5in}
+\addtolength{\textheight}{1.0in}
+
+\urlstyle{same}
+
+\raggedbottom
+\raggedright
+\setlength{\tabcolsep}{0in}
+
+\titleformat{\section}{
+  \vspace{-4pt}\scshape\raggedright\large
+}{}{0em}{}[\color{black}\titlerule \vspace{-5pt}]
+
+\pdfgentounicode=1
+
+\newcommand{\resumeItem}[1]{
+  \item\small{
+    {#1 \vspace{-2pt}}
+  }
+}
+
+\newcommand{\resumeSubheading}[4]{
+  \vspace{-2pt}\item
+    \begin{tabular*}{0.97\textwidth}[t]{l@{\extracolsep{\fill}}r}
+      \textbf{#1} & #2 \\
+      \textit{\small#3} & \textit{\small #4} \\
+    \end{tabular*}\vspace{-7pt}
+}
+
+\newcommand{\resumeProjectHeading}[2]{
+    \item
+    \begin{tabular*}{0.97\textwidth}{l@{\extracolsep{\fill}}r}
+      \small#1 & #2 \\
+    \end{tabular*}\vspace{-7pt}
+}
+
+\newcommand{\resumeSubItem}[1]{\resumeItem{#1}\vspace{-4pt}}
+
+\renewcommand\labelitemii{$\vcenter{\hbox{\tiny$\bullet$}}$}
+
+\newcommand{\resumeSubHeadingListStart}{\begin{itemize}[leftmargin=0.15in, label={}]}
+\newcommand{\resumeSubHeadingListEnd}{\end{itemize}}
+\newcommand{\resumeItemListStart}{\begin{itemize}}
+\newcommand{\resumeItemListEnd}{\end{itemize}\vspace{-5pt}}
+
+\begin{document}
+
+\begin{center}
+    \textbf{\Huge \scshape Erika Musterfrau} \\ \vspace{1pt}
+    \small +49 30 7654321 $|$ \href{mailto:erika.musterfrau@example.org}{\underline{erika.musterfrau@example.org}} $|$
+    \href{https://linkedin.com/in/erika-musterfrau}{\underline{linkedin.com/in/erika-musterfrau}} $|$
+    \href{https://github.com/erika-musterfrau}{\underline{github.com/erika-musterfrau}}
+\end{center}
+
+\section{Education}
+  \resumeSubHeadingListStart
+    \resumeSubheading
+      {Universit\"at Beispielstadt}{Berlin, Germany}
+      {B.Sc. Computer Science}{Oct. 2016 -- Sep. 2019}
+  \resumeSubHeadingListEnd
+
+\section{Experience}
+  \resumeSubHeadingListStart
+    \resumeSubheading
+      {Backend Engineer}{Jan. 2022 -- Present}
+      {Spreeufer Labs GmbH}{Berlin, Germany}
+      \resumeItemListStart
+        \resumeItem{Designed event-driven services in Go and Kafka for 2 million users}
+        \resumeItem{Introduced contract tests that halved integration incidents}
+      \resumeItemListEnd
+
+    \resumeSubheading
+      {Software Developer}{Oct. 2019 -- Dec. 2021}
+      {Acme Data GmbH}{Hamburg, Germany}
+      \resumeItemListStart
+        \resumeItem{Built REST APIs in Python and PostgreSQL}
+      \resumeItemListEnd
+  \resumeSubHeadingListEnd
+
+\section{Projects}
+    \resumeSubHeadingListStart
+      \resumeProjectHeading
+          {\textbf{Gitlytics} $|$ \emph{Go, React, PostgreSQL}}{June 2021 -- Present}
+          \resumeItemListStart
+            \resumeItem{A dashboard for repository statistics}
+          \resumeItemListEnd
+    \resumeSubHeadingListEnd
+
+\section{Technical Skills}
+ \begin{itemize}[leftmargin=0.15in, label={}]
+    \small{\item{
+     \textbf{Languages}{: Go, Python, SQL, TypeScript} \\
+     \textbf{Frameworks}{: React, gRPC} \\
+     \textbf{Developer Tools}{: Git, Docker, Kubernetes}
+    }}
+ \end{itemize}
+
+\end{document}
