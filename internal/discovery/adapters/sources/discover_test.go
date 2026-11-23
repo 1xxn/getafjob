@@ -45,7 +45,7 @@ func TestFindBoard(t *testing.T) {
 		discovery.Hit{Title: "Go Developer (m/w/d)", URL: "https://www.arbeitnow.com/jobs/x", ApplyURL: "https://boards.greenhouse.io/beispiel/jobs/1"})
 
 	cl, r := client(t, "ashby", map[string][]string{
-		"GET https://api.ashbyhq.com/posting-api/job-board/beispiellabs": {"board.json"},
+		"GET https://api.ashbyhq.com/posting-api/job-board/beispiellabs?includeCompensation=true": {"board.json"},
 	})
 	b, ok, err := sources.NewFinder(cl).FindBoard(t.Context(), c)
 	if err != nil || !ok || b.ATS != "ashby" || b.Slug != "beispiellabs" || b.Company != "Beispiel Labs GmbH" {
@@ -58,7 +58,7 @@ func TestFindBoard(t *testing.T) {
 	// The board answers but lists none of the hits.
 	other := candidate("Beispiel Labs GmbH", discovery.Hit{Title: "Chef"})
 	cl, _ = client(t, "ashby", map[string][]string{
-		"GET https://api.ashbyhq.com/posting-api/job-board/beispiellabs": {"board.json"},
+		"GET https://api.ashbyhq.com/posting-api/job-board/beispiellabs?includeCompensation=true": {"board.json"},
 	})
 	if b, ok, err := sources.NewFinder(cl).FindBoard(t.Context(), other); ok || err != nil {
 		t.Errorf("no match: %+v, %v, %v", b, ok, err)

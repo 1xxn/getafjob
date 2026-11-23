@@ -17,7 +17,25 @@
       "applyUrl": "https://jobs.ashbyhq.com/beispiel/1b6c4a0e-0000-4000-8000-000000000001/application",
       "descriptionPlain": "Design tools for Max Mustermann and friends.",
       "descriptionHtml": "<p>ignored</p>",
-      "publishedAt": "2026-10-28T12:00:00.000+00:00"
+      "publishedAt": "2026-10-28T12:00:00.000+00:00",
+      "compensation": {
+        "summaryComponents": [
+          {
+            "compensationType": "EquityPercentage",
+            "interval": "NONE",
+            "currencyCode": null,
+            "minValue": null,
+            "maxValue": null
+          },
+          {
+            "compensationType": "Salary",
+            "interval": "1 YEAR",
+            "currencyCode": "EUR",
+            "minValue": 70000,
+            "maxValue": 85000
+          }
+        ]
+      }
     },
     {
       "id": "1b6c4a0e-0000-4000-8000-000000000002",
@@ -25,7 +43,18 @@
       "location": "Berlin",
       "isListed": false,
       "jobUrl": "https://jobs.ashbyhq.com/beispiel/2",
-      "descriptionPlain": "not listed"
+      "descriptionPlain": "not listed",
+      "compensation": {
+        "summaryComponents": [
+          {
+            "compensationType": "Salary",
+            "interval": "1 HOUR",
+            "currencyCode": "EUR",
+            "minValue": 40,
+            "maxValue": 55
+          }
+        ]
+      }
     },
     {
       "id": "1b6c4a0e-0000-4000-8000-000000000003",

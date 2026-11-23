@@ -140,13 +140,13 @@ func TestSources(t *testing.T) {
 	}
 	cases := []tc{
 		{"greenhouse", map[string][]string{
-			"GET https://boards-api.greenhouse.io/v1/boards/acme":                   {"board.json"},
-			"GET https://boards-api.greenhouse.io/v1/boards/acme/jobs?content=true": {"jobs.json"},
+			"GET https://boards-api.greenhouse.io/v1/boards/acme":                                         {"board.json"},
+			"GET https://boards-api.greenhouse.io/v1/boards/acme/jobs?content=true&pay_transparency=true": {"jobs.json"},
 		}, func(t *testing.T, c *sources.Client) discovery.Source {
 			return board(t, c, "greenhouse", "acme", "", "")
 		}},
 		{"ashby", map[string][]string{
-			"GET https://api.ashbyhq.com/posting-api/job-board/beispiel": {"board.json"},
+			"GET https://api.ashbyhq.com/posting-api/job-board/beispiel?includeCompensation=true": {"board.json"},
 		}, func(t *testing.T, c *sources.Client) discovery.Source {
 			return board(t, c, "ashby", "beispiel", "Beispiel Labs", "")
 		}},
@@ -338,9 +338,9 @@ func TestFromBoardRejectsUnsafeSlugs(t *testing.T) {
 func TestClientErrors(t *testing.T) {
 	ctx := context.Background()
 	cl, r := client(t, "client", map[string][]string{
-		"GET https://boards-api.greenhouse.io/v1/boards/flaky/jobs?content=true": {"status:500", "status:429", "../greenhouse/jobs.json"},
-		"GET https://boards-api.greenhouse.io/v1/boards/down/jobs?content=true":  {"status:500", "status:500", "status:500"},
-		"GET https://boards-api.greenhouse.io/v1/boards/junk/jobs?content=true":  {"junk.txt"},
+		"GET https://boards-api.greenhouse.io/v1/boards/flaky/jobs?content=true&pay_transparency=true": {"status:500", "status:429", "../greenhouse/jobs.json"},
+		"GET https://boards-api.greenhouse.io/v1/boards/down/jobs?content=true&pay_transparency=true":  {"status:500", "status:500", "status:500"},
+		"GET https://boards-api.greenhouse.io/v1/boards/junk/jobs?content=true&pay_transparency=true":  {"junk.txt"},
 	})
 	if _, err := board(t, cl, "greenhouse", "flaky", "Flaky", "").Fetch(ctx); err != nil {
 		t.Fatalf("retries did not recover: %v", err)
