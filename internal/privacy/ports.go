@@ -8,7 +8,9 @@ import (
 	"github.com/1xxn/getafjob/internal/application"
 	"github.com/1xxn/getafjob/internal/identity"
 	"github.com/1xxn/getafjob/internal/matching"
+	"github.com/1xxn/getafjob/internal/notify"
 	"github.com/1xxn/getafjob/internal/profile"
+	"github.com/1xxn/getafjob/internal/tracking"
 )
 
 // IdentityService supplies identity data and handles user lifecycle.
@@ -30,6 +32,41 @@ type ProfileService interface {
 type StationService interface {
 	WorkExperiences(ctx context.Context, userID uuid.UUID) ([]profile.WorkExperience, error)
 	Educations(ctx context.Context, userID uuid.UUID) ([]profile.EducationStation, error)
+}
+
+// Extras are the further parts of the export; a nil field leaves its part out.
+type Extras struct {
+	Notes     NoteReader
+	Searches  SearchLister
+	Blocklist BlocklistReader
+	Notify    NotifyReader
+	Mailbox   MailboxReader
+}
+
+// NoteReader returns the private notes of an application (application.ErrNotFound when there are none).
+type NoteReader interface {
+	GetNotes(ctx context.Context, userID, appID uuid.UUID) (application.NoteData, error)
+}
+
+// SearchLister lists the saved searches.
+type SearchLister interface {
+	List(ctx context.Context, userID uuid.UUID) ([]matching.SavedSearch, error)
+}
+
+// BlocklistReader lists the blocked employers and keywords.
+type BlocklistReader interface {
+	Blocklist(ctx context.Context, userID uuid.UUID) ([]matching.BlocklistItem, error)
+}
+
+// NotifyReader returns the notification settings.
+type NotifyReader interface {
+	GetPreferences(ctx context.Context, userID uuid.UUID) (notify.Preferences, error)
+}
+
+// MailboxReader returns the inbox tracking settings and suggestions.
+type MailboxReader interface {
+	GetMailbox(ctx context.Context, userID uuid.UUID) (tracking.MailboxAccount, error)
+	Suggestions(ctx context.Context, userID uuid.UUID, status string) ([]tracking.StatusSuggestion, error)
 }
 
 // ItemService supplies answer bank and text blocks.

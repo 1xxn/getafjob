@@ -15,8 +15,10 @@ import (
 	"github.com/1xxn/getafjob/internal/application"
 	"github.com/1xxn/getafjob/internal/identity"
 	"github.com/1xxn/getafjob/internal/matching"
+	"github.com/1xxn/getafjob/internal/notify"
 	"github.com/1xxn/getafjob/internal/privacy"
 	"github.com/1xxn/getafjob/internal/profile"
+	"github.com/1xxn/getafjob/internal/tracking"
 )
 
 type fakeIdentity struct {
@@ -76,6 +78,36 @@ func (f *fakeStations) WorkExperiences(_ context.Context, _ uuid.UUID) ([]profil
 
 func (f *fakeStations) Educations(_ context.Context, _ uuid.UUID) ([]profile.EducationStation, error) {
 	return []profile.EducationStation{{Institution: "TU Musterstadt", Degree: "M.Sc."}}, f.err
+}
+
+type fakeExtras struct{ appID uuid.UUID }
+
+func (f fakeExtras) GetNotes(_ context.Context, _, appID uuid.UUID) (application.NoteData, error) {
+	if appID != f.appID {
+		return application.NoteData{}, application.ErrNotFound
+	}
+	return application.NoteData{Notes: "Call back on Friday", SalaryDiscussed: "75k"}, nil
+}
+
+func (fakeExtras) List(context.Context, uuid.UUID) ([]matching.SavedSearch, error) {
+	return []matching.SavedSearch{{Name: "Kubernetes remote", Query: "q=kubernetes", Alert: true}}, nil
+}
+
+func (fakeExtras) Blocklist(context.Context, uuid.UUID) ([]matching.BlocklistItem, error) {
+	return []matching.BlocklistItem{{Kind: "company", Pattern: "Spamcorp"}}, nil
+}
+
+func (fakeExtras) GetPreferences(_ context.Context, userID uuid.UUID) (notify.Preferences, error) {
+	return notify.Preferences{UserID: userID, NtfyEnabled: true, NtfyTopic: "max-jobs", NtfyToken: "tk_secret"}, nil
+}
+
+func (fakeExtras) GetMailbox(context.Context, uuid.UUID) (tracking.MailboxAccount, error) {
+	return tracking.MailboxAccount{Host: "imap.example.org", Port: 993, Username: "max@example.org",
+		EncryptedPassword: []byte("sealed-password"), Enabled: true}, nil
+}
+
+func (fakeExtras) Suggestions(context.Context, uuid.UUID, string) ([]tracking.StatusSuggestion, error) {
+	return []tracking.StatusSuggestion{{MessageFrom: "hr@acme.example.org", MessageSubject: "Interview", SuggestedState: "interview"}}, nil
 }
 
 type fakeItems struct {
@@ -230,7 +262,9 @@ func TestExportGeneratesValidZip(t *testing.T) {
 	fBlobs := &fakeBlobs{}
 
 	fStations := &fakeStations{works: []profile.WorkExperience{{Company: "Musterfirma GmbH", Title: "Lead Engineer"}}}
+	extras := fakeExtras{appID: fApps.apps[0].ID}
 	svc := privacy.NewService(fIds, fProf, fItems, fDocs, fApps, fMatch, fKeys, fBlobs).WithStations(fStations).
+		WithExtras(privacy.Extras{Notes: extras, Searches: extras, Blocklist: extras, Notify: extras, Mailbox: extras}).
 		WithClock(func() time.Time { return now })
 
 	var buf bytes.Buffer
@@ -274,6 +308,17 @@ func TestExportGeneratesValidZip(t *testing.T) {
 	}
 	if !strings.Contains(entries["profile.json"], "Musterfirma GmbH") || !strings.Contains(entries["profile.json"], "TU Musterstadt") {
 		t.Errorf("profile.json missing work history or education: %s", entries["profile.json"])
+	}
+	all := entries["profile.json"] + entries["applications.json"] + entries["settings.json"]
+	for _, want := range []string{"Call back on Friday", "Kubernetes remote", "Spamcorp", "max-jobs", "imap.example.org", "hr@acme.example.org"} {
+		if !strings.Contains(all, want) {
+			t.Errorf("export misses %q", want)
+		}
+	}
+	for _, secret := range []string{"tk_secret", "sealed-password"} {
+		if strings.Contains(all, secret) {
+			t.Errorf("export holds the secret %q", secret)
+		}
 	}
 	if want := now.Add(-48 * time.Hour).UTC().Format(time.RFC3339); !strings.Contains(entries["audit_events.json"], want) {
 		t.Errorf("audit event without its own time %s: %s", want, entries["audit_events.json"])

@@ -9,7 +9,9 @@ import (
 
 	"github.com/google/uuid"
 
+	"github.com/1xxn/getafjob/internal/application"
 	"github.com/1xxn/getafjob/internal/identity"
+	"github.com/1xxn/getafjob/internal/tracking"
 )
 
 // Service coordinates data export, account erasure with cryptographic shredding,
@@ -22,6 +24,7 @@ type Service struct {
 	apps     ApplicationService
 	matching MatchingService
 	stations StationService // nil: no work history in the export
+	extras   Extras
 	keys     KeyManager
 	blobs    BlobStore
 	now      func() time.Time
@@ -54,6 +57,12 @@ func NewService(
 // WithClock sets the clock (tests).
 func (s *Service) WithClock(now func() time.Time) *Service {
 	s.now = now
+	return s
+}
+
+// WithExtras adds notes, saved searches, the blocklist, notification and inbox settings to the export.
+func (s *Service) WithExtras(e Extras) *Service {
+	s.extras = e
 	return s
 }
 
@@ -181,9 +190,20 @@ func (s *Service) collect(ctx context.Context, userID uuid.UUID) (ExportData, ma
 				evs = append(evs, EventSummary{Event: string(e.Event), From: string(e.From), To: string(e.To),
 					Actor: string(e.Actor), At: e.At, Data: e.Detail})
 			}
-			data.Applications = append(data.Applications, ApplicationSummary{ID: a.ID, JobID: a.JobID,
+			sum := ApplicationSummary{ID: a.ID, JobID: a.JobID,
 				State: string(a.State), Company: a.Company, Title: a.Title, Location: a.Location, URL: a.URL,
-				CreatedAt: a.CreatedAt, UpdatedAt: a.UpdatedAt, Events: evs})
+				CreatedAt: a.CreatedAt, UpdatedAt: a.UpdatedAt, Events: evs}
+			if s.extras.Notes != nil {
+				n, err := s.extras.Notes.GetNotes(ctx, userID, a.ID)
+				switch {
+				case err == nil:
+					sum.Notes = &NoteSummary{Notes: n.Notes, SalaryDiscussed: n.SalaryDiscussed, InterviewAt: n.InterviewAt,
+						FollowUpAt: n.FollowUpAt, UpdatedAt: n.UpdatedAt}
+				case !errors.Is(err, application.ErrNotFound):
+					return fail("notes", err)
+				}
+			}
+			data.Applications = append(data.Applications, sum)
 		}
 		st, err := s.apps.Settings(ctx, userID)
 		if err != nil {
@@ -195,6 +215,10 @@ func (s *Service) collect(ctx context.Context, userID uuid.UUID) (ExportData, ma
 		data.Settings.EasyApplyEnabled = st.EasyApplyEnabled
 	}
 
+	if err := s.collectExtras(ctx, userID, &data); err != nil {
+		return ExportData{}, nil, err
+	}
+
 	events, err := s.identity.AuditEvents(ctx, userID)
 	if err != nil {
 		return fail("audit log", err)
@@ -203,6 +227,58 @@ func (s *Service) collect(ctx context.Context, userID uuid.UUID) (ExportData, ma
 		data.AuditEvents = append(data.AuditEvents, AuditSummary{Actor: e.Actor, Code: e.Code, Params: e.Params, CreatedAt: e.At})
 	}
 	return data, files, nil
+}
+
+// collectExtras adds saved searches, the blocklist, notification and inbox settings. Secrets (the ntfy token, the
+// mailbox password) stay out.
+func (s *Service) collectExtras(ctx context.Context, userID uuid.UUID, data *ExportData) error {
+	e := s.extras
+	if e.Searches != nil {
+		list, err := e.Searches.List(ctx, userID)
+		if err != nil {
+			return fmt.Errorf("export saved searches: %w", err)
+		}
+		for _, x := range list {
+			data.SavedSearches = append(data.SavedSearches, SearchSummary{Name: x.Name, Query: x.Query, Alert: x.Alert})
+		}
+	}
+	if e.Blocklist != nil {
+		list, err := e.Blocklist.Blocklist(ctx, userID)
+		if err != nil {
+			return fmt.Errorf("export blocklist: %w", err)
+		}
+		for _, x := range list {
+			data.Blocklist = append(data.Blocklist, BlocklistSummary{Kind: x.Kind, Pattern: x.Pattern, CreatedAt: x.CreatedAt})
+		}
+	}
+	if e.Notify != nil {
+		p, err := e.Notify.GetPreferences(ctx, userID)
+		if err != nil {
+			return fmt.Errorf("export notification settings: %w", err)
+		}
+		p.NtfyToken = ""
+		data.Notifications = p
+	}
+	if e.Mailbox != nil {
+		mb, err := e.Mailbox.GetMailbox(ctx, userID)
+		switch {
+		case err == nil:
+			data.Mailbox = &MailboxSummary{Host: mb.Host, Port: mb.Port, Username: mb.Username, Enabled: mb.Enabled,
+				LastCheckedAt: mb.LastCheckedAt}
+		case !errors.Is(err, tracking.ErrNotFound):
+			return fmt.Errorf("export inbox tracking: %w", err)
+		}
+		sugs, err := e.Mailbox.Suggestions(ctx, userID, "")
+		if err != nil {
+			return fmt.Errorf("export mail suggestions: %w", err)
+		}
+		for _, x := range sugs {
+			data.MailSuggestions = append(data.MailSuggestions, SuggestionSummary{ApplicationID: x.ApplicationID,
+				From: x.MessageFrom, Subject: x.MessageSubject, MessageDate: x.MessageDate,
+				SuggestedState: x.SuggestedState, Status: x.Status})
+		}
+	}
+	return nil
 }
 
 // DeleteAccount permanently deletes the user's data from PostgreSQL, deletes all
