@@ -522,6 +522,82 @@
     border-width: 2px;
   }
 
+  /* tag input (#597): chips and a one-line input in a box that looks like .ui-input */
+  .ui-tags {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: var(--space-1);
+    width: 100%;
+    min-height: var(--control-h);
+    padding: var(--space-1) var(--space-2);
+    background: var(--surface);
+    border: 1px solid var(--border-strong);
+    border-radius: var(--radius-md);
+    cursor: text;
+  }
+
+  .ui-tags:focus-within {
+    outline: 2px solid var(--focus);
+    outline-offset: 1px;
+  }
+
+  .ui-tags-list {
+    display: contents;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
+
+  .ui-tag {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--space-1);
+    max-width: 100%;
+    padding: 0 0 0 var(--space-2);
+    background: var(--surface-2);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    overflow-wrap: anywhere;
+  }
+
+  .ui-tag-remove {
+    display: inline-grid;
+    place-items: center;
+    min-width: 1.75rem;
+    min-height: 1.75rem;
+    padding: 0;
+    color: var(--text-2);
+    background: none;
+    border: 0;
+    border-radius: var(--radius-sm);
+    cursor: pointer;
+  }
+
+  .ui-tag-remove:hover {
+    color: var(--text);
+  }
+
+  .ui-tags-input {
+    flex: 1 1 8rem;
+    min-width: 6rem;
+    min-height: calc(var(--control-h) - var(--space-2));
+    padding: 0 var(--space-1);
+    color: inherit;
+    background: none;
+    border: 0;
+    font: inherit;
+  }
+
+  .ui-tags-input:focus {
+    outline: none;
+  }
+
+  .ui-tags:has(.ui-tags-input[aria-invalid="true"]) {
+    border-color: var(--danger);
+    border-width: 2px;
+  }
+
   .ui-textarea {
     min-height: 6rem;
     resize: vertical;
