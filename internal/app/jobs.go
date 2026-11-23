@@ -53,6 +53,8 @@ type crawlWorker struct {
 	timeout time.Duration
 	metrics *crawlMetrics
 	notify  notifier
+	// portals are the job portals whose public search the crawl reads (GETAFJOB_PORTAL_SEARCHES).
+	portals []string
 	// crawled reports whether a crawl has finished before; until then a scheduled crawl does nothing (#507).
 	crawled func(context.Context) (bool, error)
 }
@@ -93,7 +95,7 @@ func (w *crawlWorker) Work(ctx context.Context, job *river.Job[CrawlArgs]) error
 	if err != nil {
 		return err
 	}
-	srcs, ids, err := crawlSources(ctx, w.client, w.boards, terms, w.logger)
+	srcs, ids, err := crawlSources(ctx, w.client, w.boards, terms, w.portals, w.logger)
 	if err != nil {
 		return err
 	}
@@ -156,9 +158,9 @@ func (w *boardDiscoveryWorker) Work(ctx context.Context, _ *river.Job[BoardDisco
 }
 
 // crawlSources lists what a crawl reads: career sites and job boards, search-based sources when users gave search
-// terms, and every enabled company board. A board that cannot be built is skipped and logged. ids maps the
+// terms (job portals only as configured in portals), and every enabled company board. A board that cannot be built is skipped and logged. ids maps the
 // source name of each board to its ID.
-func crawlSources(ctx context.Context, c *sources.Client, boards discovery.Boards, terms searchTerms, logger *slog.Logger) (
+func crawlSources(ctx context.Context, c *sources.Client, boards discovery.Boards, terms searchTerms, portals []string, logger *slog.Logger) (
 	out []discovery.Source, ids map[string]int64, err error,
 ) {
 	out = []discovery.Source{sources.NewGoogle(c), sources.NewApple(c, "germany-DEU"), sources.NewArbeitnow(c, 10),
@@ -176,13 +178,22 @@ func crawlSources(ctx context.Context, c *sources.Client, boards discovery.Board
 				locs[i] = city + ", Germany"
 			}
 		}
-		li := sources.NewLinkedIn(c, terms.Queries, locs[0])
-		li.Locations = locs
-		in := sources.NewIndeed(c, terms.Queries, locs[0])
-		in.Locations = locs
-		gd := sources.NewGlassdoor(c, terms.Queries, locs[0])
-		gd.Locations = locs
-		out = append(out, li, in, gd)
+		for _, p := range portals {
+			switch p {
+			case "linkedin":
+				li := sources.NewLinkedIn(c, terms.Queries, locs[0])
+				li.Locations = locs
+				out = append(out, li)
+			case "indeed":
+				in := sources.NewIndeed(c, terms.Queries, locs[0])
+				in.Locations = locs
+				out = append(out, in)
+			case "glassdoor":
+				gd := sources.NewGlassdoor(c, terms.Queries, locs[0])
+				gd.Locations = locs
+				out = append(out, gd)
+			}
+		}
 	}
 	list, err := boards.EnabledBoards(ctx)
 	if err != nil {

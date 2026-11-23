@@ -223,7 +223,7 @@ func worker(ctx context.Context, cfg config.Config, logger *slog.Logger) error {
 	mstore := matchingstore.New(pool)
 	recheck := urlimport.NewService(urlimport.Options{Client: netguard.NewClient(netguard.ClientOptions{
 		Proxy: cfg.EgressProxy, Timeout: 20 * time.Second})})
-	river.AddWorker(workers, &crawlWorker{svc: discovery.NewService(store).WithImportChecker(recheck), boards: store, states: store, client: client,
+	river.AddWorker(workers, &crawlWorker{svc: discovery.NewService(store).WithImportChecker(recheck), boards: store, states: store, client: client, portals: cfg.PortalSearches,
 		terms: preferenceTerms(pstore, logger), logger: logger, timeout: 90 * time.Minute, metrics: metrics,
 		notify: pageNotifier(pool, logger), crawled: func(ctx context.Context) (bool, error) {
 			run, err := store.LatestCrawlRun(ctx)

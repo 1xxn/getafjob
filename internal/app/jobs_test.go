@@ -39,16 +39,18 @@ func TestCrawlSources(t *testing.T) {
 		{ID: 3, ATS: "workday", Slug: "muster", Company: "Muster", Config: []byte(`{"host":"muster.wd3.myworkdayjobs.com","site":"External"}`)},
 	}
 	cases := []struct {
-		terms searchTerms
-		want  string
+		terms   searchTerms
+		portals []string
+		want    string
 	}{
-		{searchTerms{}, "google apple:germany-DEU arbeitnow berlinstartupjobs greenhouse:acme workday:muster/External"},
-		{searchTerms{Queries: []string{"Go"}}, "google apple:germany-DEU arbeitnow berlinstartupjobs himalayas amazon linkedin indeed glassdoor greenhouse:acme workday:muster/External"},
-		{searchTerms{Queries: []string{"Go"}, Cities: []string{"Berlin"}},
+		{searchTerms{}, []string{"linkedin"}, "google apple:germany-DEU arbeitnow berlinstartupjobs greenhouse:acme workday:muster/External"},
+		{searchTerms{Queries: []string{"Go"}}, []string{"linkedin"}, "google apple:germany-DEU arbeitnow berlinstartupjobs himalayas amazon linkedin greenhouse:acme workday:muster/External"},
+		{searchTerms{Queries: []string{"Go"}}, nil, "google apple:germany-DEU arbeitnow berlinstartupjobs himalayas amazon greenhouse:acme workday:muster/External"},
+		{searchTerms{Queries: []string{"Go"}, Cities: []string{"Berlin"}}, []string{"linkedin", "indeed", "glassdoor"},
 			"google apple:germany-DEU arbeitnow berlinstartupjobs himalayas amazon arbeitsagentur linkedin indeed glassdoor greenhouse:acme workday:muster/External"},
 	}
 	for _, tc := range cases {
-		got, _, err := crawlSources(context.Background(), c, boards, tc.terms, logger)
+		got, _, err := crawlSources(context.Background(), c, boards, tc.terms, tc.portals, logger)
 		if err != nil || names(got) != tc.want {
 			t.Errorf("sources = %q, %v; want %q", names(got), err, tc.want)
 		}
