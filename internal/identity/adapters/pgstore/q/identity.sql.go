@@ -299,11 +299,13 @@ func (q *Queries) DeleteSession(ctx context.Context, tokenHash []byte) error {
 }
 
 const deleteUser = `-- name: DeleteUser :execrows
-DELETE FROM users WHERE id = $1
+WITH i AS (DELETE FROM invitations WHERE invitations.accepted_user = $1)
+DELETE FROM users WHERE users.id = $1
 `
 
-func (q *Queries) DeleteUser(ctx context.Context, id uuid.UUID) (int64, error) {
-	result, err := q.db.Exec(ctx, deleteUser, id)
+// The accepted invitation holds the account's e-mail address; it goes with the account (the FK only sets NULL).
+func (q *Queries) DeleteUser(ctx context.Context, userID uuid.UUID) (int64, error) {
+	result, err := q.db.Exec(ctx, deleteUser, userID)
 	if err != nil {
 		return 0, err
 	}

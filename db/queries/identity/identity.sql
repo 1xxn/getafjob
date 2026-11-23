@@ -86,7 +86,9 @@ DELETE FROM sessions o WHERE o.user_id = $1
 DELETE FROM sessions WHERE user_id = $1;
 
 -- name: DeleteUser :execrows
-DELETE FROM users WHERE id = $1;
+-- The accepted invitation holds the account's e-mail address; it goes with the account (the FK only sets NULL).
+WITH i AS (DELETE FROM invitations WHERE invitations.accepted_user = sqlc.arg(user_id))
+DELETE FROM users WHERE users.id = sqlc.arg(user_id);
 
 -- name: CreateChallenge :one
 INSERT INTO webauthn_challenges (user_id, kind, data, expires_at) VALUES ($1, $2, $3, $4) RETURNING id;
