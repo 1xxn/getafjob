@@ -10,6 +10,7 @@ an error. Unknown `GETAFJOB_*` variables are reported as a warning (typos), with
 | `GETAFJOB_HEALTH_ADDR` | `:8081` | worker, runner | internal `/healthz` and `/readyz` |
 | `GETAFJOB_GATEWAY_ADDR` | `:8090` | serve | runner gateway (Connect RPC), only on the internal gateway network |
 | `GETAFJOB_RUNNER_SECRET` | none | serve, runner | shared secret of the server's runners, at least 32 characters (`admin gen-secret`); empty keeps the gateway off |
+| `GETAFJOB_RUNNER_KIND` | `server` | runner | `server` for the runners of this instance (they authenticate with `GETAFJOB_RUNNER_SECRET`), `home` for a home runner: `GETAFJOB_RUNNER_SECRET` then holds the user's home runner token (Settings > Integrations) and the runner leases only that user's runs |
 | `GETAFJOB_GATEWAY_URL` | none | runner | where the runner reaches the gateway, e.g. `http://serve:8090`; empty: the runner only self-tests |
 | `GETAFJOB_DEV_FIXTURE_HOST` | none | serve | development only: `host:port` of the fixture site whose plain http origin may take form values (`deploy/compose.dev.yaml`); ignored unless `GETAFJOB_PUBLIC_URL` is local |
 | `GETAFJOB_DEV_STYLEGUIDE` | `false` | serve | development only: serve the design system style guide at `/dev/styleguide` (signed in users) |
