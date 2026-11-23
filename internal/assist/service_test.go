@@ -3,6 +3,7 @@ package assist_test
 import (
 	"context"
 	"errors"
+	"strings"
 	"testing"
 	"time"
 
@@ -130,6 +131,13 @@ func TestAssistServicePairingAndAuth(t *testing.T) {
 	code, err := svc.GeneratePairingCode(ctx, userID)
 	if err != nil {
 		t.Fatalf("GeneratePairingCode() err = %v", err)
+	}
+
+	// A bad client name is refused without spending the code.
+	for _, name := range []string{"", "   ", strings.Repeat("x", 129)} {
+		if _, _, err := svc.Pair(ctx, code, name); !errors.Is(err, assist.ErrInvalidClientName) {
+			t.Fatalf("Pair(name %d chars) err = %v, want ErrInvalidClientName", len(name), err)
+		}
 	}
 
 	// Pair with valid code
