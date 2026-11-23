@@ -66,6 +66,12 @@ func (s *Server) PostAssistPair(ctx context.Context, req PostAssistPairRequestOb
 		}, nil
 	}
 	tok, userName, err := s.Assist.Pair(ctx, req.Body.Code, req.Body.ClientName)
+	if errors.Is(err, assist.ErrInvalidClientName) {
+		return PostAssistPairdefaultApplicationProblemPlusJSONResponse{
+			StatusCode: http.StatusBadRequest,
+			Body:       Problem{Status: http.StatusBadRequest, Code: "assist.invalid_client_name"},
+		}, nil
+	}
 	if err != nil {
 		return PostAssistPairdefaultApplicationProblemPlusJSONResponse{ //nolint:nilerr // translated to problem JSON response
 			StatusCode: http.StatusBadRequest,

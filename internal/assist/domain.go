@@ -19,7 +19,11 @@ var (
 	ErrInvalidToken       = errors.New("invalid or expired assist token")
 	ErrUnapprovedSubmit   = errors.New("submission requires user approval")
 	ErrNotFound           = errors.New("assist entity not found")
+	ErrInvalidClientName  = errors.New("client name must have 1 to 128 characters")
 )
+
+// maxClientName is the longest client name an extension may give when pairing.
+const maxClientName = 128
 
 // PairingCode represents a short-lived one-time code to link an extension.
 type PairingCode struct {

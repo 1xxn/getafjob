@@ -6,6 +6,7 @@ import (
 	"log/slog"
 	"strings"
 	"time"
+	"unicode/utf8"
 
 	"github.com/google/uuid"
 )
@@ -72,6 +73,11 @@ func (s *Service) GeneratePairingCode(ctx context.Context, userID uuid.UUID) (st
 
 // Pair exchanges a pairing code for a persistent extension bearer token.
 func (s *Service) Pair(ctx context.Context, code, clientName string) (Token, string, error) {
+	// The name is checked before the code is used, so a bad name never spends the code.
+	clientName = strings.Join(strings.Fields(clientName), " ")
+	if clientName == "" || utf8.RuneCountInString(clientName) > maxClientName {
+		return Token{}, "", ErrInvalidClientName
+	}
 	hash := HashCode(code)
 	now := s.now()
 
