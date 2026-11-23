@@ -61,3 +61,21 @@ func TestJobPostingSalary(t *testing.T) {
 		t.Fatalf("stated salary replaced: %+v", p)
 	}
 }
+
+// Himalayas names the period in words: annual and monthly count, hourly does not.
+func TestYearlyPeriods(t *testing.T) {
+	for _, c := range []struct {
+		lo, hi      float64
+		period, cur string
+		want        Salary
+	}{
+		{70000, 80000, "annual", "usd", Salary{70000, 80000, "USD"}},
+		{5000, 6500, "monthly", "EUR", Salary{60000, 78000, "EUR"}},
+		{40, 60, "hourly", "USD", Salary{}},
+		{0, 0, "annual", "EUR", Salary{}},
+	} {
+		if got, _ := yearly(c.lo, c.hi, c.period, c.cur); got != c.want {
+			t.Errorf("yearly(%v, %v, %q, %q) = %+v, want %+v", c.lo, c.hi, c.period, c.cur, got, c.want)
+		}
+	}
+}

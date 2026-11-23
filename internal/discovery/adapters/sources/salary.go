@@ -36,10 +36,6 @@ func BaseSalary(v any) (Salary, bool) {
 		}
 		return Salary{}, false
 	}
-	s := Salary{Currency: strings.ToUpper(text(bs["currency"]))}
-	if !currencyCode.MatchString(s.Currency) {
-		s.Currency = ""
-	}
 	unit := text(bs["unitText"])
 	var lo, hi float64
 	if q, ok := bs["value"].(map[string]any); ok {
@@ -51,6 +47,15 @@ func BaseSalary(v any) (Salary, bool) {
 	} else {
 		lo = amount(bs["value"])
 		hi = lo
+	}
+	return yearly(lo, hi, unit, text(bs["currency"]))
+}
+
+// yearly turns an amount range with its period into a yearly salary (see BaseSalary for the rules).
+func yearly(lo, hi float64, unit, currency string) (Salary, bool) {
+	s := Salary{Currency: strings.ToUpper(strings.TrimSpace(currency))}
+	if !currencyCode.MatchString(s.Currency) {
+		s.Currency = ""
 	}
 	switch strings.ToUpper(unit) {
 	case "YEAR", "ANNUAL", "YEARLY":
