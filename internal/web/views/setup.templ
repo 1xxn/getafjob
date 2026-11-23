@@ -252,9 +252,8 @@ templ SetupMatches(d SetupMatchesData) {
 				@ui.StatusPill(ui.StatusProps{Label: T(ctx, "jobs.crawl_queued"), Tone: ui.Info, Live: true})
 			} else if d.Crawl.LastRun != "" {
 				<span class="app-hint">{ T(ctx, "jobs.crawl_last_run", "time", d.Crawl.LastRun) }</span>
-			} else {
-				<span class="app-hint">{ T(ctx, "jobs.crawl_never") }</span>
 			}
+			// Before the first search the empty state below says so; the status line only offers the button.
 			if !d.Started {
 				<form method="post" action="/setup/crawl">
 					@ui.Button(ui.ButtonProps{Label: T(ctx, "setup.matches.crawl"), Type: "submit", Size: "sm", Icon: "search",
