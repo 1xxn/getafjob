@@ -293,7 +293,9 @@ func TestStationsCRUDAndOrdering(t *testing.T) {
 func TestMonthDate(t *testing.T) {
 	for in, want := range map[string]string{
 		"01/2021": "2021-01", "4.2019": "2019-04", " 12-2018 ": "2018-12", "2021/04": "2021-04",
-		"2021-04": "2021-04", "2021": "2021", "13/2021": "13/2021", "Jan 2021": "Jan 2021", "": "",
+		"2021-04": "2021-04", "2021": "2021", "13/2021": "13/2021", "Jan 2021": "2021-01", "Jan. 2022": "2022-01",
+		"September 2019": "2019-09", "Sept. 2019": "2019-09", "März 2020": "2020-03", "Dez 2018": "2018-12",
+		"Spring 2021": "Spring 2021", "": "",
 	} {
 		if got := MonthDate(in); got != want {
 			t.Errorf("MonthDate(%q) = %q, want %q", in, got, want)

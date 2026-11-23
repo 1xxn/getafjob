@@ -1,0 +1,111 @@
+\documentclass[letterpaper,11pt]{article}
+
+\usepackage{fontawesome5}
+\usepackage{latexsym}
+\usepackage[empty]{fullpage}
+\usepackage{titlesec}
+\usepackage{marvosym}
+\usepackage[usenames,dvipsnames]{color}
+\usepackage{verbatim}
+\usepackage{enumitem}
+\usepackage[hidelinks]{hyperref}
+\usepackage{fancyhdr}
+\usepackage[english]{babel}
+\usepackage{tabularx}
+\input{glyphtounicode}
+
+
+
+% Custom font
+\usepackage[default]{lato}
+
+\pagestyle{fancy}
+\fancyhf{} % clear all header and footer fields
+\fancyfoot{}
+\renewcommand{\headrulewidth}{0pt}
+\renewcommand{\footrulewidth}{0pt}
+
+% Adjust margins
+\addtolength{\oddsidemargin}{-0.5in}
+\addtolength{\evensidemargin}{-0.5in}
+\addtolength{\textwidth}{1in}
+\addtolength{\topmargin}{-.5in}
+\addtolength{\textheight}{1.0in}
+
+\urlstyle{same}
+
+\raggedbottom
+\raggedright
+\setlength{\tabcolsep}{0in}
+
+% Sections formatting
+\titleformat{\section}{
+  \vspace{-4pt}\scshape\raggedright\large
+}{}{0em}{}[\color{black}\titlerule\vspace{-5pt}]
+
+% Ensure that generate pdf is machine readable/ATS parsable
+\pdfgentounicode=1
+
+%-------------------------%
+% Custom commands
+\begin{document}
+\include{custom-commands}
+
+%-------------------------------------------%
+%%%%%%  RESUME STARTS HERE  %%%%%
+
+%----------HEADING----------%
+\begin{center}
+  {\Huge \scshape Max Mustermann} \\ \vspace{2pt}
+  \small Platform Engineer \\ \vspace{3pt}
+  \seticon{faMapMarker*} Hamburg, Germany \quad
+  \seticon{faPhone*} +49 40 1234567 \quad
+  \href{mailto:max.mustermann@example.org}{\seticon{faEnvelope} max.mustermann@example.org} \quad
+  \href{https://linkedin.com/in/max-mustermann}{\seticon{faLinkedin} linkedin.com/in/max-mustermann} \quad
+  \href{https://github.com/max-mustermann}{\seticon{faGithub} github.com/max-mustermann}
+\end{center}
+
+%-----------PROFILE-----------%
+\section{Profile}
+\small{Platform engineer with eight years of experience building reliable Go services and Kubernetes platforms. I care about clear interfaces and calm on-call shifts.}
+
+%-----------EXPERIENCE-----------%
+\section{Experience}
+\resumeSubHeadingListStart
+  \resumeSubheading{Musterfirma GmbH}{Hamburg, Germany}{Senior Platform Engineer}{Apr 2021 -- Present}
+  \resumeItemListStart
+    \resumeItem{Built a multi-tenant Kubernetes platform used by 40 teams}
+    \resumeItem{Cut deployment time from 30 to 6 minutes with GitOps and Argo CD}
+  \resumeItemListEnd
+  \resumeSubheading{Beispiel AG}{Berlin, Germany}{Software Engineer}{Sep 2017 -- Mar 2021}
+  \resumeItemListStart
+    \resumeItem{Maintained the payment API in Go and PostgreSQL}
+  \resumeItemListEnd
+\resumeSubHeadingListEnd
+
+%-----------SKILLS-----------%
+\section{Skills}
+\begin{itemize}[leftmargin=0.15in, label={}]
+  \small{\item{
+    \textbf{Languages}{: Go, Python, Bash} \\
+    \textbf{Platform}{: Kubernetes, Terraform, Prometheus, PostgreSQL}
+  }}
+\end{itemize}
+
+%-----------CERTIFICATION-----------%
+\section{Certifications}
+\resumeSubHeadingListStart
+  \resumeProjectHeading{\textbf{Certified Kubernetes Administrator (CKA)}}{2023}
+\resumeSubHeadingListEnd
+
+%-----------EDUCATION-----------%
+\section{Education}
+\resumeSubHeadingListStart
+  \resumeSubheading{Technische Universit\"at Musterstadt}{Musterstadt, Germany}{M.Sc. Computer Science}{2015 -- 2017}
+\resumeSubHeadingListEnd
+
+%-----------LANGUAGES-----------%
+\section{Languages}
+\small{German (native), English (C1)}
+
+\end{document}

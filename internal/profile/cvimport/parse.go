@@ -43,6 +43,10 @@ var sections = map[string][]string{
 	"experience":     {"experience", "work experience", "professional experience", "employment", "berufserfahrung", "berufliche erfahrung", "werdegang", "beruflicher werdegang"},
 	"education":      {"education", "ausbildung", "studium", "bildung", "academic background"},
 	"certifications": {"certifications", "certificates", "zertifikate", "zertifizierungen", "weiterbildung"},
+	// other ends the sections above; its lines are not read.
+	"other": {"projects", "personal projects", "side projects", "projekte", "awards", "auszeichnungen",
+		"publications", "publikationen", "interests", "interessen", "hobbies", "volunteering", "ehrenamt",
+		"references", "referenzen"},
 }
 
 var notName = []string{"lebenslauf", "curriculum vitae", "resume", "résumé", "cv"}
@@ -89,6 +93,12 @@ func Parse(text string) profile.Profile {
 	if m := postalRx.FindStringSubmatch(text); m != nil {
 		p.Personal.PostalCode, p.Personal.City = m[1], m[2]
 	}
+	if city, country := headerPlace(lines); city != "" {
+		if p.Personal.City == "" {
+			p.Personal.City = city
+		}
+		p.Personal.Country = country
+	}
 
 	parts := split(lines)
 	p.Summary = strings.Join(strings.Fields(strings.Join(parts["summary"], " ")), " ")
@@ -96,7 +106,7 @@ func Parse(text string) profile.Profile {
 		p.Summary = string(r[:1500])
 	}
 	p.Skills = mergeSkills(skillItems(parts["skills"], 60, 80), vocab.KnownSkills(strings.Join(parts["skills"], "\n")), 80)
-	p.Certifications = items(parts["certifications"], 120, 40)
+	p.Certifications = items(dropDateColumn(parts["certifications"]), 120, 40)
 	p.Languages = languages(parts["languages"])
 	return p
 }
@@ -165,6 +175,39 @@ func phone(text string) string {
 	}
 	return ""
 }
+
+// placeRx finds "City, Country" with a country CVs in this market name, e.g. "Hamburg, Germany".
+var placeRx = regexp.MustCompile(`(?:^|[\s|·•,])([\p{Lu}][\p{L}.-]+(?:[\s-][\p{Lu}][\p{L}.-]+)?),\s*(Germany|Deutschland|Austria|Österreich|Switzerland|Schweiz|Netherlands|Niederlande|Poland|Polen|France|Frankreich|Spain|Spanien|Italy|Italien|Portugal|Ireland|Irland|Denmark|Dänemark|Sweden|Schweden|Norway|Norwegen|Finland|Finnland|Belgium|Belgien|Luxembourg|Luxemburg|Czechia|Tschechien|United Kingdom|UK)\b`)
+
+// headerPlace takes the city and country from the lines before the first section heading (the contact block).
+func headerPlace(lines []string) (city, country string) {
+	for _, l := range lines {
+		if heading(l) != "" {
+			break
+		}
+		if m := placeRx.FindStringSubmatch(l); m != nil {
+			return cut(m[1], 200), cut(m[2], 200)
+		}
+	}
+	return "", ""
+}
+
+// dropDateColumn removes a right column that holds only a date or year ("Certified X  2023").
+func dropDateColumn(lines []string) []string {
+	out := make([]string, len(lines))
+	for i, l := range lines {
+		out[i] = l
+		if locs := colGapRx.FindAllStringIndex(l, -1); len(locs) > 0 {
+			last := locs[len(locs)-1]
+			if dateOnlyRx.MatchString(strings.TrimSpace(l[last[1]:])) {
+				out[i] = strings.TrimSpace(l[:last[0]])
+			}
+		}
+	}
+	return out
+}
+
+var dateOnlyRx = regexp.MustCompile(`(?i)^(?:` + dateTok + `)(?:\s*(?:-|\x{2013}|\x{2014})\s*(?:` + dateTok + `|present|heute))?$`)
 
 // split groups the lines under the section headings they follow.
 func split(lines []string) map[string][]string {
@@ -476,7 +519,7 @@ func appendBullet(we *profile.WorkExperience, bullet string, forceJoin bool) {
 
 func extractWorkExperiences(lines []string) []profile.WorkExperience {
 	var out []profile.WorkExperience
-	skipCompanyLine := -1
+	skipCompanyLine, usedLine := -1, -1
 	for i, l := range lines {
 		if len(out) > 0 && bulletRx.MatchString(l) {
 			bullet := strings.TrimSpace(bulletRx.ReplaceAllString(l, ""))
@@ -518,9 +561,18 @@ func extractWorkExperiences(lines []string) []profile.WorkExperience {
 		}
 		rest, we.WorkplaceType = extractWorkplaceType(rest)
 		we.Title, we.Company, we.Location = parseTitleCompanyLocation(rest)
-		if we.Company == "" && i+1 < len(lines) && findDateRange(lines[i+1]) == nil && !bulletRx.MatchString(lines[i+1]) {
-			we.Company = cut(lines[i+1], 200)
-			skipCompanyLine = i + 1
+		if we.Company == "" {
+			if j := pairLine(lines, i, usedLine); j >= 0 {
+				name, loc := columns(lines[j])
+				we.Title, we.Company = chooseRoleAndCompany(we.Title, name)
+				if we.Location == "" {
+					we.Location = loc
+				}
+				usedLine = j
+				if j > i {
+					skipCompanyLine = j
+				}
+			}
 		}
 		out = append(out, we)
 		if len(out) >= profile.MaxStations {
@@ -532,6 +584,7 @@ func extractWorkExperiences(lines []string) []profile.WorkExperience {
 
 func extractEducations(lines []string) []profile.EducationStation {
 	var out []profile.EducationStation
+	usedLine := -1
 	for i, l := range lines {
 		m := findDateRange(l)
 		if m == nil {
@@ -551,8 +604,14 @@ func extractEducations(lines []string) []profile.EducationStation {
 			rest = lines[i-1]
 		}
 		rawDegree, inst := titleCompany(rest)
-		if inst == "" && i+1 < len(lines) && findDateRange(lines[i+1]) == nil {
-			inst = cut(lines[i+1], 200)
+		if left, _ := columns(rest); inst == "" && left != rest {
+			rawDegree = left // "M.Sc. Computer Science  Musterstadt" keeps only the degree
+		}
+		if inst == "" {
+			if j := institutionLine(lines, i, usedLine); j >= 0 {
+				inst, _ = columns(lines[j])
+				usedLine = j
+			}
 		}
 		ed.Institution = inst
 		ed.Degree, ed.FieldOfStudy = parseDegreeAndField(rawDegree)
@@ -566,6 +625,57 @@ func extractEducations(lines []string) []profile.EducationStation {
 		}
 	}
 	return out
+}
+
+// columns splits a line of a two-column layout ("Musterfirma GmbH  Hamburg, Germany") into its left text and its
+// right column; a line without a column gap is all left.
+func columns(l string) (left, right string) {
+	l = strings.TrimSpace(l)
+	locs := colGapRx.FindAllStringIndex(l, -1)
+	if len(locs) == 0 {
+		return cut(l, 200), ""
+	}
+	last := locs[len(locs)-1]
+	return cut(strings.TrimSpace(l[:last[0]]), 200), cut(strings.Join(strings.Fields(l[last[1]:]), " "), 200)
+}
+
+// plainLine reports whether line j can hold a station's company or institution: no date range, no bullet, not
+// taken by another station.
+func plainLine(lines []string, j, used int) bool {
+	return j >= 0 && j < len(lines) && j != used && findDateRange(lines[j]) == nil && !bulletRx.MatchString(lines[j]) &&
+		strings.TrimSpace(lines[j]) != ""
+}
+
+// pairLine finds the line that completes the dated line i: below it (title above, company below), else above it
+// (company above, title below). A line above only counts when the line before it is not a plain text line, so a
+// wrapped bullet is never taken for a company.
+func pairLine(lines []string, i, used int) int {
+	if plainLine(lines, i+1, used) {
+		return i + 1
+	}
+	if plainLine(lines, i-1, used) && (i-2 < 0 || !plainLine(lines, i-2, used) || bulletRx.MatchString(lines[i-2])) {
+		return i - 1
+	}
+	return -1
+}
+
+var institutionRx = regexp.MustCompile(`(?i)universit|hochschule|college|school|schule|institut|academy|akademie|polytechnic|\btu\b|\bfh\b`)
+
+// institutionLine finds the institution next to the dated degree line i: the line that names an institution, else
+// the line above when it has a column gap (Jake's template), else the line below.
+func institutionLine(lines []string, i, used int) int {
+	for _, j := range []int{i - 1, i + 1} {
+		if plainLine(lines, j, used) && institutionRx.MatchString(lines[j]) {
+			return j
+		}
+	}
+	if plainLine(lines, i-1, used) && colGapRx.MatchString(strings.TrimSpace(lines[i-1])) {
+		return i - 1
+	}
+	if plainLine(lines, i+1, used) {
+		return i + 1
+	}
+	return -1
 }
 
 // Merge fills empty fields of cur with found; lists only when cur has none. Nothing the user entered is replaced.

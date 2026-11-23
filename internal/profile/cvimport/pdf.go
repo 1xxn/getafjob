@@ -3,7 +3,9 @@ package cvimport
 import (
 	"encoding/hex"
 	"io"
+	"strconv"
 	"strings"
+	"unicode"
 	"unicode/utf16"
 
 	"github.com/ledongthuc/pdf"
@@ -31,6 +33,84 @@ type fontDecoder struct {
 	baseName string
 	toUni    *toUnicodeCMap
 	fallback pdf.TextEncoding
+	// names are the glyph names of the font's /Differences; they decode codes the ToUnicode CMap lacks, such as
+	// the "fi" ligature of LaTeX fonts (/uniFB01).
+	names map[int]string
+	// icon marks a symbol font (Font Awesome, Marvosym, ...): its glyphs are pictures, not text.
+	icon bool
+}
+
+// iconFonts are base font names whose glyphs are icons; LaTeX CVs put them before e-mail, phone and profile links.
+var iconFonts = []string{"fontawesome", "academicons", "marvosym", "fontello", "materialicons", "octicons", "ifsym"}
+
+func iconFont(base string) bool {
+	b := strings.ToLower(base)
+	for _, f := range iconFonts {
+		if strings.Contains(b, f) {
+			return true
+		}
+	}
+	return false
+}
+
+// ligatureGlyphs are the glyph names of ligatures that fonts use without a uniXXXX name.
+var ligatureGlyphs = map[string]string{
+	"fi": "fi", "fl": "fl", "ff": "ff", "ffi": "ffi", "ffl": "ffl", "f_i": "fi", "f_l": "fl", "f_f": "ff",
+	"f_f_i": "ffi", "f_f_l": "ffl", "f_t": "ft", "s_t": "st",
+}
+
+// glyphText reads the text of a glyph name: uniXXXX (one or more code points), uXXXX[XX] and ligatures.
+func glyphText(name string) (string, bool) {
+	if s, ok := ligatureGlyphs[name]; ok {
+		return s, true
+	}
+	if hexs, ok := strings.CutPrefix(name, "uni"); ok && len(hexs) >= 4 && len(hexs)%4 == 0 {
+		var out []rune
+		for i := 0; i < len(hexs); i += 4 {
+			b, err := hex.DecodeString(hexs[i : i+4])
+			if err != nil {
+				return "", false
+			}
+			out = append(out, rune(b[0])<<8|rune(b[1]))
+		}
+		return string(out), true
+	}
+	if hexs, ok := strings.CutPrefix(name, "u"); ok && len(hexs) >= 4 && len(hexs) <= 6 {
+		r, err := strconv.ParseUint(hexs, 16, 32)
+		if err != nil || strings.ToUpper(hexs) != hexs || r > unicode.MaxRune {
+			return "", false
+		}
+		return string(rune(r)), true
+	}
+	return "", false
+}
+
+// differences reads the glyph names of a font's /Encoding /Differences array (code, then names from that code).
+func differences(f pdf.Font) map[int]string {
+	enc := f.V.Key("Encoding")
+	if enc.Kind() != pdf.Dict {
+		return nil
+	}
+	diff := enc.Key("Differences")
+	if diff.Kind() != pdf.Array {
+		return nil
+	}
+	out := map[int]string{}
+	code := 0
+	for i := 0; i < diff.Len() && i < 1024; i++ {
+		v := diff.Index(i)
+		switch v.Kind() {
+		case pdf.Integer:
+			code = int(v.Int64())
+		case pdf.Name:
+			if code >= 0 && code < 256 {
+				out[code] = v.Name()
+			}
+			code++
+		case pdf.Null, pdf.Bool, pdf.Real, pdf.String, pdf.Dict, pdf.Array, pdf.Stream:
+		}
+	}
+	return out
 }
 
 func newFontDecoder(p pdf.Page, name string) *fontDecoder {
@@ -52,7 +132,17 @@ func newFontDecoder(p pdf.Page, name string) *fontDecoder {
 		baseName: base,
 		toUni:    tu,
 		fallback: f.Encoder(),
+		names:    differences(f),
+		icon:     iconFont(base),
 	}
+}
+
+// named decodes a one-byte code by its glyph name when that name says what text it is.
+func (d *fontDecoder) named(code int) (string, bool) {
+	if name, ok := d.names[code]; ok {
+		return glyphText(name)
+	}
+	return "", false
 }
 
 func (d *fontDecoder) width(code int) float64 {
@@ -71,6 +161,13 @@ func (d *fontDecoder) decode(raw string) []glyphPiece {
 	if raw == "" {
 		return nil
 	}
+	if d.icon { // icons separate items like a space; their codes would read as stray letters
+		out := bytePieces(raw)
+		for i := range out {
+			out[i].str = " "
+		}
+		return out
+	}
 	if d.toUni == nil {
 		if d.fallback == nil {
 			return bytePieces(raw)
@@ -81,6 +178,9 @@ func (d *fontDecoder) decode(raw string) []glyphPiece {
 			n := 0
 			for _, r := range decoded {
 				out[n] = glyphPiece{code: int(raw[n]), str: string(r)}
+				if s, ok := d.named(int(raw[n])); ok {
+					out[n].str = s
+				}
 				n++
 			}
 			return out
@@ -108,6 +208,8 @@ func (d *fontDecoder) decode(raw string) []glyphPiece {
 			}
 			code := int(beUint(seg))
 			if s, ok := d.toUni.mapping[n-1][seg]; ok {
+				out = append(out, glyphPiece{code: code, str: s})
+			} else if s, ok := d.named(code); ok && n == 1 {
 				out = append(out, glyphPiece{code: code, str: s})
 			} else if d.fallback != nil {
 				out = append(out, glyphPiece{code: code, str: d.fallback.Decode(seg)})
