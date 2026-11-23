@@ -812,3 +812,36 @@ func TestRecoveryInsteadOfMagicLink(t *testing.T) {
 		t.Fatalf("cancel = %v, %v", ok, err)
 	}
 }
+
+// TestDeleteUserRemovesItsInvitation: the accepted invitation holds the account's e-mail address; it goes with the
+// account, while other invitations stay.
+func TestDeleteUserRemovesItsInvitation(t *testing.T) {
+	e := newEnv(t)
+	ctx := t.Context()
+	u, _ := signIn(t, e)
+	if _, _, err := e.svc.Invite(ctx, identity.InviteRequest{Email: "erika@example.com", Role: identity.RoleUser}); err != nil {
+		t.Fatal(err)
+	}
+	if err := e.svc.DeleteUser(ctx, u.ID); err != nil {
+		t.Fatal(err)
+	}
+	var emails []string
+	err := db.InSystemTx(ctx, e.pool, func(tx pgx.Tx) error {
+		rows, err := tx.Query(ctx, "SELECT email FROM invitations ORDER BY email")
+		if err != nil {
+			return err
+		}
+		defer rows.Close()
+		for rows.Next() {
+			var s string
+			if err := rows.Scan(&s); err != nil {
+				return err
+			}
+			emails = append(emails, s)
+		}
+		return rows.Err()
+	})
+	if err != nil || len(emails) != 1 || emails[0] != "erika@example.com" {
+		t.Fatalf("invitations left = %v, %v", emails, err)
+	}
+}
