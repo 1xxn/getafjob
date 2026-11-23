@@ -90,7 +90,7 @@ type StatusSuggestion struct {
 	MessageSubject string
 	// SealedMail holds MessageID, MessageFrom and MessageSubject sealed with the user's data key (#578); the store
 	// keeps only this, the service opens it.
-	SealedMail []byte
+	SealedMail     []byte
 	MessageDate    time.Time
 	Category       Category
 	SuggestedState string
