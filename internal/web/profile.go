@@ -551,6 +551,7 @@ func (s *Server) settingsForm(ctx context.Context, u *identity.User, p profile.P
 	}
 	f := preferencesForm(p, a, mb, np, accounts, easyApplyAdmin)
 	f.Values["time_zone"] = s.TimeZone.String()
+	f.Values["mailbox_state"], f.Values["mailbox_checked"] = mailboxState(ctx, mb)
 	if s.VAPIDPublicKey == "" { // no key: the instance cannot send web push
 		f.Values["webpush_off"] = "1"
 		f.Checks["notify_webpush_enabled"] = false
@@ -1006,5 +1007,20 @@ func (s *Server) stationOrder(kind string) func(http.ResponseWriter, *http.Reque
 		default:
 			http.Redirect(w, r, "/profile#stations", http.StatusSeeOther)
 		}
+	}
+}
+
+// mailboxState says what the last inbox check found: "" (no mailbox), "waiting" (not checked yet), "ok" or
+// "failed", with the time of the check. The worker's raw IMAP error stays in the log; the page explains in words.
+func mailboxState(ctx context.Context, mb tracking.MailboxAccount) (state, checked string) {
+	switch {
+	case mb.Host == "" || !mb.Enabled:
+		return "", ""
+	case mb.LastCheckedAt == nil:
+		return "waiting", ""
+	case mb.LastError != "":
+		return "failed", views.When(ctx, *mb.LastCheckedAt)
+	default:
+		return "ok", views.When(ctx, *mb.LastCheckedAt)
 	}
 }
