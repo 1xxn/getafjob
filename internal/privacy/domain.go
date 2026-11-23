@@ -26,6 +26,11 @@ type ExportData struct {
 	Matches         []MatchSummary       `json:"matches,omitempty"`
 	Applications    []ApplicationSummary `json:"applications,omitempty"`
 	Settings        SettingsSummary      `json:"settings,omitempty"`
+	SavedSearches   []SearchSummary      `json:"saved_searches,omitempty"`
+	Blocklist       []BlocklistSummary   `json:"blocklist,omitempty"`
+	Notifications   any                  `json:"notifications,omitempty"`
+	Mailbox         *MailboxSummary      `json:"mailbox,omitempty"`
+	MailSuggestions []SuggestionSummary  `json:"mail_suggestions,omitempty"`
 	AuditEvents     []AuditSummary       `json:"audit_events,omitempty"`
 }
 
@@ -101,6 +106,49 @@ type ApplicationSummary struct {
 	CreatedAt time.Time      `json:"created_at"`
 	UpdatedAt time.Time      `json:"updated_at"`
 	Events    []EventSummary `json:"events,omitempty"`
+	Notes     *NoteSummary   `json:"notes,omitempty"`
+}
+
+// NoteSummary holds the user's private notes on an application.
+type NoteSummary struct {
+	Notes           string     `json:"notes,omitempty"`
+	SalaryDiscussed string     `json:"salary_discussed,omitempty"`
+	InterviewAt     *time.Time `json:"interview_at,omitempty"`
+	FollowUpAt      *time.Time `json:"follow_up_at,omitempty"`
+	UpdatedAt       time.Time  `json:"updated_at"`
+}
+
+// SearchSummary is a saved search.
+type SearchSummary struct {
+	Name  string `json:"name"`
+	Query string `json:"query"`
+	Alert bool   `json:"alert"`
+}
+
+// BlocklistSummary is a blocked employer or keyword.
+type BlocklistSummary struct {
+	Kind      string    `json:"kind"`
+	Pattern   string    `json:"pattern"`
+	CreatedAt time.Time `json:"created_at"`
+}
+
+// MailboxSummary is the inbox tracking setup without its password.
+type MailboxSummary struct {
+	Host          string     `json:"host"`
+	Port          int        `json:"port"`
+	Username      string     `json:"username"`
+	Enabled       bool       `json:"enabled"`
+	LastCheckedAt *time.Time `json:"last_checked_at,omitempty"`
+}
+
+// SuggestionSummary is a status suggestion from a mail.
+type SuggestionSummary struct {
+	ApplicationID  uuid.UUID `json:"application_id"`
+	From           string    `json:"from"`
+	Subject        string    `json:"subject"`
+	MessageDate    time.Time `json:"message_date"`
+	SuggestedState string    `json:"suggested_state"`
+	Status         string    `json:"status"`
 }
 
 // EventSummary is one timeline event of an application.
@@ -157,6 +205,8 @@ func WriteArchive(w io.Writer, data ExportData, files map[string][]byte) error {
 		"profile":          data.Profile,
 		"preferences":      data.Preferences,
 		"work_experiences": data.WorkExperiences,
+		"saved_searches":   data.SavedSearches,
+		"blocklist":        data.Blocklist,
 		"educations":       data.Educations,
 		"answers":          data.Answers,
 		"texts":            data.Texts,
@@ -174,9 +224,12 @@ func WriteArchive(w io.Writer, data ExportData, files map[string][]byte) error {
 	}
 
 	if err := writeJSON("settings.json", map[string]any{
-		"settings": data.Settings,
-		"passkeys": data.Passkeys,
-		"sessions": data.Sessions,
+		"settings":         data.Settings,
+		"notifications":    data.Notifications,
+		"mailbox":          data.Mailbox,
+		"mail_suggestions": data.MailSuggestions,
+		"passkeys":         data.Passkeys,
+		"sessions":         data.Sessions,
 	}); err != nil {
 		return err
 	}

@@ -5,6 +5,7 @@ import (
 	"errors"
 	"flag"
 	"fmt"
+	"log/slog"
 	"os"
 
 	"github.com/jackc/pgx/v5/pgxpool"
@@ -15,6 +16,8 @@ import (
 	"github.com/1xxn/getafjob/internal/identity/adapters/pgstore"
 	"github.com/1xxn/getafjob/internal/matching"
 	matchingstore "github.com/1xxn/getafjob/internal/matching/adapters/pgstore"
+	"github.com/1xxn/getafjob/internal/notify"
+	notifystore "github.com/1xxn/getafjob/internal/notify/adapters/pgstore"
 	"github.com/1xxn/getafjob/internal/platform/blob"
 	"github.com/1xxn/getafjob/internal/platform/config"
 	"github.com/1xxn/getafjob/internal/platform/crypto"
@@ -22,6 +25,9 @@ import (
 	"github.com/1xxn/getafjob/internal/privacy"
 	"github.com/1xxn/getafjob/internal/profile"
 	profilestore "github.com/1xxn/getafjob/internal/profile/adapters/pgstore"
+	"github.com/1xxn/getafjob/internal/tracking"
+	trackingcrypto "github.com/1xxn/getafjob/internal/tracking/adapters/crypto"
+	trackingstore "github.com/1xxn/getafjob/internal/tracking/adapters/pgstore"
 )
 
 func newPrivacyServiceFromConfig(cfg config.Config, pool *pgxpool.Pool) (*privacy.Service, error) {
@@ -50,10 +56,16 @@ func newPrivacyServiceFromConfig(cfg config.Config, pool *pgxpool.Pool) (*privac
 	items := profile.NewItems(pstore, env)
 	docs := profile.NewDocuments(pstore, sealedFiles, env)
 	apps := application.NewService(applicationstore.New(pool))
-	listings := matching.NewListings(matchingstore.New(pool))
+	mstore := matchingstore.New(pool)
+	listings := matching.NewListings(mstore)
+	// Read-only services for the export: no mail, push or IMAP client is needed to read settings.
+	notifySvc := notify.NewService(notifystore.New(pool), nil, nil, nil, "", slog.Default())
+	trackingSvc := tracking.NewService(trackingstore.New(pool), nil, trackingcrypto.NewCipher(env), nil)
 
 	return privacy.NewService(ids, profiles, items, docs, apps, listings, env, sealedFiles).
-		WithStations(profile.NewStations(pstore, env)), nil
+		WithStations(profile.NewStations(pstore, env)).
+		WithExtras(privacy.Extras{Notes: apps, Searches: matching.NewSavedSearches(mstore, listings), Blocklist: listings,
+			Notify: notifySvc, Mailbox: trackingSvc}), nil
 }
 
 func adminDeleteUser(ctx context.Context, args []string, env Env) int {
