@@ -812,11 +812,11 @@
   }
 
   /* tabs */
+  /* Tabs wrap instead of scrolling: every tab stays in view and no scrollbar looks like an active marker. */
   .ui-tabs {
     display: flex;
+    flex-wrap: wrap;
     gap: var(--space-1);
-    overflow-x: auto;
-    scrollbar-width: thin;
     box-shadow: inset 0 -1px var(--border);
     margin-bottom: var(--space-4);
   }
