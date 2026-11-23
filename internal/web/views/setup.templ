@@ -155,7 +155,7 @@ templ SetupPage(d SetupData) {
 							@ui.Input(input(ctx, d.Form, "salary_expectation", "text", "", 200))
 						</div>
 						@ui.Checkbox(check(ctx, d.Form, "work_authorized_eu"))
-						@ui.Textarea(area(ctx, d.Form, "skills", 12000))
+						@ui.Textarea(tags(ctx, d.Form, "skills", 12000))
 						<h2>{ T(ctx, "setup.profile.stations") }</h2>
 						if len(d.Stations) == 0 {
 							<p class="app-hint">{ T(ctx, "setup.profile.no_stations") }</p>
@@ -174,8 +174,8 @@ templ SetupPage(d SetupData) {
 					</form>
 				case "search":
 					<form method="post" action="/setup/search" class="wiz-card stack" novalidate data-dirty-guard data-t-unsaved={ T(ctx, "cand.unsaved") }>
-						@ui.Textarea(area(ctx, d.Form, "titles", 12000))
-						@ui.Textarea(area(ctx, d.Form, "locations", 12000))
+						@ui.Textarea(tags(ctx, d.Form, "titles", 12000))
+						@ui.Textarea(tags(ctx, d.Form, "locations", 12000))
 						@ui.Checkbox(check(ctx, d.Form, "remote"))
 						@ui.Input(input(ctx, d.Form, "min_salary", "number", "", 9))
 						@setupButtons(d.Step, T(ctx, "setup.next"))

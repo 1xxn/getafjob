@@ -575,7 +575,7 @@ func SetupPage(d SetupData) templ.Component {
 				if templ_7745c5c3_Err != nil {
 					return templ_7745c5c3_Err
 				}
-				templ_7745c5c3_Err = ui.Textarea(area(ctx, d.Form, "skills", 12000)).Render(ctx, templ_7745c5c3_Buffer)
+				templ_7745c5c3_Err = ui.Textarea(tags(ctx, d.Form, "skills", 12000)).Render(ctx, templ_7745c5c3_Buffer)
 				if templ_7745c5c3_Err != nil {
 					return templ_7745c5c3_Err
 				}
@@ -694,11 +694,11 @@ func SetupPage(d SetupData) templ.Component {
 				if templ_7745c5c3_Err != nil {
 					return templ_7745c5c3_Err
 				}
-				templ_7745c5c3_Err = ui.Textarea(area(ctx, d.Form, "titles", 12000)).Render(ctx, templ_7745c5c3_Buffer)
+				templ_7745c5c3_Err = ui.Textarea(tags(ctx, d.Form, "titles", 12000)).Render(ctx, templ_7745c5c3_Buffer)
 				if templ_7745c5c3_Err != nil {
 					return templ_7745c5c3_Err
 				}
-				templ_7745c5c3_Err = ui.Textarea(area(ctx, d.Form, "locations", 12000)).Render(ctx, templ_7745c5c3_Buffer)
+				templ_7745c5c3_Err = ui.Textarea(tags(ctx, d.Form, "locations", 12000)).Render(ctx, templ_7745c5c3_Buffer)
 				if templ_7745c5c3_Err != nil {
 					return templ_7745c5c3_Err
 				}

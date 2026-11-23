@@ -55,6 +55,16 @@ func area(ctx context.Context, f Form, name string, maxLen int) ui.TextareaProps
 		Hint: T(ctx, "profile.hint."+name), Error: f.Errors[name]}, Value: f.Values[name], MaxLength: maxLen}
 }
 
+// tags builds a list field: a textarea with one entry per line that the tags script turns into a one-line input
+// with removable chips. Without JavaScript the textarea stays as it is; the submitted value is the same.
+func tags(ctx context.Context, f Form, name string, maxLen int) ui.TextareaProps {
+	p := area(ctx, f, name, maxLen)
+	p.Rows = 2
+	p.Attrs = templ.Attributes{"data-tags": "", "data-tags-remove": T(ctx, "profile.tags.remove"),
+		"data-tags-added": T(ctx, "profile.tags.added"), "data-tags-removed": T(ctx, "profile.tags.removed")}
+	return p
+}
+
 // check builds a checkbox labelled with profile.field.<name>.
 func check(ctx context.Context, f Form, name string) ui.CheckProps {
 	return ui.CheckProps{Name: name, Label: T(ctx, "profile.field."+name), Checked: f.Checks[name]}
@@ -269,9 +279,9 @@ templ ProfilePage(name string, h CandidateHead, f Form, experiences []ProfileExp
 			@ui.Checkbox(check(ctx, f, "willing_to_relocate"))
 			<h2 class="form-section">{ T(ctx, "profile.section.about") }</h2>
 			@ui.Textarea(area(ctx, f, "summary", 5000))
-			@ui.Textarea(area(ctx, f, "skills", 12000))
-			@ui.Textarea(area(ctx, f, "languages", 3000))
-			@ui.Textarea(area(ctx, f, "certifications", 12000))
+			@ui.Textarea(tags(ctx, f, "skills", 12000))
+			@ui.Textarea(tags(ctx, f, "languages", 3000))
+			@ui.Textarea(tags(ctx, f, "certifications", 12000))
 			@StickyBar() {
 				@SaveStateLine(SaveState{ID: "profile", Text: T(ctx, "profile.autosave.hint")})
 			}
@@ -468,11 +478,11 @@ templ PreferencesPage(name string, f Form, section string) {
 			default:
 				<form method="post" action="/preferences" class="stack set-form" novalidate data-dirty-guard>
 					<input type="hidden" name="section" value="search"/>
-					@ui.Textarea(area(ctx, f, "titles", 12000))
-					@ui.Textarea(area(ctx, f, "exclude_titles", 12000))
-					@ui.Textarea(area(ctx, f, "locations", 12000))
+					@ui.Textarea(tags(ctx, f, "titles", 12000))
+					@ui.Textarea(tags(ctx, f, "exclude_titles", 12000))
+					@ui.Textarea(tags(ctx, f, "locations", 12000))
 					@ui.Checkbox(check(ctx, f, "remote"))
-					@ui.Textarea(area(ctx, f, "remote_regions", 3000))
+					@ui.Textarea(tags(ctx, f, "remote_regions", 3000))
 					@ui.Input(input(ctx, f, "min_salary", "number", "", 9))
 					@ui.Select(choice(ctx, f, "cover_letter_lang", "profile.lang.", "auto", "en", "de"))
 					@ui.Select(choice(ctx, f, "diversity", "profile.diversity.", "decline", "answer"))

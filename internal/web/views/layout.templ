@@ -36,6 +36,7 @@ templ Layout(p Page) {
 				<script type="module" src={ Asset("js/jobs.js") } nonce={ templ.GetNonce(ctx) }></script>
 				<script type="module" src={ Asset("js/pipeline.js") } nonce={ templ.GetNonce(ctx) }></script>
 				<script type="module" src={ Asset("js/sortable.js") } nonce={ templ.GetNonce(ctx) }></script>
+				<script type="module" src={ Asset("js/tags.js") } nonce={ templ.GetNonce(ctx) }></script>
 			}
 		</head>
 		if p.UserName != "" {
