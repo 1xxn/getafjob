@@ -96,7 +96,8 @@ func TestRendererRunsInItsOwnNamespaces(t *testing.T) {
 }
 
 func TestForbiddenExtraFlagsAreRejected(t *testing.T) {
-	for _, f := range []string{"no-sandbox", "disable-web-security", "single-process"} {
+	for _, f := range []string{"no-sandbox", "disable-web-security", "single-process", "disable-features", "proxy-server",
+		"proxy-bypass-list", "force-webrtc-ip-handling-policy"} {
 		_, err := Launch(context.Background(), Options{
 			Bin: os.Getenv("GETAFJOB_BROWSER_BIN"), ExtraFlags: map[string]string{f: ""},
 		})
