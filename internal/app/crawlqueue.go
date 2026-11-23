@@ -35,13 +35,15 @@ func (q *RiverCrawlQueue) QueueCrawl(ctx context.Context) (bool, error) {
 	return !res.UniqueSkippedAsDuplicate, nil
 }
 
-// IsQueued reports whether a crawl job is currently waiting in the River queue.
+// IsQueued reports whether a crawl job is on its way: waiting, or taken by the worker before the crawl has written
+// its run (it first gathers boards and search terms), or waiting for a retry. Without the running state the status
+// would read "no search yet" right after a click.
 func (q *RiverCrawlQueue) IsQueued(ctx context.Context) (bool, error) {
 	if q.pool == nil {
 		return false, nil
 	}
 	var queued bool
-	err := q.pool.QueryRow(ctx, "SELECT EXISTS (SELECT 1 FROM river_job WHERE kind = 'crawl' AND state IN ('available', 'pending', 'scheduled'))").Scan(&queued)
+	err := q.pool.QueryRow(ctx, "SELECT EXISTS (SELECT 1 FROM river_job WHERE kind = 'crawl' AND state IN ('available', 'pending', 'scheduled', 'running', 'retryable'))").Scan(&queued)
 	if err != nil {
 		return false, err
 	}
