@@ -149,9 +149,18 @@ func TestPgstoreTracking(t *testing.T) {
 		Reasons:        []string{"Interview invitation keyword", "Company name matched"},
 		CreatedAt:      now,
 		UpdatedAt:      now,
+		SealedMail:     []byte("sealed by the service"),
 	}
 	if err := st.CreateSuggestion(ctx, sug); err != nil {
 		t.Fatalf("CreateSuggestion: %v", err)
+	}
+	// Only the sealed record is stored; sender, subject and Message-ID never reach a plain column (#578).
+	if got, err := st.Suggestion(ctx, u1, sugID); err != nil || string(got.SealedMail) != "sealed by the service" ||
+		got.MessageFrom != "" || got.MessageSubject != "" || got.MessageID != "" {
+		t.Fatalf("stored suggestion = %+v, %v", got, err)
+	}
+	if old, err := st.UnsealedSuggestions(ctx); err != nil || len(old) != 0 {
+		t.Fatalf("UnsealedSuggestions = %+v, %v", old, err)
 	}
 
 	// Suggestions for user

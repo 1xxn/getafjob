@@ -2,6 +2,7 @@ package crypto
 
 import (
 	"context"
+	"encoding/json"
 
 	"github.com/google/uuid"
 
@@ -35,4 +36,25 @@ func (c *Cipher) OpenPassword(ctx context.Context, userID uuid.UUID, ciphertext 
 		return "", err
 	}
 	return string(b), nil
+}
+
+func mailPurpose(suggestionID uuid.UUID) string { return "tracking_mail:" + suggestionID.String() }
+
+// SealMail seals the mail data of a suggestion bound to the user and the suggestion.
+func (c *Cipher) SealMail(ctx context.Context, userID, suggestionID uuid.UUID, m tracking.MailMeta) ([]byte, error) {
+	b, err := json.Marshal(m)
+	if err != nil {
+		return nil, err
+	}
+	return c.envelope.Seal(ctx, userID, mailPurpose(suggestionID), b)
+}
+
+// OpenMail opens the sealed mail data of a suggestion.
+func (c *Cipher) OpenMail(ctx context.Context, userID, suggestionID uuid.UUID, sealed []byte) (tracking.MailMeta, error) {
+	var m tracking.MailMeta
+	b, err := c.envelope.Open(ctx, userID, mailPurpose(suggestionID), sealed)
+	if err != nil {
+		return m, err
+	}
+	return m, json.Unmarshal(b, &m)
 }

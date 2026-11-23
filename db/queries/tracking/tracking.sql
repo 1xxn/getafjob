@@ -38,16 +38,17 @@ WHERE a.user_id = $1
 ORDER BY a.updated_at DESC;
 
 -- name: CreateSuggestion :exec
+-- The mail's sender, subject and Message-ID go only into sealed; the plain columns stay empty.
 INSERT INTO tracking_suggestions (
-  id, user_id, application_id, message_uid, message_id, message_from,
-  message_subject, message_date, category, suggested_state, reasons, status, created_at, updated_at
-) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, 'pending', $12, $12)
+  id, user_id, application_id, message_uid, message_from, message_subject, sealed, message_date, category,
+  suggested_state, reasons, status, created_at, updated_at
+) VALUES ($1, $2, $3, $4, '', '', $5, $6, $7, $8, $9, 'pending', $10, $10)
 ON CONFLICT (user_id, application_id, message_uid) DO NOTHING;
 
 -- name: SuggestionsByUser :many
 SELECT s.id, s.user_id, s.application_id, s.message_uid, s.message_id, s.message_from,
   s.message_subject, s.message_date, s.category, s.suggested_state, s.reasons, s.status, s.created_at, s.updated_at,
-  j.company, j.title, a.state AS current_state
+  j.company, j.title, a.state AS current_state, s.sealed
 FROM tracking_suggestions s
 JOIN applications a ON a.id = s.application_id
 JOIN jobs j ON j.id = a.job_id
@@ -57,7 +58,7 @@ ORDER BY s.message_date DESC, s.created_at DESC;
 -- name: SuggestionsByApplication :many
 SELECT s.id, s.user_id, s.application_id, s.message_uid, s.message_id, s.message_from,
   s.message_subject, s.message_date, s.category, s.suggested_state, s.reasons, s.status, s.created_at, s.updated_at,
-  j.company, j.title, a.state AS current_state
+  j.company, j.title, a.state AS current_state, s.sealed
 FROM tracking_suggestions s
 JOIN applications a ON a.id = s.application_id
 JOIN jobs j ON j.id = a.job_id
@@ -67,7 +68,7 @@ ORDER BY s.message_date DESC;
 -- name: SuggestionByID :one
 SELECT s.id, s.user_id, s.application_id, s.message_uid, s.message_id, s.message_from,
   s.message_subject, s.message_date, s.category, s.suggested_state, s.reasons, s.status, s.created_at, s.updated_at,
-  j.company, j.title, a.state AS current_state
+  j.company, j.title, a.state AS current_state, s.sealed
 FROM tracking_suggestions s
 JOIN applications a ON a.id = s.application_id
 JOIN jobs j ON j.id = a.job_id
@@ -76,3 +77,12 @@ WHERE s.id = $1 AND s.user_id = $2;
 -- name: SetSuggestionStatus :execrows
 UPDATE tracking_suggestions SET status = $3, updated_at = $4
 WHERE id = $1 AND user_id = $2 AND status = 'pending';
+
+-- name: UnsealedSuggestions :many
+-- Suggestions from before sealing (system context, for the worker).
+SELECT id, user_id, message_id, message_from, message_subject FROM tracking_suggestions
+WHERE sealed IS NULL ORDER BY created_at LIMIT 500;
+
+-- name: SealSuggestion :execrows
+UPDATE tracking_suggestions SET sealed = $3, message_id = NULL, message_from = '', message_subject = ''
+WHERE id = $1 AND user_id = $2;

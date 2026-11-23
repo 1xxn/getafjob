@@ -64,9 +64,9 @@ func (q *Queries) ActiveApplicationsForTracking(ctx context.Context, userID uuid
 
 const createSuggestion = `-- name: CreateSuggestion :exec
 INSERT INTO tracking_suggestions (
-  id, user_id, application_id, message_uid, message_id, message_from,
-  message_subject, message_date, category, suggested_state, reasons, status, created_at, updated_at
-) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, 'pending', $12, $12)
+  id, user_id, application_id, message_uid, message_from, message_subject, sealed, message_date, category,
+  suggested_state, reasons, status, created_at, updated_at
+) VALUES ($1, $2, $3, $4, '', '', $5, $6, $7, $8, $9, 'pending', $10, $10)
 ON CONFLICT (user_id, application_id, message_uid) DO NOTHING
 `
 
@@ -75,9 +75,7 @@ type CreateSuggestionParams struct {
 	UserID         uuid.UUID
 	ApplicationID  uuid.UUID
 	MessageUid     int64
-	MessageID      *string
-	MessageFrom    string
-	MessageSubject string
+	Sealed         []byte
 	MessageDate    time.Time
 	Category       string
 	SuggestedState string
@@ -85,15 +83,14 @@ type CreateSuggestionParams struct {
 	CreatedAt      time.Time
 }
 
+// The mail's sender, subject and Message-ID go only into sealed; the plain columns stay empty.
 func (q *Queries) CreateSuggestion(ctx context.Context, arg CreateSuggestionParams) error {
 	_, err := q.db.Exec(ctx, createSuggestion,
 		arg.ID,
 		arg.UserID,
 		arg.ApplicationID,
 		arg.MessageUid,
-		arg.MessageID,
-		arg.MessageFrom,
-		arg.MessageSubject,
+		arg.Sealed,
 		arg.MessageDate,
 		arg.Category,
 		arg.SuggestedState,
@@ -207,6 +204,25 @@ func (q *Queries) SaveMailbox(ctx context.Context, arg SaveMailboxParams) error 
 	return err
 }
 
+const sealSuggestion = `-- name: SealSuggestion :execrows
+UPDATE tracking_suggestions SET sealed = $3, message_id = NULL, message_from = '', message_subject = ''
+WHERE id = $1 AND user_id = $2
+`
+
+type SealSuggestionParams struct {
+	ID     uuid.UUID
+	UserID uuid.UUID
+	Sealed []byte
+}
+
+func (q *Queries) SealSuggestion(ctx context.Context, arg SealSuggestionParams) (int64, error) {
+	result, err := q.db.Exec(ctx, sealSuggestion, arg.ID, arg.UserID, arg.Sealed)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
+}
+
 const setSuggestionStatus = `-- name: SetSuggestionStatus :execrows
 UPDATE tracking_suggestions SET status = $3, updated_at = $4
 WHERE id = $1 AND user_id = $2 AND status = 'pending'
@@ -235,7 +251,7 @@ func (q *Queries) SetSuggestionStatus(ctx context.Context, arg SetSuggestionStat
 const suggestionByID = `-- name: SuggestionByID :one
 SELECT s.id, s.user_id, s.application_id, s.message_uid, s.message_id, s.message_from,
   s.message_subject, s.message_date, s.category, s.suggested_state, s.reasons, s.status, s.created_at, s.updated_at,
-  j.company, j.title, a.state AS current_state
+  j.company, j.title, a.state AS current_state, s.sealed
 FROM tracking_suggestions s
 JOIN applications a ON a.id = s.application_id
 JOIN jobs j ON j.id = a.job_id
@@ -265,6 +281,7 @@ type SuggestionByIDRow struct {
 	Company        string
 	Title          string
 	CurrentState   string
+	Sealed         []byte
 }
 
 func (q *Queries) SuggestionByID(ctx context.Context, arg SuggestionByIDParams) (SuggestionByIDRow, error) {
@@ -288,6 +305,7 @@ func (q *Queries) SuggestionByID(ctx context.Context, arg SuggestionByIDParams) 
 		&i.Company,
 		&i.Title,
 		&i.CurrentState,
+		&i.Sealed,
 	)
 	return i, err
 }
@@ -295,7 +313,7 @@ func (q *Queries) SuggestionByID(ctx context.Context, arg SuggestionByIDParams) 
 const suggestionsByApplication = `-- name: SuggestionsByApplication :many
 SELECT s.id, s.user_id, s.application_id, s.message_uid, s.message_id, s.message_from,
   s.message_subject, s.message_date, s.category, s.suggested_state, s.reasons, s.status, s.created_at, s.updated_at,
-  j.company, j.title, a.state AS current_state
+  j.company, j.title, a.state AS current_state, s.sealed
 FROM tracking_suggestions s
 JOIN applications a ON a.id = s.application_id
 JOIN jobs j ON j.id = a.job_id
@@ -326,6 +344,7 @@ type SuggestionsByApplicationRow struct {
 	Company        string
 	Title          string
 	CurrentState   string
+	Sealed         []byte
 }
 
 func (q *Queries) SuggestionsByApplication(ctx context.Context, arg SuggestionsByApplicationParams) ([]SuggestionsByApplicationRow, error) {
@@ -355,6 +374,7 @@ func (q *Queries) SuggestionsByApplication(ctx context.Context, arg SuggestionsB
 			&i.Company,
 			&i.Title,
 			&i.CurrentState,
+			&i.Sealed,
 		); err != nil {
 			return nil, err
 		}
@@ -369,7 +389,7 @@ func (q *Queries) SuggestionsByApplication(ctx context.Context, arg SuggestionsB
 const suggestionsByUser = `-- name: SuggestionsByUser :many
 SELECT s.id, s.user_id, s.application_id, s.message_uid, s.message_id, s.message_from,
   s.message_subject, s.message_date, s.category, s.suggested_state, s.reasons, s.status, s.created_at, s.updated_at,
-  j.company, j.title, a.state AS current_state
+  j.company, j.title, a.state AS current_state, s.sealed
 FROM tracking_suggestions s
 JOIN applications a ON a.id = s.application_id
 JOIN jobs j ON j.id = a.job_id
@@ -400,6 +420,7 @@ type SuggestionsByUserRow struct {
 	Company        string
 	Title          string
 	CurrentState   string
+	Sealed         []byte
 }
 
 func (q *Queries) SuggestionsByUser(ctx context.Context, arg SuggestionsByUserParams) ([]SuggestionsByUserRow, error) {
@@ -429,6 +450,47 @@ func (q *Queries) SuggestionsByUser(ctx context.Context, arg SuggestionsByUserPa
 			&i.Company,
 			&i.Title,
 			&i.CurrentState,
+			&i.Sealed,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const unsealedSuggestions = `-- name: UnsealedSuggestions :many
+SELECT id, user_id, message_id, message_from, message_subject FROM tracking_suggestions
+WHERE sealed IS NULL ORDER BY created_at LIMIT 500
+`
+
+type UnsealedSuggestionsRow struct {
+	ID             uuid.UUID
+	UserID         uuid.UUID
+	MessageID      *string
+	MessageFrom    string
+	MessageSubject string
+}
+
+// Suggestions from before sealing (system context, for the worker).
+func (q *Queries) UnsealedSuggestions(ctx context.Context) ([]UnsealedSuggestionsRow, error) {
+	rows, err := q.db.Query(ctx, unsealedSuggestions)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []UnsealedSuggestionsRow{}
+	for rows.Next() {
+		var i UnsealedSuggestionsRow
+		if err := rows.Scan(
+			&i.ID,
+			&i.UserID,
+			&i.MessageID,
+			&i.MessageFrom,
+			&i.MessageSubject,
 		); err != nil {
 			return nil, err
 		}
