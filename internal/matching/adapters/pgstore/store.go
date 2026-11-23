@@ -25,8 +25,9 @@ import (
 type Store struct{ pool *pgxpool.Pool }
 
 var (
-	_ matching.Jobs  = (*Store)(nil)
-	_ matching.Store = (*Store)(nil)
+	_ matching.Jobs     = (*Store)(nil)
+	_ matching.Store    = (*Store)(nil)
+	_ matching.Feedback = (*Store)(nil)
 )
 
 // New returns a store on pool (application role).
@@ -48,6 +49,28 @@ func (s *Store) OpenJobs(ctx context.Context, afterID int64, limit int) ([]match
 		}
 	}
 	return out, nil
+}
+
+// Rated returns up to limit jobs the user rated by an own action, the latest first.
+func (s *Store) Rated(ctx context.Context, userID uuid.UUID, limit int) ([]matching.Rated, error) {
+	var out []matching.Rated
+	err := db.InUserTx(ctx, s.pool, userID, func(tx pgx.Tx) error {
+		rows, err := q.New(tx).RatedJobs(ctx, q.RatedJobsParams{UserID: userID, MaxRows: int32(min(limit, 10_000))}) //nolint:gosec // bounded
+		if err != nil {
+			return err
+		}
+		out = make([]matching.Rated, len(rows))
+		for i, r := range rows {
+			out[i] = matching.Rated{Liked: r.Liked, Job: matching.Job{
+				ID: r.ID, Company: r.Company, Title: r.Title, Location: r.Location,
+				Workplace: r.Workplace, Description: r.Description,
+				SalaryMin: int(r.SalaryMin), SalaryMax: int(r.SalaryMax), SalaryCurrency: r.SalaryCurrency,
+				Posted: date(r.Posted), FirstSeen: r.FirstSeen,
+			}}
+		}
+		return nil
+	})
+	return out, err
 }
 
 type row struct {

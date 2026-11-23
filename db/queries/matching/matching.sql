@@ -145,3 +145,20 @@ WHERE user_id = $1 AND id = $2;
 -- name: DeleteBlocklistByPattern :exec
 DELETE FROM user_blocklist
 WHERE user_id = $1 AND kind = $2 AND lower(pattern) = lower($3);
+
+-- name: RatedJobs :many
+-- The jobs the user rated by an own action (#502): skipped (negative), or bookmarked, queued, approved or applied
+-- to (positive). Applications the planner queued count only once the user acted on them; skips of a writing
+-- suggestion say nothing about the job.
+SELECT j.id, j.company, j.title, j.location, j.workplace, j.description,
+  coalesce(j.salary_min, 0)::integer AS salary_min,
+  coalesce(j.salary_max, 0)::integer AS salary_max,
+  j.salary_currency, j.posted, j.first_seen, (a.state <> 'skipped')::boolean AS liked
+FROM applications a JOIN jobs j ON j.id = a.job_id
+WHERE a.user_id = sqlc.arg(user_id) AND (
+  (a.state = 'skipped' AND EXISTS (SELECT 1 FROM application_events e WHERE e.application_id = a.id
+    AND e.actor = 'user' AND e.event = 'skip' AND coalesce(e.detail ->> 'reason', '') <> 'assist_rejected'))
+  OR (a.state <> 'skipped' AND (a.state = 'matched' OR EXISTS (SELECT 1 FROM application_events e
+    WHERE e.application_id = a.id AND e.actor = 'user' AND e.event IN ('queue', 'requeue', 'approve', 'submitted')))))
+ORDER BY a.updated_at DESC, a.id
+LIMIT sqlc.arg(max_rows);

@@ -249,6 +249,7 @@
   "match.reason.title.none": "The title matches none of your wanted titles.",
   "match.reason.title.partial": "The title shares the word \"{term}\".",
   "match.reason.title.synonym": "The title names the same role: \"{term}\".",
+  "match.reason.weights.learned": "Weighted by your own choices ({n} rated jobs).",
   "msg.identity.invitation_invalid": "This invitation is invalid or has expired.",
   "msg.identity.magic_link_invalid": "This sign-in link is invalid or has expired.",
   "msg.identity.reauth_required": "Please sign in again to confirm this change.",

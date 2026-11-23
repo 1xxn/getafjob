@@ -36,3 +36,4 @@ rewritten once accepted: a changed decision gets a new ADR that supersedes the o
 | [0028](0028-nothing-runs-before-the-user-starts-it.md) | Nothing runs before the user starts it | accepted |
 | [0029](0029-hybrid-matching-with-static-embeddings.md) | Hybrid matching with a tech skill dictionary and static embeddings | accepted |
 | [0030](0030-approval-on-sites-the-job-does-not-name.md) | Approval on sites the job does not name | accepted |
+| [0031](0031-learned-score-weights-per-user.md) | Learned score weights per user | accepted |

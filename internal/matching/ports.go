@@ -23,3 +23,14 @@ type Jobs interface {
 type Store interface {
 	SaveMatches(ctx context.Context, userID uuid.UUID, rs []Result, at time.Time) error
 }
+
+// Feedback supplies the jobs a user rated by an own action (row-level security).
+type Feedback interface {
+	Rated(ctx context.Context, userID uuid.UUID, limit int) ([]Rated, error)
+}
+
+// Rated is a job the user liked (bookmarked, queued, approved, applied) or skipped.
+type Rated struct {
+	Job   Job
+	Liked bool
+}
