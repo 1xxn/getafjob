@@ -274,7 +274,7 @@ tasks:
   release:snapshot:
     desc: goreleaser dry run (no publishing)
     cmds:
-      - docker run --rm -v "{{.ROOT_DIR}}:/src" -w /src goreleaser/goreleaser:v2.20.0 release --snapshot --clean
+      - docker run --rm -v "{{.ROOT_DIR}}:/src" -w /src goreleaser/goreleaser:v2.20.3 release --snapshot --clean
 
   hooks:
     desc: Install git hooks (lefthook)
