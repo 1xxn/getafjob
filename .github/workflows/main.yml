@@ -15,7 +15,7 @@ concurrency:
   cancel-in-progress: false
 
 env:
-  GORELEASER_VERSION: v2.20.0
+  GORELEASER_VERSION: v2.20.3
 
 jobs:
   stack:

@@ -15,7 +15,7 @@ concurrency:
 
 env:
   GOLANGCI_LINT_VERSION: v2.15.0
-  GORELEASER_VERSION: v2.20.0
+  GORELEASER_VERSION: v2.20.3
 
 jobs:
   verify:
